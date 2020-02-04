@@ -77,6 +77,7 @@ dependencies = [
 [[package]]
 name = "embedded-nal"
 version = "0.1.0"
+source = "git+https://github.com/MathiasKoch/embedded-nal/#38eb0a1f9d71ae3924557743268469ec2454bdc5"
 dependencies = [
  "nb 0.1.2 (registry+https://github.com/rust-lang/crates.io-index)",
 ]
@@ -360,7 +361,7 @@ version = "0.0.1"
 dependencies = [
  "at-rs 0.0.7",
  "embedded-hal 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)",
- "embedded-nal 0.1.0",
+ "embedded-nal 0.1.0 (git+https://github.com/MathiasKoch/embedded-nal/)",
  "env_logger 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)",
  "heapless 0.5.2 (registry+https://github.com/rust-lang/crates.io-index)",
  "linux-embedded-hal 0.3.0 (registry+https://github.com/rust-lang/crates.io-index)",
@@ -423,6 +424,7 @@ dependencies = [
 "checksum cc 1.0.48 (registry+https://github.com/rust-lang/crates.io-index)" = "f52a465a666ca3d838ebbf08b241383421412fe7ebb463527bba275526d89f76"
 "checksum cfg-if 0.1.10 (registry+https://github.com/rust-lang/crates.io-index)" = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 "checksum embedded-hal 0.2.3 (registry+https://github.com/rust-lang/crates.io-index)" = "ee4908a155094da7723c2d60d617b820061e3b4efcc3d9e293d206a5a76c170b"
+"checksum embedded-nal 0.1.0 (git+https://github.com/MathiasKoch/embedded-nal/)" = "<none>"
 "checksum env_logger 0.7.1 (registry+https://github.com/rust-lang/crates.io-index)" = "44533bbbb3bb3c1fa17d9f2e4e38bbbaf8396ba82193c4cb1b6445d711445d36"
 "checksum generic-array 0.12.3 (registry+https://github.com/rust-lang/crates.io-index)" = "c68f0274ae0e023facc3c97b2e00f076be70e254bc851d972503b328db79b2ec"
 "checksum generic-array 0.13.2 (registry+https://github.com/rust-lang/crates.io-index)" = "0ed1e761351b56f54eb9dcd0cfaca9fd0daecf93918e1cfc01c8a3d26ee7adcd"
