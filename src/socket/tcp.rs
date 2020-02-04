@@ -13,7 +13,7 @@ use crate::socket::{RingBuffer, Socket, SocketHandle, SocketMeta};
 use heapless::consts;
 
 /// A TCP socket ring buffer.
-pub type SocketBuffer<N> = RingBuffer<u8, N>;
+// pub type SocketBuffer<N> = RingBuffer<u8, N>;
 
 /// The state of a TCP socket, according to [RFC 793].
 ///
@@ -67,8 +67,8 @@ impl fmt::Display for State {
 pub struct TcpSocket {
     pub(crate) meta: SocketMeta,
     state: State,
-    rx_buffer: SocketBuffer<consts::U8>,
-    tx_buffer: SocketBuffer<consts::U8>,
+    // rx_buffer: SocketBuffer<consts::U8>,
+    // tx_buffer: SocketBuffer<consts::U8>,
 }
 
 impl TcpSocket {

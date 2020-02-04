@@ -6,6 +6,8 @@ use heapless::{ArrayLength, String, Vec};
 
 use at::{ATCommandInterface, ATRequestType};
 
+use embedded_nal::{IpAddress, Port};
+
 mod cmd;
 
 mod response;
@@ -184,6 +186,26 @@ impl ATCommandInterface for Command {
             }
             Command::CreateSocket { protocol } => {
                 write!(buffer, "AT+USOCR={}", protocol.clone() as u8).unwrap();
+                buffer
+            }
+            Command::CloseSocket { socket } => {
+                write!(buffer, "AT+USOCL={}", socket).unwrap();
+                buffer
+            }
+            Command::ConnectSocket {
+                socket,
+                remote_addr,
+                remote_port,
+            } => {
+                let Port(port) = remote_port;
+                match remote_addr {
+                    IpAddress::IpV4(ipv4) => {
+                        write!(buffer, "AT+USOCO={},{},{}", socket, ipv4, port).unwrap()
+                    }
+                    IpAddress::IpV6(ipv6) => {
+                        write!(buffer, "AT+USOCO={},{},{}", socket, ipv6, port).unwrap()
+                    }
+                };
                 buffer
             }
             _ => String::from(""),

@@ -96,6 +96,27 @@ pub enum Command {
     CreateSocket {
         protocol: SocketProtocol
     },
+    /// 25.7 Close Socket +USOCL
+    /// Closes the specified socket, like the BSD close routine. In case of remote socket closure the user is notified
+    /// via the URC.
+    /// By default the command blocks the AT command interface until the the completion of the socket close
+    /// operation. By enabling the <async_close> flag, the final result code is sent immediately. The following
+    /// +UUSOCL URC will indicate the closure of the specified socket.
+    CloseSocket {
+        socket: u8
+    },
+    /// 25.9 Connect Socket +USOCO
+    /// Establishes a peer-to-peer connection of the socket to the specified remote host on the given remote port, like
+    /// the BSD connect routine. If the socket is a TCP socket, the command will actually perform the TCP negotiation
+    /// (3-way handshake) to open a connection. If the socket is a UDP socket, this function will just declare the remote
+    /// host address and port for later use with other socket operations (e.g. +USOWR, +USORD). This is important
+    /// to note because if <socket> refers to a UDP socket, errors will not be reported prior to an attempt to write or
+    /// read data on the socket.
+    ConnectSocket {
+        socket: u8,
+        remote_addr: IpAddress,
+        remote_port: Port
+    }
 }
 
 // /// 5.3 Set module functionality +CFUN
