@@ -3,7 +3,7 @@ use crate::{command::*, ATClient};
 use at::ATInterface;
 use embedded_hal::digital::v2::OutputPin;
 use embedded_hal::timer::CountDown;
-use log::{error, info};
+use log::error;
 
 #[macro_export]
 macro_rules! wait_for_unsolicited {
@@ -26,16 +26,6 @@ macro_rules! wait_for_unsolicited {
         res
     }};
 }
-
-// macro_rules! size_of {
-//     ($type:ident) => {
-//         info!(
-//             "Size of {}: {:?}\r",
-//             stringify!($type),
-//             core::mem::size_of::<$type>()
-//         );
-//     };
-// }
 
 pub struct GSMClient<T, RST, DTR>
 where
@@ -101,6 +91,9 @@ where
         //     }))?;
         // }
 
+        self.send_internal(RequestType::Cmd(Command::SetReportMobileTerminationError {
+            n: TerminationErrorMode::Verbose,
+        }))?;
         self.send_internal(RequestType::Cmd(Command::SetGpioConfiguration {
             gpio_id: 16,
             gpio_mode: GpioMode::GsmTxIndication,

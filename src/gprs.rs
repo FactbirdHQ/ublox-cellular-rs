@@ -42,7 +42,7 @@ where
 {
     fn attach_gprs(&mut self, apn_info: APNInfo) -> Result<(), Error> {
         // Attach GPRS
-        self.send_at(Command::SetGPRSAttached { state: true })?;
+        // self.send_at(Command::SetGPRSAttached { state: true })?;
 
         // Set APN info
         self.send_at(Command::SetPacketSwitchedConfig {

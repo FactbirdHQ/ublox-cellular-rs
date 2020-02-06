@@ -2,7 +2,7 @@
 //! Following [ATCommands Manual](https://www.u-blox.com/sites/default/files/u-connect-ATCommands-Manual_(UBX-14044127).pdf)
 
 use core::fmt::Write;
-use heapless::{ArrayLength, String, Vec};
+use heapless::{ArrayLength, String, Vec, consts};
 
 use at::{ATCommandInterface, ATRequestType};
 
@@ -17,11 +17,11 @@ pub use cmd::Command;
 use log::{info, warn};
 pub use response::{Response, UnsolicitedResponse};
 pub use types::*;
+use crate::socket::SocketHandle;
 
 #[derive(Debug, Clone)]
 pub enum ResponseType {
     SingleSolicited(Response),
-    // MultiSolicited(Vec<Response, heapless::consts::U10>),
     Unsolicited(UnsolicitedResponse),
     None,
 }
@@ -192,6 +192,7 @@ impl ATCommandInterface for Command {
                 write!(buffer, "AT+USOCL={}", socket).unwrap();
                 buffer
             }
+            Command::GetSocketError => String::from("AT+USOER"),
             Command::ConnectSocket {
                 socket,
                 remote_addr,
@@ -200,12 +201,29 @@ impl ATCommandInterface for Command {
                 let Port(port) = remote_port;
                 match remote_addr {
                     IpAddress::IpV4(ipv4) => {
-                        write!(buffer, "AT+USOCO={},{},{}", socket, ipv4, port).unwrap()
+                        write!(buffer, "AT+USOCO={},\"{}\",{}", socket, ipv4, port).unwrap()
                     }
                     IpAddress::IpV6(ipv6) => {
-                        write!(buffer, "AT+USOCO={},{},{}", socket, ipv6, port).unwrap()
+                        write!(buffer, "AT+USOCO={},\"{}\",{}", socket, ipv6, port).unwrap()
                     }
                 };
+                buffer
+            }
+            Command::WriteSocketData {
+                socket,
+                length,
+                data
+            } => {
+                // TODO: Do this without clones!
+                let s = String::from_utf8(data.clone()).unwrap();
+                write!(buffer, "AT+USOWR={},{},\"{}\"", socket, length, s).unwrap();
+                buffer
+            }
+            Command::ReadSocketData {
+                socket,
+                length,
+            } => {
+                write!(buffer, "AT+USORD={},{}", socket, length).unwrap();
                 buffer
             }
             _ => String::from(""),
@@ -234,9 +252,12 @@ impl ATCommandInterface for Command {
 
     fn parse_unsolicited(response_line: &str) -> Option<ResponseType> {
         let (cmd, response) = at::utils::split_parameterized_unsolicited(response_line);
+        info!("Unsolicited {:?} - {:?}\r", cmd, response);
         Some(match cmd {
             "+UMWI" => ResponseType::None,
             "+UUPSDD" => ResponseType::None,
+            "+UUSOCL" => ResponseType::None,
+            "+UUSORD" => ResponseType::None,
             _ => return None,
         })
     }

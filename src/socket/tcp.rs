@@ -4,16 +4,16 @@
 
 use core::fmt;
 
+use heapless::consts;
+
 // use {Error, Result};
 // use phy::DeviceCapabilities;
 // use time::{Duration, Instant};
 use crate::socket::{RingBuffer, Socket, SocketHandle, SocketMeta};
 // use wire::{IpProtocol, IpRepr, IpAddress, IpEndpoint, TcpSeqNumber, TcpRepr, TcpControl};
 
-use heapless::consts;
-
 /// A TCP socket ring buffer.
-// pub type SocketBuffer<N> = RingBuffer<u8, N>;
+pub type SocketBuffer<N> = RingBuffer<u8, N>;
 
 /// The state of a TCP socket, according to [RFC 793].
 ///
@@ -63,19 +63,26 @@ impl fmt::Display for State {
 /// Note that, for listening sockets, there is no "backlog"; to be able to simultaneously
 /// accept several connections, as many sockets must be allocated, or any new connection
 /// attempts will be reset.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct TcpSocket {
     pub(crate) meta: SocketMeta,
     state: State,
-    // rx_buffer: SocketBuffer<consts::U8>,
-    // tx_buffer: SocketBuffer<consts::U8>,
+    rx_buffer: SocketBuffer<consts::U512>,
+    // tx_buffer: SocketBuffer<consts::U512>,
 }
 
 impl TcpSocket {
     #[allow(unused_comparisons)] // small usize platforms always pass rx_capacity check
     /// Create a socket using the given buffers.
-    pub fn new() -> TcpSocket {
-        TcpSocket::default()
+    pub fn new(socket_id: usize) -> TcpSocket {
+        TcpSocket {
+            meta: SocketMeta {
+                handle: SocketHandle(socket_id)
+            },
+            state: State::Closed,
+            rx_buffer: SocketBuffer::new(),
+            // tx_buffer: SocketBuffer::new()
+        }
     }
 
     /// Return the socket handle.
@@ -560,7 +567,7 @@ impl TcpSocket {
     //         self.rx_buffer.len()
     //     }
 
-    fn set_state(&mut self, state: State) {
+    pub fn set_state(&mut self, state: State) {
         // if self.state != state {
         //     if self.remote_endpoint.addr.is_unspecified() {
         //         net_trace!("{}:{}: state={}=>{}",

@@ -103,8 +103,11 @@ pub enum Command {
     /// operation. By enabling the <async_close> flag, the final result code is sent immediately. The following
     /// +UUSOCL URC will indicate the closure of the specified socket.
     CloseSocket {
-        socket: u8
+        socket: SocketHandle
     },
+    /// 25.8 Get Socket Error +USOER
+    /// Retrieves the last error occurred in the last socket operation, stored in the BSD standard variable error.
+    GetSocketError,
     /// 25.9 Connect Socket +USOCO
     /// Establishes a peer-to-peer connection of the socket to the specified remote host on the given remote port, like
     /// the BSD connect routine. If the socket is a TCP socket, the command will actually perform the TCP negotiation
@@ -113,9 +116,36 @@ pub enum Command {
     /// to note because if <socket> refers to a UDP socket, errors will not be reported prior to an attempt to write or
     /// read data on the socket.
     ConnectSocket {
-        socket: u8,
+        socket: SocketHandle,
         remote_addr: IpAddress,
         remote_port: Port
+    },
+    /// 25.10 Write socket data +USOWR
+    /// Writes the specified amount of data to the specified socket, like the BSD write routine, and returns the number
+    /// of bytes of data actually written. The command applies to UDP sockets too, after a +USOCO command.
+    /// There are three kinds of syntax:
+    /// • Base syntax normal: writing simple strings to the socket, some characters are forbidden
+    /// • Base syntax HEX: writing hexadecimal strings to the socket, the string will be converted in binary data and
+    /// sent to the socket; see the AT+UDCONF=1 command description to enable it
+    /// • Binary extended syntax: mandatory for writing any character in the ASCII range [0x00, 0xFF]
+    WriteSocketData {
+        socket: SocketHandle,
+        length: usize,
+        data: Vec<u8, consts::U256>
+    },
+    /// 25.12 Read Socket Data +USORD
+    /// Reads the specified amount of data from the specified socket, like the BSD read routine. This command can
+    /// be used to know the total amount of unread data.
+    /// For the TCP socket type the URC +UUSORD: <socket>,<length> notifies the data bytes available for reading,
+    ///  either when buffer is empty and new data arrives or after a partial read by the user.
+    /// For the UDP socket type the URC +UUSORD: <socket>,<length> notifies that a UDP packet has been received,
+    ///  either when buffer is empty or after a UDP packet has been read and one or more packets are stored in the
+    /// buffer.
+    /// In case of a partial read of a UDP packet +UUSORD: <socket>,<length> will show the remaining number of data
+    /// bytes of the packet the user is reading.
+    ReadSocketData {
+        socket: SocketHandle,
+        length: usize
     }
 }
 

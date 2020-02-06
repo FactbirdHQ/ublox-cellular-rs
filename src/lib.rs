@@ -18,6 +18,10 @@ pub type ATClient<T> = at::client::ATClient<
 #[macro_use]
 mod test_helpers;
 
+#[cfg(test)]
+#[macro_use]
+extern crate std;
+
 mod client;
 pub mod soc;
 pub mod gprs;
