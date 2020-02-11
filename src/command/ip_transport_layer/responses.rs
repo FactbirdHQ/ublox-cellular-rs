@@ -7,12 +7,14 @@ use crate::socket::SocketHandle;
 /// 25.3 Create Socket +USOCR
 // #[derive(Deserialize)]
 pub struct CreateSocketResponse{
+    //#[atat_(position = 0)]
     socket: SocketHandle,
 }
 
 /// 25.8 Get Socket Error +USOER
 // #[derive(Deserialize)]
 pub struct SocketErrorResponse{
+    //#[atat_(position = 0)]
     error : u8
 }
 

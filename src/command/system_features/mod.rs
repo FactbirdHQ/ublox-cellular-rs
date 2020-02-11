@@ -27,9 +27,9 @@ use super::NoResponse;
 // #[derive(Clone, ATATCmd)]
 // #[at_cmd("+UPSV", NoResponse)]
 pub struct SetPowerSavingControl {
-    #[atat_(position = 0)]
+    // #[atat_(position = 0)]
     mode: PowerSavingMode,
-    #[atat_(position = 1)]
+    // #[atat_(position = 1)]
     timeout: Option<Seconds>,
 }
 // #[derive(Clone, ATATCmd)]

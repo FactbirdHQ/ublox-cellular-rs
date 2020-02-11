@@ -18,17 +18,17 @@ use super::NoResponse;
 // #[derive(Clone, ATATCmd)]
 // #[atat("+UPSD", NoResponse)]
 pub struct SetPacketSwitchedConfig {
-    #[atat_(position = 0)]
+    //#[atat_(position = 0)]
     profile_id: u8,
-    #[atat_(position = 1,2)]
+    //#[atat_(position = 1,2)]
     param: PacketSwitchedParam,
 }
 // #[derive(Clone, ATATCmd)]
 // #[atat("+UPSD", PacketSwitchedConfig)]
 pub struct GetPacketSwitchedConfig {
-    #[atat_(position = 0)]
+    //#[atat_(position = 0)]
     profile_id: u8,
-    #[atat_(position = 1)]
+    //#[atat_(position = 1)]
     param: Option<PacketSwitchedParam>,
 }
 
@@ -44,7 +44,9 @@ pub struct GetPacketSwitchedConfig {
 // #[derive(Clone, ATATCmd)]
 // #[atat("+UPSDA", NoResponse, timeout_ms = 180000, abortable = true)]
 pub struct SetPacketSwitchedAction {
+    //#[atat_(position = 0)]
     profile_id: u8,
+    //#[atat_(position = 1)]
     action: PacketSwitchedAction
 }
 
@@ -55,9 +57,9 @@ pub struct SetPacketSwitchedAction {
 // #[derive(Clone, ATATCmd)]
 // #[atat("+UPSND", PacketSwitchedNetworkData)]
 pub struct GetPacketSwitchedNetworkData {
-    #[atat_(position = 0)]
+    // #[atat_(position = 0)]
     profile_id: u8,
-    #[atat_(position = 1)]
+    // #[atat_(position = 1)]
     param: PacketSwitchedNetworkDataParam
 }
 
@@ -70,7 +72,7 @@ pub struct GetPacketSwitchedNetworkData {
 // #[derive(Clone, ATATCmd)]
 // #[atat("+CGATT", NoResponse, timeout_ms = 180000, abortable = true)]
 pub struct SetGPRSAttached {
-    #[atat_(position = 0)]
+    // #[atat_(position = 0)]
     state: bool
 }
 // #[derive(Clone, ATATCmd)]

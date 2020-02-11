@@ -22,12 +22,12 @@ use super::NoResponse;
 pub struct SetGpioConfiguration {
     /// GPIO pin identifier: pin number
     /// See the GPIO mapping for the available GPIO pins, their mapping and factoryprogrammed values on different u-blox cellular modules series and product version.
-    #[atat_(position = 0)]
+    //#[atat_(position = 0)]
     gpio_id: u8,
     /// Mode identifier: configured function
     /// See the GPIO functions for custom functions supported by different u-blox cellular
     /// modules series and product version
-    #[atat_(position = 1)]
+    //#[atat_(position = 1)]
     gpio_mode: GpioMode,
 }
 // #[derive(Clone, ATATCmd)]

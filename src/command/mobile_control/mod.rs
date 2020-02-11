@@ -16,9 +16,9 @@ use super::NoResponse;
 // #[derive(Clone, ATATCmd)]
 // #[at_cmd("+CFUN", NoResponse, timeout_ms = 180000)]
 pub struct SetModuleFunctionality {
-    #[atat_(position = 0)]
+    //#[atat_(position = 0)]
     fun: Functionality,
-    #[atat_(position = 1)]
+    //#[atat_(position = 1)]
     rst: Option<ResetMode>,
 }
 
@@ -34,7 +34,7 @@ pub struct GetModuleFunctionality;
 // #[derive(Clone, ATATCmd)]
 // #[at_cmd("+CMEE", NoResponse)]
 pub struct SetReportMobileTerminationError {
-    #[atat_(position = 0)]
+    //#[atat_(position = 0)]
     n: TerminationErrorMode,
 }
 

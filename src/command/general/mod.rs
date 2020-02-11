@@ -22,7 +22,7 @@ pub struct GetManufacturerId;
 // #[derive(Clone, ATATCmd)]
 // #[at_cmd("+CGSN", IMEI)]
 pub struct GetIMEI {
-    #[atat_(position = 0)]
+    //#[atat_(position = 0)]
     snt: Option<Snt>,
 }
 
@@ -38,8 +38,8 @@ pub struct GetCCID;
 // #[derive(Clone, ATATCmd)]
 // #[atat("+USORD", SocketData, timeout_ms = 10000, abortable = true)]
 pub struct ReadSocketData {
-    #[atat_(position = 0)]
+    //#[atat_(position = 0)]
     socket: SocketHandle,
-    #[atat_(position = 1)]
+    //#[atat_(position = 1)]
     length: usize,
 }
