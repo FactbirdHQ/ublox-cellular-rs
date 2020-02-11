@@ -17,7 +17,7 @@ pub struct Item {
 }
 
 /// A handle, identifying a socket in a set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)] // TODO: , Serialize, Deserialize)]
 pub struct Handle(pub usize);
 
 impl fmt::Display for Handle {
