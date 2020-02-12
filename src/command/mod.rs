@@ -8,10 +8,13 @@ use at::{ATCommandInterface, ATRequestType};
 
 use embedded_nal::{IpAddress, Port};
 
+
 mod cmd;
 
 mod response;
 mod types;
+
+pub struct NoResponse;
 
 pub use cmd::Command;
 use log::{info, warn};
