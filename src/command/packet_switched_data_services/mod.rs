@@ -1,37 +1,34 @@
 //! 4 General Commands
 pub mod responses;
 pub mod types;
-use at::{Error, ATATCmd};
-use heapless::{consts, String};
+use atat::{atat_derive::ATATCmd, ATATCmd, Error};
+use heapless::{consts, String, Vec};
 use responses::*;
 use types::*;
-use at::atat_derive::ATATCmd;
-use serde::Serialize;
-use super::NoResponse;
 
+use super::NoResponse;
 
 /// 18.7 Packet switched data configuration +UPSD
 /// Sets or reads all the parameters in a specific packet switched data (PSD) profile. The command is used to set
 /// up the PDP context parameters for an internal context, i.e. a data connection using the internal IP stack and
 /// related AT commands for sockets.
 /// To set all the parameters of the PSD profile a set command for each parameter needs to be issued.
-// #[derive(Clone, ATATCmd)]
-// #[atat("+UPSD", NoResponse)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+UPSD", NoResponse)]
 pub struct SetPacketSwitchedConfig {
-    //#[atat_(position = 0)]
-    profile_id: u8,
-    //#[atat_(position = 1,2)]
-    param: PacketSwitchedParam,
+    #[at_arg(position = 0)]
+    pub profile_id: u8,
+    // #[at_arg(position = 1)]
+    // pub param: PacketSwitchedParam,
 }
-// #[derive(Clone, ATATCmd)]
-// #[atat("+UPSD", PacketSwitchedConfig)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+UPSD", PacketSwitchedConfig)]
 pub struct GetPacketSwitchedConfig {
-    //#[atat_(position = 0)]
-    profile_id: u8,
-    //#[atat_(position = 1)]
-    param: Option<PacketSwitchedParam>,
+    #[at_arg(position = 0)]
+    pub profile_id: u8,
+    // #[at_arg(position = 1)]
+    // pub param: Option<PacketSwitchedParam>,
 }
-
 
 /// 18.8 Packet switched data action +UPSDA
 /// Performs the requested action for the specified PSD profile.
@@ -41,26 +38,25 @@ pub struct GetPacketSwitchedConfig {
 /// The +UUPSDD URC is raised when the data connection related to the provided PSD profile is deactivated either
 /// explicitly by the network (e.g. due to prolonged idle time) or locally by the module after a failed PS registration
 /// procedure (e.g. due to roaming) or a user required detach (e.g. triggered by AT+COPS=2).
-// #[derive(Clone, ATATCmd)]
-// #[atat("+UPSDA", NoResponse, timeout_ms = 180000, abortable = true)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+UPSDA", NoResponse, timeout_ms = 180000, abortable = true)]
 pub struct SetPacketSwitchedAction {
-    //#[atat_(position = 0)]
-    profile_id: u8,
-    //#[atat_(position = 1)]
-    action: PacketSwitchedAction
+    #[at_arg(position = 0)]
+    pub profile_id: u8,
+    #[at_arg(position = 1)]
+    pub action: PacketSwitchedAction,
 }
-
 
 /// 18.9 Packet switched network-assigned data +UPSND
 /// Returns the current (dynamic) network-assigned or network-negotiated value of the specified parameter for
 /// the active PDP context associated with the specified PSD profile.
-// #[derive(Clone, ATATCmd)]
-// #[atat("+UPSND", PacketSwitchedNetworkData)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+UPSND", PacketSwitchedNetworkData)]
 pub struct GetPacketSwitchedNetworkData {
-    // #[atat_(position = 0)]
-    profile_id: u8,
-    // #[atat_(position = 1)]
-    param: PacketSwitchedNetworkDataParam
+    #[at_arg(position = 0)]
+    pub profile_id: u8,
+    #[at_arg(position = 1)]
+    pub param: PacketSwitchedNetworkDataParam,
 }
 
 /// 18.14 GPRS attach or detach +CGATT
@@ -69,12 +65,12 @@ pub struct GetPacketSwitchedNetworkData {
 /// is ignored and OK result code is returned. If the requested state cannot be reached, an error result code is
 /// returned. The command can be aborted if a character is sent to the DCE during the command execution. Any
 /// active PDP context will be automatically deactivated when the GPRS registration state changes to detached.
-// #[derive(Clone, ATATCmd)]
-// #[atat("+CGATT", NoResponse, timeout_ms = 180000, abortable = true)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+CGATT", NoResponse, timeout_ms = 180000, abortable = true)]
 pub struct SetGPRSAttached {
-    // #[atat_(position = 0)]
-    state: bool
+    #[at_arg(position = 0)]
+    pub state: bool,
 }
-// #[derive(Clone, ATATCmd)]
-// #[atat("+CGATT?", GPRSAttached, timeout_ms = 180000, abortable = true)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+CGATT?", GPRSAttached, timeout_ms = 180000, abortable = true)]
 pub struct GetGPRSAttached;

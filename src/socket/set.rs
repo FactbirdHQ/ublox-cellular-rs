@@ -4,6 +4,7 @@ use core::{fmt, slice};
 use super::TcpState;
 use super::{AnySocket, Socket, SocketRef};
 
+use serde::{Serialize, Deserialize};
 use heapless::{ArrayLength, Vec};
 
 /// An item of a socket set.
@@ -17,7 +18,7 @@ pub struct Item {
 }
 
 /// A handle, identifying a socket in a set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default)] // TODO: , Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]
 pub struct Handle(pub usize);
 
 impl fmt::Display for Handle {

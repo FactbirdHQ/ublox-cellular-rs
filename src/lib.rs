@@ -1,18 +1,11 @@
 #![no_std]
-
+#![allow(unused)]
 extern crate heapless;
 
-extern crate at_rs as at;
-#[macro_use]
+extern crate atat;
 extern crate nb;
 extern crate no_std_net;
-
-pub type ATClient<T> = at::client::ATClient<
-    T,
-    command::RequestType,
-    heapless::consts::U5,
-    heapless::consts::U5,
->;
+extern crate ufmt;
 
 #[cfg(test)]
 #[macro_use]
@@ -25,8 +18,6 @@ extern crate std;
 mod client;
 pub mod soc;
 pub mod gprs;
-
-mod traits;
 
 pub mod command;
 pub mod error;

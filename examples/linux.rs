@@ -75,7 +75,7 @@ type ATResponseQueueLen = U5;
 
 // static mut Test: Option<Queue<Box<dyn ATCommand<Response = ()>>, ATRequestQueueLen, u8>> = None;
 static mut CELL_REQ_Q: Option<Queue<RequestType, ATRequestQueueLen, u8>> = None;
-static mut CELL_RES_Q: Option<Queue<Result<ResponseType, at::Error>, ATResponseQueueLen, u8>> =
+static mut CELL_RES_Q: Option<Queue<Result<ResponseType, atat::Error>, ATResponseQueueLen, u8>> =
     None;
 
 fn main() {
@@ -103,7 +103,8 @@ fn main() {
     unsafe { CELL_REQ_Q = Some(Queue::u8()) };
     unsafe { CELL_RES_Q = Some(Queue::u8()) };
 
-    let (cell_client, parser) = at::new::<_, _, _, SerialRxBufferLen, _, _>(
+
+    let (cell_client, parser) = atat::new::<_, _, _, SerialRxBufferLen, _, _>(
         unsafe { (CELL_REQ_Q.as_mut().unwrap(), CELL_RES_Q.as_mut().unwrap()) },
         Serial(port),
         Timer,

@@ -1,39 +1,41 @@
 //! 4 Responses for General Commands
-use heapless::{consts, String};
-use serde::Deserialize;
+use heapless::{consts, Vec};
+use atat::atat_derive::ATATResp;
+use atat::ATATResp;
+use super::types::*;
 use crate::socket::SocketHandle;
 
 
 /// 25.3 Create Socket +USOCR
-// #[derive(Deserialize)]
+#[derive(Clone, ATATResp)]
 pub struct CreateSocketResponse{
-    //#[atat_(position = 0)]
-    socket: SocketHandle,
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle,
 }
 
 /// 25.8 Get Socket Error +USOER
-// #[derive(Deserialize)]
+#[derive(Clone, ATATResp)]
 pub struct SocketErrorResponse{
-    //#[atat_(position = 0)]
-    error : u8
+    #[at_arg(position = 0)]
+    pub error : u8
 }
 
 /// 25.10 Write socket data +USOWR
-// #[derive(Deserialize)]
+#[derive(Clone, ATATResp)]
 pub struct WriteSocketDataResponse{
-    //#[atat_(position = 0)]
-    socket: SocketHandle,
-    //#[atat_(position = 1)]
-    length: usize,
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle,
+    #[at_arg(position = 1)]
+    pub length: usize,
 }
 
 /// 25.12 Read Socket Data +USORD
-// #[derive(Deserialize)]
+#[derive(Clone, ATATResp)]
 pub struct SocketData {
-    //#[atat_(position = 0)]
-    socket: SocketHandle,
-    //#[atat_(position = 1)]
-    length: usize,
-    //#[atat_(position = 2)]
-    data: Vec<u8, consts::U256>
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle,
+    #[at_arg(position = 1)]
+    pub length: usize,
+    #[at_arg(position = 2)]
+    pub data: Vec<u8, consts::U256>
 }

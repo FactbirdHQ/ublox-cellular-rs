@@ -2,8 +2,6 @@
 // [RFC 1940]: https://github.com/rust-lang/rust/issues/43302
 
 use core::cmp;
-use managed::ManagedSlice;
-
 use super::{Error, Result};
 
 use super::Resettable;
@@ -17,10 +15,6 @@ use heapless::{Vec, ArrayLength};
 ///   * Enqueueing or dequeueing one element from corresponding side of the buffer;
 ///   * Enqueueing or dequeueing a slice of elements from corresponding side of the buffer;
 ///   * Accessing allocated and unallocated areas directly.
-///
-/// It is also zero-copy; all methods provide references into the buffer's storage.
-/// Note that all references are mutable; it is considered more important to allow
-/// in-place processing than to protect from accidental mutation.
 ///
 /// This implementation is suitable for both simple uses such as a FIFO queue
 /// of UDP packets, and advanced ones such as a TCP reassembly buffer.
@@ -204,7 +198,7 @@ impl<T, N: ArrayLength<T>> RingBuffer<T, N> {
     /// This function may return a slice smaller than the given size
     /// if the free space in the buffer is not contiguous.
     // #[must_use]
-    pub fn enqueue_many<'b>(&'b mut self, size: usize) -> &'b mut [T] {
+    pub fn enqueue_many(&mut self, size: usize) -> &mut [T] {
         self.enqueue_many_with(|buf| {
             let size = cmp::min(size, buf.len());
             (size, &mut buf[..size])
@@ -261,7 +255,7 @@ impl<T, N: ArrayLength<T>> RingBuffer<T, N> {
     /// This function may return a slice smaller than the given size
     /// if the allocated space in the buffer is not contiguous.
     // #[must_use]
-    pub fn dequeue_many<'b>(&'b mut self, size: usize) -> &'b mut [T] {
+    pub fn dequeue_many(&mut self, size: usize) -> &mut [T] {
         self.dequeue_many_with(|buf| {
             let size = cmp::min(size, buf.len());
             (size, &mut buf[..size])

@@ -1,10 +1,9 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use ufmt::derive::uDebug;
 
-
-
-
-#[derive(uDebug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(uDebug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
 pub enum PowerSavingMode {
     /// Disabled: (default and factory-programmed value)
     Disabled = 0,

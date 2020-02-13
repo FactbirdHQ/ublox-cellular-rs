@@ -1,12 +1,11 @@
 //! 4 General Commands
 pub mod responses;
 pub mod types;
-use at::{Error, ATATCmd};
-use heapless::{consts, String};
+use atat::{Error, atat_derive::ATATCmd, ATATCmd};
+use heapless::{consts, String, Vec};
 use responses::*;
 use types::*;
-use at::atat_derive::ATATCmd;
-use serde::Serialize;
+
 use super::NoResponse;
 use crate::socket::SocketHandle;
 
@@ -19,13 +18,13 @@ use crate::socket::SocketHandle;
 /// • LEON-G1 - Up to 16 sockets can be created
 /// It is possible to specify the local port to bind within the socket in order to send data from a specific port. The
 /// bind functionality is supported for both TCP and UDP sockets.
-// #[derive(Clone, ATATCmd)]
-// #[at_cmd("+USOCR", CreateSocketResponse)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+USOCR", CreateSocketResponse)]
 pub struct CreateSocket {
-    //#[atat_(position = 0)]
-    protocol: SocketProtocol,
-    //#[atat_(position = 1)]
-    local_port : Option<u16>,
+    #[at_arg(position = 0)]
+    pub protocol: SocketProtocol,
+    #[at_arg(position = 1)]
+    pub local_port : Option<u16>,
 }
 
 
@@ -35,17 +34,17 @@ pub struct CreateSocket {
 /// By default the command blocks the AT command interface until the the completion of the socket close
 /// operation. By enabling the <async_close> flag, the final result code is sent immediately. The following
 /// +UUSOCL URC will indicate the closure of the specified socket.
-// #[derive(Clone, ATATCmd)]
-// #[at_cmd("+USOCL", NoResponse)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+USOCL", NoResponse)]
 pub struct CloseSocket {
-    //#[atat_(position = 0)]
-    socket: SocketHandle
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle
 }
 
 /// 25.8 Get Socket Error +USOER
 /// Retrieves the last error occurred in the last socket operation, stored in the BSD standard variable error.
-// #[derive(Clone, ATATCmd)]
-// #[at_cmd("+USOER", SocketErrorResponse)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+USOER", SocketErrorResponse)]
 pub struct GetSocketError;
 
 
@@ -58,15 +57,15 @@ pub struct GetSocketError;
 /// host address and port for later use with other socket operations (e.g. +USOWR, +USORD). This is important
 /// to note because if <socket> refers to a UDP socket, errors will not be reported prior to an attempt to write or
 /// read data on the socket.
-// #[derive(Clone, ATATCmd)]
-// #[at_cmd("+USOCO", NoResponse)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+USOCO", NoResponse)]
 pub struct ConnectSocket {
-    //#[atat_(position = 0)]
-    socket: SocketHandle,
-    //#[atat_(position = 1)]
-    remote_addr: IpAddress, //Todo: Import struct from new lib
-    //#[atat_(position = 2)]
-    remote_port: u16,
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle,
+    // #[at_arg(position = 1)]
+    // pub remote_addr: IpAddress, //Todo: Import struct from new lib
+    #[at_arg(position = 2)]
+    pub remote_port: u16,
 }
 
 
@@ -78,15 +77,15 @@ pub struct ConnectSocket {
 /// • Base syntax HEX: writing hexadecimal strings to the socket, the string will be converted in binary data and
 /// sent to the socket; see the AT+UDCONF=1 command description to enable it
 /// • Binary extended syntax: mandatory for writing any character in the ASCII range [0x00, 0xFF]
-// #[derive(Clone, ATATCmd)]
-// #[at_cmd("+USOWR", WriteSocketDataResponse, timeout_ms = 1000)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+USOWR", WriteSocketDataResponse, timeout_ms = 1000)]
 pub struct WriteSocketData {
-    //#[atat_(position = 0)]
-    socket: SocketHandle,
-    //#[atat_(position = 1)]
-    length: usize,
-    //#[atat_(position = 2)]
-    data: Vec<u8, consts::U256>
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle,
+    #[at_arg(position = 1)]
+    pub length: usize,
+    #[at_arg(position = 2)]
+    pub data: Vec<u8, consts::U256>
 }
 
 
@@ -100,11 +99,11 @@ pub struct WriteSocketData {
 /// buffer.
 /// In case of a partial read of a UDP packet +UUSORD: <socket>,<length> will show the remaining number of data
 /// bytes of the packet the user is reading.
-// #[derive(Clone, ATATCmd)]
-// #[atat("+USORD", SocketData, timeout_ms = 10000, abortable = true)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+USORD", SocketData, timeout_ms = 10000, abortable = true)]
 pub struct ReadSocketData {
-    //#[atat_(position = 0)]
-    socket: SocketHandle,
-    //#[atat_(position = 1)]
-    length: usize,
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle,
+    #[at_arg(position = 1)]
+    pub length: usize,
 }

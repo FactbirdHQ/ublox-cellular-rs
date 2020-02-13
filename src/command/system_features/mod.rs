@@ -1,18 +1,12 @@
 //! 4 General Commands
 pub mod responses;
 pub mod types;
-use at::{Error, ATATCmd};
-use heapless::{consts, String};
+use atat::{atat_derive::ATATCmd, ATATCmd, Error};
+use heapless::{consts, String, Vec};
 use responses::*;
 use types::*;
-use at::atat_derive::ATATCmd;
-use serde::Serialize;
+
 use super::NoResponse;
-
-
-
-
-
 
 /// 19.8 Power saving control (Power SaVing) +UPSV
 /// Sets the UART power saving configuration, but it has a global effect on the module power saving configuration:
@@ -24,15 +18,14 @@ use super::NoResponse;
 /// module does not enter idle mode as long as the UART RTS line state is ON
 /// - If the power saving is controlled by the UART DTR line (+UPSV: 3), the UART interface is enabled and the
 /// module does not enter idle mode as long as the UART DTR line state is ON
-// #[derive(Clone, ATATCmd)]
-// #[at_cmd("+UPSV", NoResponse)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+UPSV", NoResponse)]
 pub struct SetPowerSavingControl {
-    // #[atat_(position = 0)]
+    #[at_arg(position = 0)]
     mode: PowerSavingMode,
-    // #[atat_(position = 1)]
+    #[at_arg(position = 1)]
     timeout: Option<Seconds>,
 }
-// #[derive(Clone, ATATCmd)]
-// #[at_cmd("+UPSV?", PowerSavingControl)]
+#[derive(Clone, ATATCmd)]
+#[at_cmd("+UPSV?", PowerSavingControl)]
 pub struct GetPowerSavingControl;
-

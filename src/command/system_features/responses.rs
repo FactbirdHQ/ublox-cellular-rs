@@ -1,15 +1,13 @@
 //! 4 Responses for General Commands
-use heapless::{consts, String};
-use serde::Deserialize;
-
-
+use super::types::*;
+use atat::atat_derive::ATATResp;
+use atat::ATATResp;
 
 /// 19.8 Power saving control (Power SaVing) +UPSV
-// #[derive(Deserialize)]
-pub struct PowerSavingControl{
-    // #[atat_(position = 0)]
+#[derive(ATATResp)]
+pub struct PowerSavingControl {
+    #[at_arg(position = 0)]
     mode: PowerSavingMode,
-    // #[atat_(position = 1)]
+    #[at_arg(position = 1)]
     timeout: Option<Seconds>,
 }
-

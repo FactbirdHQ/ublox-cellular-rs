@@ -91,6 +91,10 @@ impl TcpSocket {
         self.meta.handle
     }
 
+    pub fn available(&self) -> usize {
+        0
+    }
+
     //     /// Return the timeout duration.
     //     ///
     //     /// See also the [set_timeout](#method.set_timeout) method.
