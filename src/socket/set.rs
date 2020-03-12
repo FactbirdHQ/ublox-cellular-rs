@@ -2,10 +2,10 @@ use core::{fmt, slice};
 
 #[cfg(feature = "socket-tcp")]
 use super::TcpState;
-use super::{AnySocket, Socket, SocketRef};
+use super::{AnySocket, Error, Result, Socket, SocketRef};
 
-use serde::{Serialize, Deserialize};
-use heapless::{ArrayLength, Vec};
+use heapless::{ArrayLength, LinearMap};
+use serde::{Deserialize, Serialize};
 
 /// An item of a socket set.
 ///
@@ -31,19 +31,19 @@ impl fmt::Display for Handle {
 #[derive(Debug, Default)]
 pub struct Set<N>
 where
-    N: ArrayLength<Option<Item>>,
+    N: ArrayLength<(usize, Item)>,
 {
-    sockets: Vec<Option<Item>, N>,
+    sockets: LinearMap<usize, Item, N>,
 }
 
 impl<N> Set<N>
 where
-    N: ArrayLength<Option<Item>>,
+    N: ArrayLength<(usize, Item)>,
 {
     /// Create a socket set using the provided storage.
     pub fn new() -> Set<N> {
         Set {
-            sockets: Vec::new(),
+            sockets: LinearMap::new(),
         }
     }
 
@@ -51,27 +51,19 @@ where
     ///
     /// # Panics
     /// This function panics if the storage is fixed-size (not a `Vec`) and is full.
-    pub fn add<T>(&mut self, socket: T) -> Handle
+    pub fn add<T>(&mut self, socket: T) -> Result<Handle>
     where
         T: Into<Socket>,
     {
-        fn put(index: usize, slot: &mut Option<Item>, mut socket: Socket) -> Handle {
-            // net_trace!("[{}]: adding", index);
-            let handle = Handle(index);
-            socket.meta_mut().handle = handle;
-            *slot = Some(Item { socket, refs: 1 });
-            handle
-        }
-
         let socket = socket.into();
-
-        for (index, slot) in self.sockets.iter_mut().enumerate() {
-            if slot.is_none() {
-                return put(index, slot, socket);
-            }
+        let handle = socket.handle();
+        match self
+            .sockets
+            .insert(socket.handle().0, Item { socket, refs: 1 })
+        {
+            Ok(_) => Ok(handle),
+            _ => Err(Error::SocketSetFull),
         }
-
-        panic!("adding a socket to a full SocketSet")
     }
 
     /// Get a socket from the set by its handle, as mutable.
@@ -79,11 +71,10 @@ where
     /// # Panics
     /// This function may panic if the handle does not belong to this socket set
     /// or the socket has the wrong type.
-    pub fn get<T: AnySocket>(&mut self, handle: Handle) -> SocketRef<T> {
-        match self.sockets[handle.0].as_mut() {
-            Some(item) => T::downcast(SocketRef::new(&mut item.socket))
-                .expect("handle refers to a socket of a wrong type"),
-            None => panic!("handle does not refer to a valid socket"),
+    pub fn get<T: AnySocket>(&mut self, handle: Handle) -> Result<SocketRef<T>> {
+        match self.sockets.get_mut(&handle.0) {
+            Some(item) => Ok(T::downcast(SocketRef::new(&mut item.socket))?),
+            None => Err(Error::InvalidSocket),
         }
     }
 
@@ -91,11 +82,11 @@ where
     ///
     /// # Panics
     /// This function may panic if the handle does not belong to this socket set.
-    pub fn remove(&mut self, handle: Handle) -> Socket {
+    pub fn remove(&mut self, handle: Handle) -> Result<Socket> {
         // net_trace!("[{}]: removing", handle.0);
-        match self.sockets[handle.0].take() {
-            Some(item) => item.socket,
-            None => panic!("handle does not refer to a valid socket"),
+        match self.sockets.remove(&handle.0) {
+            Some(item) => Ok(item.socket),
+            None => Err(Error::InvalidSocket),
         }
     }
 
@@ -103,11 +94,12 @@ where
     ///
     /// # Panics
     /// This function may panic if the handle does not belong to this socket set.
-    pub fn retain(&mut self, handle: Handle) {
-        self.sockets[handle.0]
-            .as_mut()
-            .expect("handle does not refer to a valid socket")
-            .refs += 1
+    pub fn retain(&mut self, handle: Handle) -> Result<()> {
+        match self.sockets.get_mut(&handle.0) {
+            Some(v) => v.refs += 1,
+            None => return Err(Error::InvalidSocket),
+        };
+        Ok(())
     }
 
     /// Decrease reference count by 1.
@@ -115,70 +107,72 @@ where
     /// # Panics
     /// This function may panic if the handle does not belong to this socket set,
     /// or if the reference count is already zero.
-    pub fn release(&mut self, handle: Handle) {
-        let refs = &mut self.sockets[handle.0]
-            .as_mut()
-            .expect("handle does not refer to a valid socket")
-            .refs;
-        if *refs == 0 {
-            panic!("decreasing reference count past zero")
-        }
-        *refs -= 1
-    }
-
-    /// Prune the sockets in this set.
-    ///
-    /// Pruning affects sockets with reference count 0. Open sockets are closed.
-    /// Closed sockets are removed and dropped.
-    pub fn prune(&mut self) {
-        for (_, item) in self.sockets.iter_mut().enumerate() {
-            let mut may_remove = false;
-            if let Some(Item {
-                refs: 0,
-                ref mut socket,
-            }) = item
-            {
-                match *socket {
-                    #[cfg(feature = "socket-raw")]
-                    Socket::Raw(_) => may_remove = true,
-                    #[cfg(all(
-                        feature = "socket-icmp",
-                        any(feature = "proto-ipv4", feature = "proto-ipv6")
-                    ))]
-                    Socket::Icmp(_) => may_remove = true,
-                    #[cfg(feature = "socket-udp")]
-                    Socket::Udp(_) => may_remove = true,
-                    #[cfg(feature = "socket-tcp")]
-                    Socket::Tcp(ref mut socket) => {
-                        if socket.state() == TcpState::Closed {
-                            may_remove = true
-                        } else {
-                            socket.close()
-                        }
-                    }
-                    Socket::__Nonexhaustive(_) => unreachable!(),
+    pub fn release(&mut self, handle: Handle) -> Result<()> {
+        match self.sockets.get_mut(&handle.0) {
+            Some(v) => {
+                if v.refs == 0 {
+                    return Err(Error::Illegal);
                 }
+                v.refs -= 1;
+                Ok(())
             }
-            if may_remove {
-                // net_trace!("[{}]: pruning", index);
-                *item = None
-            }
+            None => Err(Error::InvalidSocket),
         }
     }
 
-    /// Iterate every socket in this set.
-    pub fn iter(&self) -> Iter {
-        Iter {
-            lower: self.sockets.iter(),
-        }
-    }
+    // /// Prune the sockets in this set.
+    // ///
+    // /// Pruning affects sockets with reference count 0. Open sockets are closed.
+    // /// Closed sockets are removed and dropped.
+    // pub fn prune(&mut self) {
+    //     for (_, item) in self.sockets.iter_mut() {
+    //         let mut may_remove = false;
+    //         if let Item {
+    //             refs: 0,
+    //             ref mut socket,
+    //         } = item
+    //         {
+    //             match *socket {
+    //                 #[cfg(feature = "socket-raw")]
+    //                 Socket::Raw(_) => may_remove = true,
+    //                 #[cfg(all(
+    //                     feature = "socket-icmp",
+    //                     any(feature = "proto-ipv4", feature = "proto-ipv6")
+    //                 ))]
+    //                 Socket::Icmp(_) => may_remove = true,
+    //                 #[cfg(feature = "socket-udp")]
+    //                 Socket::Udp(_) => may_remove = true,
+    //                 #[cfg(feature = "socket-tcp")]
+    //                 Socket::Tcp(ref mut socket) => {
+    //                     if socket.state() == TcpState::Closed {
+    //                         may_remove = true
+    //                     } else {
+    //                         socket.close()
+    //                     }
+    //                 }
+    //                 Socket::__Nonexhaustive(_) => unreachable!(),
+    //             }
+    //         }
+    //         if may_remove {
+    //             // net_trace!("[{}]: pruning", index);
+    //             *item = None
+    //         }
+    //     }
+    // }
 
-    /// Iterate every socket in this set, as SocketRef.
-    pub fn iter_mut(&mut self) -> IterMut {
-        IterMut {
-            lower: self.sockets.iter_mut(),
-        }
-    }
+    // / Iterate every socket in this set.
+    // pub fn iter(&self) -> Iter {
+    //     Iter {
+    //         lower: self.sockets.iter(),
+    //     }
+    // }
+
+    // /// Iterate every socket in this set, as SocketRef.
+    // pub fn iter_mut(&mut self) -> IterMut {
+    //     IterMut {
+    //         lower: self.sockets.iter_mut(),
+    //     }
+    // }
 }
 
 /// Immutable socket set iterator.

@@ -1,12 +1,12 @@
 // Uncomment the #[must_use]s here once [RFC 1940] hits stable.
 // [RFC 1940]: https://github.com/rust-lang/rust/issues/43302
 
-use core::cmp;
 use super::{Error, Result};
+use core::cmp;
 
 use super::Resettable;
 
-use heapless::{Vec, ArrayLength};
+use heapless::{ArrayLength, Vec};
 
 /// A ring buffer.
 ///
@@ -29,8 +29,7 @@ impl<T, N: ArrayLength<T>> RingBuffer<T, N> {
     /// Create a ring buffer with the given storage.
     ///
     /// During creation, every element in `storage` is reset.
-    pub fn new() -> RingBuffer<T, N>
-    {
+    pub fn new() -> RingBuffer<T, N> {
         RingBuffer {
             storage: Vec::new(),
             read_at: 0,
@@ -46,7 +45,7 @@ impl<T, N: ArrayLength<T>> RingBuffer<T, N> {
 
     /// Return the maximum number of elements in the ring buffer.
     pub fn capacity(&self) -> usize {
-        self.storage.len()
+        self.storage.capacity()
     }
 
     /// Clear the ring buffer, and reset every element.
@@ -176,17 +175,18 @@ impl<T, N: ArrayLength<T>> RingBuffer<T, N> {
     /// than the size of the slice passed into it.
     pub fn enqueue_many_with<'b, R, F>(&'b mut self, f: F) -> (usize, R)
     where
-        F: FnOnce(&'b mut [T]) -> (usize, R),
+        F: FnOnce(&'b mut Vec<T, N>) -> (usize, R),
     {
         if self.length == 0 {
             // Ring is currently empty. Reset `read_at` to optimize
             // for contiguous space.
             self.read_at = 0;
+            self.storage.clear();
         }
 
         let write_at = self.get_idx(self.length);
         let max_size = self.contiguous_window();
-        let (size, result) = f(&mut self.storage[write_at..write_at + max_size]);
+        let (size, result) = f(&mut self.storage);
         assert!(size <= max_size);
         self.length += size;
         (size, result)
@@ -214,16 +214,16 @@ impl<T, N: ArrayLength<T>> RingBuffer<T, N> {
         T: Copy,
     {
         let (size_1, data) = self.enqueue_many_with(|buf| {
-            let size = cmp::min(buf.len(), data.len());
-            buf[..size].copy_from_slice(&data[..size]);
+            let size = cmp::min(buf.capacity(), data.len());
+            buf.extend_from_slice(&data[..size]);
             (size, &data[size..])
         });
-        let (size_2, ()) = self.enqueue_many_with(|buf| {
-            let size = cmp::min(buf.len(), data.len());
-            buf[..size].copy_from_slice(&data[..size]);
-            (size, ())
-        });
-        size_1 + size_2
+        // let (size_2, ()) = self.enqueue_many_with(|buf| {
+        //     let size = cmp::min(buf.len(), data.len());
+        //     buf[..size].copy_from_slice(&data[..size]);
+        //     (size, ())
+        // });
+        size_1
     }
 
     /// Call `f` with the largest contiguous slice of allocated buffer elements,

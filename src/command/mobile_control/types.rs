@@ -1,3 +1,4 @@
+//! Argument and parameter types used by Mobile equipment control and status Commands and Responses
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use ufmt::derive::uDebug;
 

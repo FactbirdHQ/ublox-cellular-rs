@@ -1,7 +1,7 @@
-//! 4 Responses for General Commands
-use heapless::{consts, String};
+//! Responses for General Commands
 use atat::atat_derive::ATATResp;
 use atat::ATATResp;
+use heapless::{consts, String};
 
 /// 4.1 Manufacturer identification
 /// Text string identifying the manufacturer.
@@ -16,13 +16,13 @@ pub struct ManufacturerId {
 #[derive(Clone, Debug, ATATResp)]
 pub struct IMEI {
     #[at_arg(position = 0)]
-    pub imei: u64
+    pub imei: u64,
 }
 
 /// 4.12 Card identification +CCID
 /// Returns the ICCID (Integrated Circuit Card ID) of the SIM-card. ICCID is a serial number identifying the SIM.
 #[derive(Clone, Debug, ATATResp)]
-pub struct CCID{
+pub struct CCID {
     #[at_arg(position = 0)]
-    pub ccid : u64
+    pub ccid: u128,
 }

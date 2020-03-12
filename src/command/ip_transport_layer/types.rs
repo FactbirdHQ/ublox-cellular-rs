@@ -1,6 +1,6 @@
+//! Argument and parameter types used by Internet protocol transport layer Commands and Responses
+use serde_repr::{Deserialize_repr, Serialize_repr};
 use ufmt::derive::uDebug;
-use serde_repr::{Serialize_repr, Deserialize_repr};
-
 
 #[derive(uDebug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]

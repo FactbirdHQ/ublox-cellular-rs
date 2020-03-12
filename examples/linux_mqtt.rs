@@ -1,3 +1,4 @@
+extern crate alloc;
 extern crate atat;
 extern crate env_logger;
 extern crate nb;
@@ -5,7 +6,6 @@ extern crate nb;
 mod common;
 
 use serialport;
-use std::sync::{Arc, Mutex};
 use std::thread;
 
 use ublox_cellular::gprs::APNInfo;
@@ -15,8 +15,8 @@ use ublox_cellular::{error::Error as GSMError, GSMClient, GSMConfig};
 
 use atat::ATATInterface;
 use embedded_hal::digital::v2::OutputPin;
-
 use linux_embedded_hal::Pin;
+use mqttrust::{Connect, MQTTClient, Protocol, QoS};
 
 use common::{serial::Serial, timer::SysTimer};
 use std::time::Duration;
@@ -61,68 +61,64 @@ fn main() {
 
     let gsm = GSMClient::<_, Pin, Pin>::new(cell_client, GSMConfig::new());
 
+    // Use a thread loop in lack of actual interrupt for uart rx
     let serial_irq = thread::Builder::new()
         .name("serial_irq".to_string())
         .spawn(move || loop {
             thread::sleep(Duration::from_millis(1));
-            if parser.handle_irq() {
-                parser.parse_at();
-            }
+            parser.handle_irq();
         })
         .unwrap();
 
-    if attach_gprs(&gsm).is_ok() {
-        let mut socket = {
-            let soc = gsm.open(Mode::Blocking).expect("Cannot open socket!");
+    // let urc_handler = thread::Builder::new()
+    //     .name("urc_handler".to_string())
+    //     .spawn(move || loop {
+    //         thread::sleep(Duration::from_millis(10));
+    //         gsm.handle_urc();
+    //     })
+    //     .unwrap();
 
+    if attach_gprs(&gsm).is_ok() {
+        let socket = {
+            let soc = gsm.open(Mode::Timeout(1000)).unwrap();
+            // Upgrade socket to TLS socket
+            gsm.upgrade_socket(&soc).unwrap();
+
+            // Connect to MQTT Broker
             gsm.connect(
                 soc,
-                SocketAddrV4::new(Ipv4Addr::new(195, 34, 89, 241), 7).into(),
+                SocketAddrV4::new(Ipv4Addr::new(195, 34, 89, 241), 443).into(),
             )
-            .expect("Failed to connect to remote!")
+            .unwrap()
         };
-        let urc_gsm = Arc::new(Mutex::new(gsm));
-        let data_gsm = urc_gsm.clone();
-        thread::Builder::new()
-            .spawn(move || loop {
-                thread::sleep(Duration::from_millis(10));
-                urc_gsm.lock().unwrap().handle_urc();
-            })
-            .expect("Failed to create URC Handler thread");
 
-        let mut cnt = 1;
+        let mut mqtt = MQTTClient::new(&gsm, socket, SysTimer::new(), SysTimer::new(), 512, 512);
+
+        mqtt.connect(Connect {
+            protocol: Protocol::MQTT311,
+            keep_alive: 60,
+            client_id: String::from("Sample_client_id"),
+            clean_session: true,
+            last_will: None,
+            username: None,
+            password: None,
+        })
+        .expect("Failed to connect to MQTT");
+
+        log::info!("MQTT Connected!\r");
+
         loop {
+            mqtt.publish(
+                QoS::AtLeastOnce,
+                format!("fbmini/input/{}-{}", "UUID", 0),
+                "{\"key\": \"Some json payload\"}".as_bytes().to_owned(),
+            )
+            .expect("Failed to publish MQTT msg");
             thread::sleep(Duration::from_millis(5000));
-            let mut buf = [0u8; 256];
-            {
-                let gsm = data_gsm.lock().unwrap();
-                let read = gsm
-                    .read(&mut socket, &mut buf)
-                    .expect("Failed to read from socket!");
-                if read > 0 {
-                    log::info!(
-                        "Read {:?} bytes from socket layer!  - {:?}\r",
-                        read,
-                        unsafe { core::str::from_utf8_unchecked(&buf[..read]) }
-                    );
-                }
-            }
-
-            {
-                let gsm = data_gsm.lock().unwrap();
-                let wrote = gsm
-                    .write(&mut socket, format!("Whatup {}", cnt).as_bytes())
-                    .expect("Failed to write to socket!");
-                log::info!(
-                    "Writing {:?} bytes to socket layer! - {:?}\r",
-                    wrote,
-                    format!("Whatup {}", cnt)
-                );
-            }
-            cnt += 1;
         }
     }
 
     // wait for all the threads to join back (Will never happen in this example)
+    // urc_handler.join().unwrap();
     serial_irq.join().unwrap();
 }

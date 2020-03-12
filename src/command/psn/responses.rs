@@ -13,21 +13,21 @@ use heapless::{consts, String};
 pub struct PacketSwitchedConfig {
     #[at_arg(position = 0)]
     pub profile_id: u8,
-    // #[at_arg(position = 1)]
-    // pub param: PacketSwitchedParam,
+    #[at_arg(position = 1)]
+    pub param: PacketSwitchedParam,
 }
 
 /// 18.9 Packet switched network-assigned data +UPSND
 /// Returns the current (dynamic) network-assigned or network-negotiated value of the specified parameter for
 /// the active PDP context associated with the specified PSD profile.
-#[derive(ATATResp)]
+#[derive(Debug, ATATResp)]
 pub struct PacketSwitchedNetworkData {
     #[at_arg(position = 0)]
     pub profile: u8,
     #[at_arg(position = 1)]
     pub param: PacketSwitchedNetworkDataParam,
     #[at_arg(position = 2)]
-    pub param_tag: String<consts::U64>, // TODO: Create struct to contain
+    pub param_tag: u8, // TODO: Create struct to contain
 }
 
 /// 18.14 GPRS attach or detach +CGATT

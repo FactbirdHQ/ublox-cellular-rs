@@ -1,16 +1,9 @@
-// Heads up! Before working on this file you should read, at least, RFC 793 and
-// the parts of RFC 1122 that discuss TCP. Consult RFC 7414 when implementing
-// a new feature.
-
 use core::fmt;
 
 use heapless::consts;
 
-// use {Error, Result};
-// use phy::DeviceCapabilities;
-// use time::{Duration, Instant};
+use super::{Error, Result};
 use crate::socket::{RingBuffer, Socket, SocketHandle, SocketMeta};
-// use wire::{IpProtocol, IpRepr, IpAddress, IpEndpoint, TcpSeqNumber, TcpRepr, TcpControl};
 
 /// A TCP socket ring buffer.
 pub type SocketBuffer<N> = RingBuffer<u8, N>;
@@ -67,7 +60,7 @@ impl fmt::Display for State {
 pub struct TcpSocket {
     pub(crate) meta: SocketMeta,
     state: State,
-    rx_buffer: SocketBuffer<consts::U512>,
+    rx_buffer: SocketBuffer<consts::U256>,
     // tx_buffer: SocketBuffer<consts::U512>,
 }
 
@@ -77,7 +70,7 @@ impl TcpSocket {
     pub fn new(socket_id: usize) -> TcpSocket {
         TcpSocket {
             meta: SocketMeta {
-                handle: SocketHandle(socket_id)
+                handle: SocketHandle(socket_id),
             },
             state: State::Closed,
             rx_buffer: SocketBuffer::new(),
@@ -89,10 +82,6 @@ impl TcpSocket {
     #[inline]
     pub fn handle(&self) -> SocketHandle {
         self.meta.handle
-    }
-
-    pub fn available(&self) -> usize {
-        0
     }
 
     //     /// Return the timeout duration.
@@ -400,26 +389,26 @@ impl TcpSocket {
         }
     }
 
-    // /// Return whether the receive half of the full-duplex connection is open.
-    // ///
-    // /// This function returns true if it's possible to receive data from the remote endpoint.
-    // /// It will return true while there is data in the receive buffer, and if there isn't,
-    // /// as long as the remote endpoint has not closed the connection.
-    // ///
-    // /// In terms of the TCP state machine, the socket must be in the `ESTABLISHED`,
-    // /// `FIN-WAIT-1`, or `FIN-WAIT-2` state, or have data in the receive buffer instead.
-    // #[inline]
-    // pub fn may_recv(&self) -> bool {
-    //     match self.state {
-    //         State::Established => true,
-    //         // In FIN-WAIT-1/2, we have closed our transmit half of the connection but
-    //         // we still can receive indefinitely.
-    //         State::FinWait1 | State::FinWait2 => true,
-    //         // If we have something in the receive buffer, we can receive that.
-    //         _ if self.rx_buffer.len() > 0 => true,
-    //         _ => false
-    //     }
-    // }
+    /// Return whether the receive half of the full-duplex connection is open.
+    ///
+    /// This function returns true if it's possible to receive data from the remote endpoint.
+    /// It will return true while there is data in the receive buffer, and if there isn't,
+    /// as long as the remote endpoint has not closed the connection.
+    ///
+    /// In terms of the TCP state machine, the socket must be in the `ESTABLISHED`,
+    /// `FIN-WAIT-1`, or `FIN-WAIT-2` state, or have data in the receive buffer instead.
+    #[inline]
+    pub fn may_recv(&self) -> bool {
+        match self.state {
+            State::Established => true,
+            // In FIN-WAIT-1/2, we have closed our transmit half of the connection but
+            // we still can receive indefinitely.
+            State::FinWait1 | State::FinWait2 => true,
+            // If we have something in the receive buffer, we can receive that.
+            _ if self.rx_buffer.len() > 0 => true,
+            _ => false,
+        }
+    }
 
     //     /// Check whether the transmit half of the full-duplex connection is open
     //     /// (see [may_send](#method.may_send), and the transmit buffer is not full.
@@ -430,14 +419,16 @@ impl TcpSocket {
     //         !self.tx_buffer.is_full()
     //     }
 
-    //     /// Check whether the receive half of the full-duplex connection buffer is open
-    //     /// (see [may_recv](#method.may_recv), and the receive buffer is not empty.
-    //     #[inline]
-    //     pub fn can_recv(&self) -> bool {
-    //         if !self.may_recv() { return false }
+    /// Check whether the receive half of the full-duplex connection buffer is open
+    /// (see [may_recv](#method.may_recv), and the receive buffer is not empty.
+    #[inline]
+    pub fn can_recv(&self) -> bool {
+        if !self.may_recv() {
+            return false;
+        }
 
-    //         !self.rx_buffer.is_empty()
-    //     }
+        !self.rx_buffer.is_empty()
+    }
 
     //     fn send_impl<'b, F, R>(&'b mut self, f: F) -> Result<R>
     //             where F: FnOnce(&'b mut SocketBuffer<'a>) -> (usize, R) {
@@ -484,78 +475,76 @@ impl TcpSocket {
     //         })
     //     }
 
-    //     fn recv_impl<'b, F, R>(&'b mut self, f: F) -> Result<R>
-    //             where F: FnOnce(&'b mut SocketBuffer<'a>) -> (usize, R) {
-    //         // We may have received some data inside the initial SYN, but until the connection
-    //         // is fully open we must not dequeue any data, as it may be overwritten by e.g.
-    //         // another (stale) SYN. (We do not support TCP Fast Open.)
-    //         if !self.may_recv() { return Err(Error::Illegal) }
+    fn recv_impl<'b, F, R>(&'b mut self, f: F) -> Result<R>
+    where
+        F: FnOnce(&'b mut SocketBuffer<consts::U256>) -> (usize, R),
+    {
+        // We may have received some data inside the initial SYN, but until the connection
+        // is fully open we must not dequeue any data, as it may be overwritten by e.g.
+        // another (stale) SYN. (We do not support TCP Fast Open.)
+        if !self.may_recv() {
+            return Err(Error::Illegal);
+        }
 
-    //         let _old_length = self.rx_buffer.len();
-    //         let (size, result) = f(&mut self.rx_buffer);
-    //         self.remote_seq_no += size;
-    //         if size > 0 {
-    //             #[cfg(any(test, feature = "verbose"))]
-    //             net_trace!("{}:{}:{}: rx buffer: dequeueing {} octets (now {})",
-    //                        self.meta.handle, self.local_endpoint, self.remote_endpoint,
-    //                        size, _old_length - size);
-    //         }
-    //         Ok(result)
-    //     }
+        let (size, result) = f(&mut self.rx_buffer);
+        Ok(result)
+    }
 
-    //     /// Call `f` with the largest contiguous slice of octets in the receive buffer,
-    //     /// and dequeue the amount of elements returned by `f`.
-    //     ///
-    //     /// This function returns `Err(Error::Illegal) if the receive half of
-    //     /// the connection is not open; see [may_recv](#method.may_recv).
-    //     pub fn recv<'b, F, R>(&'b mut self, f: F) -> Result<R>
-    //             where F: FnOnce(&'b mut [u8]) -> (usize, R) {
-    //         self.recv_impl(|rx_buffer| {
-    //             rx_buffer.dequeue_many_with(f)
-    //         })
-    //     }
+    /// Call `f` with the largest contiguous slice of octets in the receive buffer,
+    /// and dequeue the amount of elements returned by `f`.
+    ///
+    /// This function returns `Err(Error::Illegal) if the receive half of
+    /// the connection is not open; see [may_recv](#method.may_recv).
+    pub fn recv<'b, F, R>(&'b mut self, f: F) -> Result<R>
+    where
+        F: FnOnce(&'b mut [u8]) -> (usize, R),
+    {
+        self.recv_impl(|rx_buffer| rx_buffer.dequeue_many_with(f))
+    }
 
-    //     /// Dequeue a sequence of received octets, and fill a slice from it.
-    //     ///
-    //     /// This function returns the amount of bytes actually dequeued, which is limited
-    //     /// by the amount of free space in the transmit buffer; down to zero.
-    //     ///
-    //     /// See also [recv](#method.recv).
-    //     pub fn recv_slice(&mut self, data: &mut [u8]) -> Result<usize> {
-    //         self.recv_impl(|rx_buffer| {
-    //             let size = rx_buffer.dequeue_slice(data);
-    //             (size, size)
-    //         })
-    //     }
+    /// Dequeue a sequence of received octets, and fill a slice from it.
+    ///
+    /// This function returns the amount of bytes actually dequeued, which is limited
+    /// by the amount of free space in the transmit buffer; down to zero.
+    ///
+    /// See also [recv](#method.recv).
+    pub fn recv_slice(&mut self, data: &mut [u8]) -> Result<usize> {
+        self.recv_impl(|rx_buffer| {
+            let size = rx_buffer.dequeue_slice(data);
+            (size, size)
+        })
+    }
 
-    //     /// Peek at a sequence of received octets without removing them from
-    //     /// the receive buffer, and return a pointer to it.
-    //     ///
-    //     /// This function otherwise behaves identically to [recv](#method.recv).
-    //     pub fn peek(&mut self, size: usize) -> Result<&[u8]> {
-    //         // See recv() above.
-    //         if !self.may_recv() { return Err(Error::Illegal) }
+    /// Peek at a sequence of received octets without removing them from
+    /// the receive buffer, and return a pointer to it.
+    ///
+    /// This function otherwise behaves identically to [recv](#method.recv).
+    pub fn peek(&mut self, size: usize) -> Result<&[u8]> {
+        // See recv() above.
+        if !self.may_recv() {
+            return Err(Error::Illegal);
+        }
 
-    //         let buffer = self.rx_buffer.get_allocated(0, size);
-    //         if buffer.len() > 0 {
-    //             #[cfg(any(test, feature = "verbose"))]
-    //             net_trace!("{}:{}:{}: rx buffer: peeking at {} octets",
-    //                        self.meta.handle, self.local_endpoint, self.remote_endpoint,
-    //                        buffer.len());
-    //         }
-    //         Ok(buffer)
-    //     }
+        let buffer = self.rx_buffer.get_allocated(0, size);
+        // if buffer.len() > 0 {
+        //     #[cfg(any(test, feature = "verbose"))]
+        //     net_trace!("{}:{}:{}: rx buffer: peeking at {} octets",
+        //                self.meta.handle, self.local_endpoint, self.remote_endpoint,
+        //                buffer.len());
+        // }
+        Ok(buffer)
+    }
 
-    //     /// Peek at a sequence of received octets without removing them from
-    //     /// the receive buffer, and fill a slice from it.
-    //     ///
-    //     /// This function otherwise behaves identically to [recv_slice](#method.recv_slice).
-    //     pub fn peek_slice(&mut self, data: &mut [u8]) -> Result<usize> {
-    //         let buffer = self.peek(data.len())?;
-    //         let data = &mut data[..buffer.len()];
-    //         data.copy_from_slice(buffer);
-    //         Ok(buffer.len())
-    //     }
+    /// Peek at a sequence of received octets without removing them from
+    /// the receive buffer, and fill a slice from it.
+    ///
+    /// This function otherwise behaves identically to [recv_slice](#method.recv_slice).
+    pub fn peek_slice(&mut self, data: &mut [u8]) -> Result<usize> {
+        let buffer = self.peek(data.len())?;
+        let data = &mut data[..buffer.len()];
+        data.copy_from_slice(buffer);
+        Ok(buffer.len())
+    }
 
     //     /// Return the amount of octets queued in the transmit buffer.
     //     ///
@@ -564,12 +553,15 @@ impl TcpSocket {
     //         self.tx_buffer.len()
     //     }
 
-    //     /// Return the amount of octets queued in the receive buffer.
-    //     ///
-    //     /// Note that the Berkeley sockets interface does not have an equivalent of this API.
-    //     pub fn recv_queue(&self) -> usize {
-    //         self.rx_buffer.len()
-    //     }
+    pub fn rx_enqueue_slice(&mut self, data: &[u8]) -> usize {
+        self.rx_buffer.enqueue_slice(data)
+    }
+    /// Return the amount of octets queued in the receive buffer.
+    ///
+    /// Note that the Berkeley sockets interface does not have an equivalent of this API.
+    pub fn recv_queue(&self) -> usize {
+        self.rx_buffer.len()
+    }
 
     pub fn set_state(&mut self, state: State) {
         // if self.state != state {

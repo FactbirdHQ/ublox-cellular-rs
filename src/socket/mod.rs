@@ -18,7 +18,6 @@ pub use self::set::{Iter as SocketSetIter, IterMut as SocketSetIterMut};
 pub use self::ref_::Ref as SocketRef;
 pub(crate) use self::ref_::Session as SocketSession;
 
-
 /// The error type for the networking stack.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
@@ -49,8 +48,11 @@ pub enum Error {
     /// E.g. a TCP packet addressed to a socket that doesn't exist.
     Dropped,
 
+    SocketSetFull,
+    InvalidSocket,
+
     #[doc(hidden)]
-    __Nonexhaustive
+    __Nonexhaustive,
 }
 
 type Result<T> = core::result::Result<T, Error>;
@@ -132,7 +134,7 @@ impl SocketSession for Socket {
 
 /// A conversion trait for network sockets.
 pub trait AnySocket: SocketSession + Sized {
-    fn downcast(socket_ref: SocketRef<'_, Socket>) -> Option<SocketRef<'_, Self>>;
+    fn downcast(socket_ref: SocketRef<'_, Socket>) -> Result<SocketRef<'_, Self>>;
 }
 
 /// A trait for setting a value to a known state.
@@ -145,10 +147,10 @@ pub trait Resettable {
 macro_rules! from_socket {
     ($socket:ty, $variant:ident) => {
         impl AnySocket for $socket {
-            fn downcast(ref_: SocketRef<'_, Socket>) -> Option<SocketRef<'_, Self>> {
+            fn downcast(ref_: SocketRef<'_, Socket>) -> Result<SocketRef<'_, Self>> {
                 match SocketRef::into_inner(ref_) {
-                    Socket::$variant(ref mut socket) => Some(SocketRef::new(socket)),
-                    _ => None,
+                    Socket::$variant(ref mut socket) => Ok(SocketRef::new(socket)),
+                    _ => Err(Error::Illegal),
                 }
             }
         }

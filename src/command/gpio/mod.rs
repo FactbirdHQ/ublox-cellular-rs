@@ -1,18 +1,24 @@
-//! 4 General Commands
+//! ### 20 - GPIO Commands
+//! The section describes the AT commands used to configure the GPIO pins provided by u-blox cellular modules
+//! ### GPIO functions
+//! On u-blox cellular modules, GPIO pins can be opportunely configured as general purpose input or output.
+//! Moreover GPIO pins of u-blox cellular modules can be configured to provide custom functions via +UGPIOC
+//! AT command. The custom functions availability can vary depending on the u-blox cellular modules series and
+//! version: see Table 53 for an overview of the custom functions supported by u-blox cellular modules. \
+//! The configuration of the GPIO pins (i.e. the setting of the parameters of the +UGPIOC AT command) is saved
+//! in the NVM and used at the next power-on.
 pub mod responses;
 pub mod types;
 
-use atat::{Error, atat_derive::ATATCmd, ATATCmd};
+use atat::{atat_derive::ATATCmd, ATATCmd, Error};
 use heapless::{consts, String};
 use responses::*;
 use types::*;
 
 use super::NoResponse;
 
-
-
-
-/// 20.2 GPIO select configuration command +UGPIOC
+/// 20.2 Set GPIO select configuration command +UGPIOC
+///
 /// Configures the GPIOs pins as input, output or to handle a custom function. When the GPIOs pins are configured
 /// as output pin, it is possible to set the value.
 /// The test command provides the list of the supported GPIOs, the supported functions and the status of all the
@@ -30,6 +36,13 @@ pub struct SetGpioConfiguration {
     //#[atat_(position = 1)]
     pub gpio_mode: GpioMode,
 }
+
+/// 20.2 Get GPIO select configuration command +UGPIOC
+///
+/// Configures the GPIOs pins as input, output or to handle a custom function. When the GPIOs pins are configured
+/// as output pin, it is possible to set the value.
+/// The test command provides the list of the supported GPIOs, the supported functions and the status of all the
+/// GPIOs.
 #[derive(Clone, ATATCmd)]
 #[at_cmd("+UGPIOC?", GpioConfiguration, timeout_ms = 10000)]
 pub struct GetGpioConfiguration;

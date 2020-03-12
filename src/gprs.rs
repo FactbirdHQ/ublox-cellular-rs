@@ -1,19 +1,22 @@
-use crate::GSMClient;
+use atat::prelude::*;
 use embedded_hal::digital::v2::OutputPin;
-
-// use crate::command::*;
-
 use heapless::{consts, String};
+use no_std_net::{IpAddr, Ipv4Addr};
 
-#[derive(Debug)]
-pub enum Error {
-    ATError(atat::Error),
-}
+use crate::{
+    client::State,
+    command::{
+        network_service::{self, types::*},
+        psn::{self, types::*},
+    },
+    error::Error,
+    GSMClient,
+};
 
 pub struct APNInfo {
-    pub apn: String<consts::U128>,
-    pub user_name: Option<String<consts::U128>>,
-    pub password: Option<String<consts::U128>>,
+    pub apn: String<consts::U99>,
+    pub user_name: Option<String<consts::U64>>,
+    pub password: Option<String<consts::U64>>,
 }
 
 impl APNInfo {
@@ -27,8 +30,8 @@ impl APNInfo {
 }
 
 pub trait GPRS {
-    fn attach_gprs(&mut self, apn_info: APNInfo) -> Result<(), Error>;
-    fn detach_gprs(&mut self) -> Result<(), Error>;
+    fn attach_gprs(&self, apn_info: APNInfo) -> Result<(), Error>;
+    fn detach_gprs(&self) -> Result<(), Error>;
 }
 
 impl<C, RST, DTR> GPRS for GSMClient<C, RST, DTR>
@@ -37,66 +40,79 @@ where
     RST: OutputPin,
     DTR: OutputPin,
 {
-    fn attach_gprs(&mut self, _apn_info: APNInfo) -> Result<(), Error> {
+    fn attach_gprs(&self, apn_info: APNInfo) -> Result<(), Error> {
+        // self.state = State::Attaching;
+
         // Attach GPRS
-        // self.send_at(Command::SetGPRSAttached { state: true })?;
+        self.send_at(&psn::SetGPRSAttached { state: 1 })?;
 
         // Set APN info
-        // self.send_at(Command::SetPacketSwitchedConfig {
-        //     profile_id: 0,
-        //     param: PacketSwitchedParam::APN(apn_info.apn),
-        // })?;
+        self.send_at(&psn::SetPacketSwitchedConfig {
+            profile_id: 0,
+            param: PacketSwitchedParam::APN(apn_info.apn),
+        })?;
 
-        // // Set auth mode
-        // // Set username
-        // if let Some(user_name) = apn_info.user_name {
-        //     self.send_at(Command::SetPacketSwitchedConfig {
-        //         profile_id: 0,
-        //         param: PacketSwitchedParam::Username(user_name),
-        //     })?;
-        // }
+        // Set auth mode
+        self.send_at(&psn::SetPacketSwitchedConfig {
+            profile_id: 0,
+            param: PacketSwitchedParam::Authentication(AuthenticationType::Auto),
+        })?;
 
-        // // Set password
-        // if let Some(password) = apn_info.password {
-        //     self.send_at(Command::SetPacketSwitchedConfig {
-        //         profile_id: 0,
-        //         param: PacketSwitchedParam::Password(password),
-        //     })?;
-        // }
+        // Set username
+        if let Some(user_name) = apn_info.user_name {
+            self.send_at(&psn::SetPacketSwitchedConfig {
+                profile_id: 0,
+                param: PacketSwitchedParam::Username(user_name),
+            })?;
+        }
 
-        // // Set dynamic IP
+        // Set password
+        if let Some(password) = apn_info.password {
+            self.send_at(&psn::SetPacketSwitchedConfig {
+                profile_id: 0,
+                param: PacketSwitchedParam::Password(password),
+            })?;
+        }
 
-        // // Activate IP
-        // self.send_at(Command::SetPacketSwitchedAction {
-        //     profile_id: 0,
-        //     action: PacketSwitchedAction::Activate,
-        // })?;
+        // Set dynamic IP
+        self.send_at(&psn::SetPacketSwitchedConfig {
+            profile_id: 0,
+            param: PacketSwitchedParam::IPAddress(IpAddr::V4(Ipv4Addr::new(0, 0, 0, 0))),
+        })?;
 
-        // // Check profile status
-        // self.send_at(Command::GetPacketSwitchedNetworkData {
-        //     profile_id: 0,
-        //     param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
-        // })?;
+        // Activate IP
+        self.send_at(&psn::SetPacketSwitchedAction {
+            profile_id: 0,
+            action: PacketSwitchedAction::Activate,
+        })?;
 
+        // Check profile status
+        let psn::responses::PacketSwitchedNetworkData { param_tag, .. } =
+            self.send_at(&psn::GetPacketSwitchedNetworkData {
+                profile_id: 0,
+                param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+            })?;
+
+        if param_tag != 1 {
+            // self.state = State::Deattached;
+            return Err(Error::Network);
+        }
+
+        // self.state = State::Attached;
         Ok(())
     }
 
-    fn detach_gprs(&mut self) -> Result<(), Error> {
-        // // Deactivate IP
-        // self.send_at(Command::SetPacketSwitchedAction {
-        //     profile_id: 0,
-        //     action: PacketSwitchedAction::Deactivate,
-        // })?;
+    fn detach_gprs(&self) -> Result<(), Error> {
+        // Deactivate IP
+        self.send_at(&psn::SetPacketSwitchedAction {
+            profile_id: 0,
+            action: PacketSwitchedAction::Deactivate,
+        })?;
 
-        // // Detach from network
-        // self.send_at(Command::SetGPRSAttached { state: false })?;
+        // Detach from network
+        self.send_at(&psn::SetGPRSAttached { state: 0 })?;
+        // self.state = State::Deattached;
 
         Ok(())
-    }
-}
-
-impl From<atat::Error> for Error {
-    fn from(e: atat::Error) -> Self {
-        Error::ATError(e)
     }
 }

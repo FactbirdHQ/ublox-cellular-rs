@@ -1,4 +1,4 @@
-//! 4 Responses for General Commands
+//! Responses for System features Commands
 use super::types::*;
 use atat::atat_derive::ATATResp;
 use atat::ATATResp;

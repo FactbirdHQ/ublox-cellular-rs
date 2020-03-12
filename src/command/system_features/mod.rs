@@ -1,4 +1,9 @@
-//! 4 General Commands
+//! ### 19 - System features Commands
+//!
+//! Triggers the FW installation procedure, starting from the file (update binary file) stored in the module file
+//! system. It could be used as a part of implementation of the FOTA procedure. The command causes a SW
+//! system reset with network deregistration.
+
 pub mod responses;
 pub mod types;
 use atat::{atat_derive::ATATCmd, ATATCmd, Error};
@@ -22,9 +27,9 @@ use super::NoResponse;
 #[at_cmd("+UPSV", NoResponse)]
 pub struct SetPowerSavingControl {
     #[at_arg(position = 0)]
-    mode: PowerSavingMode,
+    pub mode: PowerSavingMode,
     #[at_arg(position = 1)]
-    timeout: Option<Seconds>,
+    pub timeout: Option<Seconds>,
 }
 #[derive(Clone, ATATCmd)]
 #[at_cmd("+UPSV?", PowerSavingControl)]
