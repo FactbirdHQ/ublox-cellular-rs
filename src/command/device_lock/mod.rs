@@ -4,7 +4,7 @@ pub mod impl_;
 pub mod responses;
 pub mod types;
 
-use atat::{atat_derive::ATATCmd, ATATCmd, Error};
+use atat::{atat_derive::AtatCmd, AtatCmd, Error};
 use heapless::{consts, String};
 use responses::*;
 use types::*;
@@ -16,18 +16,18 @@ use super::NoResponse;
 /// Enter PIN. If no PIN request is pending, the corresponding error code is returned. If a wrong PIN is given three
 /// times, the PUK must be inserted in place of the PIN, followed by the <newpin> which replaces the old pin in
 /// the SIM.
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+CPIN?", PinStatus, timeout_ms = 10000)]
 pub struct GetPinStatus;
 
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+CPIN", NoResponse, timeout_ms = 10000)]
 pub struct SetPin<'a> {
     #[at_arg(position = 0)]
     pub pin: &'a str,
 }
 
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+CPIN", NoResponse, timeout_ms = 10000)]
 pub struct ChangePin<'a> {
     #[at_arg(position = 0)]

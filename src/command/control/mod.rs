@@ -5,7 +5,7 @@
 // pub mod responses;
 pub mod types;
 
-use atat::{atat_derive::ATATCmd, ATATCmd, Error};
+use atat::{atat_derive::AtatCmd, AtatCmd, Error};
 use heapless::{consts, String};
 // use responses::*;
 use types::*;
@@ -18,7 +18,7 @@ use super::NoResponse;
 /// • No flow control
 /// • HW flow control also referred with RTS / CTS flow control
 /// • SW flow control also referred with XON / XOFF flow control
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("&K", NoResponse, value_sep = false)]
 pub struct SetFlowControl {
     #[at_arg(position = 0)]
@@ -36,7 +36,7 @@ pub struct SetFlowControl {
 /// DC1/DC3 characters could be used to wake up the module's UART, and therefore lost. In case a DC3 character
 /// (XOFF) is correctly received by module's UART and some data is waiting to be transmitted, the module is forced
 /// to stay awake until a subsequent DC1 character (XON) is received.
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("\\Q", NoResponse, value_sep = false)]
 pub struct SetSoftwareFlowControl {
     #[at_arg(position = 0)]
@@ -47,7 +47,7 @@ pub struct SetSoftwareFlowControl {
 ///
 /// Specifies the data rate at which the DCE accepts commands on the UART interface. The full range of data
 /// rates depends on HW or other criteria.
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+IPR", NoResponse)]
 pub struct SetDataRate {
     #[at_arg(position = 0)]
@@ -61,6 +61,6 @@ pub struct SetDataRate {
 /// In case of success, the response is issued using the configuration of the result codes format (Q, V, S3, S4
 /// AT commands) loaded from the factory-programmed profile. The other DCE settings are applied after the
 /// response has been sent.
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("&F", NoResponse)]
 pub struct FactoryResetConfig;

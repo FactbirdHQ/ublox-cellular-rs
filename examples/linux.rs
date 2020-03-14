@@ -13,7 +13,7 @@ use ublox_cellular::prelude::*;
 use ublox_cellular::soc::{Ipv4Addr, Mode, SocketAddrV4};
 use ublox_cellular::{error::Error as GSMError, GSMClient, GSMConfig};
 
-use atat::ATATInterface;
+use atat::AtatClient;
 use embedded_hal::digital::v2::OutputPin;
 
 use linux_embedded_hal::Pin;
@@ -23,7 +23,7 @@ use std::time::Duration;
 
 fn attach_gprs<C, RST, DTR>(gsm: &GSMClient<C, RST, DTR>) -> Result<(), GSMError>
 where
-    C: ATATInterface,
+    C: AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
 {

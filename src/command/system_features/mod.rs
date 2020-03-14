@@ -6,7 +6,7 @@
 
 pub mod responses;
 pub mod types;
-use atat::{atat_derive::ATATCmd, ATATCmd, Error};
+use atat::{atat_derive::AtatCmd, AtatCmd, Error};
 use heapless::{consts, String, Vec};
 use responses::*;
 use types::*;
@@ -23,7 +23,7 @@ use super::NoResponse;
 /// module does not enter idle mode as long as the UART RTS line state is ON
 /// - If the power saving is controlled by the UART DTR line (+UPSV: 3), the UART interface is enabled and the
 /// module does not enter idle mode as long as the UART DTR line state is ON
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+UPSV", NoResponse)]
 pub struct SetPowerSavingControl {
     #[at_arg(position = 0)]
@@ -31,6 +31,6 @@ pub struct SetPowerSavingControl {
     #[at_arg(position = 1)]
     pub timeout: Option<Seconds>,
 }
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+UPSV?", PowerSavingControl)]
 pub struct GetPowerSavingControl;

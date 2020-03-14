@@ -5,7 +5,7 @@ pub mod responses;
 pub mod types;
 pub mod urc;
 
-use atat::{atat_derive::ATATCmd, ATATCmd, Error};
+use atat::{atat_derive::AtatCmd, AtatCmd, Error};
 use heapless::{consts, String, Vec};
 use no_std_net::IpAddr;
 use responses::*;
@@ -24,7 +24,7 @@ use crate::socket::SocketHandle;
 ///
 /// It is possible to specify the local port to bind within the socket in order to send data from a specific port. The
 /// bind functionality is supported for both TCP and UDP sockets.
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+USOCR", CreateSocketResponse)]
 pub struct CreateSocket {
     #[at_arg(position = 0)]
@@ -40,7 +40,7 @@ pub struct CreateSocket {
 /// By default the command blocks the AT command interface until the the completion of the socket close
 /// operation. By enabling the <async_close> flag, the final result code is sent immediately. The following
 /// +UUSOCL URC will indicate the closure of the specified socket.
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+USOCL", NoResponse)]
 pub struct CloseSocket {
     #[at_arg(position = 0)]
@@ -50,7 +50,7 @@ pub struct CloseSocket {
 /// 25.8 Get Socket Error +USOER
 ///
 /// Retrieves the last error occurred in the last socket operation, stored in the BSD standard variable error.
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+USOER", SocketErrorResponse)]
 pub struct GetSocketError;
 
@@ -62,7 +62,7 @@ pub struct GetSocketError;
 /// host address and port for later use with other socket operations (e.g. +USOWR, +USORD). This is important
 /// to note because if <socket> refers to a UDP socket, errors will not be reported prior to an attempt to write or
 /// read data on the socket.
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+USOCO", NoResponse, timeout_ms = 120000)]
 pub struct ConnectSocket {
     #[at_arg(position = 0)]
@@ -79,7 +79,7 @@ pub struct ConnectSocket {
 /// of bytes of data actually written. The command applies to UDP sockets too, after a +USOCO command.
 /// There are three kinds of syntax:
 /// - Base syntax normal: writing simple strings to the socket, some characters are forbidden
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+USOWR", WriteSocketDataResponse, timeout_ms = 1000)]
 pub struct WriteSocketData<'a> {
     #[at_arg(position = 0)]
@@ -97,7 +97,7 @@ pub struct WriteSocketData<'a> {
 /// There are three kinds of syntax:
 /// - Base syntax HEX: writing hexadecimal strings to the socket, the string will be converted in binary data and
 /// sent to the socket; see the AT+UDCONF=1 command description to enable it
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+USOWR", WriteSocketDataResponse, timeout_ms = 1000)]
 pub struct WriteSocketDataHex<'a> {
     #[at_arg(position = 0)]
@@ -114,7 +114,7 @@ pub struct WriteSocketDataHex<'a> {
 /// of bytes of data actually written. The command applies to UDP sockets too, after a +USOCO command.
 /// There are three kinds of syntax:
 /// - Binary extended syntax: mandatory for writing any character in the ASCII range [0x00, 0xFF]
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+USOWR", WriteSocketDataResponse, timeout_ms = 1000)]
 pub struct WriteSocketDataBinary<'a> {
     #[at_arg(position = 0)]
@@ -136,7 +136,7 @@ pub struct WriteSocketDataBinary<'a> {
 /// buffer. \
 /// In case of a partial read of a UDP packet +UUSORD: <socket>,<length> will show the remaining number of data
 /// bytes of the packet the user is reading.
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+USORD", SocketData, timeout_ms = 10000, abortable = true)]
 pub struct ReadSocketData {
     #[at_arg(position = 0)]

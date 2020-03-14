@@ -15,7 +15,7 @@ pub trait SSL {
 
 impl<C, RST, DTR> SSL for GSMClient<C, RST, DTR>
 where
-    C: atat::ATATInterface,
+    C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
 {

@@ -91,7 +91,7 @@ where
 
 pub struct GSMClient<C, RST, DTR>
 where
-    C: ATATInterface,
+    C: AtatClient,
 {
     initialized: RefCell<bool>,
     config: Config<RST, DTR>,
@@ -102,7 +102,7 @@ where
 
 impl<C, RST, DTR> GSMClient<C, RST, DTR>
 where
-    C: ATATInterface,
+    C: AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
 {
@@ -177,7 +177,7 @@ where
         }
 
         self.send_internal(&SetReportMobileTerminationError {
-            n: TerminationErrorMode::Verbose,
+            n: TerminationErrorMode::Disabled,
         })?;
 
         self.send_internal(&SetGpioConfiguration {
@@ -214,15 +214,13 @@ where
     }
 
     fn autosense(&self) -> Result<(), Error> {
-        let mut attempt = 1;
-        while attempt < 15 {
+        for _ in 0..15 {
             match self.send_internal(&AT) {
                 Ok(_) => {
                     return Ok(());
                 }
                 Err(e) => {}
             };
-            attempt += 1;
         }
         Err(Error::BaudDetection)
     }
@@ -265,7 +263,7 @@ where
         Ok(tcp.rx_enqueue_slice(&socket_data.data.as_bytes()))
     }
 
-    fn send_internal<A: atat::ATATCmd>(&self, req: &A) -> Result<A::Response, Error> {
+    fn send_internal<A: atat::AtatCmd>(&self, req: &A) -> Result<A::Response, Error> {
         self.client
             .try_borrow_mut()?
             .send(req)
@@ -273,12 +271,12 @@ where
                 nb::Error::Other(ate) => {
                     log::error!("{:?}: [{:?}]\r", ate, req.as_str());
                     ate.into()
-                },
+                }
                 _ => atat::Error::ResponseError.into(),
             })
     }
 
-    pub fn send_at<A: atat::ATATCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
+    pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
         // if !self.initialized.try_borrow()? {
         //     self.init(false)?
         // }

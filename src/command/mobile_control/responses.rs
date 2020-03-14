@@ -1,12 +1,12 @@
 //! Responses for Mobile equipment control and status Commands
 use super::types::*;
-use atat::atat_derive::ATATResp;
-use atat::ATATResp;
+use atat::atat_derive::AtatResp;
+use atat::AtatResp;
 use heapless::{consts, Vec};
 
 /// 5.3 Set module functionality +CFUN
 /// Selects the level of functionality <fun> in the MT.
-#[derive(Clone, ATATResp)]
+#[derive(Clone, AtatResp)]
 pub struct ModuleFunctionality {
     #[at_arg(position = 0)]
     pub power_mode: PowerMode,
@@ -21,7 +21,7 @@ pub struct ModuleFunctionality {
 /// state (see <descr> parameter).
 /// The list of indications for set and read commands follows the indexes reported in the <descr> parameter, so
 /// that the first <ind> corresponds to "battchg" and so on
-#[derive(Clone, Debug, ATATResp)]
+#[derive(Clone, Debug, AtatResp)]
 pub struct IndicatorControl {
     /// "battchg": battery charge level (0-5)
     #[at_arg(position = 0)]
@@ -95,7 +95,7 @@ pub struct IndicatorControl {
 /// functionality of the MT. When enabled, MT related errors cause +CME ERROR: <err> final result code instead
 /// of the regular ERROR final result code. The error result code is returned normally when an error is related to
 /// syntax, invalid parameters or MT functionality
-#[derive(Clone, ATATResp)]
+#[derive(Clone, AtatResp)]
 pub struct ReportMobileTerminationError {
     #[at_arg(position = 0)]
     pub status: ReportMobileTerminationErrorStatus,

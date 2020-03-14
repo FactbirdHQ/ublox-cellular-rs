@@ -36,7 +36,7 @@ pub trait GPRS {
 
 impl<C, RST, DTR> GPRS for GSMClient<C, RST, DTR>
 where
-    C: atat::ATATInterface,
+    C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
 {

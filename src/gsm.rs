@@ -22,7 +22,7 @@ pub trait GSM {
 
 impl<C, RST, DTR> GSM for GSMClient<C, RST, DTR>
 where
-    C: atat::ATATInterface,
+    C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
 {

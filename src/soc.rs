@@ -16,7 +16,7 @@ use crate::socket::{TcpSocket, TcpState};
 // #[cfg(feature = "socket-udp")]
 // impl<C, RST, DTR> UdpStack for GSMClient<C, RST, DTR>
 // where
-//     C: atat::ATATInterface,
+//     C: atat::AtatClient,
 //     RST: OutputPin,
 //     DTR: OutputPin,
 // {
@@ -99,7 +99,7 @@ use crate::socket::{TcpSocket, TcpState};
 #[cfg(feature = "socket-tcp")]
 impl<C, RST, DTR> TcpStack for GSMClient<C, RST, DTR>
 where
-    C: atat::ATATInterface,
+    C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
 {

@@ -4,7 +4,7 @@ mod impl_;
 pub mod responses;
 pub mod types;
 
-use atat::{atat_derive::ATATCmd, ATATCmd, Error};
+use atat::{atat_derive::AtatCmd, AtatCmd, Error};
 use heapless::{consts, String};
 use responses::*;
 use types::*;
@@ -23,13 +23,13 @@ use super::NoResponse;
 /// The read command provides the same information issued by the URC together with the current value of the
 /// <n> parameter. The location information elements <lac>, <ci> and <AcTStatus>, if available, are returned only
 /// when <n>=2 and the MT is registered with the network.
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+CREG?", NetworkRegistrationStatus)]
 pub struct SetNetworkRegistrationStatus {
     #[at_arg(position = 0)]
     n: NetworkRegistrationUrc,
 }
 
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+CREG?", NetworkRegistrationStatus)]
 pub struct GetNetworkRegistrationStatus;

@@ -1,11 +1,11 @@
 //! Responses for GPIO Commands
 use super::types::*;
-use atat::atat_derive::ATATResp;
-use atat::ATATResp;
+use atat::atat_derive::AtatResp;
+use atat::AtatResp;
 use heapless::{consts, String};
 
 /// 20.2 GPIO select configuration command +UGPIOC
-#[derive(Clone, ATATResp)]
+#[derive(Clone, AtatResp)]
 pub struct GpioConfiguration {
     /// GPIO pin identifier: pin number
     /// See the GPIO mapping for the available GPIO pins, their mapping and factoryprogrammed values on different u-blox cellular modules series and product version.

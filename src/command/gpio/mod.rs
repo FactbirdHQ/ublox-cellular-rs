@@ -10,7 +10,7 @@
 pub mod responses;
 pub mod types;
 
-use atat::{atat_derive::ATATCmd, ATATCmd, Error};
+use atat::{atat_derive::AtatCmd, AtatCmd, Error};
 use heapless::{consts, String};
 use responses::*;
 use types::*;
@@ -23,7 +23,7 @@ use super::NoResponse;
 /// as output pin, it is possible to set the value.
 /// The test command provides the list of the supported GPIOs, the supported functions and the status of all the
 /// GPIOs.
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+UGPIOC", NoResponse, timeout_ms = 10000)]
 pub struct SetGpioConfiguration {
     /// GPIO pin identifier: pin number
@@ -43,6 +43,6 @@ pub struct SetGpioConfiguration {
 /// as output pin, it is possible to set the value.
 /// The test command provides the list of the supported GPIOs, the supported functions and the status of all the
 /// GPIOs.
-#[derive(Clone, ATATCmd)]
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+UGPIOC?", GpioConfiguration, timeout_ms = 10000)]
 pub struct GetGpioConfiguration;
