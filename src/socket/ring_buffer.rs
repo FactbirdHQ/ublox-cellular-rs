@@ -265,7 +265,6 @@ impl<T, N: ArrayLength<T>> RingBuffer<T, N> {
 
     /// Dequeue as many elements from the buffer into the given slice as possible,
     /// and return the amount of elements that could fit.
-    // #[must_use]
     pub fn dequeue_slice(&mut self, data: &mut [T]) -> usize
     where
         T: Copy,
@@ -280,6 +279,7 @@ impl<T, N: ArrayLength<T>> RingBuffer<T, N> {
             data[..size].copy_from_slice(&buf[..size]);
             (size, ())
         });
+
         size_1 + size_2
     }
 }

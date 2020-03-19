@@ -160,10 +160,14 @@ mod test {
 
     #[test]
     fn serialize_pin_status() {
+        let options = serde_at::SerializeOptions {
+            value_sep: false,
+            ..serde_at::SerializeOptions::default()
+        };
         let s = to_string::<consts::U32, consts::U32, _>(
             &PinStatusCode::PhNetSubPin,
             String::from(""),
-            false,
+            options
         )
         .unwrap();
 

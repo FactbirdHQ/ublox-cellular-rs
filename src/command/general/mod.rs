@@ -2,8 +2,7 @@
 pub mod responses;
 pub mod types;
 
-use atat::{atat_derive::AtatCmd, AtatCmd, Error};
-use heapless::{consts, String};
+use atat::atat_derive::AtatCmd;
 use responses::*;
 use types::*;
 

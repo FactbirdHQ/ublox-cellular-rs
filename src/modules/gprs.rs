@@ -1,14 +1,9 @@
-use atat::prelude::*;
 use embedded_hal::digital::v2::OutputPin;
 use heapless::{consts, String};
 use no_std_net::{IpAddr, Ipv4Addr};
 
 use crate::{
-    client::State,
-    command::{
-        network_service::{self, types::*},
-        psn::{self, types::*},
-    },
+    command::psn::{self, types::*},
     error::Error,
     GSMClient,
 };

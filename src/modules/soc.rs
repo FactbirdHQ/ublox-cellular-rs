@@ -1,100 +1,17 @@
 use embedded_hal::digital::v2::OutputPin;
 pub use embedded_nal::{Ipv4Addr, Mode, SocketAddr, SocketAddrV4};
-use embedded_nal::{TcpStack, UdpStack};
+use embedded_nal::TcpStack;
 
 use crate::command::ip_transport_layer::{types::*, *};
 use crate::error::Error;
 use crate::GSMClient;
 
-use crate::socket::{self, AnySocket, Socket, SocketHandle};
+use crate::socket::SocketHandle;
 
 #[cfg(feature = "socket-udp")]
 use crate::socket::UdpSocket;
 #[cfg(feature = "socket-tcp")]
 use crate::socket::{TcpSocket, TcpState};
-
-// #[cfg(feature = "socket-udp")]
-// impl<C, RST, DTR> UdpStack for GSMClient<C, RST, DTR>
-// where
-//     C: atat::AtatClient,
-//     RST: OutputPin,
-//     DTR: OutputPin,
-// {
-//     type Error = Error;
-//     type UdpSocket = UdpSocket;
-
-//     /// Open a new TCP socket to the given address and port. The socket starts in the unconnected state.
-//     fn open(&mut self, _mode: Mode) -> Result<Self::UdpSocket, Self::Error> {
-//         let socket_resp = self.send_at(&CreateSocket {
-//             protocol: SocketProtocol::UDP,
-//             local_port: None,
-//         })?;
-
-//         Ok(UdpSocket::new(socket_resp.socket.0))
-//     }
-
-//     /// Write to the stream. Returns the number of bytes written is returned
-//     /// (which may be less than `buffer.len()`), or an error.
-//     fn write(
-//         &mut self,
-//         socket: &mut Self::UdpSocket,
-//         buffer: &[u8],
-//     ) -> nb::Result<usize, Self::Error> {
-//         if !socket.may_send() {
-//             return Err(nb::Error::Other(Error::SocketClosed));
-//         }
-
-//         let mut remaining = buffer.len();
-//         let mut written = 0;
-
-//         while remaining > 0 {
-//             let chunk_size = core::cmp::min(remaining, 256);
-
-//             let mut data = Vec::new();
-//             data.extend_from_slice(&buffer[written..written + chunk_size])
-//                 .ok();
-
-//             self.send_at(&WriteSocketData {
-//                 socket: socket.handle(),
-//                 length: chunk_size,
-//                 data,
-//             })
-//             .map_err(|_e| Error::E)?;
-
-//             written += chunk_size;
-//             remaining -= chunk_size;
-//         }
-
-//         Ok(written)
-//     }
-
-//     /// Read from the stream. Returns `Ok(n)`, which means `n` bytes of
-//     /// data have been received and they have been placed in
-//     /// `&buffer[0..n]`, or an error.
-//     fn read(
-//         &mut self,
-//         socket: &mut Self::UdpSocket,
-//         buffer: &mut [u8],
-//     ) -> nb::Result<usize, Self::Error> {
-//         let data = self.send_at(&ReadSocketData {
-//             socket: socket.handle(),
-//             length: 256,
-//         })?;
-
-//         Ok(data.length)
-//     }
-
-//     /// Close an existing UDP socket.
-//     fn close(&mut self, socket: Self::UdpSocket) -> Result<(), Self::Error> {
-//         // socket.close();
-
-//         self.send_at(&CloseSocket {
-//             socket: socket.handle(),
-//         })?;
-
-//         Ok(())
-//     }
-// }
 
 #[cfg(feature = "socket-tcp")]
 impl<C, RST, DTR> TcpStack for GSMClient<C, RST, DTR>
@@ -150,32 +67,42 @@ where
     /// Write to the stream. Returns the number of bytes written is returned
     /// (which may be less than `buffer.len()`), or an error.
     fn write(&self, socket: &mut Self::TcpSocket, buffer: &[u8]) -> nb::Result<usize, Self::Error> {
-        let mut sockets = self
-            .sockets
-            .try_borrow_mut()
-            .map_err(|e| nb::Error::Other(e.into()))?;
+        {
+            let mut sockets = self
+                .sockets
+                .try_borrow_mut()
+                .map_err(|e| nb::Error::Other(e.into()))?;
 
-        let tcp = sockets
-            .get::<TcpSocket>(socket.clone())
-            .map_err(|e| nb::Error::Other(Error::Socket(e)))?;
+            let tcp = sockets
+                .get::<TcpSocket>(socket.clone())
+                .map_err(|e| nb::Error::Other(Error::Socket(e)))?;
 
-        if !tcp.is_active() || !tcp.may_send() {
-            return Err(nb::Error::Other(Error::SocketClosed));
+            if !tcp.is_active() || !tcp.may_send() {
+                return Err(nb::Error::Other(Error::SocketClosed));
+            }
         }
 
         let mut remaining = buffer.len();
         let mut written = 0;
 
         while remaining > 0 {
-            let chunk_size = core::cmp::min(remaining, 256);
+            let chunk_size = core::cmp::min(remaining, 200);
 
-            self.send_at(&WriteSocketData {
-                socket,
+            self.send_at(&PrepareWriteSocketDataBinary {
+                socket: socket.clone(),
                 length: chunk_size,
-                data: unsafe {
-                    core::str::from_utf8_unchecked(&buffer[written..written + chunk_size])
-                },
             })?;
+
+            let response = self.send_at(&WriteSocketDataBinary {
+                data: serde_at::ser::Bytes(&buffer[written..written + chunk_size]),
+            })?;
+
+            if response.length != chunk_size {
+                return Err(nb::Error::Other(Error::BadLength));
+            }
+            if &response.socket != socket {
+                return Err(nb::Error::Other(Error::WrongSocketType));
+            }
 
             written += chunk_size;
             remaining -= chunk_size;
@@ -192,6 +119,8 @@ where
         socket: &mut Self::TcpSocket,
         buffer: &mut [u8],
     ) -> nb::Result<usize, Self::Error> {
+        self.spin()?;
+
         let mut sockets = self
             .sockets
             .try_borrow_mut()
@@ -205,7 +134,7 @@ where
     }
 
     /// Close an existing TCP socket.
-    fn close(&self, mut socket: Self::TcpSocket) -> Result<(), Self::Error> {
+    fn close(&self, socket: Self::TcpSocket) -> Result<(), Self::Error> {
         // socket.close();
 
         self.send_at(&CloseSocket { socket })?;

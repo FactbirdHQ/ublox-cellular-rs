@@ -2,8 +2,7 @@
 use super::types::*;
 use crate::socket::SocketHandle;
 use atat::atat_derive::AtatResp;
-use atat::AtatResp;
-use heapless::{consts, String, Vec};
+use heapless::{consts, String};
 
 /// 25.3 Create Socket +USOCR
 #[derive(Clone, AtatResp)]
@@ -37,4 +36,15 @@ pub struct SocketData {
     pub length: usize,
     #[at_arg(position = 2)]
     pub data: String<consts::U256>,
+}
+
+/// 25.25 Socket control +USOCTL
+#[derive(Clone, AtatResp)]
+pub struct SocketControlResponse {
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle,
+    #[at_arg(position = 1)]
+    pub param_id: SocketControlParam,
+    #[at_arg(position = 2)]
+    pub param_val: u32,
 }

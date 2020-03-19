@@ -164,14 +164,30 @@ pub enum ResetMode {
     Reset = 1,
 }
 
+/// Automatic time zone update
+#[derive(uDebug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
+#[repr(u8)]
+pub enum AutomaticTimezone {
+    /// 0: automatic time zone via NITZ disabled
+    Disabled = 0,
+    /// 1: automatic time zone update
+    /// via NITZ enabled; if the network supports the service, update the local
+    /// time to the module (not only time zone)
+    EnabledLocal = 1,
+    /// 2: automatic time zone update
+    /// via NITZ enabled; if the network supports the service, update the GMT
+    /// time to the module (not only time zone)
+    EnabledGMT = 2,
+}
+
 #[derive(uDebug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum TerminationErrorMode {
-    /// +CME ERROR: <err> result code disabled and ERROR used
+    /// 0: +CME ERROR: <err> result code disabled and ERROR used
     Disabled = 0,
-    /// +CME ERROR: <err> result code enabled and numeric <err> values used
+    /// 1: +CME ERROR: <err> result code enabled and numeric <err> values used
     Enabled = 1,
-    /// +CME ERROR: <err> result code enabled and verbose <err> values used
+    /// 2: +CME ERROR: <err> result code enabled and verbose <err> values used
     Verbose = 2,
 }
 

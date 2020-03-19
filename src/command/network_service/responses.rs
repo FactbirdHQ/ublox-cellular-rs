@@ -1,8 +1,6 @@
 //! Responses for Network service Commands
 use super::types::*;
 use atat::atat_derive::AtatResp;
-use atat::AtatResp;
-use heapless::{consts, String, Vec};
 
 /// 7.14 Network registration status +CREG
 #[derive(Clone, AtatResp)]

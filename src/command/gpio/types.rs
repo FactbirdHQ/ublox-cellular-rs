@@ -1,6 +1,5 @@
 //! Argument and parameter types used by GPIO Commands and Responses
 
-use serde::{Deserialize, Serialize};
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use ufmt::derive::uDebug;
 

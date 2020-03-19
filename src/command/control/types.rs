@@ -1,26 +1,30 @@
+//! Argument and parameter types used by V24 control and V25ter Commands and Responses
+
 use serde_repr::{Deserialize_repr, Serialize_repr};
 use ufmt::derive::uDebug;
 
 #[derive(uDebug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum FlowControl {
-    /// • 0: disable DTE flow control
+    /// - 0: disable DTE flow control
     Disabled = 0,
-    /// • 3 (default and factory-programmed value): enable the RTS/CTS DTE flow control
+    /// - 3 (**default and factory-programmed value**): enable the RTS/CTS DTE flow
+    ///   control
     RtsCts = 3,
-    /// • 4: enable the XON/XOFF DTE flow control
-    /// • 5: enable the XON/XOFF DTE flow control
-    /// • 6: enable the XON/XOFF DTE flow control
+    /// - 4: enable the XON/XOFF DTE flow control
+    /// - 5: enable the XON/XOFF DTE flow control
+    /// - 6: enable the XON/XOFF DTE flow control
     XonXoff = 4,
 }
 
 #[derive(uDebug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]
 #[repr(u8)]
 pub enum SoftwareFlowControl {
+    /// - 0: Software flow control off
     None = 0,
-    /// DC1/DC3 on circuit 103 and 104 (XON/XOFF)
+    /// - 1: DC1/DC3 on circuit 103 and 104 (XON/XOFF)
     Circuit103_104 = 1,
-    /// (default value): DCE_by_DTE on circuit 105 (RTS) and DTE_by_DCE on circuit 106 (CTS)
+    /// - 3: (**default value**): DCE_by_DTE on circuit 105 (RTS) and DTE_by_DCE on circuit 106 (CTS)
     Circuit105_106 = 3,
 }
 

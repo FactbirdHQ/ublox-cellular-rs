@@ -48,9 +48,6 @@ where
     }
 
     /// Add a socket to the set with the reference count 1, and return its handle.
-    ///
-    /// # Panics
-    /// This function panics if the storage is fixed-size (not a `Vec`) and is full.
     pub fn add<T>(&mut self, socket: T) -> Result<Handle>
     where
         T: Into<Socket>,
@@ -67,10 +64,6 @@ where
     }
 
     /// Get a socket from the set by its handle, as mutable.
-    ///
-    /// # Panics
-    /// This function may panic if the handle does not belong to this socket set
-    /// or the socket has the wrong type.
     pub fn get<T: AnySocket>(&mut self, handle: Handle) -> Result<SocketRef<T>> {
         match self.sockets.get_mut(&handle.0) {
             Some(item) => Ok(T::downcast(SocketRef::new(&mut item.socket))?),
@@ -79,9 +72,6 @@ where
     }
 
     /// Remove a socket from the set, without changing its state.
-    ///
-    /// # Panics
-    /// This function may panic if the handle does not belong to this socket set.
     pub fn remove(&mut self, handle: Handle) -> Result<Socket> {
         // net_trace!("[{}]: removing", handle.0);
         match self.sockets.remove(&handle.0) {
@@ -91,9 +81,6 @@ where
     }
 
     /// Increase reference count by 1.
-    ///
-    /// # Panics
-    /// This function may panic if the handle does not belong to this socket set.
     pub fn retain(&mut self, handle: Handle) -> Result<()> {
         match self.sockets.get_mut(&handle.0) {
             Some(v) => v.refs += 1,
@@ -103,10 +90,6 @@ where
     }
 
     /// Decrease reference count by 1.
-    ///
-    /// # Panics
-    /// This function may panic if the handle does not belong to this socket set,
-    /// or if the reference count is already zero.
     pub fn release(&mut self, handle: Handle) -> Result<()> {
         match self.sockets.get_mut(&handle.0) {
             Some(v) => {

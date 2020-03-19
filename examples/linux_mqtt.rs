@@ -2,11 +2,12 @@ extern crate alloc;
 extern crate atat;
 extern crate env_logger;
 extern crate nb;
-
 mod common;
 
 use serialport;
+use std::io;
 use std::thread;
+use std::sync::Arc;
 
 use ublox_cellular::gprs::APNInfo;
 use ublox_cellular::prelude::*;
@@ -28,6 +29,29 @@ where
     DTR: OutputPin,
 {
     gsm.init(true)?;
+
+    gsm.import_root_ca(
+        0,
+        "Verisign",
+        include_str!("./secrets/aws/Verisign.pem"),
+    )
+    .expect("Failed to import root CA");
+
+    gsm.import_certificate(
+        0,
+        "cf0c600_cert",
+        include_str!("./secrets/aws/certificate.pem.crt"),
+    )
+    .expect("Failed to import certificate");
+
+    gsm.import_private_key(
+        0,
+        "cf0c600_key",
+        include_str!("./secrets/aws/private.pem.key"),
+        None,
+    )
+    .expect("Failed to import private key");
+
     gsm.begin("")?;
     gsm.attach_gprs(APNInfo::new("em"))?;
     Ok(())
@@ -45,59 +69,73 @@ fn main() {
         parity: serialport::Parity::None,
         stop_bits: serialport::StopBits::One,
         flow_control: serialport::FlowControl::None,
-        timeout: Duration::from_millis(2),
+        timeout: Duration::from_millis(5000),
     };
 
     // Open serial port
-    let port = serialport::open_with_settings("/dev/ttyUSB0", &settings)
+    let serial_tx = serialport::open_with_settings("/dev/ttyUSB1", &settings)
         .expect("Could not open serial port");
-    let port2 = port.try_clone().expect("Failed to clone serial port");
+    let mut serial_rx = serial_tx.try_clone().expect("Failed to clone serial port");
 
-    let (cell_client, mut parser) = atat::new::<_, _, SysTimer>(
-        (Serial(port), Serial(port2)),
+    let (cell_client, mut ingress) = atat::new::<_, SysTimer>(
+        Serial(serial_tx),
         SysTimer::new(),
         atat::Config::new(atat::Mode::Timeout),
     );
 
-    let gsm = GSMClient::<_, Pin, Pin>::new(cell_client, GSMConfig::new());
-
-    // Use a thread loop in lack of actual interrupt for uart rx
-    let serial_irq = thread::Builder::new()
-        .name("serial_irq".to_string())
+    let gsm = Arc::new(GSMClient::<_, Pin, Pin>::new(cell_client, GSMConfig::new()));
+    // Launch reading thread
+    thread::Builder::new()
+        .name("serial_read".to_string())
         .spawn(move || loop {
-            thread::sleep(Duration::from_millis(1));
-            parser.handle_irq();
+            let mut buffer = [0; 32];
+            match serial_rx.read(&mut buffer[..]) {
+                Ok(0) => {}
+                Ok(bytes_read) => {
+                    ingress.write(&buffer[0..bytes_read]);
+                    ingress.digest();
+                    ingress.digest();
+                    // gsm.spin();
+                }
+                Err(e) => match e.kind() {
+                    io::ErrorKind::WouldBlock
+                    | io::ErrorKind::TimedOut
+                    | io::ErrorKind::Interrupted => {
+                        // Ignore
+                    }
+                    _ => {
+                        log::error!("Serial reading thread error while reading: {}", e);
+                    }
+                },
+            }
         })
         .unwrap();
-
-    // let urc_handler = thread::Builder::new()
-    //     .name("urc_handler".to_string())
-    //     .spawn(move || loop {
-    //         thread::sleep(Duration::from_millis(10));
-    //         gsm.handle_urc();
-    //     })
-    //     .unwrap();
 
     if attach_gprs(&gsm).is_ok() {
         let socket = {
             let soc = gsm.open(Mode::Timeout(1000)).unwrap();
             // Upgrade socket to TLS socket
-            gsm.upgrade_socket(&soc).unwrap();
+            gsm.enable_ssl(soc, 0).unwrap();
 
-            // Connect to MQTT Broker
+            // Connect to MQTT Broker: a69ih9fwq4cti-ats.iot.eu-west-1.amazonaws.com
             gsm.connect(
                 soc,
-                SocketAddrV4::new(Ipv4Addr::new(195, 34, 89, 241), 443).into(),
+                // a69ih9fwq4cti.iot.eu-west-1.amazonaws.com :
+                SocketAddrV4::new(Ipv4Addr::new(52, 209, 116, 12), 8883).into(),
+                // a69ih9fwq4cti-ats.iot.eu-west-1.amazonaws.com :
+                // SocketAddrV4::new(Ipv4Addr::new(34, 250, 137, 90), 8883).into(),
+                // test.mosquitto.org :
+                // SocketAddrV4::new(Ipv4Addr::new(5, 196, 95, 208), 8884).into(),
             )
             .unwrap()
         };
 
-        let mut mqtt = MQTTClient::new(&gsm, socket, SysTimer::new(), SysTimer::new(), 512, 512);
+        let mut mqtt = MQTTClient::new(&*gsm, socket, SysTimer::new(), SysTimer::new(), 512, 512);
 
         mqtt.connect(Connect {
             protocol: Protocol::MQTT311,
             keep_alive: 60,
-            client_id: String::from("Sample_client_id"),
+            client_id: String::from("MINI"),
             clean_session: true,
             last_will: None,
             username: None,
@@ -110,15 +148,11 @@ fn main() {
         loop {
             mqtt.publish(
                 QoS::AtLeastOnce,
-                format!("fbmini/input/{}-{}", "UUID", 0),
-                "{\"key\": \"Some json payload\"}".as_bytes().to_owned(),
+                String::from("fbmini"),
+                "{\"key\": \"Hello World from Factbird Mini!\"}".as_bytes().to_owned(),
             )
             .expect("Failed to publish MQTT msg");
             thread::sleep(Duration::from_millis(5000));
         }
     }
-
-    // wait for all the threads to join back (Will never happen in this example)
-    // urc_handler.join().unwrap();
-    serial_irq.join().unwrap();
 }

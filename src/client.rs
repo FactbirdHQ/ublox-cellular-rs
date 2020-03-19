@@ -1,4 +1,4 @@
-use atat::prelude::*;
+use atat::AtatClient;
 use core::cell::RefCell;
 use embedded_hal::digital::v2::OutputPin;
 use heapless::consts;
@@ -6,13 +6,11 @@ use heapless::consts;
 use crate::{
     command::{
         control::{types::*, *},
-        general::*,
         gpio::{types::*, *},
-        ip_transport_layer::{types::*, *},
+        ip_transport_layer::*,
         mobile_control::{types::*, *},
-        network_service::*,
         system_features::{types::*, *},
-        *,
+        Urc, *,
     },
     error::Error,
     socket::{SocketHandle, SocketSet, TcpSocket},
@@ -137,9 +135,12 @@ where
             // Relevant issue: https://github.com/rust-embedded/embedded-hal/issues/79
             return Err(Error::_Unknown);
 
-            self.send_internal(&SetDataRate {
-                rate: BaudRate::B115200,
-            })?;
+            self.send_internal(
+                &SetDataRate {
+                    rate: BaudRate::B115200,
+                },
+                true,
+            )?;
 
             // NOTE: On the UART AT interface, after the reception of the "OK" result code for the +IPR command, the DTE
             // shall wait for at least 100 ms before issuing a new AT command; this is to guarantee a proper baud rate
@@ -153,45 +154,69 @@ where
         }
 
         if self.config.flow_control {
-            self.send_internal(&SetFlowControl {
-                value: FlowControl::RtsCts,
-            })?;
+            self.send_internal(
+                &SetFlowControl {
+                    value: FlowControl::RtsCts,
+                },
+                true,
+            )?;
         } else {
-            self.send_internal(&SetFlowControl {
-                value: FlowControl::Disabled,
-            })?;
+            self.send_internal(
+                &SetFlowControl {
+                    value: FlowControl::Disabled,
+                },
+                true,
+            )?;
         }
 
         if self.config.dtr_pin.is_some() && self.config.low_power_mode {
             self.low_power_mode(self.config.low_power_mode)?;
 
-            self.send_internal(&SetPowerSavingControl {
-                mode: PowerSavingMode::CtrlByDtr,
-                timeout: None,
-            })?;
+            self.send_internal(
+                &SetPowerSavingControl {
+                    mode: PowerSavingMode::CtrlByDtr,
+                    timeout: None,
+                },
+                true,
+            )?;
         } else {
-            self.send_internal(&SetPowerSavingControl {
-                mode: PowerSavingMode::Disabled,
-                timeout: None,
-            })?;
+            self.send_internal(
+                &SetPowerSavingControl {
+                    mode: PowerSavingMode::Disabled,
+                    timeout: None,
+                },
+                true,
+            )?;
         }
 
-        self.send_internal(&SetReportMobileTerminationError {
-            n: TerminationErrorMode::Disabled,
-        })?;
+        self.send_internal(
+            &SetReportMobileTerminationError {
+                n: TerminationErrorMode::Verbose,
+            },
+            true,
+        )?;
 
-        self.send_internal(&SetGpioConfiguration {
-            gpio_id: 42,
-            gpio_mode: GpioMode::PadDisabled,
-        })?;
-        self.send_internal(&SetGpioConfiguration {
-            gpio_id: 16,
-            gpio_mode: GpioMode::GsmTxIndication,
-        })?;
-        self.send_internal(&SetGpioConfiguration {
-            gpio_id: 23,
-            gpio_mode: GpioMode::NetworkStatus,
-        })?;
+        self.send_internal(
+            &SetGpioConfiguration {
+                gpio_id: 42,
+                gpio_mode: GpioMode::PadDisabled,
+            },
+            true,
+        )?;
+        self.send_internal(
+            &SetGpioConfiguration {
+                gpio_id: 16,
+                gpio_mode: GpioMode::GsmTxIndication,
+            },
+            true,
+        )?;
+        self.send_internal(
+            &SetGpioConfiguration {
+                gpio_id: 23,
+                gpio_mode: GpioMode::NetworkStatus,
+            },
+            true,
+        )?;
 
         // info!("{:?}\r", self.send_internal(&GetIndicatorControl)?);
         // info!("{:?}\r", self.send_internal(&GetIMEI { snt: None })?);
@@ -215,11 +240,11 @@ where
 
     fn autosense(&self) -> Result<(), Error> {
         for _ in 0..15 {
-            match self.send_internal(&AT) {
+            match self.send_internal(&AT, true) {
                 Ok(_) => {
                     return Ok(());
                 }
-                Err(e) => {}
+                Err(_e) => {}
             };
         }
         Err(Error::BaudDetection)
@@ -233,46 +258,77 @@ where
         Ok(())
     }
 
-    pub fn handle_urc(&self) {
-        let urc = if let Ok(ref mut client) = self.client.try_borrow_mut() {
-            client.check_urc::<crate::command::Urc>()
-        } else {
-            None
-        };
-
-        match urc {
-            Some(crate::command::Urc::MessageWaitingIndication(_)) => {}
-            Some(crate::command::Urc::SocketDataAvailable(
-                ip_transport_layer::urc::SocketDataAvailable { socket, length },
-            )) => while self.socket_ingress(socket, length).is_err() {},
-            Some(_) => log::info!("Some other URC\r"),
-            _ => (),
-        };
+    pub fn spin(&self) -> Result<(), Error>{
+        self.handle_urcs()
     }
 
-    fn socket_ingress(&self, socket: SocketHandle, length: usize) -> Result<usize, ()> {
-        let socket_data = self
-            .send_at(&ReadSocketData { socket, length })
-            .map_err(|e| ())?;
+    fn handle_urcs(&self) -> Result<(), Error> {
+        loop {
+            let urc = self.client.try_borrow_mut()?.check_urc::<Urc>();
 
-        let mut sockets = self.sockets.try_borrow_mut().map_err(|e| ())?;
-        let mut tcp = sockets
-            .get::<TcpSocket>(socket_data.socket)
-            .map_err(|e| ())?;
+            match urc {
+                Some(Urc::MessageWaitingIndication(_)) => {
+                    log::info!("[URC] MessageWaitingIndication\r");
+                }
+                Some(Urc::SocketClosed(ip_transport_layer::urc::SocketClosed {
+                    socket,
+                })) => {
+                    let mut sockets = self.sockets.try_borrow_mut()?;
+                    let mut tcp = sockets.get::<TcpSocket>(socket)?;
+                    tcp.close();
+                }
+                Some(Urc::SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable {
+                    socket,
+                    length,
+                })) => {
+                    log::info!("[URC] SocketDataAvailable: {:?} bytes\r", length);
+                    if length > 0 {
+                        match self.socket_ingress(socket, length) {
+                            Ok(bytes) => log::info!("Ingressed {:?} bytes\r", bytes),
+                            Err(e) => log::error!("Failed ingress! {:?}\r", e)
+                        }
+                    }
+                }
+                None => break,
+            };
+        }
+        Ok(())
+    }
+
+    fn socket_ingress(&self, socket: SocketHandle, length: usize) -> Result<usize, Error> {
+        let socket_data = self.send_at(&ReadSocketData { socket, length })?;
+
+        if socket_data.length != length {
+            return Err(Error::BadLength);
+        }
+
+        let mut sockets = self.sockets.try_borrow_mut()?;
+        let mut tcp = sockets.get::<TcpSocket>(socket_data.socket)?;
 
         Ok(tcp.rx_enqueue_slice(&socket_data.data.as_bytes()))
     }
 
-    fn send_internal<A: atat::AtatCmd>(&self, req: &A) -> Result<A::Response, Error> {
+    pub(crate) fn send_internal<A: atat::AtatCmd>(
+        &self,
+        req: &A,
+        check_urc: bool,
+    ) -> Result<A::Response, Error> {
+        // React to any enqueued URC's before starting a new command exchange
+        if check_urc {
+            if let Err(e) = self.handle_urcs() {
+                log::error!("Failed handle URC: {:?}\r", e);
+            }
+        }
+
         self.client
             .try_borrow_mut()?
             .send(req)
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
-                    log::error!("{:?}: [{:?}]\r", ate, req.as_str());
+                    log::error!("{:?}: [{:?}]\r", ate, req.as_string());
                     ate.into()
                 }
-                _ => atat::Error::ResponseError.into(),
+                nb::Error::WouldBlock => Error::_Unknown,
             })
     }
 
@@ -281,6 +337,6 @@ where
         //     self.init(false)?
         // }
 
-        self.send_internal(cmd)
+        self.send_internal(cmd, true)
     }
 }

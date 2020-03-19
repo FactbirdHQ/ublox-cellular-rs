@@ -1,26 +1,18 @@
 #![no_std]
-#![allow(unused)]
-extern crate heapless;
-
-extern crate atat;
-extern crate nb;
-extern crate no_std_net;
-extern crate ufmt;
-
-#[cfg(test)]
-#[macro_use]
-extern crate std;
 
 mod client;
-pub mod gprs;
-pub mod gsm;
-pub mod soc;
-pub mod ssl;
-
+mod modules;
 pub mod command;
 pub mod error;
-pub mod prelude;
 pub mod socket;
 
-pub use client::Config as GSMConfig;
-pub use client::GSMClient;
+pub use modules::{gprs, gsm, soc, ssl};
+pub use client::{GSMClient, Config as GSMConfig};
+
+/// Prelude - Include traits
+pub mod prelude {
+    pub use super::gprs::GPRS;
+    pub use super::gsm::GSM;
+    pub use super::ssl::SSL;
+    pub use embedded_nal::{TcpStack, UdpStack};
+}

@@ -1,8 +1,6 @@
 //! Responses for Mobile equipment control and status Commands
 use super::types::*;
 use atat::atat_derive::AtatResp;
-use atat::AtatResp;
-use heapless::{consts, Vec};
 
 /// 5.3 Set module functionality +CFUN
 /// Selects the level of functionality <fun> in the MT.

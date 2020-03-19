@@ -3,13 +3,25 @@
 
 pub mod responses;
 pub mod types;
-use atat::{atat_derive::AtatCmd, AtatCmd, Error};
-use heapless::{consts, String, Vec};
+use atat::atat_derive::AtatCmd;
 use responses::*;
 use types::*;
 
 use super::NoResponse;
-use log::info;
+
+/// 5.2 Module switch off +CPWROFF
+///
+/// Switches off the MT. During shut-down current settings are saved in module's
+/// non-volatile memory
+///
+/// **Notes:**
+/// - Using this command can result in the following command line being ignored.
+/// - See the corresponding System Integration Manual for the timing and the
+///   electrical details of the module power-off sequence via the +CPWROFF
+///   command.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+CPWROFF", NoResponse, timeout_ms = 40000)]
+pub struct ModuleSwitchOff;
 
 /// 5.3 Set module functionality +CFUN
 ///
@@ -40,6 +52,18 @@ pub struct GetModuleFunctionality;
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+CIND?", IndicatorControl)]
 pub struct GetIndicatorControl;
+
+/// 5.15 Automatic time zone update +CTZU
+///
+/// Configures the automatic time zone update via NITZ. **Notes:**
+/// - The Time Zone information is provided after the network registration (if
+///   the network supports the time zone information).
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+CMEE", NoResponse)]
+pub struct SetAutomaticTimezoneUpdate {
+    #[at_arg(position = 0)]
+    pub on_off: AutomaticTimezone,
+}
 
 /// 5.19 Report mobile termination error +CMEE
 ///

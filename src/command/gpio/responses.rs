@@ -1,8 +1,6 @@
 //! Responses for GPIO Commands
 use super::types::*;
 use atat::atat_derive::AtatResp;
-use atat::AtatResp;
-use heapless::{consts, String};
 
 /// 20.2 GPIO select configuration command +UGPIOC
 #[derive(Clone, AtatResp)]

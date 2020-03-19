@@ -5,7 +5,7 @@ extern crate nb;
 mod common;
 
 use serialport;
-use std::sync::{Arc, Mutex};
+use std::io;
 use std::thread;
 
 use ublox_cellular::gprs::APNInfo;
@@ -49,24 +49,35 @@ fn main() {
     };
 
     // Open serial port
-    let port = serialport::open_with_settings("/dev/ttyUSB0", &settings)
+    let serial_tx = serialport::open_with_settings("/dev/ttyUSB0", &settings)
         .expect("Could not open serial port");
-    let port2 = port.try_clone().expect("Failed to clone serial port");
+    let mut serial_rx = serial_tx.try_clone().expect("Failed to clone serial port");
 
-    let (cell_client, mut parser) = atat::new::<_, _, SysTimer>(
-        (Serial(port), Serial(port2)),
+    let (cell_client, mut ingress) = atat::new::<_, SysTimer>(
+        Serial(serial_tx),
         SysTimer::new(),
         atat::Config::new(atat::Mode::Timeout),
     );
 
     let gsm = GSMClient::<_, Pin, Pin>::new(cell_client, GSMConfig::new());
 
-    let serial_irq = thread::Builder::new()
-        .name("serial_irq".to_string())
+    // Launch reading thread
+    thread::Builder::new()
+        .name("serial_read".to_string())
         .spawn(move || loop {
-            thread::sleep(Duration::from_millis(1));
-            if parser.handle_irq() {
-                parser.parse_at();
+            let mut buffer = [0; 32];
+            match serial_rx.read(&mut buffer[..]) {
+                Ok(0) => {}
+                Ok(bytes_read) => {
+                    ingress.write(&buffer[0..bytes_read]);
+                    ingress.digest();
+                }
+                Err(e) => match e.kind() {
+                    io::ErrorKind::Interrupted => {}
+                    _ => {
+                        log::error!("Serial reading thread error while reading: {}", e);
+                    }
+                },
             }
         })
         .unwrap();
@@ -81,48 +92,30 @@ fn main() {
             )
             .expect("Failed to connect to remote!")
         };
-        let urc_gsm = Arc::new(Mutex::new(gsm));
-        let data_gsm = urc_gsm.clone();
-        thread::Builder::new()
-            .spawn(move || loop {
-                thread::sleep(Duration::from_millis(10));
-                urc_gsm.lock().unwrap().handle_urc();
-            })
-            .expect("Failed to create URC Handler thread");
 
         let mut cnt = 1;
         loop {
             thread::sleep(Duration::from_millis(5000));
             let mut buf = [0u8; 256];
-            {
-                let gsm = data_gsm.lock().unwrap();
-                let read = gsm
-                    .read(&mut socket, &mut buf)
-                    .expect("Failed to read from socket!");
-                if read > 0 {
-                    log::info!(
-                        "Read {:?} bytes from socket layer!  - {:?}\r",
-                        read,
-                        unsafe { core::str::from_utf8_unchecked(&buf[..read]) }
-                    );
-                }
-            }
-
-            {
-                let gsm = data_gsm.lock().unwrap();
-                let wrote = gsm
-                    .write(&mut socket, format!("Whatup {}", cnt).as_bytes())
-                    .expect("Failed to write to socket!");
+            let read = gsm
+                .read(&mut socket, &mut buf)
+                .expect("Failed to read from socket!");
+            if read > 0 {
                 log::info!(
-                    "Writing {:?} bytes to socket layer! - {:?}\r",
-                    wrote,
-                    format!("Whatup {}", cnt)
+                    "Read {:?} bytes from socket layer!  - {:?}\r",
+                    read,
+                    unsafe { core::str::from_utf8_unchecked(&buf[..read]) }
                 );
             }
+            let wrote = gsm
+                .write(&mut socket, format!("Whatup {}", cnt).as_bytes())
+                .expect("Failed to write to socket!");
+            log::info!(
+                "Writing {:?} bytes to socket layer! - {:?}\r",
+                wrote,
+                format!("Whatup {}", cnt)
+            );
             cnt += 1;
         }
     }
-
-    // wait for all the threads to join back (Will never happen in this example)
-    serial_irq.join().unwrap();
 }

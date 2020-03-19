@@ -280,44 +280,10 @@ impl TcpSocket {
     //         Ok(())
     //     }
 
-    /// Close the transmit half of the full-duplex connection.
-    ///
-    /// Note that there is no corresponding function for the receive half of the full-duplex
-    /// connection; only the remote end can close it. If you no longer wish to receive any
-    /// data and would like to reuse the socket right away, use [abort](#method.abort).
+    /// Close the connection.
     pub fn close(&mut self) {
-        match self.state {
-            // In the LISTEN state there is no established connection.
-            State::Listen => self.set_state(State::Closed),
-            // In the SYN-SENT state the remote endpoint is not yet synchronized and, upon
-            // receiving an RST, will abort the connection.
-            State::SynSent => self.set_state(State::Closed),
-            // In the SYN-RECEIVED, ESTABLISHED and CLOSE-WAIT states the transmit half
-            // of the connection is open, and needs to be explicitly closed with a FIN.
-            State::SynReceived | State::Established => self.set_state(State::FinWait1),
-            State::CloseWait => self.set_state(State::LastAck),
-            // In the FIN-WAIT-1, FIN-WAIT-2, CLOSING, LAST-ACK, TIME-WAIT and CLOSED states,
-            // the transmit half of the connection is already closed, and no further
-            // action is needed.
-            State::FinWait1
-            | State::FinWait2
-            | State::Closing
-            | State::TimeWait
-            | State::LastAck
-            | State::Closed => (),
-        }
+        self.set_state(State::Closed);
     }
-
-    //     /// Aborts the connection, if any.
-    //     ///
-    //     /// This function instantly closes the socket. One reset packet will be sent to the remote
-    //     /// endpoint.
-    //     ///
-    //     /// In terms of the TCP state machine, the socket may be in any state and is moved to
-    //     /// the `CLOSED` state.
-    //     pub fn abort(&mut self) {
-    //         self.set_state(State::Closed);
-    //     }
 
     /// Return whether the socket is passively listening for incoming connections.
     ///
@@ -509,6 +475,7 @@ impl TcpSocket {
     ///
     /// See also [recv](#method.recv).
     pub fn recv_slice(&mut self, data: &mut [u8]) -> Result<usize> {
+
         self.recv_impl(|rx_buffer| {
             let size = rx_buffer.dequeue_slice(data);
             (size, size)
