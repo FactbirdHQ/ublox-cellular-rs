@@ -2,6 +2,7 @@
 
 mod client;
 mod modules;
+mod hex;
 pub mod command;
 pub mod error;
 pub mod socket;

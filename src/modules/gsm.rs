@@ -66,7 +66,9 @@ where
     }
 
     fn shutdown(&self, secure: bool) -> Result<(), Error> {
-        self.send_at(&mobile_control::ModuleSwitchOff)?;
+        if secure {
+            self.send_at(&mobile_control::ModuleSwitchOff)?;
+        }
         Ok(())
     }
 

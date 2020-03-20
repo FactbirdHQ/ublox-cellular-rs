@@ -6,8 +6,8 @@ mod common;
 
 use serialport;
 use std::io;
-use std::thread;
 use std::sync::Arc;
+use std::thread;
 
 use ublox_cellular::gprs::APNInfo;
 use ublox_cellular::prelude::*;
@@ -30,12 +30,8 @@ where
 {
     gsm.init(true)?;
 
-    gsm.import_root_ca(
-        0,
-        "Verisign",
-        include_str!("./secrets/aws/Verisign.pem"),
-    )
-    .expect("Failed to import root CA");
+    gsm.import_root_ca(0, "Verisign", include_str!("./secrets/aws/Verisign.pem"))
+        .expect("Failed to import root CA");
 
     gsm.import_certificate(
         0,
@@ -59,7 +55,7 @@ where
 
 fn main() {
     env_logger::builder()
-        .filter_level(log::LevelFilter::Trace)
+        .filter_level(log::LevelFilter::Debug)
         .init();
 
     // Serial port settings
@@ -73,7 +69,7 @@ fn main() {
     };
 
     // Open serial port
-    let serial_tx = serialport::open_with_settings("/dev/ttyUSB1", &settings)
+    let serial_tx = serialport::open_with_settings("/dev/ttyUSB0", &settings)
         .expect("Could not open serial port");
     let mut serial_rx = serial_tx.try_clone().expect("Failed to clone serial port");
 
@@ -145,13 +141,17 @@ fn main() {
 
         log::info!("MQTT Connected!\r");
 
+        let mut cnt = 0;
         loop {
             mqtt.publish(
                 QoS::AtLeastOnce,
                 String::from("fbmini"),
-                "{\"key\": \"Hello World from Factbird Mini!\"}".as_bytes().to_owned(),
+                format!("{{\"key\": \"Hello World from Factbird Mini - {}!\"}}", cnt)
+                    .as_bytes()
+                    .to_owned(),
             )
             .expect("Failed to publish MQTT msg");
+            cnt += 1;
             thread::sleep(Duration::from_millis(5000));
         }
     }

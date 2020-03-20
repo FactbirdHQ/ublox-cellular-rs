@@ -13,6 +13,7 @@ use crate::{
         Urc, *,
     },
     error::Error,
+    hex,
     socket::{SocketHandle, SocketSet, TcpSocket},
 };
 
@@ -196,6 +197,13 @@ where
             true,
         )?;
 
+        // self.send_internal(
+        //     &general::IdentificationInformation {
+        //         n: 9,
+        //     },
+        //     true,
+        // )?;
+
         self.send_internal(
             &SetGpioConfiguration {
                 gpio_id: 42,
@@ -258,7 +266,7 @@ where
         Ok(())
     }
 
-    pub fn spin(&self) -> Result<(), Error>{
+    pub fn spin(&self) -> Result<(), Error> {
         self.handle_urcs()
     }
 
@@ -270,9 +278,7 @@ where
                 Some(Urc::MessageWaitingIndication(_)) => {
                     log::info!("[URC] MessageWaitingIndication\r");
                 }
-                Some(Urc::SocketClosed(ip_transport_layer::urc::SocketClosed {
-                    socket,
-                })) => {
+                Some(Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket })) => {
                     let mut sockets = self.sockets.try_borrow_mut()?;
                     let mut tcp = sockets.get::<TcpSocket>(socket)?;
                     tcp.close();
@@ -285,7 +291,7 @@ where
                     if length > 0 {
                         match self.socket_ingress(socket, length) {
                             Ok(bytes) => log::info!("Ingressed {:?} bytes\r", bytes),
-                            Err(e) => log::error!("Failed ingress! {:?}\r", e)
+                            Err(e) => log::error!("Failed ingress! {:?}\r", e),
                         }
                     }
                 }
@@ -296,16 +302,19 @@ where
     }
 
     fn socket_ingress(&self, socket: SocketHandle, length: usize) -> Result<usize, Error> {
-        let socket_data = self.send_at(&ReadSocketData { socket, length })?;
+        let chunk_size = core::cmp::min(length, 200);
+        let socket_data = self.send_at(&ReadSocketData { socket, length: chunk_size })?;
 
-        if socket_data.length != length {
+        if socket_data.length != chunk_size {
             return Err(Error::BadLength);
         }
 
         let mut sockets = self.sockets.try_borrow_mut()?;
         let mut tcp = sockets.get::<TcpSocket>(socket_data.socket)?;
 
-        Ok(tcp.rx_enqueue_slice(&socket_data.data.as_bytes()))
+
+        let data: heapless::Vec<_, consts::U200> = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
+        Ok(tcp.rx_enqueue_slice(&data))
     }
 
     pub(crate) fn send_internal<A: atat::AtatCmd>(

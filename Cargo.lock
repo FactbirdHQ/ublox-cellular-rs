@@ -48,7 +48,6 @@ dependencies = [
  "atat_derive",
  "embedded-hal",
  "heapless",
- "log",
  "nb",
  "serde",
  "serde_at",
