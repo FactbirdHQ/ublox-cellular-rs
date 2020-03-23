@@ -10,6 +10,7 @@ use crate::{
     },
     error::Error,
     GSMClient,
+    GSMState
 };
 
 pub trait GSM {
@@ -25,6 +26,8 @@ where
     DTR: OutputPin,
 {
     fn begin(&self, pin: &str) -> Result<(), Error> {
+        self.set_state(GSMState::Registering)?;
+
         let pin_status = self.send_at(&device_lock::GetPinStatus)?;
 
         match pin_status.code {
@@ -61,6 +64,8 @@ where
             .registration_ok()?
             .is_access_alive()
         {}
+
+        self.set_state(GSMState::Registered)?;
 
         Ok(())
     }

@@ -8,7 +8,7 @@ pub mod error;
 pub mod socket;
 
 pub use modules::{gprs, gsm, soc, ssl};
-pub use client::{GSMClient, Config as GSMConfig};
+pub use client::{GSMClient, Config as GSMConfig, State as GSMState};
 
 /// Prelude - Include traits
 pub mod prelude {

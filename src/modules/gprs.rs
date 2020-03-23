@@ -6,6 +6,7 @@ use crate::{
     command::psn::{self, types::*},
     error::Error,
     GSMClient,
+    GSMState
 };
 
 pub struct APNInfo {
@@ -36,7 +37,13 @@ where
     DTR: OutputPin,
 {
     fn attach_gprs(&self, apn_info: APNInfo) -> Result<(), Error> {
-        // self.state = State::Attaching;
+        match self.get_state()? {
+            GSMState::Registered | GSMState::Registering => return Err(Error::_Unknown),
+            GSMState::Attaching | GSMState::Attached => return Ok(()),
+            _ => {}
+        };
+
+        self.set_state(GSMState::Attaching)?;
 
         // Attach GPRS
         self.send_at(&psn::SetGPRSAttached { state: 1 })?;
@@ -89,11 +96,11 @@ where
             })?;
 
         if param_tag != 1 {
-            // self.state = State::Deattached;
+            self.set_state(GSMState::Deattached)?;
             return Err(Error::Network);
         }
+        self.set_state(GSMState::Attached)?;
 
-        // self.state = State::Attached;
         Ok(())
     }
 
@@ -106,7 +113,7 @@ where
 
         // Detach from network
         self.send_at(&psn::SetGPRSAttached { state: 0 })?;
-        // self.state = State::Deattached;
+        self.set_state(GSMState::Deattached)?;
 
         Ok(())
     }

@@ -26,6 +26,8 @@ pub struct AT;
 pub enum Urc {
     #[at_urc("+UUSORD")]
     SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable),
+    #[at_urc("+UUPSDD")]
+    DataConnectionDeactivated(psn::urc::DataConnectionDeactivated),
     #[at_urc("+UUSOCL")]
     SocketClosed(ip_transport_layer::urc::SocketClosed),
     #[at_urc("+UMWI")]

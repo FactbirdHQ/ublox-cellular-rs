@@ -17,13 +17,14 @@ use crate::{
     socket::{SocketHandle, SocketSet, TcpSocket},
 };
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum State {
+    Deregistered,
+    Registering,
+    Registered,
     Deattached,
     Attaching,
-    Attached,
-    Disconnected,
-    Connecting,
-    Connected,
+    Attached
 }
 
 #[derive(Debug, Default)]
@@ -94,7 +95,7 @@ where
 {
     initialized: RefCell<bool>,
     config: Config<RST, DTR>,
-    pub(crate) state: State,
+    pub(crate) state: RefCell<State>,
     pub(crate) client: RefCell<C>,
     pub(crate) sockets: RefCell<SocketSet<consts::U10>>,
 }
@@ -108,11 +109,20 @@ where
     pub fn new(client: C, config: Config<RST, DTR>) -> Self {
         GSMClient {
             config,
-            state: State::Deattached,
+            state: RefCell::new(State::Deregistered),
             initialized: RefCell::new(false),
             client: RefCell::new(client),
             sockets: RefCell::new(SocketSet::new()),
         }
+    }
+
+    pub(crate) fn set_state(&self, state: State) -> Result<(), Error> {
+        *self.state.try_borrow_mut().map_err(|_| Error::SetState)? = state;
+        Ok(())
+    }
+
+    pub(crate) fn get_state(&self) -> Result<State, Error> {
+        Ok(*self.state.try_borrow().map_err(|_| Error::SetState)?)
     }
 
     /// Initilize a new ublox device to a known state (restart, wait for startup, set RS232 settings, gpio settings, etc.)
@@ -229,7 +239,8 @@ where
         // info!("{:?}\r", self.send_internal(&GetIndicatorControl)?);
         // info!("{:?}\r", self.send_internal(&GetIMEI { snt: None })?);
 
-        self.initialized.swap(&RefCell::new(true));
+        *self.initialized.try_borrow_mut()? = true;
+
 
         Ok(())
     }
@@ -283,16 +294,16 @@ where
                     let mut tcp = sockets.get::<TcpSocket>(socket)?;
                     tcp.close();
                 }
+                Some(Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated { .. })) => {
+                    self.set_state(State::Deattached)?;
+                }
                 Some(Urc::SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable {
                     socket,
                     length,
                 })) => {
-                    log::info!("[URC] SocketDataAvailable: {:?} bytes\r", length);
-                    if length > 0 {
-                        match self.socket_ingress(socket, length) {
-                            Ok(bytes) => log::info!("Ingressed {:?} bytes\r", bytes),
-                            Err(e) => log::error!("Failed ingress! {:?}\r", e),
-                        }
+                    match self.socket_ingress(socket, length) {
+                        Ok(bytes) => log::info!("[URC] Ingressed {:?} bytes\r", bytes),
+                        Err(e) => log::error!("[URC] Failed ingress! {:?}\r", e),
                     }
                 }
                 None => break,
@@ -302,6 +313,9 @@ where
     }
 
     fn socket_ingress(&self, socket: SocketHandle, length: usize) -> Result<usize, Error> {
+        if length == 0 {
+            return Ok(0);
+        }
         let chunk_size = core::cmp::min(length, 200);
         let socket_data = self.send_at(&ReadSocketData { socket, length: chunk_size })?;
 
@@ -313,6 +327,7 @@ where
         let mut tcp = sockets.get::<TcpSocket>(socket_data.socket)?;
 
 
+        // TODO: Handle this decoding in-place?
         let data: heapless::Vec<_, consts::U200> = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
         Ok(tcp.rx_enqueue_slice(&data))
     }
@@ -342,9 +357,9 @@ where
     }
 
     pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
-        // if !self.initialized.try_borrow()? {
-        //     self.init(false)?
-        // }
+        if !*self.initialized.try_borrow()? {
+            self.init(false)?
+        }
 
         self.send_internal(cmd, true)
     }

@@ -1,4 +1,4 @@
-//! Responses for Internet protocol transport layer Commands
+//! Unsolicited responses for Internet protocol transport layer Commands
 use crate::socket::SocketHandle;
 use atat::atat_derive::AtatResp;
 

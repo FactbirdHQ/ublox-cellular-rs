@@ -6,6 +6,7 @@ use atat;
 
 #[derive(Debug)]
 pub enum Error {
+    SetState,
     BadLength,
     Network,
     Pin,
