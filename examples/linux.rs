@@ -102,7 +102,7 @@ fn main() {
                 .expect("Failed to read from socket!");
             if read > 0 {
                 log::info!(
-                    "Read {:?} bytes from socket layer!  - {:?}\r",
+                    "Read {:?} bytes from socket layer!  - {:?}",
                     read,
                     unsafe { core::str::from_utf8_unchecked(&buf[..read]) }
                 );
@@ -111,7 +111,7 @@ fn main() {
                 .write(&mut socket, format!("Whatup {}", cnt).as_bytes())
                 .expect("Failed to write to socket!");
             log::info!(
-                "Writing {:?} bytes to socket layer! - {:?}\r",
+                "Writing {:?} bytes to socket layer! - {:?}",
                 wrote,
                 format!("Whatup {}", cnt)
             );

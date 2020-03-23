@@ -139,7 +139,7 @@ fn main() {
         })
         .expect("Failed to connect to MQTT");
 
-        log::info!("MQTT Connected!\r");
+        log::info!("MQTT Connected!");
 
         let mut cnt = 0;
         loop {

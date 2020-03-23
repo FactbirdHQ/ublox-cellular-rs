@@ -236,8 +236,8 @@ where
             true,
         )?;
 
-        // info!("{:?}\r", self.send_internal(&GetIndicatorControl)?);
-        // info!("{:?}\r", self.send_internal(&GetIMEI { snt: None })?);
+        // info!("{:?}", self.send_internal(&GetIndicatorControl)?);
+        // info!("{:?}", self.send_internal(&GetIMEI { snt: None })?);
 
         *self.initialized.try_borrow_mut()? = true;
 
@@ -287,7 +287,7 @@ where
 
             match urc {
                 Some(Urc::MessageWaitingIndication(_)) => {
-                    log::info!("[URC] MessageWaitingIndication\r");
+                    log::info!("[URC] MessageWaitingIndication");
                 }
                 Some(Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket })) => {
                     let mut sockets = self.sockets.try_borrow_mut()?;
@@ -302,8 +302,8 @@ where
                     length,
                 })) => {
                     match self.socket_ingress(socket, length) {
-                        Ok(bytes) => log::info!("[URC] Ingressed {:?} bytes\r", bytes),
-                        Err(e) => log::error!("[URC] Failed ingress! {:?}\r", e),
+                        Ok(bytes) => log::info!("[URC] Ingressed {:?} bytes", bytes),
+                        Err(e) => log::error!("[URC] Failed ingress! {:?}", e),
                     }
                 }
                 None => break,
@@ -340,7 +340,7 @@ where
         // React to any enqueued URC's before starting a new command exchange
         if check_urc {
             if let Err(e) = self.handle_urcs() {
-                log::error!("Failed handle URC: {:?}\r", e);
+                log::error!("Failed handle URC: {:?}", e);
             }
         }
 
@@ -349,7 +349,7 @@ where
             .send(req)
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
-                    log::error!("{:?}: [{:?}]\r", ate, req.as_string());
+                    log::error!("{:?}: [{:?}]", ate, req.as_string());
                     ate.into()
                 }
                 nb::Error::WouldBlock => Error::_Unknown,

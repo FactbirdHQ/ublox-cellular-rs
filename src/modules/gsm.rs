@@ -42,7 +42,7 @@ where
             | PinStatusCode::PhNetSubPin
             | PinStatusCode::PhSpPin
             | PinStatusCode::PhCorpPin => {
-                log::info!("Pin NOT Ready!\r");
+                log::info!("Pin NOT Ready!");
                 return Err(Error::Pin);
             }
             PinStatusCode::Ready => {}
