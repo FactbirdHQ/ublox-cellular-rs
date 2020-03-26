@@ -5,6 +5,7 @@ use embedded_nal::TcpStack;
 use crate::command::ip_transport_layer::{types::*, *};
 use crate::error::Error;
 use crate::GSMClient;
+use crate::modules::ssl::SSL;
 
 use crate::socket::SocketHandle;
 
@@ -45,6 +46,8 @@ where
         socket: Self::TcpSocket,
         remote: SocketAddr,
     ) -> Result<Self::TcpSocket, Self::Error> {
+        self.enable_ssl(socket, 0)?;
+
         self.send_at(&ConnectSocket {
             socket,
             remote_addr: remote.ip(),

@@ -138,16 +138,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "embedded-timeout-macros"
-version = "0.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e22be75848ec44e5a1e900b9731949f1bc0abaf733e92857b0fd95bf0d8cf21e"
-dependencies = [
- "embedded-hal",
- "nb",
-]
-
-[[package]]
 name = "env_logger"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -340,7 +330,6 @@ dependencies = [
  "bytes",
  "embedded-hal",
  "embedded-nal",
- "embedded-timeout-macros",
  "heapless",
  "log",
  "mqttrs",

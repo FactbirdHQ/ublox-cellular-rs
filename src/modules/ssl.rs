@@ -8,51 +8,6 @@ use crate::{
     GSMClient,
 };
 
-// pub enum SecurityData<'a> {
-//     Hash(String<consts::U32>),
-//     Data(&'a str)
-// }
-
-// TODO: Rough idea
-// -------------------------------------
-// pub struct SecurityProfile<'a, 'b> {
-//     profile_id: Option<u8>,
-//     root_ca: SecurityData<'a>,
-//     client_certificate: SecurityData<'a>,
-//     private_key: SecurityData<'a>,
-//     password: Option<&'b str>
-// }
-
-// impl<'a, 'b> SecurityProfile<'a, 'b> {
-//     pub fn new(root_ca: &'a str, client_certificate: &'a str, private_key: &'a str) -> Self {
-//         SecurityProfile {
-//             profile_id: None,
-//             root_ca: SecurityData::Data(root_ca),
-//             client_certificate: SecurityData::Data(client_certificate),
-//             private_key: SecurityData::Data(private_key),
-//             password: None
-//         }
-//     }
-
-//     pub fn from_id<C, RST, DTR>(client: &GSMClient<C, RST, DTR>, profile_id: u8) -> Self
-//     where
-//         C: atat::AtatClient,
-//         RST: OutputPin,
-//         DTR: OutputPin,
-//     {
-//         // Fetch security profile
-//         // client.send_at()?;
-
-//         SecurityProfile {
-//             profile_id: Some(profile_id),
-//             root_ca: SecurityData::Hash(String::new()),
-//             client_certificate: SecurityData::Hash(String::new()),
-//             private_key: SecurityData::Hash(String::new()),
-//             password: None
-//         }
-//     }
-// }
-
 pub trait SSL {
     fn import_certificate(&self, profile_id: u8, name: &str, certificate: &str) -> Result<(), Error>;
     fn import_root_ca(&self, profile_id: u8, name: &str, root_ca: &str) -> Result<(), Error>;
@@ -157,7 +112,7 @@ where
         self.send_at(&SecurityProfileManager {
             profile_id,
             op_code: SecurityProfileOperation::CipherSuite,
-            arg: 2,
+            arg: 0,
         })?;
 
         self.send_at(&SecurityProfileManagerString {

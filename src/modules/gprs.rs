@@ -3,24 +3,25 @@ use heapless::{consts, String};
 use no_std_net::{IpAddr, Ipv4Addr};
 
 use crate::{
+    command::dns::{self, responses::*, types::*},
     command::psn::{self, types::*},
     error::Error,
-    GSMClient,
-    GSMState
+    GSMClient, GSMState,
 };
 
+#[derive(Clone)]
 pub struct APNInfo {
     pub apn: String<consts::U99>,
-    pub user_name: Option<String<consts::U64>>,
-    pub password: Option<String<consts::U64>>,
+    // pub user_name: Option<String<consts::U64>>,
+    // pub password: Option<String<consts::U64>>,
 }
 
 impl APNInfo {
     pub fn new(apn: &str) -> Self {
         APNInfo {
             apn: String::from(apn),
-            user_name: None,
-            password: None,
+            // user_name: None,
+            // password: None,
         }
     }
 }
@@ -28,6 +29,7 @@ impl APNInfo {
 pub trait GPRS {
     fn attach_gprs(&self, apn_info: APNInfo) -> Result<(), Error>;
     fn detach_gprs(&self) -> Result<(), Error>;
+    fn dns_lookup(&self, hostname: &str) -> Result<Ipv4Addr, Error>;
 }
 
 impl<C, RST, DTR> GPRS for GSMClient<C, RST, DTR>
@@ -37,11 +39,11 @@ where
     DTR: OutputPin,
 {
     fn attach_gprs(&self, apn_info: APNInfo) -> Result<(), Error> {
-        match self.get_state()? {
-            GSMState::Registered | GSMState::Registering => return Err(Error::_Unknown),
-            GSMState::Attaching | GSMState::Attached => return Ok(()),
-            _ => {}
-        };
+        // match self.get_state()? {
+        //     GSMState::Registered | GSMState::Registering => return Err(Error::_Unknown),
+        //     GSMState::Attaching | GSMState::Attached => return Ok(()),
+        //     _ => {}
+        // };
 
         self.set_state(GSMState::Attaching)?;
 
@@ -61,20 +63,20 @@ where
         })?;
 
         // Set username
-        if let Some(user_name) = apn_info.user_name {
-            self.send_at(&psn::SetPacketSwitchedConfig {
-                profile_id: 0,
-                param: PacketSwitchedParam::Username(user_name),
-            })?;
-        }
+        // if let Some(user_name) = apn_info.user_name {
+        //     self.send_at(&psn::SetPacketSwitchedConfig {
+        //         profile_id: 0,
+        //         param: PacketSwitchedParam::Username(user_name),
+        //     })?;
+        // }
 
-        // Set password
-        if let Some(password) = apn_info.password {
-            self.send_at(&psn::SetPacketSwitchedConfig {
-                profile_id: 0,
-                param: PacketSwitchedParam::Password(password),
-            })?;
-        }
+        // // Set password
+        // if let Some(password) = apn_info.password {
+        //     self.send_at(&psn::SetPacketSwitchedConfig {
+        //         profile_id: 0,
+        //         param: PacketSwitchedParam::Password(password),
+        //     })?;
+        // }
 
         // Set dynamic IP
         self.send_at(&psn::SetPacketSwitchedConfig {
@@ -116,5 +118,13 @@ where
         self.set_state(GSMState::Deattached)?;
 
         Ok(())
+    }
+
+    fn dns_lookup(&self, hostname: &str) -> Result<Ipv4Addr, Error> {
+        let ResolveIpResponse { ip_string } = self.send_at(&dns::ResolveIp {
+            domain_string: hostname,
+        })?;
+
+        Ok(ip_string.parse().map_err(|_e| Error::Network)?)
     }
 }

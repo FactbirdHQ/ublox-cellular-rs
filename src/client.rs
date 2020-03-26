@@ -302,7 +302,9 @@ where
                     length,
                 })) => {
                     match self.socket_ingress(socket, length) {
-                        Ok(bytes) => log::info!("[URC] Ingressed {:?} bytes", bytes),
+                        Ok(_bytes) => {
+                            // log::info!("[URC] Ingressed {:?} bytes", bytes)
+                        },
                         Err(e) => log::error!("[URC] Failed ingress! {:?}", e),
                     }
                 }

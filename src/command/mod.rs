@@ -12,6 +12,7 @@ pub mod gpio;
 pub mod ip_transport_layer;
 pub mod psn;
 pub mod system_features;
+pub mod dns;
 
 use atat::atat_derive::{AtatCmd, AtatResp, AtatUrc};
 

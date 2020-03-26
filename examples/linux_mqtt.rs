@@ -48,8 +48,8 @@ where
     )
     .expect("Failed to import private key");
 
-    gsm.begin("")?;
-    gsm.attach_gprs(APNInfo::new("em"))?;
+    gsm.begin("").unwrap();
+    gsm.attach_gprs(APNInfo::new("em")).unwrap();
     Ok(())
 }
 
@@ -73,10 +73,11 @@ fn main() {
         .expect("Could not open serial port");
     let mut serial_rx = serial_tx.try_clone().expect("Failed to clone serial port");
 
-    let (cell_client, mut ingress) = atat::new::<_, SysTimer>(
+    let (cell_client, mut ingress) = atat::new::<_, SysTimer, atat::NoopUrcMatcher>(
         Serial(serial_tx),
         SysTimer::new(),
         atat::Config::new(atat::Mode::Timeout),
+        None,
     );
 
     let gsm = Arc::new(GSMClient::<_, Pin, Pin>::new(cell_client, GSMConfig::new()));
@@ -110,14 +111,15 @@ fn main() {
     if attach_gprs(&gsm).is_ok() {
         let socket = {
             let soc = gsm.open(Mode::Timeout(1000)).unwrap();
-            // Upgrade socket to TLS socket
-            gsm.enable_ssl(soc, 0).unwrap();
 
+            let ip = gsm
+                .dns_lookup("a69ih9fwq4cti.iot.eu-west-1.amazonaws.com")
+                .unwrap();
             // Connect to MQTT Broker: a69ih9fwq4cti-ats.iot.eu-west-1.amazonaws.com
             gsm.connect(
                 soc,
                 // a69ih9fwq4cti.iot.eu-west-1.amazonaws.com :
-                SocketAddrV4::new(Ipv4Addr::new(52, 209, 116, 12), 8883).into(),
+                SocketAddrV4::new(ip, 8883).into(),
                 // a69ih9fwq4cti-ats.iot.eu-west-1.amazonaws.com :
                 // SocketAddrV4::new(Ipv4Addr::new(34, 250, 137, 90), 8883).into(),
                 // test.mosquitto.org :
@@ -126,30 +128,35 @@ fn main() {
             .unwrap()
         };
 
-        let mut mqtt = MQTTClient::new(&*gsm, socket, SysTimer::new(), SysTimer::new(), 512, 512);
+        let mut mqtt = MQTTClient::new(SysTimer::new(), SysTimer::new(), 512, 512);
 
-        mqtt.connect(Connect {
-            protocol: Protocol::MQTT311,
-            keep_alive: 60,
-            client_id: String::from("MINI"),
-            clean_session: true,
-            last_will: None,
-            username: None,
-            password: None,
-        })
+        nb::block!(mqtt.connect(
+            &*gsm,
+            socket,
+            Connect {
+                protocol: Protocol::MQTT311,
+                keep_alive: 60,
+                client_id: String::from("MINI"),
+                clean_session: true,
+                last_will: None,
+                username: None,
+                password: None,
+            }
+        ))
         .expect("Failed to connect to MQTT");
 
         log::info!("MQTT Connected!");
 
         let mut cnt = 0;
         loop {
-            mqtt.publish(
+            nb::block!(mqtt.publish(
+                &*gsm,
                 QoS::AtLeastOnce,
                 String::from("fbmini"),
                 format!("{{\"key\": \"Hello World from Factbird Mini - {}!\"}}", cnt)
                     .as_bytes()
                     .to_owned(),
-            )
+            ))
             .expect("Failed to publish MQTT msg");
             cnt += 1;
             thread::sleep(Duration::from_millis(5000));

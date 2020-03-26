@@ -59,7 +59,7 @@ pub struct GetIndicatorControl;
 /// - The Time Zone information is provided after the network registration (if
 ///   the network supports the time zone information).
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CMEE", NoResponse)]
+#[at_cmd("+CTZU", NoResponse)]
 pub struct SetAutomaticTimezoneUpdate {
     #[at_arg(position = 0)]
     pub on_off: AutomaticTimezone,
