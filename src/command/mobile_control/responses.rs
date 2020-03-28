@@ -92,7 +92,7 @@ pub struct IndicatorControl {
 /// Reads the real-time clock of the MT
 #[derive(Clone, Debug, AtatResp)]
 pub struct DateTime {
-    pub time: heapless::String<heapless::consts::U20>
+    pub time: heapless::String<heapless::consts::U20>,
 }
 
 /// 5.19 Report mobile termination error +CMEE

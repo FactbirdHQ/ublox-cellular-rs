@@ -59,7 +59,7 @@ pub struct GetIndicatorControl;
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+CCLK", NoResponse)]
 pub struct SetClock<'a> {
-    pub time: &'a str
+    pub time: &'a str,
 }
 
 /// 5.7 Clock +CCLK
