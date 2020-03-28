@@ -5,5 +5,5 @@
 target/
 *.o
 .vscode
-examples/secrets
+**/secrets
 cmds
