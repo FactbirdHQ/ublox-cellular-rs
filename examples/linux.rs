@@ -53,10 +53,11 @@ fn main() {
         .expect("Could not open serial port");
     let mut serial_rx = serial_tx.try_clone().expect("Failed to clone serial port");
 
-    let (cell_client, mut ingress) = atat::new::<_, SysTimer>(
+    let (cell_client, mut ingress) = atat::new::<_, SysTimer, atat::NoopUrcMatcher>(
         Serial(serial_tx),
         SysTimer::new(),
         atat::Config::new(atat::Mode::Timeout),
+        None
     );
 
     let gsm = GSMClient::<_, Pin, Pin>::new(cell_client, GSMConfig::new());
