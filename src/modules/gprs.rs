@@ -3,7 +3,7 @@ use heapless::{consts, String};
 use no_std_net::{IpAddr, Ipv4Addr};
 
 use crate::{
-    command::dns::{self, responses::*, types::*},
+    command::dns::{self, responses::*},
     command::psn::{self, types::*},
     error::Error,
     GSMClient, GSMState,
@@ -12,16 +12,16 @@ use crate::{
 #[derive(Clone)]
 pub struct APNInfo {
     pub apn: String<consts::U99>,
-    // pub user_name: Option<String<consts::U64>>,
-    // pub password: Option<String<consts::U64>>,
+    pub user_name: Option<String<consts::U64>>,
+    pub password: Option<String<consts::U64>>,
 }
 
 impl APNInfo {
     pub fn new(apn: &str) -> Self {
         APNInfo {
             apn: String::from(apn),
-            // user_name: None,
-            // password: None,
+            user_name: None,
+            password: None,
         }
     }
 }
@@ -63,20 +63,20 @@ where
         })?;
 
         // Set username
-        // if let Some(user_name) = apn_info.user_name {
-        //     self.send_at(&psn::SetPacketSwitchedConfig {
-        //         profile_id: 0,
-        //         param: PacketSwitchedParam::Username(user_name),
-        //     })?;
-        // }
+        if let Some(user_name) = apn_info.user_name {
+            self.send_at(&psn::SetPacketSwitchedConfig {
+                profile_id: 0,
+                param: PacketSwitchedParam::Username(user_name),
+            })?;
+        }
 
-        // // Set password
-        // if let Some(password) = apn_info.password {
-        //     self.send_at(&psn::SetPacketSwitchedConfig {
-        //         profile_id: 0,
-        //         param: PacketSwitchedParam::Password(password),
-        //     })?;
-        // }
+        // Set password
+        if let Some(password) = apn_info.password {
+            self.send_at(&psn::SetPacketSwitchedConfig {
+                profile_id: 0,
+                param: PacketSwitchedParam::Password(password),
+            })?;
+        }
 
         // Set dynamic IP
         self.send_at(&psn::SetPacketSwitchedConfig {

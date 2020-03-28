@@ -118,7 +118,10 @@ where
         self.send_at(&SecurityProfileManagerString {
             profile_id,
             op_code: SecurityProfileOperation::ExpectedServerHostname,
-            arg: "a69ih9fwq4cti.iot.eu-west-1.amazonaws.com",
+            // Staging:
+            arg: "a3f8k0ccx04zas.iot.eu-west-1.amazonaws.com",
+            // Playground:
+            // arg: "a69ih9fwq4cti.iot.eu-west-1.amazonaws.com",
             // arg: "test.mosquitto.org",
         })?;
 
