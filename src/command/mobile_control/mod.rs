@@ -53,6 +53,33 @@ pub struct GetModuleFunctionality;
 #[at_cmd("+CIND?", IndicatorControl)]
 pub struct GetIndicatorControl;
 
+/// 5.7 Clock +CCLK
+///
+/// Sets the real-time clock of the MT
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+CCLK", NoResponse)]
+pub struct SetClock<'a> {
+    pub time: &'a str
+}
+
+/// 5.7 Clock +CCLK
+///
+/// Reads the real-time clock of the MT
+///
+/// **Notes:**
+/// - If the parameter value is out of range, then the "+CME ERROR: operation
+///   not supported" or "+CME ERROR: 4" will be provided (depending on the +CMEE
+///   AT command setting).
+/// - "TZ": The Time Zone information is represented by two digits. The value is
+///   updated during the registration procedure when the automatic time zone
+///   update is enabled (using +CTZU command) and the network supports the time
+///   zone information.
+/// - The Time Zone information is expressed in steps of 15 minutes and it can
+///   assume a value in the range that goes from -96 to +96.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+CCLK?", DateTime)]
+pub struct GetClock;
+
 /// 5.15 Automatic time zone update +CTZU
 ///
 /// Configures the automatic time zone update via NITZ. **Notes:**

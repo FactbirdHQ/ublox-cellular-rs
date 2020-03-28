@@ -15,7 +15,7 @@ use crate::{
 pub trait GSM {
     fn begin(&self, pin: &str) -> Result<(), Error>;
     fn shutdown(&self, secure: bool) -> Result<(), Error>;
-    fn get_time(&self) -> Result<DateTimeString, Error>;
+    fn get_time(&self) -> Result<DateTime, Error>;
 }
 
 impl<C, RST, DTR> GSM for GSMClient<C, RST, DTR>
@@ -76,29 +76,7 @@ where
         Ok(())
     }
 
-    fn get_time(&self) -> Result<DateTimeString, Error> {
+    fn get_time(&self) -> Result<DateTime, Error> {
         self.send_at(&mobile_control::GetClock)
-
-        // let parts: Vec<u8, consts::U7> = datetime
-        //     .time
-        //     .split(|c| c == '/' || c == ',' || c == ':' || c == '+'  || c == '-')
-        //     .map(|p| p.parse::<u8>().unwrap())
-        //     .collect();
-
-        // let timezone: i8 = if datetime.time.contains("+") {
-        //     parts[6] as i8
-        // } else {
-        //     -(parts[6] as i8)
-        // };
-
-        // Ok(DateTime {
-        //     year: parts[0],
-        //     month: parts[1],
-        //     day: parts[2],
-        //     hours: parts[3],
-        //     minutes: parts[4],
-        //     seconds: parts[5],
-        //     timezone
-        // })
     }
 }

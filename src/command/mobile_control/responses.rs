@@ -87,6 +87,14 @@ pub struct IndicatorControl {
     pub simind: u8,
 }
 
+/// 5.7 Clock +CCLK
+///
+/// Reads the real-time clock of the MT
+#[derive(Clone, Debug, AtatResp)]
+pub struct DateTime {
+    pub time: heapless::String<heapless::consts::U20>
+}
+
 /// 5.19 Report mobile termination error +CMEE
 ///
 /// Configures the formatting of the result code +CME ERROR: <err> as an indication of an error relating to the
