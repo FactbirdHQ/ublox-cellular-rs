@@ -110,13 +110,12 @@ pub struct PrepareSecurityDataImport<'a> {
     value_sep = false,
     force_receive_state = true,
     cmd_prefix = "",
-    termination = "",
+    termination = ""
 )]
 pub struct SendSecurityDataImport<'a> {
     #[at_arg(position = 0)]
     pub data: serde_at::ser::Bytes<'a>,
 }
-
 
 /// 26.1.3 SSL/TLS security layer profile manager +USECPRF
 ///
@@ -203,8 +202,7 @@ pub struct SecurityProfileManager {
     #[at_arg(position = 1)]
     pub op_code: SecurityProfileOperation,
     #[at_arg(position = 2)]
-    pub arg: u8
-    // pub op_code: SecurityProfileOperation
+    pub arg: u8, // pub op_code: SecurityProfileOperation
 }
 
 #[derive(Clone, AtatCmd)]
@@ -218,6 +216,5 @@ pub struct SecurityProfileManagerString<'a> {
     #[at_arg(position = 1)]
     pub op_code: SecurityProfileOperation,
     #[at_arg(position = 2)]
-    pub arg: &'a str
-    // pub op_code: SecurityProfileOperation
+    pub arg: &'a str, // pub op_code: SecurityProfileOperation
 }

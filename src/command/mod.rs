@@ -1,18 +1,18 @@
 //! AT Commands for U-Blox short range module family\
 //! Following the [u-connect ATCommands Manual](https://www.u-blox.com/sites/default/files/u-connect-ATCommands-Manual_(UBX-14044127).pdf)
 
-pub mod general;
-pub mod mobile_control;
-pub mod network_service;
-pub mod device_lock;
-pub mod sms;
 pub mod control;
 pub mod device_data_security;
+pub mod device_lock;
+pub mod dns;
+pub mod general;
 pub mod gpio;
 pub mod ip_transport_layer;
+pub mod mobile_control;
+pub mod network_service;
 pub mod psn;
+pub mod sms;
 pub mod system_features;
-pub mod dns;
 
 use atat::atat_derive::{AtatCmd, AtatResp, AtatUrc};
 

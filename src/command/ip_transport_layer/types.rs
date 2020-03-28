@@ -17,7 +17,7 @@ pub enum SslTlsStatus {
     Disabled = 0,
     /// 1: enable the SSL/TLS on the socket; a USECMNG profile can be specified
     /// with the <usecmng_profile_id> parameter.
-    Enabled = 1
+    Enabled = 1,
 }
 
 /// Enables/disables the HEX mode for +USOWR, +USOST, +USORD and +USORF AT
@@ -28,7 +28,7 @@ pub enum HexMode {
     /// 0 (factory-programmed value): HEX mode disabled
     Disabled = 0,
     /// 1: HEX mode enabled
-    Enabled = 1
+    Enabled = 1,
 }
 
 /// Control request identifier

@@ -167,7 +167,7 @@ mod test {
         let s = to_string::<consts::U32, consts::U32, _>(
             &PinStatusCode::PhNetSubPin,
             String::from(""),
-            options
+            options,
         )
         .unwrap();
 

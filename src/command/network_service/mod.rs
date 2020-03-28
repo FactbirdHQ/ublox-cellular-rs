@@ -8,7 +8,6 @@ use atat::atat_derive::AtatCmd;
 use responses::*;
 use types::*;
 
-
 /// 7.14 Network registration status +CREG
 ///
 /// Configures the network registration URC related to CS domain. Depending on the <n> parameter value, a URC

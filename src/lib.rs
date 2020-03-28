@@ -1,14 +1,14 @@
 #![no_std]
 
 mod client;
-mod modules;
-mod hex;
 pub mod command;
 pub mod error;
+mod hex;
+mod modules;
 pub mod socket;
 
+pub use client::{Config as GSMConfig, GSMClient, State as GSMState};
 pub use modules::{gprs, gsm, soc, ssl};
-pub use client::{GSMClient, Config as GSMConfig, State as GSMState};
 
 /// Prelude - Include traits
 pub mod prelude {

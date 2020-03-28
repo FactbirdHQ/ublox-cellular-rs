@@ -24,7 +24,7 @@ pub enum State {
     Registered,
     Deattached,
     Attaching,
-    Attached
+    Attached,
 }
 
 #[derive(Debug, Default)]
@@ -241,7 +241,6 @@ where
 
         *self.initialized.try_borrow_mut()? = true;
 
-
         Ok(())
     }
 
@@ -294,7 +293,9 @@ where
                     let mut tcp = sockets.get::<TcpSocket>(socket)?;
                     tcp.close();
                 }
-                Some(Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated { .. })) => {
+                Some(Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
+                    ..
+                })) => {
                     self.set_state(State::Deattached)?;
                 }
                 Some(Urc::SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable {
@@ -304,7 +305,7 @@ where
                     match self.socket_ingress(socket, length) {
                         Ok(_bytes) => {
                             // log::info!("[URC] Ingressed {:?} bytes", bytes)
-                        },
+                        }
                         Err(e) => log::error!("[URC] Failed ingress! {:?}", e),
                     }
                 }
@@ -319,7 +320,10 @@ where
             return Ok(0);
         }
         let chunk_size = core::cmp::min(length, 200);
-        let socket_data = self.send_at(&ReadSocketData { socket, length: chunk_size })?;
+        let socket_data = self.send_at(&ReadSocketData {
+            socket,
+            length: chunk_size,
+        })?;
 
         if socket_data.length != chunk_size {
             return Err(Error::BadLength);
@@ -328,9 +332,9 @@ where
         let mut sockets = self.sockets.try_borrow_mut()?;
         let mut tcp = sockets.get::<TcpSocket>(socket_data.socket)?;
 
-
         // TODO: Handle this decoding in-place?
-        let data: heapless::Vec<_, consts::U200> = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
+        let data: heapless::Vec<_, consts::U200> =
+            hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
         Ok(tcp.rx_enqueue_slice(&data))
     }
 

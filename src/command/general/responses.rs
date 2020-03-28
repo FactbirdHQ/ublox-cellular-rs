@@ -26,7 +26,7 @@ pub struct IMEI {
 /// about the firmware version.
 #[derive(Clone, Debug, AtatResp)]
 pub struct IdentificationInformationResponse {
-    pub app_ver: String<consts::U32>
+    pub app_ver: String<consts::U32>,
 }
 
 /// 4.12 Card identification +CCID

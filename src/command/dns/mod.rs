@@ -49,8 +49,13 @@ use types::*;
 ///   the user sets a DNS for a profile, and a different profile is activated,
 ///   the user DNS has no action and the network DNS is used if available).
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+UDNSRN=0,", ResolveIpResponse, timeout_ms = 120000, value_sep = false)]
+#[at_cmd(
+    "+UDNSRN=0,",
+    ResolveIpResponse,
+    timeout_ms = 120000,
+    value_sep = false
+)]
 pub struct ResolveIp<'a> {
     #[at_arg(position = 0)]
-    pub domain_string: &'a str
+    pub domain_string: &'a str,
 }

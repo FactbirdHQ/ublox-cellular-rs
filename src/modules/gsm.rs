@@ -79,7 +79,6 @@ where
     fn get_time(&self) -> Result<DateTimeString, Error> {
         self.send_at(&mobile_control::GetClock)
 
-
         // let parts: Vec<u8, consts::U7> = datetime
         //     .time
         //     .split(|c| c == '/' || c == ',' || c == ':' || c == '+'  || c == '-')

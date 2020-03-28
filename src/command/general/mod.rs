@@ -36,7 +36,7 @@ pub struct GetIMEI {
 #[at_cmd("I" IdentificationInformationResponse, value_sep = false)]
 pub struct IdentificationInformation {
     #[at_arg(position = 0)]
-    pub n: u8
+    pub n: u8,
 }
 
 /// 4.12 Card identification +CCID

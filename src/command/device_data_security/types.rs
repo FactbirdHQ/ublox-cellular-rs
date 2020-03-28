@@ -55,7 +55,7 @@ pub enum CertificateValidationLevel {
     ///   Root certificate validation with check of certificate validity date.
     ///   Level 2 validation with an additional check of certificate validity
     ///   date.
-    RootCertValidationWithIntegrity = 2
+    RootCertValidationWithIntegrity = 2,
 }
 
 #[derive(uDebug, Clone, PartialEq, Serialize_repr, Deserialize_repr)]

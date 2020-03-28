@@ -101,11 +101,9 @@ fn main() {
                 .read(&mut socket, &mut buf)
                 .expect("Failed to read from socket!");
             if read > 0 {
-                log::info!(
-                    "Read {:?} bytes from socket layer!  - {:?}",
-                    read,
-                    unsafe { core::str::from_utf8_unchecked(&buf[..read]) }
-                );
+                log::info!("Read {:?} bytes from socket layer!  - {:?}", read, unsafe {
+                    core::str::from_utf8_unchecked(&buf[..read])
+                });
             }
             let wrote = gsm
                 .write(&mut socket, format!("Whatup {}", cnt).as_bytes())

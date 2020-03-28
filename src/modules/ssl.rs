@@ -9,7 +9,12 @@ use crate::{
 };
 
 pub trait SSL {
-    fn import_certificate(&self, profile_id: u8, name: &str, certificate: &str) -> Result<(), Error>;
+    fn import_certificate(
+        &self,
+        profile_id: u8,
+        name: &str,
+        certificate: &str,
+    ) -> Result<(), Error>;
     fn import_root_ca(&self, profile_id: u8, name: &str, root_ca: &str) -> Result<(), Error>;
     fn import_private_key(
         &self,
@@ -27,7 +32,12 @@ where
     RST: OutputPin,
     DTR: OutputPin,
 {
-    fn import_certificate(&self, profile_id: u8, name: &str, certificate: &str) -> Result<(), Error> {
+    fn import_certificate(
+        &self,
+        profile_id: u8,
+        name: &str,
+        certificate: &str,
+    ) -> Result<(), Error> {
         assert!(name.len() < 200);
 
         self.send_at(&PrepareSecurityDataImport {
@@ -125,12 +135,10 @@ where
             // arg: "test.mosquitto.org",
         })?;
 
-
         self.send_at(&SetSocketSslState {
             socket,
             ssl_tls_status: SslTlsStatus::Enabled,
-            profile_id
-            // ssl_tls_status: SslTlsStatus::Enabled(profile)
+            profile_id, // ssl_tls_status: SslTlsStatus::Enabled(profile)
         })?;
 
         Ok(())

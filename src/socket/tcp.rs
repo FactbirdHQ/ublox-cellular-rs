@@ -475,7 +475,6 @@ impl TcpSocket {
     ///
     /// See also [recv](#method.recv).
     pub fn recv_slice(&mut self, data: &mut [u8]) -> Result<usize> {
-
         self.recv_impl(|rx_buffer| {
             let size = rx_buffer.dequeue_slice(data);
             (size, size)

@@ -1,11 +1,11 @@
 use embedded_hal::digital::v2::OutputPin;
-pub use embedded_nal::{Ipv4Addr, Mode, SocketAddr, SocketAddrV4};
 use embedded_nal::TcpStack;
+pub use embedded_nal::{Ipv4Addr, Mode, SocketAddr, SocketAddrV4};
 
 use crate::command::ip_transport_layer::{types::*, *};
 use crate::error::Error;
-use crate::GSMClient;
 use crate::modules::ssl::SSL;
+use crate::GSMClient;
 
 use crate::socket::SocketHandle;
 
