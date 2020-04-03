@@ -229,6 +229,21 @@ pub struct ReadSocketData {
     pub length: usize,
 }
 
+/// 25.13 Receive From command (UDP only) +USORF
+/// Reads the specified amount of data from the specified UDP socket, like the 
+/// BSD recvfrom routine. The URC +UUSORF: <socket>,<length> (or also +UUSORD: 
+/// <socket>,<length>) notifies that new data is available for reading, either 
+/// when new data arrives or after a partial read by the user for the socket. 
+/// This command can also return the total amount of unread data.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+USORF", UDPSocketData, timeout_ms = 10000, abortable = true)]
+pub struct ReadUDPSocketData {
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle,
+    #[at_arg(position = 1)]
+    pub length: usize,
+}
+
 /// 25.16 HEX mode configuration +UDCONF=1
 ///
 /// Enables/disables the HEX mode for +USOWR, +USOST, +USORD and +USORF AT

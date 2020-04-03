@@ -316,32 +316,51 @@ where
     }
 
     fn socket_ingress(&self, socket: SocketHandle, length: usize) -> Result<usize, Error> {
+
         if length == 0 {
             return Ok(0);
         }
-        let chunk_size = core::cmp::min(length, 200);
-        let socket_data = self.send_at(&ReadSocketData {
-            socket,
-            length: chunk_size,
-        })?;
 
-        if socket_data.length != chunk_size {
-            return Err(Error::BadLength);
+        let chunk_size = core::cmp::min(length, 200);
+        // let socket_data;
+        let mut sockets = self.sockets.try_borrow_mut()?;
+
+        let data: heapless::Vec<_, consts::U200>;
+
+        match sockets.get::<TcpSocket>(socket){
+            //Handle tcp socket
+            Ok(mut tcp) => {
+                let socket_data = self.send_at(&ReadSocketData {
+                    socket,
+                    length: chunk_size,
+                })?;
+
+                if socket_data.length != chunk_size {
+                    return Err(Error::BadLength);
+                }
+
+                data = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
+                return Ok(tcp.rx_enqueue_slice(&data))
+            },
+            Err(_) => {}
         }
 
-        // TODO: Handle this decoding in-place?
-        let data: heapless::Vec<_, consts::U200> =
-            hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
+        match sockets.get::<UdpSocket>(socket){
+            //Handle udp socket
+            Ok(mut udp) => {
+                let socket_data = self.send_at(&ReadUDPSocketData {
+                    socket,
+                    length: chunk_size,
+                })?;
 
-        let mut sockets = self.sockets.try_borrow_mut()?;
-        match sockets.get::<TcpSocket>(socket_data.socket){
-            Ok(mut tcp) => Ok(tcp.rx_enqueue_slice(&data)),
-            Err(_) => {
-                match sockets.get::<UdpSocket>(socket_data.socket){
-                    Ok(mut udp) => Ok(udp.rx_enqueue_slice(&data)),
-                    Err(e) => Err(Error::Socket(e))
+                if socket_data.length != chunk_size {
+                    return Err(Error::BadLength);
                 }
-            }   
+
+                data = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
+                Ok(udp.rx_enqueue_slice(&data))
+            },
+            Err(e) => return Err(Error::Socket(e))
         }
     }
 
