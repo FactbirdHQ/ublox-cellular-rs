@@ -150,7 +150,7 @@ pub struct WriteSocketDataHex<'a> {
 /// - Binary extended syntax: mandatory for writing any character in the ASCII
 ///   range [0x00, 0xFF]
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+USOWR", NoResponse, timeout_ms = 1000)]
+#[at_cmd("+USOWR", NoResponse, timeout_ms = 15000)]
 pub struct PrepareWriteSocketDataBinary {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,
@@ -186,7 +186,7 @@ pub struct WriteSocketDataBinary<'a> {
 /// In case of a partial read of a UDP packet +UUSORD: <socket>,<length> will
 /// show the remaining number of data bytes of the packet the user is reading.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+USORD", SocketData, timeout_ms = 10000, abortable = true)]
+#[at_cmd("+USORD", SocketData)]
 pub struct ReadSocketData {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,

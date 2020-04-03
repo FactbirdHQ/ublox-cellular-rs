@@ -70,23 +70,15 @@ where
     /// Write to the stream. Returns the number of bytes written is returned
     /// (which may be less than `buffer.len()`), or an error.
     fn write(&self, socket: &mut Self::TcpSocket, buffer: &[u8]) -> nb::Result<usize, Self::Error> {
-        {
-            let mut sockets = self
-                .sockets
-                .try_borrow_mut()
-                .map_err(|e| nb::Error::Other(e.into()))?;
-
-            let tcp = sockets
-                .get::<TcpSocket>(socket.clone())
-                .map_err(|e| nb::Error::Other(Error::Socket(e)))?;
-
-            if !tcp.is_active() || !tcp.may_send() {
-                return Err(nb::Error::Other(Error::SocketClosed));
-            }
+        if !self.is_connected(&socket)? {
+            return Err(nb::Error::Other(Error::SocketClosed));
         }
+        self.spin()?;
 
         let mut remaining = buffer.len();
         let mut written = 0;
+
+        // log::debug!("Sending: {} bytes, {:?}", remaining, buffer);
 
         while remaining > 0 {
             let chunk_size = core::cmp::min(remaining, 200);
@@ -128,9 +120,11 @@ where
             .sockets
             .try_borrow_mut()
             .map_err(|e| nb::Error::Other(e.into()))?;
+
         let mut tcp = sockets
             .get::<TcpSocket>(socket.clone())
-            .map_err(|e| nb::Error::Other(Error::Socket(e)))?;
+            .map_err(|e| nb::Error::Other(e.into()))?;
+
         return tcp
             .recv_slice(buffer)
             .map_err(|e| nb::Error::Other(e.into()));
@@ -138,7 +132,9 @@ where
 
     /// Close an existing TCP socket.
     fn close(&self, socket: Self::TcpSocket) -> Result<(), Self::Error> {
-        // socket.close();
+        let mut sockets = self.sockets.try_borrow_mut()?;
+        let mut tcp = sockets.get::<TcpSocket>(socket.clone())?;
+        tcp.close();
 
         self.send_at(&CloseSocket { socket })?;
 

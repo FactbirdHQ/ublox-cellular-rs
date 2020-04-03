@@ -108,9 +108,9 @@ pub struct PrepareSecurityDataImport<'a> {
     "",
     SecurityDataImport,
     value_sep = false,
-    force_receive_state = true,
     cmd_prefix = "",
-    termination = ""
+    termination = "",
+    force_receive_state = true
 )]
 pub struct SendSecurityDataImport<'a> {
     #[at_arg(position = 0)]

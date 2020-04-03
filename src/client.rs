@@ -97,7 +97,8 @@ where
     config: Config<RST, DTR>,
     pub(crate) state: RefCell<State>,
     pub(crate) client: RefCell<C>,
-    pub(crate) sockets: RefCell<SocketSet<consts::U10>>,
+    // Ublox devices can hold a maximum of 6 active sockets
+    pub(crate) sockets: RefCell<SocketSet<consts::U6>>,
 }
 
 impl<C, RST, DTR> GSMClient<C, RST, DTR>
@@ -127,6 +128,7 @@ where
 
     /// Initilize a new ublox device to a known state (restart, wait for startup, set RS232 settings, gpio settings, etc.)
     pub fn init(&self, restart: bool) -> Result<(), Error> {
+
         if restart && self.config.rst_pin.is_some() {
             if let Some(ref rst) = self.config.rst_pin {
                 // rst.set_high().ok();
@@ -140,6 +142,10 @@ where
         }
 
         self.autosense()?;
+
+        // if *self.initialized.try_borrow()? {
+        //     return Ok(())
+        // }
 
         if self.config.baud_rate > 230_400_u32 {
             // Needs a way to reconfigure uart baud rate temporarily
@@ -202,7 +208,7 @@ where
 
         self.send_internal(
             &SetReportMobileTerminationError {
-                n: TerminationErrorMode::Verbose,
+                n: TerminationErrorMode::Disabled,
             },
             true,
         )?;
@@ -269,10 +275,13 @@ where
     }
 
     fn reset(&self) -> Result<(), Error> {
-        // self.send_internal(&SetModuleFunctionality {
-        //     fun: Functionality::SilentResetWithSimReset,
-        //     rst: None,
-        // })?;
+        self.send_internal(
+            &SetModuleFunctionality {
+                fun: Functionality::SilentResetWithSimReset,
+                rst: None,
+            },
+            true,
+        )?;
         Ok(())
     }
 
@@ -289,6 +298,7 @@ where
                     log::info!("[URC] MessageWaitingIndication");
                 }
                 Some(Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket })) => {
+                    log::info!("[URC] SocketClosed");
                     let mut sockets = self.sockets.try_borrow_mut()?;
                     let mut tcp = sockets.get::<TcpSocket>(socket)?;
                     tcp.close();
@@ -296,34 +306,55 @@ where
                 Some(Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
                     ..
                 })) => {
+                    log::info!("[URC] DataConnectionDeactivated");
                     self.set_state(State::Deattached)?;
                 }
                 Some(Urc::SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable {
                     socket,
                     length,
-                })) => {
-                    match self.socket_ingress(socket, length) {
-                        Ok(_bytes) => {
-                            // log::info!("[URC] Ingressed {:?} bytes", bytes)
-                        }
-                        Err(e) => log::error!("[URC] Failed ingress! {:?}", e),
-                    }
-                }
+                })) => match self.socket_ingress(&socket, length) {
+                    Ok(bytes) => log::info!("[URC] Ingressed {:?} bytes", bytes),
+                    Err(e) => log::error!("[URC] Failed ingress! {:?}", e),
+                },
                 None => break,
             };
         }
         Ok(())
     }
 
-    fn socket_ingress(&self, socket: SocketHandle, length: usize) -> Result<usize, Error> {
+    pub(crate) fn socket_ingress(
+        &self,
+        socket: &SocketHandle,
+        length: usize,
+    ) -> Result<usize, Error> {
         if length == 0 {
             return Ok(0);
         }
         let chunk_size = core::cmp::min(length, 200);
+
+        // let mut retry_attempt = 5;
         let socket_data = self.send_at(&ReadSocketData {
-            socket,
+            socket: socket.clone(),
             length: chunk_size,
         })?;
+        // loop {
+        //      {
+        //         Ok(resp) => break resp,
+        //         // Retry on timeout!
+        //         Err(e @ Error::AT(atat::Error::Timeout)) => {
+        //             // if retry_attempt <= 0 {
+        //             //     let mut sockets = self.sockets.try_borrow_mut()?;
+        //             //     let mut tcp = sockets.get::<TcpSocket>(socket.clone())?;
+        //             //     tcp.close();
+        //                 return Err(e);
+        //             // }
+        //             // retry_attempt -= 1;
+        //         }
+        //         Err(e) => return Err(e)
+        //     };
+        // };
+
+        // log::debug!("Ingressed: {} bytes, {:?}", socket_data.length, socket_data.data);
 
         if socket_data.length != chunk_size {
             return Err(Error::BadLength);
@@ -363,9 +394,7 @@ where
     }
 
     pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
-        if !*self.initialized.try_borrow()? {
-            self.init(false)?
-        }
+        self.init(false)?;
 
         self.send_internal(cmd, true)
     }
