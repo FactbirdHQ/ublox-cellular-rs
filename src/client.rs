@@ -14,7 +14,7 @@ use crate::{
     },
     error::Error,
     hex,
-    socket::{SocketHandle, SocketSet, TcpSocket},
+    socket::{SocketHandle, SocketSet, TcpSocket, UdpSocket},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -329,13 +329,20 @@ where
             return Err(Error::BadLength);
         }
 
-        let mut sockets = self.sockets.try_borrow_mut()?;
-        let mut tcp = sockets.get::<TcpSocket>(socket_data.socket)?;
-
         // TODO: Handle this decoding in-place?
         let data: heapless::Vec<_, consts::U200> =
             hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
-        Ok(tcp.rx_enqueue_slice(&data))
+
+        let mut sockets = self.sockets.try_borrow_mut()?;
+        match sockets.get::<TcpSocket>(socket_data.socket){
+            Ok(mut tcp) => Ok(tcp.rx_enqueue_slice(&data)),
+            Err(_) => {
+                match sockets.get::<UdpSocket>(socket_data.socket){
+                    Ok(mut udp) => Ok(udp.rx_enqueue_slice(&data)),
+                    Err(e) => Err(Error::Socket(e))
+                }
+            }   
+        }
     }
 
     pub(crate) fn send_internal<A: atat::AtatCmd>(

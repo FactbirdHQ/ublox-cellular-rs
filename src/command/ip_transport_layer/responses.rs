@@ -27,6 +27,15 @@ pub struct WriteSocketDataResponse {
     pub length: usize,
 }
 
+/// 25.11 UDP Send To data +USOST:
+#[derive(Clone, AtatResp)]
+pub struct UDPSendToDataResponse {
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle,
+    #[at_arg(position = 1)]
+    pub length: usize,
+}
+
 /// 25.12 Read Socket Data +USORD
 #[derive(Clone, AtatResp)]
 pub struct SocketData {

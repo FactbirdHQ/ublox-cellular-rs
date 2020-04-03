@@ -41,7 +41,7 @@ atat = { git = "https://github.com/BlackbirdHQ/atat" }
 serde_at = { git = "https://github.com/BlackbirdHQ/atat" }
 
 [features]
-default = ["sara_u2", "socket-tcp", "use_ufmt"]
+default = ["sara_u2", "socket-udp", "socket-tcp", "use_ufmt"]
 
 topy_l4 = []
 mpci_l2 = []
@@ -56,5 +56,5 @@ lara_r2 = []
 leon_g1 = []
 
 socket-tcp = []
-# socket-udp = []
+socket-udp = []
 use_ufmt = ["ufmt"]

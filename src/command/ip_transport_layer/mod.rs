@@ -172,6 +172,41 @@ pub struct WriteSocketDataBinary<'a> {
     pub data: serde_at::ser::Bytes<'a>,
 }
 
+///25.11 SendTo command (UDP only) +USOST
+/// 
+/// Writes the specified amount of data to the remote address, 
+/// like the BSD sendto routine, and returns the number of bytes 
+/// of data actually written. It can be applied to UDP sockets 
+/// only. This command allows the reuse of the same socket to send
+/// data to many different remote hosts.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+USOST", NoResponse, timeout_ms = 1000)]
+pub struct PrepareUDPSendToDataBinary {
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle,
+    #[at_arg(position = 1)]
+    pub remote_addr: IpAddr,
+    #[at_arg(position = 2)]
+    pub remote_port: u16,
+    #[at_arg(position = 3)]
+    pub length: usize,
+}
+
+#[derive(Clone, AtatCmd)]
+#[at_cmd(
+    "",
+    UDPSendToDataResponse,
+    value_sep = false,
+    cmd_prefix = "",
+    termination = "",
+    force_receive_state = true
+)]
+pub struct UDPSendToDataBinary<'a> {
+    #[at_arg(position = 0)]
+    pub data: serde_at::ser::Bytes<'a>,
+}
+
+
 /// 25.12 Read Socket Data +USORD
 ///
 /// Reads the specified amount of data from the specified socket, like the BSD

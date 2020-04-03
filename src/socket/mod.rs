@@ -5,10 +5,13 @@ mod ref_;
 mod ring_buffer;
 mod set;
 pub mod tcp;
+pub mod udp;
 
 pub(crate) use self::meta::Meta as SocketMeta;
 pub use self::ring_buffer::RingBuffer;
 
+#[cfg(feature = "socket-udp")]
+pub use udp::{State as UdpState, UdpSocket};
 #[cfg(feature = "socket-tcp")]
 pub use tcp::{State as TcpState, TcpSocket};
 
@@ -77,7 +80,7 @@ pub enum Socket {
     ))]
     Icmp(IcmpSocket<'a, 'b>),
     #[cfg(feature = "socket-udp")]
-    Udp(UdpSocket<'a, 'b>),
+    Udp(UdpSocket),
     #[cfg(feature = "socket-tcp")]
     Tcp(TcpSocket),
     #[doc(hidden)]

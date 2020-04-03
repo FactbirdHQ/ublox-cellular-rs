@@ -30,7 +30,7 @@ impl<'a, 'b> Session for RawSocket<'a, 'b> {}
 ))]
 impl<'a, 'b> Session for IcmpSocket<'a, 'b> {}
 #[cfg(feature = "socket-udp")]
-impl<'a, 'b> Session for UdpSocket<'a, 'b> {}
+impl Session for UdpSocket {}
 #[cfg(feature = "socket-tcp")]
 impl Session for TcpSocket {}
 
