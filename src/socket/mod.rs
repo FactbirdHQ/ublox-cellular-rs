@@ -10,10 +10,10 @@ pub mod udp;
 pub(crate) use self::meta::Meta as SocketMeta;
 pub use self::ring_buffer::RingBuffer;
 
-#[cfg(feature = "socket-udp")]
-pub use udp::{State as UdpState, UdpSocket};
 #[cfg(feature = "socket-tcp")]
 pub use tcp::{State as TcpState, TcpSocket};
+#[cfg(feature = "socket-udp")]
+pub use udp::{State as UdpState, UdpSocket};
 
 pub use self::set::{Handle as SocketHandle, Item as SocketSetItem, Set as SocketSet};
 pub use self::set::{Iter as SocketSetIter, IterMut as SocketSetIterMut};

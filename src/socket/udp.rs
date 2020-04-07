@@ -6,11 +6,10 @@ use heapless::consts;
 
 use super::{Error, Result};
 use crate::socket::{RingBuffer, Socket, SocketHandle, SocketMeta};
-pub use embedded_nal::{SocketAddr, Ipv4Addr, SocketAddrV4};
+pub use embedded_nal::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 /// A UDP socket ring buffer.
 pub type SocketBuffer<N> = RingBuffer<u8, N>;
-
 
 /// The state of a TCP socket, according to [RFC 793].
 ///
@@ -27,7 +26,6 @@ impl Default for State {
     }
 }
 
-
 /// A User Datagram Protocol socket.
 ///
 /// A UDP socket is bound to a specific endpoint, and owns transmit and receive
@@ -39,20 +37,20 @@ pub struct UdpSocket {
     rx_buffer: SocketBuffer<consts::U256>,
     state: State,
     /// The time-to-live (IPv4) or hop limit (IPv6) value used in outgoing packets.
-    hop_limit: Option<u8>
+    hop_limit: Option<u8>,
 }
 
 impl UdpSocket {
     /// Create an UDP socket with the given buffers.
     pub fn new(socket_id: usize) -> UdpSocket {
         UdpSocket {
-            meta:      SocketMeta {
+            meta: SocketMeta {
                 handle: SocketHandle(socket_id),
             },
             endpoint: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),
             rx_buffer: SocketBuffer::new(),
             state: State::default(),
-            hop_limit: None
+            hop_limit: None,
         }
     }
 
@@ -101,15 +99,23 @@ impl UdpSocket {
     /// (see [is_open](#method.is_open)), and `Err(Error::Unaddressable)`
     /// if the port in the given endpoint is zero.
     pub fn bind<T: Into<SocketAddr>>(&mut self, endpoint: T) -> Result<()> {
-        if self.is_open() { return Err(Error::Illegal) }
-        
-        let endpoint = endpoint.into();
-        match endpoint {
-            SocketAddr::V4(ipv4) => if ipv4.port() == 0 { return Err(Error::Unaddressable) }
-            SocketAddr::V6(ipv6) => if ipv6.port() == 0 { return Err(Error::Unaddressable) }
+        if self.is_open() {
+            return Err(Error::Illegal);
         }
 
-
+        let endpoint = endpoint.into();
+        match endpoint {
+            SocketAddr::V4(ipv4) => {
+                if ipv4.port() == 0 {
+                    return Err(Error::Unaddressable);
+                }
+            }
+            SocketAddr::V6(ipv6) => {
+                if ipv6.port() == 0 {
+                    return Err(Error::Unaddressable);
+                }
+            }
+        }
 
         self.endpoint = endpoint;
         Ok(())
@@ -119,8 +125,16 @@ impl UdpSocket {
     #[inline]
     pub fn is_open(&self) -> bool {
         match self.endpoint {
-            SocketAddr::V4(ipv4) => if ipv4.port() == 0 { return false }
-            SocketAddr::V6(ipv6) => if ipv6.port() == 0 { return false }
+            SocketAddr::V4(ipv4) => {
+                if ipv4.port() == 0 {
+                    return false;
+                }
+            }
+            SocketAddr::V6(ipv6) => {
+                if ipv6.port() == 0 {
+                    return false;
+                }
+            }
         }
         true
     }
@@ -211,7 +225,6 @@ impl UdpSocket {
     //     Ok(length)
     // }
 
-
     fn recv_impl<'b, F, R>(&'b mut self, f: F) -> Result<R>
     where
         F: FnOnce(&'b mut SocketBuffer<consts::U256>) -> (usize, R),
@@ -227,7 +240,6 @@ impl UdpSocket {
         Ok(result)
     }
 
-
     pub fn recv<'b, F, R>(&'b mut self, f: F) -> Result<R>
     where
         F: FnOnce(&'b mut [u8]) -> (usize, R),
@@ -235,7 +247,6 @@ impl UdpSocket {
         self.recv_impl(|rx_buffer| rx_buffer.dequeue_many_with(f))
     }
 
-    
     pub fn recv_slice(&mut self, data: &mut [u8]) -> Result<usize> {
         self.recv_impl(|rx_buffer| {
             let size = rx_buffer.dequeue_slice(data);
@@ -253,7 +264,6 @@ impl UdpSocket {
     ///
     /// It returns `Err(Error::Exhausted)` if the receive buffer is empty.
     pub fn peek(&mut self, size: usize) -> Result<&[u8]> {
-
         if !self.is_open() {
             return Err(Error::Illegal);
         }
@@ -264,9 +274,9 @@ impl UdpSocket {
         // let handle = self.meta.handle;
         // self.rx_buffer.peek()
         //     .map(|payload_buf| {
-            // net_trace!("{}: peek {} buffered octets",
-            //            handle,
-            //            payload_buf.len());
+        // net_trace!("{}: peek {} buffered octets",
+        //            handle,
+        //            payload_buf.len());
         //    (payload_buf)
         // })
     }
@@ -343,10 +353,10 @@ impl UdpSocket {
     //     }
     // }
 
-    pub fn close(&mut self) -> Result<()>{
+    pub fn close(&mut self) -> Result<()> {
         match self.endpoint {
-            SocketAddr::V4(mut ipv4) => ipv4.set_port(0), 
-            SocketAddr::V6(mut ipv6) => ipv6.set_port(0), 
+            SocketAddr::V4(mut ipv4) => ipv4.set_port(0),
+            SocketAddr::V6(mut ipv6) => ipv6.set_port(0),
         }
         Ok(())
     }

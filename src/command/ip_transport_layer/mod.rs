@@ -173,10 +173,10 @@ pub struct WriteSocketDataBinary<'a> {
 }
 
 ///25.11 SendTo command (UDP only) +USOST
-/// 
-/// Writes the specified amount of data to the remote address, 
-/// like the BSD sendto routine, and returns the number of bytes 
-/// of data actually written. It can be applied to UDP sockets 
+///
+/// Writes the specified amount of data to the remote address,
+/// like the BSD sendto routine, and returns the number of bytes
+/// of data actually written. It can be applied to UDP sockets
 /// only. This command allows the reuse of the same socket to send
 /// data to many different remote hosts.
 #[derive(Clone, AtatCmd)]
@@ -206,7 +206,6 @@ pub struct UDPSendToDataBinary<'a> {
     pub data: serde_at::ser::Bytes<'a>,
 }
 
-
 /// 25.12 Read Socket Data +USORD
 ///
 /// Reads the specified amount of data from the specified socket, like the BSD
@@ -230,10 +229,10 @@ pub struct ReadSocketData {
 }
 
 /// 25.13 Receive From command (UDP only) +USORF
-/// Reads the specified amount of data from the specified UDP socket, like the 
-/// BSD recvfrom routine. The URC +UUSORF: <socket>,<length> (or also +UUSORD: 
-/// <socket>,<length>) notifies that new data is available for reading, either 
-/// when new data arrives or after a partial read by the user for the socket. 
+/// Reads the specified amount of data from the specified UDP socket, like the
+/// BSD recvfrom routine. The URC +UUSORF: <socket>,<length> (or also +UUSORD:
+/// <socket>,<length>) notifies that new data is available for reading, either
+/// when new data arrives or after a partial read by the user for the socket.
 /// This command can also return the total amount of unread data.
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USORF", UDPSocketData, timeout_ms = 10000, abortable = true)]

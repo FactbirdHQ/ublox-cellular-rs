@@ -5,7 +5,6 @@ use atat::atat_derive::AtatResp;
 use heapless::{consts, String};
 use no_std_net::IpAddr;
 
-
 /// 25.3 Create Socket +USOCR
 #[derive(Clone, AtatResp)]
 pub struct CreateSocketResponse {
@@ -37,7 +36,6 @@ pub struct UDPSendToDataResponse {
     #[at_arg(position = 1)]
     pub length: usize,
 }
-
 
 /// 25.12 Read Socket Data +USORD
 #[derive(Clone, AtatResp)]

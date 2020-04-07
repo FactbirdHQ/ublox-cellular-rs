@@ -57,7 +57,7 @@ fn main() {
         Serial(serial_tx),
         SysTimer::new(),
         atat::Config::new(atat::Mode::Timeout),
-        None
+        None,
     );
 
     let gsm = GSMClient::<_, Pin, Pin>::new(cell_client, GSMConfig::new());

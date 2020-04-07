@@ -1,6 +1,6 @@
 use embedded_hal::digital::v2::OutputPin;
-use embedded_nal::{TcpStack, UdpStack};
 pub use embedded_nal::{Ipv4Addr, Mode, SocketAddr, SocketAddrV4};
+use embedded_nal::{TcpStack, UdpStack};
 
 use crate::command::ip_transport_layer::{types::*, *};
 use crate::error::Error;
@@ -27,10 +27,9 @@ where
     // as the Socket object itself provides no value without accessing it though the client.
     type UdpSocket = SocketHandle;
 
-
     /// Open a new UDP socket to the given address and port. UDP is connectionless,
-	/// so unlike `TcpStack` no `connect()` is required.
-	fn open(&self, remote: SocketAddr, _mode: Mode) -> Result<Self::UdpSocket, Self::Error>{
+    /// so unlike `TcpStack` no `connect()` is required.
+    fn open(&self, remote: SocketAddr, _mode: Mode) -> Result<Self::UdpSocket, Self::Error> {
         let socket_resp = self.send_at(&CreateSocket {
             protocol: SocketProtocol::UDP,
             local_port: None,
@@ -39,14 +38,11 @@ where
         let mut socket = UdpSocket::new(socket_resp.socket.0);
         socket.bind(remote)?;
 
-        Ok(self
-            .sockets
-            .try_borrow_mut()?
-            .add(socket)?)
+        Ok(self.sockets.try_borrow_mut()?.add(socket)?)
     }
 
-	/// Send a datagram to the remote host.
-    fn write(&self, socket: &mut Self::UdpSocket, buffer: &[u8]) -> nb::Result<(), Self::Error>{
+    /// Send a datagram to the remote host.
+    fn write(&self, socket: &mut Self::UdpSocket, buffer: &[u8]) -> nb::Result<(), Self::Error> {
         let mut sockets = self
             .sockets
             .try_borrow_mut()
@@ -59,7 +55,7 @@ where
         if !udp.is_open() {
             return Err(nb::Error::Other(Error::SocketClosed));
         }
-        
+
         let mut remaining = buffer.len();
         let mut written = 0;
 
@@ -88,17 +84,17 @@ where
             remaining -= chunk_size;
         }
 
-        return Ok(())
+        return Ok(());
     }
 
-	/// Read a datagram the remote host has sent to us. Returns `Ok(n)`, which
-	/// means a datagram of size `n` has been received and it has been placed
-	/// in `&buffer[0..n]`, or an error.
-	fn read(
-		&self,
-		socket: &mut Self::UdpSocket,
-		buffer: &mut [u8],
-	) -> nb::Result<usize, Self::Error>{
+    /// Read a datagram the remote host has sent to us. Returns `Ok(n)`, which
+    /// means a datagram of size `n` has been received and it has been placed
+    /// in `&buffer[0..n]`, or an error.
+    fn read(
+        &self,
+        socket: &mut Self::UdpSocket,
+        buffer: &mut [u8],
+    ) -> nb::Result<usize, Self::Error> {
         self.spin()?;
 
         let mut sockets = self
@@ -113,9 +109,8 @@ where
             .map_err(|e| nb::Error::Other(e.into()));
     }
 
-	/// Close an existing UDP socket.
-	fn close(&self, socket: Self::UdpSocket) -> Result<(), Self::Error>{
-
+    /// Close an existing UDP socket.
+    fn close(&self, socket: Self::UdpSocket) -> Result<(), Self::Error> {
         self.send_at(&CloseSocket { socket })?;
 
         let mut sockets = self.sockets.try_borrow_mut()?;

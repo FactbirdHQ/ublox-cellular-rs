@@ -316,7 +316,6 @@ where
     }
 
     fn socket_ingress(&self, socket: SocketHandle, length: usize) -> Result<usize, Error> {
-
         if length == 0 {
             return Ok(0);
         }
@@ -327,7 +326,7 @@ where
 
         let data: heapless::Vec<_, consts::U200>;
 
-        match sockets.get::<TcpSocket>(socket){
+        match sockets.get::<TcpSocket>(socket) {
             //Handle tcp socket
             Ok(mut tcp) => {
                 let socket_data = self.send_at(&ReadSocketData {
@@ -340,12 +339,12 @@ where
                 }
 
                 data = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
-                return Ok(tcp.rx_enqueue_slice(&data))
-            },
+                return Ok(tcp.rx_enqueue_slice(&data));
+            }
             Err(_) => {}
         }
 
-        match sockets.get::<UdpSocket>(socket){
+        match sockets.get::<UdpSocket>(socket) {
             //Handle udp socket
             Ok(mut udp) => {
                 let socket_data = self.send_at(&ReadUDPSocketData {
@@ -359,8 +358,8 @@ where
 
                 data = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
                 Ok(udp.rx_enqueue_slice(&data))
-            },
-            Err(e) => return Err(Error::Socket(e))
+            }
+            Err(e) => return Err(Error::Socket(e)),
         }
     }
 
