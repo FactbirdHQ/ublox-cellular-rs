@@ -229,6 +229,7 @@ pub struct ReadSocketData {
 }
 
 /// 25.13 Receive From command (UDP only) +USORF
+/// 
 /// Reads the specified amount of data from the specified UDP socket, like the
 /// BSD recvfrom routine. The URC +UUSORF: <socket>,<length> (or also +UUSORD:
 /// <socket>,<length>) notifies that new data is available for reading, either

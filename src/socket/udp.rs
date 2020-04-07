@@ -14,17 +14,6 @@ pub type SocketBuffer<N> = RingBuffer<u8, N>;
 /// The state of a TCP socket, according to [RFC 793].
 ///
 /// [RFC 793]: https://tools.ietf.org/html/rfc793
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
-pub enum State {
-    Closed,
-    Open,
-}
-
-impl Default for State {
-    fn default() -> Self {
-        State::Open
-    }
-}
 
 /// A User Datagram Protocol socket.
 ///
@@ -35,7 +24,6 @@ pub struct UdpSocket {
     pub(crate) meta: SocketMeta,
     pub(crate) endpoint: SocketAddr,
     rx_buffer: SocketBuffer<consts::U256>,
-    state: State,
     /// The time-to-live (IPv4) or hop limit (IPv6) value used in outgoing packets.
     hop_limit: Option<u8>,
 }
@@ -49,7 +37,6 @@ impl UdpSocket {
             },
             endpoint: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),
             rx_buffer: SocketBuffer::new(),
-            state: State::default(),
             hop_limit: None,
         }
     }
@@ -139,12 +126,6 @@ impl UdpSocket {
         true
     }
 
-    // /// Check whether the transmit buffer is full.
-    // #[inline]
-    // pub fn can_send(&self) -> bool {
-    //     !self.tx_buffer.is_full()
-    // }
-
     /// Check whether the receive buffer is not empty.
     #[inline]
     pub fn can_recv(&self) -> bool {
@@ -157,48 +138,10 @@ impl UdpSocket {
     //     self.rx_buffer.packet_capacity()
     // }
 
-    // /// Return the maximum number packets the socket can transmit.
-    // #[inline]
-    // pub fn packet_send_capacity(&self) -> usize {
-    //     self.tx_buffer.packet_capacity()
-    // }
-
     // /// Return the maximum number of bytes inside the recv buffer.
     // #[inline]
     // pub fn payload_recv_capacity(&self) -> usize {
     //     self.rx_buffer.payload_capacity()
-    // }
-
-    // /// Return the maximum number of bytes inside the transmit buffer.
-    // #[inline]
-    // pub fn payload_send_capacity(&self) -> usize {
-    //     self.tx_buffer.payload_capacity()
-    // }
-
-    // /// Enqueue a packet to be sent to a given remote endpoint, and return a pointer
-    // /// to its payload.
-    // ///
-    // /// This function returns `Err(Error::Exhausted)` if the transmit buffer is full,
-    // /// `Err(Error::Unaddressable)` if local or remote port, or remote address are unspecified,
-    // /// and `Err(Error::Truncated)` if there is not enough transmit buffer capacity
-    // /// to ever send this packet.
-    // pub fn send(&mut self, size: usize, endpoint: IpEndpoint) -> Result<&mut [u8]> {
-    //     if self.endpoint.port == 0 { return Err(Error::Unaddressable) }
-    //     if !endpoint.is_specified() { return Err(Error::Unaddressable) }
-
-    //     let payload_buf = self.tx_buffer.enqueue(size, endpoint)?;
-
-    //     net_trace!("{}:{}:{}: buffer to send {} octets",
-    //                self.meta.handle, self.endpoint, endpoint, size);
-    //     Ok(payload_buf)
-    // }
-
-    // /// Enqueue a packet to be sent to a given remote endpoint, and fill it from a slice.
-    // ///
-    // /// See also [send](#method.send).
-    // pub fn send_slice(&mut self, data: &[u8], endpoint: IpEndpoint) -> Result<()> {
-    //     self.send(data.len(), endpoint)?.copy_from_slice(data);
-    //     Ok(())
     // }
 
     /// Dequeue a packet received from a remote endpoint, and return the endpoint as well
@@ -293,65 +236,6 @@ impl UdpSocket {
         data[..length].copy_from_slice(&buffer[..length]);
         Ok(length)
     }
-
-    // pub(crate) fn accepts(&self, ip_repr: &IpRepr, repr: &UdpRepr) -> bool {
-    //     if self.endpoint.port != repr.dst_port { return false }
-    //     if !self.endpoint.addr.is_unspecified() &&
-    //         self.endpoint.addr != ip_repr.dst_addr() &&
-    //         !ip_repr.dst_addr().is_broadcast() &&
-    //         !ip_repr.dst_addr().is_multicast() { return false }
-
-    //     true
-    // }
-
-    // pub(crate) fn process(&mut self, ip_repr: &IpRepr, repr: &UdpRepr) -> Result<()> {
-    //     debug_assert!(self.accepts(ip_repr, repr));
-
-    //     let size = repr.payload.len();
-
-    //     let endpoint = IpEndpoint { addr: ip_repr.src_addr(), port: repr.src_port };
-    //     self.rx_buffer.enqueue(size, endpoint)?.copy_from_slice(repr.payload);
-
-    //     // net_trace!("{}:{}:{}: receiving {} octets",
-    //     //            self.meta.handle, self.endpoint,
-    //     //            endpoint, size);
-    //     Ok(())
-    // }
-
-    // pub(crate) fn dispatch<F>(&mut self, emit: F) -> Result<()>
-    //         where F: FnOnce((IpRepr, UdpRepr)) -> Result<()> {
-    //     let handle    = self.handle();
-    //     let endpoint  = self.endpoint;
-    //     let hop_limit = self.hop_limit.unwrap_or(64);
-
-    //     self.tx_buffer.dequeue_with(|remote_endpoint, payload_buf| {
-    //         net_trace!("{}:{}:{}: sending {} octets",
-    //                     handle, endpoint,
-    //                     endpoint, payload_buf.len());
-
-    //         let repr = UdpRepr {
-    //             src_port: endpoint.port,
-    //             dst_port: remote_endpoint.port,
-    //             payload:  payload_buf,
-    //         };
-    //         let ip_repr = IpRepr::Unspecified {
-    //             src_addr:    endpoint.addr,
-    //             dst_addr:    remote_endpoint.addr,
-    //             protocol:    IpProtocol::Udp,
-    //             payload_len: repr.buffer_len(),
-    //             hop_limit:   hop_limit,
-    //         };
-    //         emit((ip_repr, repr))
-    //     })
-    // }
-
-    // pub(crate) fn poll_at(&self) -> PollAt {
-    //     if self.tx_buffer.is_empty() {
-    //         PollAt::Ingress
-    //     } else {
-    //         PollAt::Now
-    //     }
-    // }
 
     pub fn close(&mut self) -> Result<()> {
         match self.endpoint {

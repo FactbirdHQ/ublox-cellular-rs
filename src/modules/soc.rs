@@ -1,6 +1,5 @@
 use embedded_hal::digital::v2::OutputPin;
 pub use embedded_nal::{Ipv4Addr, Mode, SocketAddr, SocketAddrV4};
-use embedded_nal::{TcpStack, UdpStack};
 
 use crate::command::ip_transport_layer::{types::*, *};
 use crate::error::Error;
@@ -11,8 +10,10 @@ use crate::socket::SocketHandle;
 
 #[cfg(feature = "socket-udp")]
 use crate::socket::UdpSocket;
+use embedded_nal::UdpStack;
 #[cfg(feature = "socket-tcp")]
 use crate::socket::{TcpSocket, TcpState};
+use embedded_nal::TcpStack;
 
 #[cfg(feature = "socket-udp")]
 impl<C, RST, DTR> UdpStack for GSMClient<C, RST, DTR>
