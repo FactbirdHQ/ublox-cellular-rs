@@ -10,10 +10,10 @@ use crate::socket::SocketHandle;
 
 #[cfg(feature = "socket-udp")]
 use crate::socket::UdpSocket;
-use embedded_nal::UdpStack;
 #[cfg(feature = "socket-tcp")]
 use crate::socket::{TcpSocket, TcpState};
 use embedded_nal::TcpStack;
+use embedded_nal::UdpStack;
 
 #[cfg(feature = "socket-udp")]
 impl<C, RST, DTR> UdpStack for GSMClient<C, RST, DTR>
