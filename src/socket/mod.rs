@@ -5,12 +5,15 @@ mod ref_;
 mod ring_buffer;
 mod set;
 pub mod tcp;
+pub mod udp;
 
 pub(crate) use self::meta::Meta as SocketMeta;
 pub use self::ring_buffer::RingBuffer;
 
 #[cfg(feature = "socket-tcp")]
 pub use tcp::{State as TcpState, TcpSocket};
+#[cfg(feature = "socket-udp")]
+pub use udp::UdpSocket;
 
 pub use self::set::{Handle as SocketHandle, Item as SocketSetItem, Set as SocketSet};
 pub use self::set::{Iter as SocketSetIter, IterMut as SocketSetIterMut};
@@ -69,15 +72,15 @@ type Result<T> = core::result::Result<T, Error>;
 /// [SocketSet::get]: struct.SocketSet.html#method.get
 #[derive(Debug)]
 pub enum Socket {
-    #[cfg(feature = "socket-raw")]
-    Raw(RawSocket<'a, 'b>),
-    #[cfg(all(
-        feature = "socket-icmp",
-        any(feature = "proto-ipv4", feature = "proto-ipv6")
-    ))]
-    Icmp(IcmpSocket<'a, 'b>),
+    // #[cfg(feature = "socket-raw")]
+    // Raw(RawSocket<'a, 'b>),
+    // #[cfg(all(
+    //     feature = "socket-icmp",
+    //     any(feature = "proto-ipv4", feature = "proto-ipv6")
+    // ))]
+    // Icmp(IcmpSocket<'a, 'b>),
     #[cfg(feature = "socket-udp")]
-    Udp(UdpSocket<'a, 'b>),
+    Udp(UdpSocket),
     #[cfg(feature = "socket-tcp")]
     Tcp(TcpSocket),
     #[doc(hidden)]
@@ -93,10 +96,10 @@ macro_rules! dispatch_socket {
     };
     (@inner $( $mut_:ident )* $self_:expr, |$socket:ident| $code:expr) => {
         match *$self_ {
-            #[cfg(feature = "socket-raw")]
-            Socket::Raw(ref $( $mut_ )* $socket) => $code,
-            #[cfg(all(feature = "socket-icmp", any(feature = "proto-ipv4", feature = "proto-ipv6")))]
-            Socket::Icmp(ref $( $mut_ )* $socket) => $code,
+            // #[cfg(feature = "socket-raw")]
+            // Socket::Raw(ref $( $mut_ )* $socket) => $code,
+            // #[cfg(all(feature = "socket-icmp", any(feature = "proto-ipv4", feature = "proto-ipv6")))]
+            // Socket::Icmp(ref $( $mut_ )* $socket) => $code,
             #[cfg(feature = "socket-udp")]
             Socket::Udp(ref $( $mut_ )* $socket) => $code,
             #[cfg(feature = "socket-tcp")]
@@ -157,13 +160,13 @@ macro_rules! from_socket {
     };
 }
 
-#[cfg(feature = "socket-raw")]
-from_socket!(RawSocket, Raw);
-#[cfg(all(
-    feature = "socket-icmp",
-    any(feature = "proto-ipv4", feature = "proto-ipv6")
-))]
-from_socket!(IcmpSocket, Icmp);
+// #[cfg(feature = "socket-raw")]
+// from_socket!(RawSocket, Raw);
+// #[cfg(all(
+//     feature = "socket-icmp",
+//     any(feature = "proto-ipv4", feature = "proto-ipv6")
+// ))]
+// from_socket!(IcmpSocket, Icmp);
 #[cfg(feature = "socket-udp")]
 from_socket!(UdpSocket, Udp);
 #[cfg(feature = "socket-tcp")]

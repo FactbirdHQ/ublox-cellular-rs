@@ -6,7 +6,6 @@ mod common;
 
 use serialport;
 use std::io;
-use std::sync::Arc;
 use std::thread;
 
 use ublox_cellular::gprs::APNInfo;
@@ -34,25 +33,6 @@ where
     DTR: OutputPin,
 {
     gsm.init(true)?;
-
-    gsm.import_root_ca(0, "Verisign", include_str!("./secrets/aws/Verisign.pem"))
-        .expect("Failed to import root CA");
-
-    gsm.import_certificate(
-        0,
-        "cf0c600_cert",
-        include_str!("./secrets/aws/certificate.pem.crt"),
-    )
-    .expect("Failed to import certificate");
-
-    gsm.import_private_key(
-        0,
-        "cf0c600_key",
-        include_str!("./secrets/aws/private.pem.key"),
-        None,
-    )
-    .expect("Failed to import private key");
-
     gsm.begin("").unwrap();
     gsm.attach_gprs(APNInfo::new("em")).unwrap();
     Ok(())
@@ -61,6 +41,7 @@ where
 static mut Q: Queue<Request, consts::U10> = Queue(heapless::i::Queue::new());
 
 fn main() {
+    #[cfg(features = "logging")]
     env_logger::builder()
         .filter_level(log::LevelFilter::Debug)
         .init();
@@ -87,7 +68,7 @@ fn main() {
     )
     .build();
 
-    let gsm = Arc::new(GSMClient::<_, Pin, Pin>::new(cell_client, GSMConfig::new()));
+    let gsm = GSMClient::<_, Pin, Pin>::new(cell_client, GSMConfig::new());
 
     let (mut p, c) = unsafe { Q.split() };
 
@@ -119,6 +100,7 @@ fn main() {
                         // Ignore
                     }
                     _ => {
+                        #[cfg(features = "logging")]
                         log::error!("Serial reading thread error while reading: {}", e);
                     }
                 },
@@ -127,7 +109,7 @@ fn main() {
         .unwrap();
 
     if attach_gprs(&gsm).is_ok() {
-        nb::block!(mqtt_eventloop.connect(&*gsm)).expect("Failed to connect to MQTT");
+        nb::block!(mqtt_eventloop.connect(&gsm)).expect("Failed to connect to MQTT");
 
         p.enqueue(
             SubscribeRequest {
@@ -168,8 +150,9 @@ fn main() {
             .unwrap();
 
         loop {
-            match nb::block!(mqtt_eventloop.yield_event(&*gsm)) {
+            match nb::block!(mqtt_eventloop.yield_event(&gsm)) {
                 Ok(Notification::Publish(publish)) => {
+                    #[cfg(features = "logging")]
                     log::debug!(
                         "[{}, {:?}]: {:?}",
                         publish.topic_name,

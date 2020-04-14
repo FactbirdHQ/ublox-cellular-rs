@@ -34,6 +34,7 @@ where
 }
 
 fn main() {
+    #[cfg(features = "logging")]
     env_logger::builder()
         .filter_level(log::LevelFilter::Trace)
         .init();
@@ -53,12 +54,12 @@ fn main() {
         .expect("Could not open serial port");
     let mut serial_rx = serial_tx.try_clone().expect("Failed to clone serial port");
 
-    let (cell_client, mut ingress) = atat::new::<_, SysTimer, atat::NoopUrcMatcher>(
+    let (cell_client, mut ingress) = atat::ClientBuilder::<_, _, atat::NoopUrcMatcher>::new(
         Serial(serial_tx),
         SysTimer::new(),
         atat::Config::new(atat::Mode::Timeout),
-        None
-    );
+    )
+    .build();
 
     let gsm = GSMClient::<_, Pin, Pin>::new(cell_client, GSMConfig::new());
 
@@ -76,6 +77,7 @@ fn main() {
                 Err(e) => match e.kind() {
                     io::ErrorKind::Interrupted => {}
                     _ => {
+                        #[cfg(features = "logging")]
                         log::error!("Serial reading thread error while reading: {}", e);
                     }
                 },
@@ -85,7 +87,8 @@ fn main() {
 
     if attach_gprs(&gsm).is_ok() {
         let mut socket = {
-            let soc = gsm.open(Mode::Blocking).expect("Cannot open socket!");
+            let soc = <GSMClient<_, _, _> as TcpStack>::open(&gsm, Mode::Blocking)
+                .expect("Cannot open socket!");
 
             gsm.connect(
                 soc,
@@ -98,17 +101,21 @@ fn main() {
         loop {
             thread::sleep(Duration::from_millis(5000));
             let mut buf = [0u8; 256];
-            let read = gsm
-                .read(&mut socket, &mut buf)
+            let read = <GSMClient<_, _, _> as TcpStack>::read(&gsm, &mut socket, &mut buf)
                 .expect("Failed to read from socket!");
             if read > 0 {
+                #[cfg(features = "logging")]
                 log::info!("Read {:?} bytes from socket layer!  - {:?}", read, unsafe {
                     core::str::from_utf8_unchecked(&buf[..read])
                 });
             }
-            let wrote = gsm
-                .write(&mut socket, format!("Whatup {}", cnt).as_bytes())
-                .expect("Failed to write to socket!");
+            let wrote = <GSMClient<_, _, _> as TcpStack>::write(
+                &gsm,
+                &mut socket,
+                format!("Whatup {}", cnt).as_bytes(),
+            )
+            .expect("Failed to write to socket!");
+            #[cfg(features = "logging")]
             log::info!(
                 "Writing {:?} bytes to socket layer! - {:?}",
                 wrote,
