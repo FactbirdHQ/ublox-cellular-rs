@@ -76,6 +76,7 @@ fn main() {
                 Err(e) => match e.kind() {
                     io::ErrorKind::Interrupted => {}
                     _ => {
+                        #[cfg(features = "logging")]
                         log::error!("Serial reading thread error while reading: {}", e);
                     }
                 },
@@ -102,6 +103,7 @@ fn main() {
             let read = <GSMClient<_, _, _> as TcpStack>::read(&gsm, &mut socket, &mut buf)
                 .expect("Failed to read from socket!");
             if read > 0 {
+                #[cfg(features = "logging")]
                 log::info!("Read {:?} bytes from socket layer!  - {:?}", read, unsafe {
                     core::str::from_utf8_unchecked(&buf[..read])
                 });
@@ -112,6 +114,7 @@ fn main() {
                 format!("Whatup {}", cnt).as_bytes(),
             )
             .expect("Failed to write to socket!");
+            #[cfg(features = "logging")]
             log::info!(
                 "Writing {:?} bytes to socket layer! - {:?}",
                 wrote,

@@ -88,6 +88,7 @@ fn main() {
                         // Ignore
                     }
                     _ => {
+                        #[cfg(features = "logging")]
                         log::error!("Serial reading thread error while reading: {}", e);
                     }
                 },
@@ -112,6 +113,7 @@ fn main() {
             .spawn(move || loop {
                 match nb::block!(mqtt_eventloop.yield_event(&gsm)) {
                     Ok(Notification::Publish(publish)) => {
+                        #[cfg(features = "logging")]
                         log::debug!(
                             "[{}, {:?}]: {:?}",
                             publish.topic_name,
@@ -120,12 +122,14 @@ fn main() {
                         );
                     }
                     _ => {
+                        // #[cfg(features = "logging")]
                         // log::debug!("{:?}", n);
                     }
                 }
             })
             .unwrap();
 
+        #[cfg(features = "logging")]
         log::info!("MQTT Connected!");
 
         let mut cnt = 0;

@@ -246,11 +246,11 @@ where
 
     fn low_power_mode(&self, enable: bool) -> Result<(), atat::Error> {
         if let Some(ref dtr) = self.config.dtr_pin {
-            if enable {
-                // dtr.set_high().ok();
-            } else {
-                // dtr.set_low().ok();
-            }
+            // if enable {
+            // dtr.set_high().ok();
+            // } else {
+            // dtr.set_low().ok();
+            // }
             return Ok(());
         }
         Ok(())
@@ -286,6 +286,7 @@ where
 
             match urc {
                 Some(Urc::MessageWaitingIndication(_)) => {
+                    #[cfg(features = "logging")]
                     log::info!("[URC] MessageWaitingIndication");
                 }
                 Some(Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket })) => {
@@ -304,9 +305,13 @@ where
                 })) => {
                     match self.socket_ingress(socket, length) {
                         Ok(_bytes) => {
+                            // #[cfg(features = "logging")]
                             // log::info!("[URC] Ingressed {:?} bytes", bytes)
                         }
-                        Err(e) => log::error!("[URC] Failed ingress! {:?}", e),
+                        Err(e) => {
+                            #[cfg(features = "logging")]
+                            log::error!("[URC] Failed ingress! {:?}", e);
+                        }
                     }
                 }
                 None => break,
@@ -378,6 +383,7 @@ where
         // React to any enqueued URC's before starting a new command exchange
         if check_urc {
             if let Err(e) = self.handle_urcs() {
+                #[cfg(features = "logging")]
                 log::error!("Failed handle URC: {:?}", e);
             }
         }
@@ -387,6 +393,7 @@ where
             .send(req)
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
+                    #[cfg(features = "logging")]
                     log::error!("{:?}: [{:?}]", ate, req.as_string());
                     ate.into()
                 }
