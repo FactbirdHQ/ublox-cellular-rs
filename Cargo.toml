@@ -34,7 +34,7 @@ env_logger = "0.7.1"
 void = "1.0.2"
 linux-embedded-hal = "0.3.0"
 serialport = "3.3.0"
-mqttrust = { path = "../mqttrust" }
+mqttrust = { git = "https://github.com/BlackbirdHQ/mqttrust" }
 
 [patch.crates-io]
 atat = { git = "https://github.com/BlackbirdHQ/atat" }

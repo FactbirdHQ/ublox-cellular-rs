@@ -210,13 +210,16 @@ pub struct UDPSendToDataBinary<'a> {
 ///
 /// Reads the specified amount of data from the specified socket, like the BSD
 /// read routine. This command can be used to know the total amount of unread
-/// data. \
+/// data.
+///
 /// For the TCP socket type the URC +UUSORD: <socket>,<length> notifies the data
 /// bytes available for reading, either when buffer is empty and new data
-/// arrives or after a partial read by the user. \
+/// arrives or after a partial read by the user.
+///
 /// For the UDP socket type the URC +UUSORD: <socket>,<length> notifies that a
 /// UDP packet has been received, either when buffer is empty or after a UDP
-/// packet has been read and one or more packets are stored in the buffer. \
+/// packet has been read and one or more packets are stored in the buffer.
+///
 /// In case of a partial read of a UDP packet +UUSORD: <socket>,<length> will
 /// show the remaining number of data bytes of the packet the user is reading.
 #[derive(Clone, AtatCmd)]

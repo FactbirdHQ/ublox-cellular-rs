@@ -1,7 +1,5 @@
 use core::cmp::min;
 
-use core::fmt;
-
 use heapless::consts;
 
 use super::{Error, Result};
@@ -10,10 +8,6 @@ pub use embedded_nal::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 /// A UDP socket ring buffer.
 pub type SocketBuffer<N> = RingBuffer<u8, N>;
-
-/// The state of a TCP socket, according to [RFC 793].
-///
-/// [RFC 793]: https://tools.ietf.org/html/rfc793
 
 /// A User Datagram Protocol socket.
 ///
@@ -24,8 +18,6 @@ pub struct UdpSocket {
     pub(crate) meta: SocketMeta,
     pub(crate) endpoint: SocketAddr,
     rx_buffer: SocketBuffer<consts::U256>,
-    /// The time-to-live (IPv4) or hop limit (IPv6) value used in outgoing packets.
-    hop_limit: Option<u8>,
 }
 
 impl UdpSocket {
@@ -35,49 +27,21 @@ impl UdpSocket {
             meta: SocketMeta {
                 handle: SocketHandle(socket_id),
             },
-            endpoint: SocketAddr::V4(SocketAddrV4::new(Ipv4Addr::new(0, 0, 0, 0), 0)),
+            endpoint: SocketAddrV4::new(Ipv4Addr::unspecified(), 0).into(),
             rx_buffer: SocketBuffer::new(),
-            hop_limit: None,
         }
     }
 
-    // /// Return the socket handle.
-    // #[inline]
-    // pub fn handle(&self) -> SocketHandle {
-    //     self.meta.handle
-    // }
-
-    // /// Return the bound endpoint.
-    // #[inline]
-    // pub fn endpoint(&self) -> IpEndpoint {
-    //     self.endpoint
-    // }
-
-    /// Return the time-to-live (IPv4) or hop limit (IPv6) value used in outgoing packets.
-    ///
-    /// See also the [set_hop_limit](#method.set_hop_limit) method
-    pub fn hop_limit(&self) -> Option<u8> {
-        self.hop_limit
+    /// Return the socket handle.
+    #[inline]
+    pub fn handle(&self) -> SocketHandle {
+        self.meta.handle
     }
 
-    /// Set the time-to-live (IPv4) or hop limit (IPv6) value used in outgoing packets.
-    ///
-    /// A socket without an explicitly set hop limit value uses the default [IANA recommended]
-    /// value (64).
-    ///
-    /// # Panics
-    ///
-    /// This function panics if a hop limit value of 0 is given. See [RFC 1122 § 3.2.1.7].
-    ///
-    /// [IANA recommended]: https://www.iana.org/assignments/ip-parameters/ip-parameters.xhtml
-    /// [RFC 1122 § 3.2.1.7]: https://tools.ietf.org/html/rfc1122#section-3.2.1.7
-    pub fn set_hop_limit(&mut self, hop_limit: Option<u8>) {
-        // A host MUST NOT send a datagram with a hop limit value of 0
-        if let Some(0) = hop_limit {
-            panic!("the time-to-live value of a packet must not be zero")
-        }
-
-        self.hop_limit = hop_limit
+    /// Return the bound endpoint.
+    #[inline]
+    pub fn endpoint(&self) -> SocketAddr {
+        self.endpoint
     }
 
     /// Bind the socket to the given endpoint.
@@ -144,30 +108,6 @@ impl UdpSocket {
     //     self.rx_buffer.payload_capacity()
     // }
 
-    /// Dequeue a packet received from a remote endpoint, and return the endpoint as well
-    /// as a pointer to the payload.
-    ///
-    /// This function returns `Err(Error::Exhausted)` if the receive buffer is empty.
-    // pub fn recv(&mut self) -> Result<&[u8]> {
-    //     let (endpoint, payload_buf) = self.rx_buffer.dequeue()?;
-
-    //     // net_trace!("{}:{}:{}: receive {} buffered octets",
-    //     //            self.meta.handle, self.endpoint,
-    //     //            endpoint, payload_buf.len());
-    //     Ok(payload_buf)
-    // }
-
-    /// Dequeue a packet received from a remote endpoint, copy the payload into the given slice,
-    /// and return the amount of octets copied as well as the endpoint.
-    ///
-    /// See also [recv](#method.recv).
-    // pub fn recv_slice(&mut self, data: &mut [u8]) -> Result<(usize)> {
-    //     let (buffer) = self.recv()?;
-    //     let length = min(data.len(), buffer.len());
-    //     data[..length].copy_from_slice(&buffer[..length]);
-    //     Ok(length)
-    // }
-
     fn recv_impl<'b, F, R>(&'b mut self, f: F) -> Result<R>
     where
         F: FnOnce(&'b mut SocketBuffer<consts::U256>) -> (usize, R),
@@ -183,6 +123,10 @@ impl UdpSocket {
         Ok(result)
     }
 
+    /// Dequeue a packet received from a remote endpoint, and return the endpoint as well
+    /// as a pointer to the payload.
+    ///
+    /// This function returns `Err(Error::Exhausted)` if the receive buffer is empty.
     pub fn recv<'b, F, R>(&'b mut self, f: F) -> Result<R>
     where
         F: FnOnce(&'b mut [u8]) -> (usize, R),
@@ -190,6 +134,10 @@ impl UdpSocket {
         self.recv_impl(|rx_buffer| rx_buffer.dequeue_many_with(f))
     }
 
+    /// Dequeue a packet received from a remote endpoint, copy the payload into the given slice,
+    /// and return the amount of octets copied as well as the endpoint.
+    ///
+    /// See also [recv](#method.recv).
     pub fn recv_slice(&mut self, data: &mut [u8]) -> Result<usize> {
         self.recv_impl(|rx_buffer| {
             let size = rx_buffer.dequeue_slice(data);

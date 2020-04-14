@@ -321,7 +321,6 @@ where
         }
 
         let chunk_size = core::cmp::min(length, 200);
-        // let socket_data;
         let mut sockets = self.sockets.try_borrow_mut()?;
 
         let data: heapless::Vec<_, consts::U200>;
@@ -336,6 +335,10 @@ where
 
                 if socket_data.length != chunk_size {
                     return Err(Error::BadLength);
+                }
+
+                if socket_data.socket != socket {
+                    return Err(Error::WrongSocketType);
                 }
 
                 data = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
@@ -354,6 +357,10 @@ where
 
                 if socket_data.length != chunk_size {
                     return Err(Error::BadLength);
+                }
+
+                if socket_data.socket != socket {
+                    return Err(Error::WrongSocketType);
                 }
 
                 data = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;

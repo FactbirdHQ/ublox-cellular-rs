@@ -1,12 +1,12 @@
 use core::ops::{Deref, DerefMut};
 
-#[cfg(all(
-    feature = "socket-icmp",
-    any(feature = "proto-ipv4", feature = "proto-ipv6")
-))]
-use crate::socket::IcmpSocket;
-#[cfg(feature = "socket-raw")]
-use crate::socket::RawSocket;
+// #[cfg(all(
+//     feature = "socket-icmp",
+//     any(feature = "proto-ipv4", feature = "proto-ipv6")
+// ))]
+// use crate::socket::IcmpSocket;
+// #[cfg(feature = "socket-raw")]
+// use crate::socket::RawSocket;
 #[cfg(feature = "socket-tcp")]
 use crate::socket::TcpSocket;
 #[cfg(feature = "socket-udp")]
@@ -22,13 +22,13 @@ pub trait Session {
     fn finish(&mut self) {}
 }
 
-#[cfg(feature = "socket-raw")]
-impl<'a, 'b> Session for RawSocket<'a, 'b> {}
-#[cfg(all(
-    feature = "socket-icmp",
-    any(feature = "proto-ipv4", feature = "proto-ipv6")
-))]
-impl<'a, 'b> Session for IcmpSocket<'a, 'b> {}
+// #[cfg(feature = "socket-raw")]
+// impl<'a, 'b> Session for RawSocket<'a, 'b> {}
+// #[cfg(all(
+//     feature = "socket-icmp",
+//     any(feature = "proto-ipv4", feature = "proto-ipv6")
+// ))]
+// impl<'a, 'b> Session for IcmpSocket<'a, 'b> {}
 #[cfg(feature = "socket-udp")]
 impl Session for UdpSocket {}
 #[cfg(feature = "socket-tcp")]
