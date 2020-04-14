@@ -1,7 +1,5 @@
 use core::{fmt, slice};
 
-#[cfg(feature = "socket-tcp")]
-use super::TcpState;
 use super::{AnySocket, Error, Result, Socket, SocketRef};
 
 use heapless::{ArrayLength, LinearMap};

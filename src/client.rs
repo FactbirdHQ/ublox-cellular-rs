@@ -14,7 +14,7 @@ use crate::{
     },
     error::Error,
     hex,
-    socket::{SocketHandle, SocketSet, TcpSocket},
+    socket::{SocketHandle, SocketSet, TcpSocket, UdpSocket},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -246,11 +246,11 @@ where
 
     fn low_power_mode(&self, enable: bool) -> Result<(), atat::Error> {
         if let Some(ref dtr) = self.config.dtr_pin {
-            if enable {
-                // dtr.set_high().ok();
-            } else {
-                // dtr.set_low().ok();
-            }
+            // if enable {
+            // dtr.set_high().ok();
+            // } else {
+            // dtr.set_low().ok();
+            // }
             return Ok(());
         }
         Ok(())
@@ -286,6 +286,7 @@ where
 
             match urc {
                 Some(Urc::MessageWaitingIndication(_)) => {
+                    #[cfg(features = "logging")]
                     log::info!("[URC] MessageWaitingIndication");
                 }
                 Some(Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket })) => {
@@ -304,9 +305,13 @@ where
                 })) => {
                     match self.socket_ingress(socket, length) {
                         Ok(_bytes) => {
+                            // #[cfg(features = "logging")]
                             // log::info!("[URC] Ingressed {:?} bytes", bytes)
                         }
-                        Err(e) => log::error!("[URC] Failed ingress! {:?}", e),
+                        Err(e) => {
+                            #[cfg(features = "logging")]
+                            log::error!("[URC] Failed ingress! {:?}", e);
+                        }
                     }
                 }
                 None => break,
@@ -319,23 +324,55 @@ where
         if length == 0 {
             return Ok(0);
         }
-        let chunk_size = core::cmp::min(length, 200);
-        let socket_data = self.send_at(&ReadSocketData {
-            socket,
-            length: chunk_size,
-        })?;
 
-        if socket_data.length != chunk_size {
-            return Err(Error::BadLength);
+        let chunk_size = core::cmp::min(length, 200);
+        let mut sockets = self.sockets.try_borrow_mut()?;
+
+        let data: heapless::Vec<_, consts::U200>;
+
+        match sockets.get::<TcpSocket>(socket) {
+            //Handle tcp socket
+            Ok(mut tcp) => {
+                let socket_data = self.send_at(&ReadSocketData {
+                    socket,
+                    length: chunk_size,
+                })?;
+
+                if socket_data.length != chunk_size {
+                    return Err(Error::BadLength);
+                }
+
+                if socket_data.socket != socket {
+                    return Err(Error::WrongSocketType);
+                }
+
+                data = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
+                return Ok(tcp.rx_enqueue_slice(&data));
+            }
+            Err(_) => {}
         }
 
-        let mut sockets = self.sockets.try_borrow_mut()?;
-        let mut tcp = sockets.get::<TcpSocket>(socket_data.socket)?;
+        match sockets.get::<UdpSocket>(socket) {
+            //Handle udp socket
+            Ok(mut udp) => {
+                let socket_data = self.send_at(&ReadUDPSocketData {
+                    socket,
+                    length: chunk_size,
+                })?;
 
-        // TODO: Handle this decoding in-place?
-        let data: heapless::Vec<_, consts::U200> =
-            hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
-        Ok(tcp.rx_enqueue_slice(&data))
+                if socket_data.length != chunk_size {
+                    return Err(Error::BadLength);
+                }
+
+                if socket_data.socket != socket {
+                    return Err(Error::WrongSocketType);
+                }
+
+                data = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
+                Ok(udp.rx_enqueue_slice(&data))
+            }
+            Err(e) => return Err(Error::Socket(e)),
+        }
     }
 
     pub(crate) fn send_internal<A: atat::AtatCmd>(
@@ -346,6 +383,7 @@ where
         // React to any enqueued URC's before starting a new command exchange
         if check_urc {
             if let Err(e) = self.handle_urcs() {
+                #[cfg(features = "logging")]
                 log::error!("Failed handle URC: {:?}", e);
             }
         }
@@ -355,6 +393,7 @@ where
             .send(req)
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
+                    #[cfg(features = "logging")]
                     log::error!("{:?}: [{:?}]", ate, req.as_string());
                     ate.into()
                 }

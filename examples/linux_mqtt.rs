@@ -11,13 +11,14 @@ use std::thread;
 
 use ublox_cellular::gprs::APNInfo;
 use ublox_cellular::prelude::*;
-use ublox_cellular::soc::{Ipv4Addr, Mode, SocketAddrV4};
 use ublox_cellular::{error::Error as GSMError, GSMClient, GSMConfig};
 
 use atat::AtatClient;
 use embedded_hal::digital::v2::OutputPin;
 use linux_embedded_hal::Pin;
-use mqttrust::{Connect, MQTTClient, Protocol, QoS};
+use mqttrust::{MqttEvent, MqttOptions, Notification, PublishRequest, Request};
+
+use heapless::{consts, spsc::Queue};
 
 use common::{serial::Serial, timer::SysTimer};
 use std::time::Duration;
@@ -29,29 +30,12 @@ where
     DTR: OutputPin,
 {
     gsm.init(true)?;
-
-    gsm.import_root_ca(0, "Verisign", include_str!("./secrets/aws/Verisign.pem"))
-        .expect("Failed to import root CA");
-
-    gsm.import_certificate(
-        0,
-        "cf0c600_cert",
-        include_str!("./secrets/aws/certificate.pem.crt"),
-    )
-    .expect("Failed to import certificate");
-
-    gsm.import_private_key(
-        0,
-        "cf0c600_key",
-        include_str!("./secrets/aws/private.pem.key"),
-        None,
-    )
-    .expect("Failed to import private key");
-
     gsm.begin("").unwrap();
     gsm.attach_gprs(APNInfo::new("em")).unwrap();
     Ok(())
 }
+
+static mut Q: Queue<Request, consts::U10> = Queue(heapless::i::Queue::new());
 
 fn main() {
     env_logger::builder()
@@ -80,7 +64,10 @@ fn main() {
         None,
     );
 
-    let gsm = Arc::new(GSMClient::<_, Pin, Pin>::new(cell_client, GSMConfig::new()));
+    let (mut p, c) = unsafe { Q.split() };
+
+    let gsm = GSMClient::<_, Pin, Pin>::new(cell_client, GSMConfig::new());
+
     // Launch reading thread
     thread::Builder::new()
         .name("serial_read".to_string())
@@ -101,6 +88,7 @@ fn main() {
                         // Ignore
                     }
                     _ => {
+                        #[cfg(features = "logging")]
                         log::error!("Serial reading thread error while reading: {}", e);
                     }
                 },
@@ -109,55 +97,53 @@ fn main() {
         .unwrap();
 
     if attach_gprs(&gsm).is_ok() {
-        let socket = {
-            let soc = gsm.open(Mode::Timeout(1000)).unwrap();
+        let ip = gsm.dns_lookup("test.mosquitto.org").unwrap();
 
-            let ip = gsm
-                .dns_lookup("a69ih9fwq4cti.iot.eu-west-1.amazonaws.com")
-                .unwrap();
-            // Connect to MQTT Broker: a69ih9fwq4cti-ats.iot.eu-west-1.amazonaws.com
-            gsm.connect(
-                soc,
-                // a69ih9fwq4cti.iot.eu-west-1.amazonaws.com :
-                SocketAddrV4::new(ip, 8883).into(),
-                // a69ih9fwq4cti-ats.iot.eu-west-1.amazonaws.com :
-                // SocketAddrV4::new(Ipv4Addr::new(34, 250, 137, 90), 8883).into(),
-                // test.mosquitto.org :
-                // SocketAddrV4::new(Ipv4Addr::new(5, 196, 95, 208), 8884).into(),
-            )
-            .unwrap()
-        };
+        let mut mqtt_eventloop = MqttEvent::new(
+            c,
+            SysTimer::new(),
+            SysTimer::new(),
+            MqttOptions::new("mqtt_test_client_id", ip, 1883),
+        );
 
-        let mut mqtt = MQTTClient::new(SysTimer::new(), SysTimer::new(), 512, 512);
+        nb::block!(mqtt_eventloop.connect(&gsm)).expect("Failed to connect to MQTT");
 
-        nb::block!(mqtt.connect(
-            &*gsm,
-            socket,
-            Connect {
-                protocol: Protocol::MQTT311,
-                keep_alive: 60,
-                client_id: String::from("MINI"),
-                clean_session: true,
-                last_will: None,
-                username: None,
-                password: None,
-            }
-        ))
-        .expect("Failed to connect to MQTT");
+        thread::Builder::new()
+            .name("eventloop".to_string())
+            .spawn(move || loop {
+                match nb::block!(mqtt_eventloop.yield_event(&gsm)) {
+                    Ok(Notification::Publish(publish)) => {
+                        #[cfg(features = "logging")]
+                        log::debug!(
+                            "[{}, {:?}]: {:?}",
+                            publish.topic_name,
+                            publish.qospid,
+                            String::from_utf8(publish.payload).unwrap()
+                        );
+                    }
+                    _ => {
+                        // #[cfg(features = "logging")]
+                        // log::debug!("{:?}", n);
+                    }
+                }
+            })
+            .unwrap();
 
+        #[cfg(features = "logging")]
         log::info!("MQTT Connected!");
 
         let mut cnt = 0;
         loop {
-            nb::block!(mqtt.publish(
-                &*gsm,
-                QoS::AtLeastOnce,
-                String::from("fbmini"),
-                format!("{{\"key\": \"Hello World from Factbird Mini - {}!\"}}", cnt)
-                    .as_bytes()
-                    .to_owned(),
-            ))
-            .expect("Failed to publish MQTT msg");
+            p.enqueue(
+                PublishRequest::new(
+                    "ublox_mqtt/tester/whatup".to_owned(),
+                    format!("{{\"key\": \"Hello World from UBlox - {}!\"}}", cnt)
+                        .as_bytes()
+                        .to_owned(),
+                )
+                .into(),
+            )
+            .expect("Failed to publish!");
             cnt += 1;
             thread::sleep(Duration::from_millis(5000));
         }

@@ -172,22 +172,75 @@ pub struct WriteSocketDataBinary<'a> {
     pub data: serde_at::ser::Bytes<'a>,
 }
 
+///25.11 SendTo command (UDP only) +USOST
+///
+/// Writes the specified amount of data to the remote address,
+/// like the BSD sendto routine, and returns the number of bytes
+/// of data actually written. It can be applied to UDP sockets
+/// only. This command allows the reuse of the same socket to send
+/// data to many different remote hosts.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+USOST", NoResponse, timeout_ms = 1000)]
+pub struct PrepareUDPSendToDataBinary {
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle,
+    #[at_arg(position = 1)]
+    pub remote_addr: IpAddr,
+    #[at_arg(position = 2)]
+    pub remote_port: u16,
+    #[at_arg(position = 3)]
+    pub length: usize,
+}
+
+#[derive(Clone, AtatCmd)]
+#[at_cmd(
+    "",
+    UDPSendToDataResponse,
+    value_sep = false,
+    cmd_prefix = "",
+    termination = "",
+    force_receive_state = true
+)]
+pub struct UDPSendToDataBinary<'a> {
+    #[at_arg(position = 0)]
+    pub data: serde_at::ser::Bytes<'a>,
+}
+
 /// 25.12 Read Socket Data +USORD
 ///
 /// Reads the specified amount of data from the specified socket, like the BSD
 /// read routine. This command can be used to know the total amount of unread
-/// data. \
+/// data.
+///
 /// For the TCP socket type the URC +UUSORD: <socket>,<length> notifies the data
 /// bytes available for reading, either when buffer is empty and new data
-/// arrives or after a partial read by the user. \
+/// arrives or after a partial read by the user.
+///
 /// For the UDP socket type the URC +UUSORD: <socket>,<length> notifies that a
 /// UDP packet has been received, either when buffer is empty or after a UDP
-/// packet has been read and one or more packets are stored in the buffer. \
+/// packet has been read and one or more packets are stored in the buffer.
+///
 /// In case of a partial read of a UDP packet +UUSORD: <socket>,<length> will
 /// show the remaining number of data bytes of the packet the user is reading.
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USORD", SocketData, timeout_ms = 10000, abortable = true)]
 pub struct ReadSocketData {
+    #[at_arg(position = 0)]
+    pub socket: SocketHandle,
+    #[at_arg(position = 1)]
+    pub length: usize,
+}
+
+/// 25.13 Receive From command (UDP only) +USORF
+///
+/// Reads the specified amount of data from the specified UDP socket, like the
+/// BSD recvfrom routine. The URC +UUSORF: <socket>,<length> (or also +UUSORD:
+/// <socket>,<length>) notifies that new data is available for reading, either
+/// when new data arrives or after a partial read by the user for the socket.
+/// This command can also return the total amount of unread data.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+USORF", UDPSocketData, timeout_ms = 10000, abortable = true)]
+pub struct ReadUDPSocketData {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,
     #[at_arg(position = 1)]

@@ -320,7 +320,8 @@ checksum = "3728d817d99e5ac407411fa471ff9800a778d88a24685968b36824eaf4bee400"
 [[package]]
 name = "mqttrs"
 version = "0.3.0"
-source = "git+https://github.com/00imvj00/mqttrs#a84c9342e284284a12d3a738d9604c56eeeea66c"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "853454f11ce548c11dc66164340d93ab81f0abf7b6deb76bf71f44f76e3ffb91"
 dependencies = [
  "bytes",
 ]
@@ -328,14 +329,15 @@ dependencies = [
 [[package]]
 name = "mqttrust"
 version = "0.0.1"
+source = "git+https://github.com/BlackbirdHQ/mqttrust#0355a75ffb2e586f2594a96bdfd3b466a40e767d"
 dependencies = [
  "bytes",
  "embedded-hal",
  "embedded-nal",
  "heapless",
- "log",
  "mqttrs",
  "nb",
+ "no-std-net",
  "ufmt",
 ]
 

@@ -26,22 +26,22 @@ serde_repr = "0.1"
 ufmt = { version = "0.1.0", optional = true }
 embedded-nal = { git = "https://github.com/thejpster/embedded-nal" }
 hex = { version = "0.4.2", default-features = false }
-log = { version = "0.4", default-features = false }
+log = { version = "0.4", default-features = false, optional = true }
 
 
 [dev-dependencies]
 env_logger = "0.7.1"
-void = "1.0.2"
+void = { version = "1.0.2", default-features = false }
 linux-embedded-hal = "0.3.0"
 serialport = "3.3.0"
-mqttrust = { path = "../mqttrust" }
+mqttrust = { git = "https://github.com/BlackbirdHQ/mqttrust" }
 
 [patch.crates-io]
 atat = { git = "https://github.com/BlackbirdHQ/atat" }
 serde_at = { git = "https://github.com/BlackbirdHQ/atat" }
 
 [features]
-default = ["sara_u2", "socket-tcp", "use_ufmt"]
+default = ["sara_u2", "socket-udp", "socket-tcp", "use_ufmt"]
 
 topy_l4 = []
 mpci_l2 = []
@@ -56,5 +56,6 @@ lara_r2 = []
 leon_g1 = []
 
 socket-tcp = []
-# socket-udp = []
+socket-udp = []
 use_ufmt = ["ufmt"]
+logging = ["log"]
