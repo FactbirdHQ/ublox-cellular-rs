@@ -41,7 +41,7 @@ where
             | PinStatusCode::PhNetSubPin
             | PinStatusCode::PhSpPin
             | PinStatusCode::PhCorpPin => {
-                #[cfg(features = "logging")]
+                #[cfg(feature = "logging")]
                 log::info!("Pin NOT Ready!");
                 return Err(Error::Pin);
             }

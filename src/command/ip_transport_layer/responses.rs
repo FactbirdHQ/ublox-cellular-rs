@@ -45,7 +45,7 @@ pub struct SocketData {
     #[at_arg(position = 1)]
     pub length: usize,
     #[at_arg(position = 2)]
-    pub data: String<consts::U256>,
+    pub data: Option<String<consts::U256>>,
 }
 
 /// 25.13 Read UDP Socket Data +USORF
@@ -60,7 +60,7 @@ pub struct UDPSocketData {
     #[at_arg(position = 3)]
     pub length: usize,
     #[at_arg(position = 4)]
-    pub data: String<consts::U256>,
+    pub data: Option<String<consts::U256>>,
 }
 
 /// 25.25 Socket control +USOCTL

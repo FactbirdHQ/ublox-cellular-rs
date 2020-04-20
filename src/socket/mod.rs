@@ -16,7 +16,6 @@ pub use tcp::{State as TcpState, TcpSocket};
 pub use udp::UdpSocket;
 
 pub use self::set::{Handle as SocketHandle, Item as SocketSetItem, Set as SocketSet};
-pub use self::set::{Iter as SocketSetIter, IterMut as SocketSetIterMut};
 
 pub use self::ref_::Ref as SocketRef;
 pub(crate) use self::ref_::Session as SocketSession;
@@ -87,6 +86,24 @@ pub enum Socket {
     __Nonexhaustive(PhantomData<()>),
 }
 
+#[derive(Debug)]
+pub enum SocketType {
+    Udp,
+    Tcp,
+    #[doc(hidden)]
+    __Nonexhaustive,
+}
+
+impl Socket {
+    pub fn get_type(&self) -> SocketType {
+        match self {
+            Socket::Tcp(_) => SocketType::Tcp,
+            Socket::Udp(_) => SocketType::Udp,
+            Socket::__Nonexhaustive(_) => SocketType::__Nonexhaustive,
+        }
+    }
+}
+
 macro_rules! dispatch_socket {
     ($self_:expr, |$socket:ident| $code:expr) => {
         dispatch_socket!(@inner $self_, |$socket| $code);
@@ -120,12 +137,8 @@ impl Socket {
         dispatch_socket!(self, |socket| &socket.meta)
     }
 
-    pub(crate) fn meta_mut(&mut self) -> &mut SocketMeta {
-        dispatch_socket!(mut self, |socket| &mut socket.meta)
-    }
-
-    // pub(crate) fn poll_at(&self) -> PollAt {
-    //     dispatch_socket!(self, |socket| socket.poll_at())
+    // pub(crate) fn meta_mut(&mut self) -> &mut SocketMeta {
+    //     dispatch_socket!(mut self, |socket| &mut socket.meta)
     // }
 }
 

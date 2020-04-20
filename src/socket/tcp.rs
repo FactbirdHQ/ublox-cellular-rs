@@ -452,7 +452,7 @@ impl TcpSocket {
             return Err(Error::Illegal);
         }
 
-        let (size, result) = f(&mut self.rx_buffer);
+        let (_size, result) = f(&mut self.rx_buffer);
         Ok(result)
     }
 

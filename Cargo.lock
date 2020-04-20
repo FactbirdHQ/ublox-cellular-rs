@@ -44,7 +44,6 @@ dependencies = [
 [[package]]
 name = "atat"
 version = "0.3.0"
-source = "git+https://github.com/BlackbirdHQ/atat#be343ed8df87720ea03139500b46dbd4f505018e"
 dependencies = [
  "atat_derive",
  "embedded-hal",
@@ -60,7 +59,6 @@ dependencies = [
 [[package]]
 name = "atat_derive"
 version = "0.3.0"
-source = "git+https://github.com/BlackbirdHQ/atat#be343ed8df87720ea03139500b46dbd4f505018e"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
@@ -486,7 +484,6 @@ dependencies = [
 [[package]]
 name = "serde_at"
 version = "0.3.0"
-source = "git+https://github.com/BlackbirdHQ/atat#be343ed8df87720ea03139500b46dbd4f505018e"
 dependencies = [
  "heapless",
  "log",

@@ -7,14 +7,14 @@ use crate::{
     command::{
         control::{types::*, *},
         gpio::{types::*, *},
-        ip_transport_layer::*,
+        ip_transport_layer::{responses::*, *},
         mobile_control::{types::*, *},
         system_features::{types::*, *},
         Urc, *,
     },
     error::Error,
     hex,
-    socket::{SocketHandle, SocketSet, TcpSocket, UdpSocket},
+    socket::{SocketHandle, SocketSet, SocketType, TcpSocket, UdpSocket},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -25,6 +25,7 @@ pub enum State {
     Deattached,
     Attaching,
     Attached,
+    Sending,
 }
 
 #[derive(Debug, Default)]
@@ -96,6 +97,7 @@ where
     initialized: RefCell<bool>,
     config: Config<RST, DTR>,
     pub(crate) state: RefCell<State>,
+    pub(crate) poll_cnt: RefCell<u8>,
     pub(crate) client: RefCell<C>,
     // Ublox devices can hold a maximum of 6 active sockets
     pub(crate) sockets: RefCell<SocketSet<consts::U6>>,
@@ -111,15 +113,17 @@ where
         GSMClient {
             config,
             state: RefCell::new(State::Deregistered),
+            poll_cnt: RefCell::new(0),
             initialized: RefCell::new(false),
             client: RefCell::new(client),
             sockets: RefCell::new(SocketSet::new()),
         }
     }
 
-    pub(crate) fn set_state(&self, state: State) -> Result<(), Error> {
+    pub(crate) fn set_state(&self, state: State) -> Result<State, Error> {
+        let prev_state = self.get_state()?;
         *self.state.try_borrow_mut().map_err(|_| Error::SetState)? = state;
-        Ok(())
+        Ok(prev_state)
     }
 
     pub(crate) fn get_state(&self) -> Result<State, Error> {
@@ -284,8 +288,90 @@ where
         Ok(())
     }
 
+    /// Helper function to manage the internal poll counter, used to poll open
+    /// sockets for incoming data, in case a `SocketDataAvailable` URC is missed
+    /// once in a while, as the ublox module will never send the URC again, if
+    /// the socket is not read.
+    fn poll_cnt(&self, reset: bool) -> u8 {
+        match self.poll_cnt.try_borrow_mut() {
+            Ok(mut pc) => {
+                if reset {
+                    // Reset poll_cnt
+                    *pc = 0;
+                    0
+                } else {
+                    // Increment poll_cnt by one, and return the old value
+                    *pc += 1;
+                    *pc - 1
+                }
+            }
+            Err(_) => 0,
+        }
+    }
+
     pub fn spin(&self) -> Result<(), Error> {
-        self.handle_urcs()
+        self.handle_urcs()?;
+
+        // Occasionally poll every open socket, in case a `SocketDataAvailable`
+        // URC was missed somehow
+        let data_available: heapless::Vec<(SocketHandle, usize), consts::U6> = {
+            let sockets = self.sockets.try_borrow()?;
+
+            if sockets.len() > 0 && self.poll_cnt(false) >= 50 {
+                sockets
+                    .iter()
+                    .filter_map(|(h, s)| {
+                        // Figure out if socket is TCP or UDP
+                        match s.get_type() {
+                            SocketType::Tcp => self
+                                .send_internal(
+                                    &ReadSocketData {
+                                        socket: h,
+                                        length: 0,
+                                    },
+                                    false,
+                                )
+                                .map_or(None, |s| {
+                                    if s.length > 0 {
+                                        Some((h, s.length))
+                                    } else {
+                                        None
+                                    }
+                                }),
+                            SocketType::Udp => self
+                                .send_internal(
+                                    &ReadUDPSocketData {
+                                        socket: h,
+                                        length: 0,
+                                    },
+                                    false,
+                                )
+                                .map_or(None, |s| {
+                                    if s.length > 0 {
+                                        Some((h, s.length))
+                                    } else {
+                                        None
+                                    }
+                                }),
+                            _ => None,
+                        }
+                    })
+                    .collect()
+            } else {
+                heapless::Vec::new()
+            }
+        };
+
+        data_available
+            .iter()
+            .try_for_each(|(handle, len)| self.socket_ingress(&handle, *len).map(|_| ()))
+            .map_err(|e| {
+                #[cfg(feature = "logging")]
+                log::error!("ERROR: {:?}", e);
+                e
+            })?;
+
+        Ok(())
     }
 
     fn handle_urcs(&self) -> Result<(), Error> {
@@ -294,20 +380,21 @@ where
 
             match urc {
                 Some(Urc::MessageWaitingIndication(_)) => {
-                    #[cfg(features = "logging")]
+                    #[cfg(feature = "logging")]
                     log::info!("[URC] MessageWaitingIndication");
                 }
                 Some(Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket })) => {
-                    #[cfg(features = "logging")]
+                    #[cfg(feature = "logging")]
                     log::info!("[URC] SocketClosed");
                     let mut sockets = self.sockets.try_borrow_mut()?;
                     let mut tcp = sockets.get::<TcpSocket>(&socket)?;
                     tcp.close();
+                    sockets.remove(socket)?;
                 }
                 Some(Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
                     ..
                 })) => {
-                    #[cfg(features = "logging")]
+                    #[cfg(feature = "logging")]
                     log::info!("[URC] DataConnectionDeactivated");
                     self.set_state(State::Deattached)?;
                 }
@@ -316,18 +403,64 @@ where
                     length,
                 })) => match self.socket_ingress(&socket, length) {
                     Ok(bytes) => {
-                        #[cfg(features = "logging")]
-                        log::info!("[URC] Ingressed {:?} bytes", bytes);
+                        // #[cfg(feature = "logging")]
+                        // log::info!("[URC] Ingressed {:?} bytes", bytes);
                     }
                     Err(e) => {
-                        #[cfg(features = "logging")]
+                        #[cfg(feature = "logging")]
                         log::error!("[URC] Failed ingress! {:?}", e);
+                        return Err(e);
                     }
                 },
                 None => break,
             };
         }
         Ok(())
+    }
+
+    pub(crate) fn handle_socket_error<A: atat::AtatResp, F: Fn() -> Result<A, Error>>(
+        &self,
+        f: F,
+        socket: Option<SocketHandle>,
+        attempt: u8,
+    ) -> Result<A, Error> {
+        match f() {
+            Ok(r) => Ok(r),
+            Err(e @ Error::AT(atat::Error::Timeout)) => {
+                if attempt < 3 {
+                    #[cfg(feature = "logging")]
+                    log::error!("[RETRY] Retrying! {:?}", attempt);
+                    self.handle_socket_error(f, socket, attempt + 1)
+                } else {
+                    Err(e)
+                }
+            }
+            Err(e @ Error::AT(atat::Error::InvalidResponse)) => {
+                let SocketErrorResponse { error } = self
+                    .send_internal(&GetSocketError, false)
+                    .unwrap_or_else(|_e| SocketErrorResponse { error: 110 });
+
+                if error != 0 {
+                    if let Some(handle) = socket {
+                        let mut sockets = self.sockets.try_borrow_mut()?;
+                        match sockets.socket_type(&handle) {
+                            Some(SocketType::Tcp) => {
+                                let mut tcp = sockets.get::<TcpSocket>(&handle)?;
+                                tcp.close();
+                            }
+                            Some(SocketType::Udp) => {
+                                let mut udp = sockets.get::<UdpSocket>(&handle)?;
+                                udp.close();
+                            }
+                            _ => {}
+                        }
+                        sockets.remove(handle)?;
+                    }
+                }
+                Err(e)
+            }
+            Err(e) => Err(e),
+        }
     }
 
     pub(crate) fn socket_ingress(
@@ -339,40 +472,67 @@ where
             return Ok(0);
         }
 
-        let chunk_size = core::cmp::min(length, 200);
+        // Allow room for 2x length (Hex), and command overhead
+        let chunk_size = core::cmp::min(length, 50);
         let mut sockets = self.sockets.try_borrow_mut()?;
 
-        let data: heapless::Vec<_, consts::U200>;
+        // Reset poll_cnt
+        self.poll_cnt(true);
 
-        match sockets.get::<TcpSocket>(socket) {
-            //Handle tcp socket
-            Ok(mut tcp) => {
-                let socket_data = self.send_at(&ReadSocketData {
-                    socket: socket.clone(),
-                    length: chunk_size,
-                })?;
+        match sockets.socket_type(socket) {
+            Some(SocketType::Tcp) => {
+                // Handle tcp socket
+                let mut tcp = sockets.get::<TcpSocket>(socket)?;
 
-                if socket_data.length != chunk_size {
-                    return Err(Error::BadLength);
-                }
+                let socket_data = self.handle_socket_error(
+                    || {
+                        self.send_internal(
+                            &ReadSocketData {
+                                socket: socket.clone(),
+                                length: chunk_size,
+                            },
+                            false,
+                        )
+                    },
+                    Some(socket.clone()),
+                    0,
+                )?;
 
                 if &socket_data.socket != socket {
+                    #[cfg(feature = "logging")]
+                    log::error!("WrongSocketType {:?} != {:?}", socket_data.socket, socket);
                     return Err(Error::WrongSocketType);
                 }
 
-                data = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
-                return Ok(tcp.rx_enqueue_slice(&data));
+                if let Some(data) = &socket_data.data {
+                    if socket_data.length > 0 && data.len() / 2 != socket_data.length {
+                        #[cfg(feature = "logging")]
+                        log::error!(
+                            "BadLength {:?} != {:?}, {:?}",
+                            socket_data.length,
+                            data.len() / 2,
+                            data
+                        );
+                        return Err(Error::BadLength);
+                    }
+                    let data: heapless::Vec<_, consts::U256> =
+                        hex::decode_hex(data).map_err(|_| Error::InvalidHex)?;
+                    Ok(tcp.rx_enqueue_slice(&data))
+                } else {
+                    Ok(0)
+                }
             }
-            Err(_) => {}
-        }
+            Some(SocketType::Udp) => {
+                // Handle udp socket
+                let mut udp = sockets.get::<UdpSocket>(socket)?;
 
-        match sockets.get::<UdpSocket>(socket) {
-            //Handle udp socket
-            Ok(mut udp) => {
-                let socket_data = self.send_at(&ReadUDPSocketData {
-                    socket: socket.clone(),
-                    length: chunk_size,
-                })?;
+                let socket_data = self.send_internal(
+                    &ReadUDPSocketData {
+                        socket: socket.clone(),
+                        length: chunk_size,
+                    },
+                    false,
+                )?;
 
                 if socket_data.length != chunk_size {
                     return Err(Error::BadLength);
@@ -382,10 +542,11 @@ where
                     return Err(Error::WrongSocketType);
                 }
 
-                data = hex::decode_hex(&socket_data.data).map_err(|_| Error::BadLength)?;
+                let data: heapless::Vec<_, consts::U256> =
+                    hex::decode_hex(&socket_data.data.unwrap()).map_err(|_| Error::InvalidHex)?;
                 Ok(udp.rx_enqueue_slice(&data))
             }
-            Err(e) => return Err(Error::Socket(e)),
+            _ => Err(Error::WrongSocketType),
         }
     }
 
@@ -397,7 +558,7 @@ where
         // React to any enqueued URC's before starting a new command exchange
         if check_urc {
             if let Err(e) = self.handle_urcs() {
-                #[cfg(features = "logging")]
+                #[cfg(feature = "logging")]
                 log::error!("Failed handle URC: {:?}", e);
             }
         }
@@ -407,8 +568,11 @@ where
             .send(req)
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
-                    #[cfg(features = "logging")]
-                    log::error!("{:?}: [{:?}]", ate, req.as_string());
+                    #[cfg(feature = "logging")]
+                    match core::str::from_utf8(&req.as_bytes()) {
+                        Ok(s) => log::error!("{:?}: [{:?}]", ate, s),
+                        Err(_) => log::error!("{:?}: [{:?}]", ate, req.as_bytes()),
+                    };
                     ate.into()
                 }
                 nb::Error::WouldBlock => Error::_Unknown,
@@ -416,7 +580,9 @@ where
     }
 
     pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
-        self.init(false)?;
+        if !*self.initialized.try_borrow()? {
+            self.init(false)?;
+        }
 
         self.send_internal(cmd, true)
     }

@@ -41,7 +41,7 @@ where
 static mut Q: Queue<Request, consts::U10> = Queue(heapless::i::Queue::new());
 
 fn main() {
-    #[cfg(features = "logging")]
+    #[cfg(feature = "logging")]
     env_logger::builder()
         .filter_level(log::LevelFilter::Debug)
         .init();
@@ -100,7 +100,7 @@ fn main() {
                         // Ignore
                     }
                     _ => {
-                        #[cfg(features = "logging")]
+                        #[cfg(feature = "logging")]
                         log::error!("Serial reading thread error while reading: {}", e);
                     }
                 },
@@ -152,7 +152,7 @@ fn main() {
         loop {
             match nb::block!(mqtt_eventloop.yield_event(&gsm)) {
                 Ok(Notification::Publish(publish)) => {
-                    #[cfg(features = "logging")]
+                    #[cfg(feature = "logging")]
                     log::debug!(
                         "[{}, {:?}]: {:?}",
                         publish.topic_name,

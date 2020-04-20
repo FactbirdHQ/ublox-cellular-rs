@@ -18,7 +18,8 @@ pub enum Error {
     BorrowError(core::cell::BorrowError),
     BorrowMutError(core::cell::BorrowMutError),
     AT(atat::Error),
-
+    Busy,
+    InvalidHex,
     _Unknown,
 }
 

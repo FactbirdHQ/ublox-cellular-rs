@@ -111,7 +111,7 @@ pub struct ConnectSocket {
 /// - Base syntax normal: writing simple strings to the socket, some characters
 ///   are forbidden
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+USOWR", WriteSocketDataResponse, timeout_ms = 1000)]
+#[at_cmd("+USOWR", WriteSocketDataResponse)]
 pub struct WriteSocketData<'a> {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,
@@ -131,7 +131,7 @@ pub struct WriteSocketData<'a> {
 ///   will be converted in binary data and sent to the socket; see the
 ///   AT+UDCONF=1 command description to enable it
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+USOWR", WriteSocketDataResponse, timeout_ms = 1000)]
+#[at_cmd("+USOWR", WriteSocketDataResponse)]
 pub struct WriteSocketDataHex<'a> {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,
@@ -150,7 +150,7 @@ pub struct WriteSocketDataHex<'a> {
 /// - Binary extended syntax: mandatory for writing any character in the ASCII
 ///   range [0x00, 0xFF]
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+USOWR", NoResponse, timeout_ms = 15000)]
+#[at_cmd("+USOWR", NoResponse)]
 pub struct PrepareWriteSocketDataBinary {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,
@@ -239,7 +239,7 @@ pub struct ReadSocketData {
 /// when new data arrives or after a partial read by the user for the socket.
 /// This command can also return the total amount of unread data.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+USORF", UDPSocketData, timeout_ms = 10000, abortable = true)]
+#[at_cmd("+USORF", UDPSocketData)]
 pub struct ReadUDPSocketData {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,

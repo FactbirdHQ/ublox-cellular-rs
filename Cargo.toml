@@ -37,8 +37,10 @@ serialport = "3.3.0"
 mqttrust = { git = "https://github.com/BlackbirdHQ/mqttrust" }
 
 [patch.crates-io]
-atat = { git = "https://github.com/BlackbirdHQ/atat" }
-serde_at = { git = "https://github.com/BlackbirdHQ/atat" }
+# atat = { git = "https://github.com/BlackbirdHQ/atat" }
+# serde_at = { git = "https://github.com/BlackbirdHQ/atat" }
+atat = { path = "../atat/atat" }
+serde_at = { path = "../atat/serde_at" }
 
 [features]
 default = ["sara_u2", "socket-udp", "socket-tcp", "use_ufmt"]

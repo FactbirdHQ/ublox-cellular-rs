@@ -184,7 +184,7 @@ impl<T, N: ArrayLength<T>> RingBuffer<T, N> {
             self.storage.clear();
         }
 
-        let write_at = self.get_idx(self.length);
+        // let write_at = self.get_idx(self.length);
         let max_size = self.contiguous_window();
         let (size, result) = f(&mut self.storage);
         assert!(size <= max_size);
@@ -213,7 +213,7 @@ impl<T, N: ArrayLength<T>> RingBuffer<T, N> {
     where
         T: Copy,
     {
-        let (size_1, data) = self.enqueue_many_with(|buf| {
+        let (size_1, _data) = self.enqueue_many_with(|buf| {
             let size = cmp::min(buf.capacity(), data.len());
             buf.extend_from_slice(&data[..size]);
             (size, &data[size..])

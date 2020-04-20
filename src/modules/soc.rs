@@ -31,10 +31,10 @@ where
     /// Open a new UDP socket to the given address and port. UDP is connectionless,
     /// so unlike `TcpStack` no `connect()` is required.
     fn open(&self, remote: SocketAddr, _mode: Mode) -> Result<Self::UdpSocket, Self::Error> {
-        let socket_resp = self.send_at(&CreateSocket {
+        let socket_resp = self.send_internal(&CreateSocket {
             protocol: SocketProtocol::UDP,
             local_port: None,
-        })?;
+        }, false)?;
 
         let mut socket = UdpSocket::new(socket_resp.socket.0);
         socket.bind(remote)?;
@@ -63,16 +63,16 @@ where
         while remaining > 0 {
             let chunk_size = core::cmp::min(remaining, 200);
 
-            self.send_at(&PrepareUDPSendToDataBinary {
+            self.send_internal(&PrepareUDPSendToDataBinary {
                 socket: socket.clone(),
                 remote_addr: udp.endpoint.ip(),
                 remote_port: udp.endpoint.port(),
                 length: chunk_size,
-            })?;
+            }, false)?;
 
-            let response = self.send_at(&UDPSendToDataBinary {
+            let response = self.send_internal(&UDPSendToDataBinary {
                 data: serde_at::ser::Bytes(&buffer[written..written + chunk_size]),
-            })?;
+            }, false)?;
 
             if response.length != chunk_size {
                 return Err(nb::Error::Other(Error::BadLength));
@@ -112,11 +112,11 @@ where
 
     /// Close an existing UDP socket.
     fn close(&self, socket: Self::UdpSocket) -> Result<(), Self::Error> {
-        self.send_at(&CloseSocket { socket })?;
+        self.send_internal(&CloseSocket { socket }, false)?;
 
         let mut sockets = self.sockets.try_borrow_mut()?;
         let mut udp = sockets.get::<UdpSocket>(&socket)?;
-        udp.close()?;
+        udp.close();
 
         Ok(())
     }
@@ -137,10 +137,16 @@ where
 
     /// Open a new TCP socket to the given address and port. The socket starts in the unconnected state.
     fn open(&self, _mode: Mode) -> Result<Self::TcpSocket, Self::Error> {
-        let socket_resp = self.send_at(&CreateSocket {
-            protocol: SocketProtocol::TCP,
-            local_port: None,
-        })?;
+        let socket_resp = self.handle_socket_error(
+            || {
+                self.send_internal(&CreateSocket {
+                    protocol: SocketProtocol::TCP,
+                    local_port: None,
+                }, false)
+            },
+            None,
+            0,
+        )?;
 
         Ok(self
             .sockets
@@ -156,11 +162,17 @@ where
     ) -> Result<Self::TcpSocket, Self::Error> {
         self.enable_ssl(socket, 0)?;
 
-        self.send_at(&ConnectSocket {
-            socket,
-            remote_addr: remote.ip(),
-            remote_port: remote.port(),
-        })?;
+        self.handle_socket_error(
+            || {
+                self.send_internal(&ConnectSocket {
+                    socket,
+                    remote_addr: remote.ip(),
+                    remote_port: remote.port(),
+                }, false)
+            },
+            Some(socket),
+            0,
+        )?;
 
         let mut sockets = self.sockets.try_borrow_mut()?;
         let mut tcp = sockets.get::<TcpSocket>(&socket)?;
@@ -181,25 +193,36 @@ where
         if !self.is_connected(&socket)? {
             return Err(nb::Error::Other(Error::SocketClosed));
         }
-        self.spin()?;
 
         let mut remaining = buffer.len();
         let mut written = 0;
 
+        // #[cfg(feature = "logging")]
         // log::debug!("Sending: {} bytes, {:?}", remaining, buffer);
 
         while remaining > 0 {
             let chunk_size = core::cmp::min(remaining, 200);
 
-            self.send_at(&PrepareWriteSocketDataBinary {
-                socket: socket.clone(),
-                length: chunk_size,
-            })?;
+            self.handle_socket_error(
+                || {
+                    self.send_internal(&PrepareWriteSocketDataBinary {
+                        socket: socket.clone(),
+                        length: chunk_size,
+                    }, false)
+                },
+                Some(socket.clone()),
+                0,
+            )?;
 
-            let response = self.send_at(&WriteSocketDataBinary {
-                data: serde_at::ser::Bytes(&buffer[written..written + chunk_size]),
-            })?;
-
+            let response = self.handle_socket_error(
+                || {
+                    self.send_internal(&WriteSocketDataBinary {
+                        data: serde_at::ser::Bytes(&buffer[written..written + chunk_size]),
+                    }, false)
+                },
+                Some(socket.clone()),
+                0,
+            )?;
             if response.length != chunk_size {
                 return Err(nb::Error::Other(Error::BadLength));
             }
@@ -243,8 +266,9 @@ where
         let mut sockets = self.sockets.try_borrow_mut()?;
         let mut tcp = sockets.get::<TcpSocket>(&socket)?;
         tcp.close();
+        sockets.remove(socket)?;
 
-        self.send_at(&CloseSocket { socket })?;
+        self.handle_socket_error(|| self.send_internal(&CloseSocket { socket }, false), Some(socket), 0)?;
 
         Ok(())
     }

@@ -1,5 +1,5 @@
-//! AT Commands for U-Blox short range module family\
-//! Following the [u-connect ATCommands Manual](https://www.u-blox.com/sites/default/files/u-connect-ATCommands-Manual_(UBX-14044127).pdf)
+//! AT Commands for u-blox cellular module family\
+//! Following the [u-blox cellular modules AT commands manual](https://www.u-blox.com/sites/default/files/u-blox-CEL_ATCommands_%28UBX-13002752%29.pdf)
 
 pub mod control;
 pub mod device_data_security;
@@ -25,12 +25,12 @@ pub struct AT;
 
 #[derive(Clone, AtatUrc)]
 pub enum Urc {
-    #[at_urc("+UUSORD")]
+    #[at_urc(b"+UUSORD")]
     SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable),
-    #[at_urc("+UUPSDD")]
+    #[at_urc(b"+UUPSDD")]
     DataConnectionDeactivated(psn::urc::DataConnectionDeactivated),
-    #[at_urc("+UUSOCL")]
+    #[at_urc(b"+UUSOCL")]
     SocketClosed(ip_transport_layer::urc::SocketClosed),
-    #[at_urc("+UMWI")]
+    #[at_urc(b"+UMWI")]
     MessageWaitingIndication(sms::urc::MessageWaitingIndication),
 }

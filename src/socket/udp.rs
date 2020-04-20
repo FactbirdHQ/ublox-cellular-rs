@@ -119,7 +119,7 @@ impl UdpSocket {
             return Err(Error::Illegal);
         }
 
-        let (size, result) = f(&mut self.rx_buffer);
+        let (_size, result) = f(&mut self.rx_buffer);
         Ok(result)
     }
 
@@ -185,12 +185,11 @@ impl UdpSocket {
         Ok(length)
     }
 
-    pub fn close(&mut self) -> Result<()> {
+    pub fn close(&mut self) {
         match self.endpoint {
             SocketAddr::V4(mut ipv4) => ipv4.set_port(0),
             SocketAddr::V6(mut ipv6) => ipv6.set_port(0),
         }
-        Ok(())
     }
 }
 

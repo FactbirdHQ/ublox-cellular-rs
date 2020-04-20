@@ -1,6 +1,4 @@
-use core::{fmt, slice};
-
-use super::{AnySocket, Error, Result, Socket, SocketRef};
+use super::{AnySocket, Error, Result, Socket, SocketRef, SocketType};
 
 use heapless::{ArrayLength, LinearMap};
 use serde::{Deserialize, Serialize};
@@ -19,8 +17,8 @@ pub struct Item {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]
 pub struct Handle(pub usize);
 
-impl fmt::Display for Handle {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+impl core::fmt::Display for Handle {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
@@ -43,6 +41,17 @@ where
         Set {
             sockets: LinearMap::new(),
         }
+    }
+
+    pub fn socket_type(&self, handle: &Handle) -> Option<SocketType> {
+        match self.sockets.get(&handle.0) {
+            Some(item) => Some(item.socket.get_type()),
+            None => None
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.sockets.len()
     }
 
     /// Add a socket to the set with the reference count 1, and return its handle.
@@ -141,59 +150,15 @@ where
     //     }
     // }
 
-    // / Iterate every socket in this set.
-    // pub fn iter(&self) -> Iter {
-    //     Iter {
-    //         lower: self.sockets.iter(),
-    //     }
-    // }
+    /// Iterate every socket in this set.
+    pub fn iter(&self) -> impl Iterator<Item = (Handle, &Socket)> {
+        self.sockets.iter().map(|(k, v)| (Handle(*k), &v.socket))
+    }
 
     // /// Iterate every socket in this set, as SocketRef.
-    // pub fn iter_mut(&mut self) -> IterMut {
-    //     IterMut {
-    //         lower: self.sockets.iter_mut(),
-    //     }
-    // }
-}
-
-/// Immutable socket set iterator.
-///
-/// This struct is created by the [iter](struct.SocketSet.html#method.iter)
-/// on [socket sets](struct.SocketSet.html).
-pub struct Iter<'a> {
-    lower: slice::Iter<'a, Option<Item>>,
-}
-
-impl<'a> Iterator for Iter<'a> {
-    type Item = &'a Socket;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Some(item_opt) = self.lower.next() {
-            if let Some(item) = item_opt.as_ref() {
-                return Some(&item.socket);
-            }
-        }
-        None
-    }
-}
-
-/// Mutable socket set iterator.
-///
-/// This struct is created by the [iter_mut](struct.SocketSet.html#method.iter_mut)
-/// on [socket sets](struct.SocketSet.html).
-pub struct IterMut<'a> {
-    lower: slice::IterMut<'a, Option<Item>>,
-}
-
-impl<'a> Iterator for IterMut<'a> {
-    type Item = SocketRef<'a, Socket>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Some(item_opt) = self.lower.next() {
-            if let Some(item) = item_opt.as_mut() {
-                return Some(SocketRef::new(&mut item.socket));
-            }
-        }
-        None
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = (Handle, SocketRef<Socket>)> {
+        self.sockets
+            .iter_mut()
+            .map(|(k, v)| (Handle(*k), SocketRef::new(&mut v.socket)))
     }
 }
