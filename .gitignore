@@ -5,5 +5,4 @@
 target/
 *.o
 .vscode
-**/secrets
-cmds
+**/*secrets*
