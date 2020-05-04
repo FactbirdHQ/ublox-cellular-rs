@@ -21,23 +21,23 @@ impl FileHandler {
 
 impl OtaPal for FileHandler {
     type Error = ();
-    fn abort(&mut self, _file: &FileDescription) -> Result<(), OtaPalError> {
+    fn abort(&mut self, _file: &FileDescription) -> Result<(), OtaPalError<Self::Error>> {
         Ok(())
     }
-    fn create_file_for_rx(&mut self, file: &FileDescription) -> Result<(), OtaPalError> {
+    fn create_file_for_rx(&mut self, file: &FileDescription) -> Result<(), OtaPalError<Self::Error>> {
         self.filebuf = Some(Cursor::new(Vec::with_capacity(file.filesize)));
         Ok(())
     }
-    fn get_platform_image_state(&mut self) -> Result<PalImageState, OtaPalError> {
+    fn get_platform_image_state(&mut self) -> Result<PalImageState, OtaPalError<Self::Error>> {
         unimplemented!()
     }
-    fn set_platform_image_state(&mut self, _image_state: ImageState) -> Result<(), OtaPalError> {
+    fn set_platform_image_state(&mut self, _image_state: ImageState) -> Result<(), OtaPalError<Self::Error>> {
         unimplemented!()
     }
-    fn reset_device(&mut self) -> Result<(), OtaPalError> {
+    fn reset_device(&mut self) -> Result<(), OtaPalError<Self::Error>> {
         Ok(())
     }
-    fn close_file(&mut self, _file: &FileDescription) -> Result<(), OtaPalError> {
+    fn close_file(&mut self, _file: &FileDescription) -> Result<(), OtaPalError<Self::Error>> {
         if let Some(ref mut buf) = &mut self.filebuf {
             let mut hasher = Sha1::new();
             hasher.input(buf.get_ref());
@@ -52,7 +52,7 @@ impl OtaPal for FileHandler {
         _file: &FileDescription,
         block_offset: usize,
         block_payload: &[u8],
-    ) -> Result<usize, OtaPalError> {
+    ) -> Result<usize, OtaPalError<Self::Error>> {
         if let Some(ref mut buf) = &mut self.filebuf {
             buf.set_position(block_offset as u64);
             buf.write(block_payload)
