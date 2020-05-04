@@ -1,6 +1,6 @@
 //! Argument and parameter types used by System features Commands and Responses
-use serde::{Deserialize, Serialize};
 use atat::atat_derive::{AtatEnum, AtatLen};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, AtatEnum)]
 pub enum PowerSavingMode {

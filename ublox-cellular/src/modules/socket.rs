@@ -127,7 +127,7 @@ where
                                 socket,
                                 length: chunk_size,
                             },
-                            false
+                            false,
                         )
                     },
                     Some(socket.clone()),
@@ -169,7 +169,7 @@ where
                         socket,
                         length: chunk_size,
                     },
-                    false
+                    false,
                 )?;
 
                 if socket_data.length != chunk_size {
@@ -215,7 +215,7 @@ where
                 protocol: SocketProtocol::UDP,
                 local_port: None,
             },
-            false
+            false,
         )?;
 
         let mut socket = UdpSocket::new(socket_resp.socket.0);
@@ -252,14 +252,14 @@ where
                     remote_port: udp.endpoint.port(),
                     length: chunk_size,
                 },
-                false
+                false,
             )?;
 
             let response = self.send_internal(
                 &UDPSendToDataBinary {
                     data: serde_at::ser::Bytes(&buffer[written..written + chunk_size]),
                 },
-                false
+                false,
             )?;
 
             if response.length != chunk_size {
@@ -332,7 +332,7 @@ where
                         protocol: SocketProtocol::TCP,
                         local_port: None,
                     },
-                    false
+                    false,
                 )
             },
             None,
@@ -361,7 +361,7 @@ where
                         remote_addr: remote.ip(),
                         remote_port: remote.port(),
                     },
-                    false
+                    false,
                 )
             },
             Some(socket),
@@ -388,7 +388,6 @@ where
             return Err(nb::Error::Other(Error::SocketClosed));
         }
 
-
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
             // #[cfg(feature = "logging")]
             // log::debug!("Sending: {} bytes, {:?}", chunk.len(), chunk);
@@ -399,7 +398,7 @@ where
                             socket: socket.clone(),
                             length: chunk.len(),
                         },
-                        false
+                        false,
                     )
                 },
                 Some(socket.clone()),
@@ -412,7 +411,7 @@ where
                         &WriteSocketDataBinary {
                             data: serde_at::ser::Bytes(chunk),
                         },
-                        false
+                        false,
                     )
                 },
                 Some(socket.clone()),
@@ -449,8 +448,7 @@ where
             .get::<TcpSocket<_>>(&socket)
             .map_err(|e| nb::Error::Other(e.into()))?;
 
-        tcp
-            .recv_slice(buffer)
+        tcp.recv_slice(buffer)
             .map_err(|e| nb::Error::Other(e.into()))
     }
 

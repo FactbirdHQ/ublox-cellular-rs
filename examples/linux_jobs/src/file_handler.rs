@@ -1,3 +1,5 @@
+use crypto::digest::Digest;
+use crypto::sha1::Sha1;
 use rustot::{
     jobs::FileDescription,
     ota::{
@@ -6,18 +8,14 @@ use rustot::{
     },
 };
 use std::io::{Cursor, Write};
-use crypto::digest::Digest;
-use crypto::sha1::Sha1;
 
 pub struct FileHandler {
-    filebuf: Option<Cursor<Vec<u8>>>
+    filebuf: Option<Cursor<Vec<u8>>>,
 }
 
 impl FileHandler {
     pub fn new() -> Self {
-        FileHandler {
-            filebuf: None
-        }
+        FileHandler { filebuf: None }
     }
 }
 
@@ -57,7 +55,8 @@ impl OtaPal for FileHandler {
     ) -> Result<usize, OtaPalError> {
         if let Some(ref mut buf) = &mut self.filebuf {
             buf.set_position(block_offset as u64);
-            buf.write(block_payload).map_err(|_e| OtaPalError::FileWriteFailed)?;
+            buf.write(block_payload)
+                .map_err(|_e| OtaPalError::FileWriteFailed)?;
             Ok(block_payload.len())
         } else {
             Err(OtaPalError::BadFileHandle)

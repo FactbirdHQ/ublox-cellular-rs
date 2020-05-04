@@ -209,15 +209,15 @@ where
                 &SetFlowControl {
                     value: FlowControl::RtsCts,
                 },
-            false
-        )?;
+                false,
+            )?;
         } else {
             self.send_internal(
                 &SetFlowControl {
                     value: FlowControl::Disabled,
                 },
-            false
-        )?;
+                false,
+            )?;
         }
 
         if self.config.dtr_pin.is_some() && self.config.low_power_mode {
@@ -228,23 +228,23 @@ where
                     mode: PowerSavingMode::CtrlByDtr,
                     timeout: None,
                 },
-            false
-        )?;
+                false,
+            )?;
         } else {
             self.send_internal(
                 &SetPowerSavingControl {
                     mode: PowerSavingMode::Disabled,
                     timeout: None,
                 },
-            false
-        )?;
+                false,
+            )?;
         }
 
         self.send_internal(
             &SetReportMobileTerminationError {
                 n: TerminationErrorMode::Disabled,
             },
-            false
+            false,
         )?;
 
         // self.send_internal(
@@ -259,21 +259,21 @@ where
                 gpio_id: 42,
                 gpio_mode: GpioMode::PadDisabled,
             },
-            false
+            false,
         )?;
         self.send_internal(
             &SetGpioConfiguration {
                 gpio_id: 16,
                 gpio_mode: GpioMode::GsmTxIndication,
             },
-            false
+            false,
         )?;
         self.send_internal(
             &SetGpioConfiguration {
                 gpio_id: 23,
                 gpio_mode: GpioMode::NetworkStatus,
             },
-            false
+            false,
         )?;
 
         // info!("{:?}", self.send_internal(&GetIndicatorControl)?);
@@ -314,7 +314,7 @@ where
                 fun: Functionality::SilentResetWithSimReset,
                 rst: None,
             },
-            false
+            false,
         )?;
         Ok(())
     }
@@ -341,7 +341,7 @@ where
                                         socket: &h,
                                         length: 0,
                                     },
-                                    false
+                                    false,
                                 )
                                 .map_or(None, |s| {
                                     if s.length > 0 {
@@ -356,7 +356,7 @@ where
                                         socket: &h,
                                         length: 0,
                                     },
-                                    false
+                                    false,
                                 )
                                 .map_or(None, |s| {
                                     if s.length > 0 {
@@ -419,9 +419,7 @@ where
                     // log::info!("[URC] Ingressed {:?} bytes", bytes);
                     Ok(())
                 }
-                Ok(_) => {
-                    Ok(())
-                }
+                Ok(_) => Ok(()),
                 Err(e) => {
                     #[cfg(feature = "logging")]
                     log::error!("[URC] Failed ingress! {:?}", e);

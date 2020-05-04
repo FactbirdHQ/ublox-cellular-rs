@@ -21,7 +21,7 @@ pub struct Handle(pub usize);
 pub struct Set<N, L>
 where
     N: ArrayLength<(usize, Item<L>)>,
-    L: ArrayLength<u8>
+    L: ArrayLength<u8>,
 {
     sockets: LinearMap<usize, Item<L>, N>,
 }
@@ -41,7 +41,7 @@ where
     pub fn socket_type(&self, handle: &Handle) -> Option<SocketType> {
         match self.sockets.get(&handle.0) {
             Some(item) => Some(item.socket.get_type()),
-            None => None
+            None => None,
         }
     }
 

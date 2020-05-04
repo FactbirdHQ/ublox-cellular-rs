@@ -14,9 +14,7 @@ fn val(c: u8) -> Result<u8, FromHexError> {
         b'A'..=b'F' => Ok(c - b'A' + 10),
         b'a'..=b'f' => Ok(c - b'a' + 10),
         b'0'..=b'9' => Ok(c - b'0'),
-        _ => {
-            Err(FromHexError::InvalidHexCharacter)
-        }
+        _ => Err(FromHexError::InvalidHexCharacter),
     }
 }
 
@@ -25,9 +23,9 @@ pub fn from_hex<'a>(hex: &'a mut [u8]) -> Result<&'a [u8], FromHexError> {
         return Err(FromHexError::OddLength);
     }
 
-    let len = hex.len()/2;
+    let len = hex.len() / 2;
     for i in 0..len {
-        hex[i] = val(hex[i*2])? << 4 | val(hex[i*2+1])?
+        hex[i] = val(hex[i * 2])? << 4 | val(hex[i * 2 + 1])?
     }
     Ok(&hex[..len])
 }

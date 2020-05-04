@@ -225,7 +225,12 @@ fn main() {
                                 }
                             }
                             Err(e) => {
-                                log::error!("[{}, {:?}]: {:?}", publish.topic_name, publish.qospid, e);
+                                log::error!(
+                                    "[{}, {:?}]: {:?}",
+                                    publish.topic_name,
+                                    publish.qospid,
+                                    e
+                                );
                             }
                         }
                     } else if is_ota_message(&publish.topic_name) {
@@ -239,7 +244,12 @@ fn main() {
                                 }
                             }
                             Err(e) => {
-                                log::error!("[{}, {:?}]: {:?}", publish.topic_name, publish.qospid, e);
+                                log::error!(
+                                    "[{}, {:?}]: {:?}",
+                                    publish.topic_name,
+                                    publish.qospid,
+                                    e
+                                );
                             }
                         }
                     } else {

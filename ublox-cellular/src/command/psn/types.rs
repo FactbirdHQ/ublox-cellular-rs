@@ -1,7 +1,7 @@
+use atat::atat_derive::AtatEnum;
 use heapless::{consts, String};
 use no_std_net::IpAddr;
 use serde::{Deserialize, Serialize};
-use atat::atat_derive::AtatEnum;
 
 impl atat::AtatLen for PacketSwitchedParam {
     type Len = consts::U128;
