@@ -24,14 +24,20 @@ impl OtaPal for FileHandler {
     fn abort(&mut self, _file: &FileDescription) -> Result<(), OtaPalError<Self::Error>> {
         Ok(())
     }
-    fn create_file_for_rx(&mut self, file: &FileDescription) -> Result<(), OtaPalError<Self::Error>> {
+    fn create_file_for_rx(
+        &mut self,
+        file: &FileDescription,
+    ) -> Result<(), OtaPalError<Self::Error>> {
         self.filebuf = Some(Cursor::new(Vec::with_capacity(file.filesize)));
         Ok(())
     }
     fn get_platform_image_state(&mut self) -> Result<PalImageState, OtaPalError<Self::Error>> {
         unimplemented!()
     }
-    fn set_platform_image_state(&mut self, _image_state: ImageState) -> Result<(), OtaPalError<Self::Error>> {
+    fn set_platform_image_state(
+        &mut self,
+        _image_state: ImageState,
+    ) -> Result<(), OtaPalError<Self::Error>> {
         unimplemented!()
     }
     fn reset_device(&mut self) -> Result<(), OtaPalError<Self::Error>> {
