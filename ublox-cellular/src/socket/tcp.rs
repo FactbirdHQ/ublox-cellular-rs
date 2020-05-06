@@ -6,21 +6,14 @@ use crate::socket::{RingBuffer, Socket, SocketHandle, SocketMeta};
 /// A TCP socket ring buffer.
 pub type SocketBuffer<N> = RingBuffer<u8, N>;
 
-/// The state of a TCP socket, according to [RFC 793].
-///
-/// [RFC 793]: https://tools.ietf.org/html/rfc793
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum State {
     Closed,
     Listen,
-    SynSent,
-    SynReceived,
     Established,
     FinWait1,
     FinWait2,
     CloseWait,
-    Closing,
-    LastAck,
     TimeWait,
 }
 
@@ -52,7 +45,6 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
             },
             state: State::Closed,
             rx_buffer: SocketBuffer::new(),
-            // tx_buffer: SocketBuffer::new()
         }
     }
 
@@ -225,14 +217,7 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
             return Err(Error::Illegal);
         }
 
-        let buffer = self.rx_buffer.get_allocated(0, size);
-        // if buffer.len() > 0 {
-        //     #[cfg(any(test, feature = "verbose"))]
-        //     net_trace!("{}:{}:{}: rx buffer: peeking at {} octets",
-        //                self.meta.handle, self.local_endpoint, self.remote_endpoint,
-        //                buffer.len());
-        // }
-        Ok(buffer)
+        Ok(self.rx_buffer.get_allocated(0, size))
     }
 
     /// Peek at a sequence of received octets without removing them from

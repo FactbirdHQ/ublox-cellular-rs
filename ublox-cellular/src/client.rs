@@ -13,7 +13,7 @@ use crate::{
         Urc, *,
     },
     error::Error,
-    socket::{SocketHandle, SocketSet, SocketType, TcpSocket},
+    socket::{SocketHandle, SocketSet, SocketType, TcpSocket, UdpSocket},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -89,43 +89,12 @@ where
     }
 }
 
-#[derive(Debug, Default)]
-pub struct Statistics {
-    sent: u32,
-    timeouts: u32,
-    error: u32,
-}
-
-impl Statistics {
-    fn new() -> Self {
-        Statistics {
-            sent: 0,
-            timeouts: 0,
-            error: 0,
-        }
-    }
-
-    fn handle_err(&mut self, e: &atat::Error) {
-        match e {
-            atat::Error::Timeout => self.timeouts += 1,
-            // atat::Error::Read =>
-            // atat::Error::Write =>
-            // atat::Error::InvalidResponse =>
-            // atat::Error::Aborted =>
-            // atat::Error::Overflow =>
-            // atat::Error::ParseString =>
-            _ => self.error += 1,
-        }
-    }
-}
-
 pub struct GsmClient<C, RST, DTR>
 where
     C: AtatClient,
 {
     initialized: RefCell<bool>,
     config: Config<RST, DTR>,
-    stats: RefCell<Statistics>,
     pub(crate) state: RefCell<State>,
     pub(crate) poll_cnt: RefCell<u8>,
     pub(crate) client: RefCell<C>,
@@ -143,7 +112,6 @@ where
         GsmClient {
             config,
             state: RefCell::new(State::Deregistered),
-            stats: RefCell::new(Statistics::new()),
             poll_cnt: RefCell::new(0),
             initialized: RefCell::new(false),
             client: RefCell::new(client),
@@ -177,9 +145,9 @@ where
 
         self.autosense()?;
 
-        // if *self.initialized.try_borrow()? {
-        //     return Ok(())
-        // }
+        if *self.initialized.try_borrow()? {
+            return Ok(())
+        }
 
         if self.config.baud_rate > 230_400_u32 {
             // Needs a way to reconfigure uart baud rate temporarily
@@ -399,9 +367,18 @@ where
                 #[cfg(feature = "logging")]
                 log::info!("[URC] SocketClosed");
                 let mut sockets = self.sockets.try_borrow_mut()?;
-                let mut tcp = sockets.get::<TcpSocket<_>>(&socket)?;
-                tcp.close();
-                Ok(sockets.remove(socket).map(|_| ())?)
+                match sockets.socket_type(&socket) {
+                    Some(SocketType::Tcp) => {
+                        let mut tcp = sockets.get::<TcpSocket<_>>(&socket)?;
+                        tcp.close();
+                    }
+                    Some(SocketType::Udp) => {
+                        let mut udp = sockets.get::<UdpSocket<_>>(&socket)?;
+                        udp.close();
+                    }
+                    _ => {}
+                }
+                Ok(())
             }
             Some(Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
                 ..
@@ -442,15 +419,11 @@ where
             }
         }
 
-        self.stats.try_borrow_mut()?.sent += 1;
         self.client
             .try_borrow_mut()?
             .send(req)
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
-                    if let Ok(mut stats) = self.stats.try_borrow_mut() {
-                        stats.handle_err(&ate);
-                    }
                     #[cfg(feature = "logging")]
                     match core::str::from_utf8(&req.as_bytes()) {
                         Ok(s) => log::error!("{:?}: [{:?}]", ate, s),

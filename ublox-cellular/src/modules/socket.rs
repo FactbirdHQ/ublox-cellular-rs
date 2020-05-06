@@ -306,6 +306,14 @@ where
         let mut udp = sockets.get::<UdpSocket<_>>(&socket)?;
         udp.close();
 
+        self.handle_socket_error(
+            || self.send_internal(&CloseSocket { socket }, false),
+            Some(socket),
+            0,
+        )?;
+
+        sockets.remove(socket)?;
+
         Ok(())
     }
 }
@@ -457,13 +465,14 @@ where
         let mut sockets = self.sockets.try_borrow_mut()?;
         let mut tcp = sockets.get::<TcpSocket<_>>(&socket)?;
         tcp.close();
-        sockets.remove(socket)?;
 
         self.handle_socket_error(
             || self.send_internal(&CloseSocket { socket }, false),
             Some(socket),
             0,
         )?;
+
+        sockets.remove(socket)?;
 
         Ok(())
     }

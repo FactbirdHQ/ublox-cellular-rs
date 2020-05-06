@@ -158,17 +158,7 @@ impl<L: ArrayLength<u8>> UdpSocket<L> {
             return Err(Error::Illegal);
         }
 
-        let buffer = self.rx_buffer.get_allocated(0, size);
-        Ok(buffer)
-
-        // let handle = self.meta.handle;
-        // self.rx_buffer.peek()
-        //     .map(|payload_buf| {
-        // net_trace!("{}: peek {} buffered octets",
-        //            handle,
-        //            payload_buf.len());
-        //    (payload_buf)
-        // })
+        Ok(self.rx_buffer.get_allocated(0, size))
     }
 
     /// Peek at a packet received from a remote endpoint, copy the payload into the given slice,
@@ -185,10 +175,7 @@ impl<L: ArrayLength<u8>> UdpSocket<L> {
     }
 
     pub fn close(&mut self) {
-        match self.endpoint {
-            SocketAddr::V4(mut ipv4) => ipv4.set_port(0),
-            SocketAddr::V6(mut ipv6) => ipv6.set_port(0),
-        }
+        self.endpoint.set_port(0);
     }
 }
 
