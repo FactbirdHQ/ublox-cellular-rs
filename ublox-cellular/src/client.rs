@@ -146,7 +146,7 @@ where
         self.autosense()?;
 
         if *self.initialized.try_borrow()? {
-            return Ok(())
+            return Ok(());
         }
 
         if self.config.baud_rate > 230_400_u32 {
