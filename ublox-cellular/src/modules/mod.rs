@@ -1,4 +1,5 @@
 pub mod call;
+pub mod dns;
 pub mod gprs;
 pub mod gsm;
 pub mod location;

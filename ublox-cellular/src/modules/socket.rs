@@ -210,12 +210,18 @@ where
     /// Open a new UDP socket to the given address and port. UDP is connectionless,
     /// so unlike `TcpStack` no `connect()` is required.
     fn open(&self, remote: SocketAddr, _mode: Mode) -> Result<Self::UdpSocket, Self::Error> {
-        let socket_resp = self.send_internal(
-            &CreateSocket {
-                protocol: SocketProtocol::UDP,
-                local_port: None,
+        let socket_resp = self.handle_socket_error(
+            || {
+                self.send_internal(
+                    &CreateSocket {
+                        protocol: SocketProtocol::UDP,
+                        local_port: None,
+                    },
+                    false,
+                )
             },
-            false,
+            None,
+            0,
         )?;
 
         let mut socket = UdpSocket::new(socket_resp.socket.0);
@@ -239,38 +245,44 @@ where
             return Err(nb::Error::Other(Error::SocketClosed));
         }
 
-        let mut remaining = buffer.len();
-        let mut written = 0;
-
-        while remaining > 0 {
-            let chunk_size = core::cmp::min(remaining, 512);
-
-            self.send_internal(
-                &PrepareUDPSendToDataBinary {
-                    socket: socket.clone(),
-                    remote_addr: udp.endpoint.ip(),
-                    remote_port: udp.endpoint.port(),
-                    length: chunk_size,
+        for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
+            // #[cfg(feature = "logging")]
+            // log::debug!("Sending: {} bytes, {:?}", chunk.len(), chunk);
+            self.handle_socket_error(
+                || {
+                    self.send_internal(
+                        &PrepareUDPSendToDataBinary {
+                            socket: socket.clone(),
+                            remote_addr: udp.endpoint.ip(),
+                            remote_port: udp.endpoint.port(),
+                            length: chunk.len(),
+                        },
+                        false,
+                    )
                 },
-                false,
+                Some(socket.clone()),
+                0,
             )?;
 
-            let response = self.send_internal(
-                &UDPSendToDataBinary {
-                    data: serde_at::ser::Bytes(&buffer[written..written + chunk_size]),
+            let response = self.handle_socket_error(
+                || {
+                    self.send_internal(
+                        &UDPSendToDataBinary {
+                            data: serde_at::ser::Bytes(chunk),
+                        },
+                        false,
+                    )
                 },
-                false,
+                Some(socket.clone()),
+                0,
             )?;
 
-            if response.length != chunk_size {
+            if response.length != chunk.len() {
                 return Err(nb::Error::Other(Error::BadLength));
             }
             if &response.socket != socket {
                 return Err(nb::Error::Other(Error::WrongSocketType));
             }
-
-            written += chunk_size;
-            remaining -= chunk_size;
         }
 
         return Ok(());
@@ -385,8 +397,7 @@ where
     /// Check if this socket is still connected
     fn is_connected(&self, socket: &Self::TcpSocket) -> Result<bool, Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut()?;
-        let tcp = sockets.get::<TcpSocket<_>>(&socket)?;
-        Ok(tcp.is_active())
+        Ok(sockets.get::<TcpSocket<_>>(&socket)?.is_active())
     }
 
     /// Write to the stream. Returns the number of bytes written is returned

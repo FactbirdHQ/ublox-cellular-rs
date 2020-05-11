@@ -51,7 +51,7 @@ dependencies = [
  "log",
  "nb",
  "serde",
- "serde_at",
+ "serde_at 0.3.0",
  "typenum",
  "void",
 ]
@@ -62,7 +62,7 @@ version = "0.3.0"
 dependencies = [
  "proc-macro2",
  "quote",
- "serde_at",
+ "serde_at 0.3.0",
  "syn",
 ]
 
@@ -148,8 +148,8 @@ dependencies = [
 [[package]]
 name = "embedded-nal"
 version = "0.1.0"
-source = "git+https://github.com/thejpster/embedded-nal#f8bb7d76695488b4838211c5e7037e0379e422aa"
 dependencies = [
+ "heapless",
  "nb",
  "no-std-net",
 ]
@@ -223,6 +223,7 @@ dependencies = [
  "hash32",
  "serde",
  "stable_deref_trait",
+ "ufmt-write",
 ]
 
 [[package]]
@@ -233,12 +234,6 @@ checksum = "61565ff7aaace3525556587bd2dc31d4a07071957be715e63ce7b1eccf51a8f4"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "hex"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "644f9158b2f133fd50f5fb3242878846d9eb792e445c893805ff0e3824006e35"
 
 [[package]]
 name = "humantime"
@@ -639,6 +634,16 @@ dependencies = [
 [[package]]
 name = "serde_at"
 version = "0.3.0"
+source = "git+https://github.com/BlackbirdHQ/atat#98063446ab323c92cb9520f14a98db8153837d3d"
+dependencies = [
+ "heapless",
+ "log",
+ "serde",
+]
+
+[[package]]
+name = "serde_at"
+version = "0.3.0"
 dependencies = [
  "heapless",
  "log",
@@ -684,17 +689,6 @@ dependencies = [
  "itoa",
  "ryu",
  "serde",
-]
-
-[[package]]
-name = "serde_repr"
-version = "0.1.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd02c7587ec314570041b2754829f84d873ced14a96d1fd1823531e11db40573"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
 ]
 
 [[package]]
@@ -823,13 +817,11 @@ dependencies = [
  "embedded-hal",
  "embedded-nal",
  "heapless",
- "hex",
  "log",
  "nb",
  "no-std-net",
  "serde",
- "serde_at",
- "serde_repr",
+ "serde_at 0.3.0 (git+https://github.com/BlackbirdHQ/atat)",
  "typenum",
 ]
 

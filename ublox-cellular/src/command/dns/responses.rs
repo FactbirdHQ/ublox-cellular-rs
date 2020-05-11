@@ -4,7 +4,7 @@ use heapless::{consts, String};
 
 /// 24.1 Resolve name / IP number through DNS +UDNSRN
 #[derive(Clone, PartialEq, AtatResp)]
-pub struct ResolveIpResponse {
+pub struct ResolveNameIpResponse {
     #[at_arg(position = 0)]
-    pub ip_string: String<consts::U64>,
+    pub ip_domain_string: String<consts::U128>,
 }

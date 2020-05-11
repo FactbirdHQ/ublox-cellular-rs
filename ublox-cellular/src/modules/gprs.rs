@@ -3,7 +3,6 @@ use heapless::{consts, String};
 use no_std_net::{IpAddr, Ipv4Addr};
 
 use crate::{
-    command::dns::{self, responses::*},
     command::psn::{self, types::*},
     error::Error,
     GsmClient, State,
@@ -29,7 +28,6 @@ impl APNInfo {
 pub trait GPRS {
     fn attach_gprs(&self, apn_info: APNInfo) -> Result<(), Error>;
     fn detach_gprs(&self) -> Result<(), Error>;
-    fn dns_lookup(&self, hostname: &str) -> Result<Ipv4Addr, Error>;
 }
 
 impl<C, RST, DTR> GPRS for GsmClient<C, RST, DTR>
@@ -118,13 +116,5 @@ where
         self.set_state(State::Deattached)?;
 
         Ok(())
-    }
-
-    fn dns_lookup(&self, hostname: &str) -> Result<Ipv4Addr, Error> {
-        let ResolveIpResponse { ip_string } = self.send_at(&dns::ResolveIp {
-            domain_string: hostname,
-        })?;
-
-        Ok(ip_string.parse().map_err(|_e| Error::Network)?)
     }
 }

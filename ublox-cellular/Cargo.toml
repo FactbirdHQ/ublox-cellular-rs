@@ -22,9 +22,7 @@ nb = "^0.1"
 atat = { version = "^0.3", features = ["derive"] }
 serde_at = { version = "^0.3" }
 serde = { version = "^1", default-features = false, features = ["derive"] }
-serde_repr = "0.1"
 embedded-nal = { git = "https://github.com/thejpster/embedded-nal" }
-hex = { version = "0.4.2", default-features = false }
 log = { version = "0.4", default-features = false, optional = true }
 typenum = "^1"
 

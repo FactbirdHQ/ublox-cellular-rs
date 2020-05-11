@@ -18,6 +18,7 @@ pub mod types;
 
 use atat::atat_derive::AtatCmd;
 use responses::*;
+use types::*;
 
 /// 24.1 Resolve name / IP number through DNS +UDNSRN
 ///
@@ -48,13 +49,10 @@ use responses::*;
 ///   the user sets a DNS for a profile, and a different profile is activated,
 ///   the user DNS has no action and the network DNS is used if available).
 #[derive(Clone, AtatCmd)]
-#[at_cmd(
-    "+UDNSRN=0,",
-    ResolveIpResponse,
-    timeout_ms = 120000,
-    value_sep = false
-)]
-pub struct ResolveIp<'a> {
-    #[at_arg(position = 0, len = 128)]
-    pub domain_string: &'a str,
+#[at_cmd("+UDNSRN", ResolveNameIpResponse, timeout_ms = 120000)]
+pub struct ResolveNameIp<'a> {
+    #[at_arg(position = 0)]
+    pub resolution_type: ResolutionType,
+    #[at_arg(position = 1, len = 128)]
+    pub ip_domain_string: &'a str,
 }
