@@ -14,6 +14,7 @@ pub enum Error {
     SocketClosed,
     WrongSocketType,
     SocketNotFound,
+    NetworkState(crate::State),
     Socket(socket::Error),
     BorrowError(core::cell::BorrowError),
     BorrowMutError(core::cell::BorrowMutError),

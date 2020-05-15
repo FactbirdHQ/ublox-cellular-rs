@@ -37,7 +37,7 @@ where
     /// sockets for incoming data, in case a `SocketDataAvailable` URC is missed
     /// once in a while, as the ublox module will never send the URC again, if
     /// the socket is not read.
-    pub(crate) fn poll_cnt(&self, reset: bool) -> u8 {
+    pub(crate) fn poll_cnt(&self, reset: bool) -> u16 {
         match self.poll_cnt.try_borrow_mut() {
             Ok(mut pc) => {
                 if reset {
@@ -72,26 +72,25 @@ where
                 }
             }
             Err(e @ Error::AT(atat::Error::InvalidResponse)) => {
-                let SocketErrorResponse { error } = self
-                    .send_internal(&GetSocketError, false)
-                    .unwrap_or_else(|_e| SocketErrorResponse { error: 110 });
+                // let SocketErrorResponse { error } = self
+                //     .send_internal(&GetSocketError, false)
+                //     .unwrap_or_else(|_e| SocketErrorResponse { error: 110 });
 
-                if error != 0 {
-                    if let Some(handle) = socket {
-                        let mut sockets = self.sockets.try_borrow_mut()?;
-                        match sockets.socket_type(&handle) {
-                            Some(SocketType::Tcp) => {
-                                let mut tcp = sockets.get::<TcpSocket<_>>(&handle)?;
-                                tcp.close();
-                            }
-                            Some(SocketType::Udp) => {
-                                let mut udp = sockets.get::<UdpSocket<_>>(&handle)?;
-                                udp.close();
-                            }
-                            _ => {}
+                // if error != 0 {
+                if let Some(handle) = socket {
+                    let mut sockets = self.sockets.try_borrow_mut()?;
+                    match sockets.socket_type(&handle) {
+                        Some(SocketType::Tcp) => {
+                            let mut tcp = sockets.get::<TcpSocket<_>>(&handle)?;
+                            tcp.close();
                         }
-                        sockets.remove(handle)?;
+                        Some(SocketType::Udp) => {
+                            let mut udp = sockets.get::<UdpSocket<_>>(&handle)?;
+                            udp.close();
+                        }
+                        _ => {}
                     }
+                    sockets.remove(handle)?;
                 }
                 Err(e)
             }
@@ -119,6 +118,9 @@ where
             Some(SocketType::Tcp) => {
                 // Handle tcp socket
                 let mut tcp = sockets.get::<TcpSocket<_>>(socket)?;
+                if !tcp.may_recv() {
+                    return Err(Error::SocketClosed);
+                }
 
                 let mut socket_data = self.handle_socket_error(
                     || {
@@ -345,6 +347,10 @@ where
 
     /// Open a new TCP socket to the given address and port. The socket starts in the unconnected state.
     fn open(&self, _mode: Mode) -> Result<Self::TcpSocket, Self::Error> {
+        if self.get_state()? != crate::client::State::Attached {
+            return Err(Error::Network);
+        }
+
         let socket_resp = self.handle_socket_error(
             || {
                 self.send_internal(
@@ -371,6 +377,10 @@ where
         socket: Self::TcpSocket,
         remote: SocketAddr,
     ) -> Result<Self::TcpSocket, Self::Error> {
+        if self.get_state()? != crate::client::State::Attached {
+            return Err(Error::Network);
+        }
+
         self.enable_ssl(socket, 0)?;
 
         self.handle_socket_error(
@@ -396,6 +406,10 @@ where
 
     /// Check if this socket is still connected
     fn is_connected(&self, socket: &Self::TcpSocket) -> Result<bool, Self::Error> {
+        if self.get_state()? != crate::client::State::Attached {
+            return Ok(false);
+        }
+
         let mut sockets = self.sockets.try_borrow_mut()?;
         Ok(sockets.get::<TcpSocket<_>>(&socket)?.is_active())
     }
@@ -477,13 +491,9 @@ where
         let mut tcp = sockets.get::<TcpSocket<_>>(&socket)?;
         tcp.close();
 
-        self.handle_socket_error(
-            || self.send_internal(&CloseSocket { socket }, false),
-            Some(socket),
-            0,
-        )?;
-
         sockets.remove(socket)?;
+
+        self.send_internal(&CloseSocket { socket }, false)?;
 
         Ok(())
     }

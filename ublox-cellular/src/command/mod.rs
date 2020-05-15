@@ -25,13 +25,15 @@ pub struct AT;
 
 #[derive(Clone, AtatUrc)]
 pub enum Urc {
-    #[at_urc(b"+UUSORD")]
+    #[at_urc("+UUSORD")]
     SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable),
-    #[at_urc(b"+UUPSDD")]
+    #[at_urc("+UUPSDA")]
+    DataConnectionActivated(psn::urc::DataConnectionActivated),
+    #[at_urc("+UUPSDD")]
     DataConnectionDeactivated(psn::urc::DataConnectionDeactivated),
-    #[at_urc(b"+UUSOCL")]
+    #[at_urc("+UUSOCL")]
     SocketClosed(ip_transport_layer::urc::SocketClosed),
-    #[at_urc(b"+UMWI")]
+    #[at_urc("+UMWI")]
     MessageWaitingIndication(sms::urc::MessageWaitingIndication),
 }
 

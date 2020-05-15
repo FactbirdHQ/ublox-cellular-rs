@@ -1,7 +1,7 @@
 use atat::AtatClient;
 use core::cell::RefCell;
 use embedded_hal::digital::v2::OutputPin;
-use heapless::consts;
+use heapless::{consts, String};
 
 use crate::{
     command::{
@@ -13,6 +13,8 @@ use crate::{
         Urc, *,
     },
     error::Error,
+    prelude::*,
+    gprs::APNInfo,
     socket::{SocketHandle, SocketSet, SocketType, TcpSocket, UdpSocket},
 };
 
@@ -21,7 +23,7 @@ pub enum State {
     Deregistered,
     Registering,
     Registered,
-    Deattached,
+    Detached,
     Attaching,
     Attached,
     Sending,
@@ -34,6 +36,8 @@ pub struct Config<RST, DTR> {
     baud_rate: u32,
     low_power_mode: bool,
     flow_control: bool,
+    pub(crate) apn_info: APNInfo,
+    pin: String<consts::U4>
 }
 
 impl<RST, DTR> Config<RST, DTR>
@@ -41,13 +45,15 @@ where
     RST: OutputPin,
     DTR: OutputPin,
 {
-    pub fn new() -> Self {
+    pub fn new(apn_info: APNInfo) -> Self {
         Config {
             rst_pin: None,
             dtr_pin: None,
             baud_rate: 115_200_u32,
             low_power_mode: false,
             flow_control: false,
+            apn_info,
+            pin: String::from("")
         }
     }
 
@@ -87,6 +93,10 @@ where
             ..self
         }
     }
+
+    pub fn pin(&self) -> &str {
+        &self.pin
+    }
 }
 
 pub struct GsmClient<C, RST, DTR>
@@ -94,9 +104,9 @@ where
     C: AtatClient,
 {
     initialized: RefCell<bool>,
-    config: Config<RST, DTR>,
+    pub(crate) config: Config<RST, DTR>,
     pub(crate) state: RefCell<State>,
-    pub(crate) poll_cnt: RefCell<u8>,
+    pub(crate) poll_cnt: RefCell<u16>,
     pub(crate) client: RefCell<C>,
     // Ublox devices can hold a maximum of 6 active sockets
     pub(crate) sockets: RefCell<SocketSet<consts::U2, consts::U2048>>,
@@ -125,7 +135,7 @@ where
         Ok(prev_state)
     }
 
-    pub(crate) fn get_state(&self) -> Result<State, Error> {
+    pub fn get_state(&self) -> Result<State, Error> {
         Ok(*self.state.try_borrow().map_err(|_| Error::SetState)?)
     }
 
@@ -266,7 +276,7 @@ where
 
     fn autosense(&self) -> Result<(), Error> {
         for _ in 0..15 {
-            match self.send_internal(&AT, false) {
+            match self.client.try_borrow_mut()?.send(&AT) {
                 Ok(_) => {
                     return Ok(());
                 }
@@ -290,12 +300,22 @@ where
     pub fn spin(&self) -> Result<(), Error> {
         self.handle_urc()?;
 
+        match self.get_state()? {
+            State::Attached => {}
+            State::Sending => {
+                return Ok(());
+            }
+            s @ _ => {
+                return Err(Error::NetworkState(s));
+            }
+        }
+
         // Occasionally poll every open socket, in case a `SocketDataAvailable`
-        // URC was missed somehow
+        // URC was missed somehow. TODO: rewrite this to readable code
         let data_available: heapless::Vec<(SocketHandle, usize), consts::U6> = {
             let sockets = self.sockets.try_borrow()?;
 
-            if sockets.len() > 0 && self.poll_cnt(false) >= 50 {
+            if sockets.len() > 0 && self.poll_cnt(false) >= 500 {
                 self.poll_cnt(true);
 
                 sockets
@@ -365,7 +385,7 @@ where
             }
             Some(Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket })) => {
                 #[cfg(feature = "logging")]
-                log::info!("[URC] SocketClosed");
+                log::info!("[URC] SocketClosed {:?}", socket);
                 let mut sockets = self.sockets.try_borrow_mut()?;
                 match sockets.socket_type(&socket) {
                     Some(SocketType::Tcp) => {
@@ -378,14 +398,23 @@ where
                     }
                     _ => {}
                 }
+                sockets.remove(socket)?;
+                Ok(())
+            }
+            Some(Urc::DataConnectionActivated(psn::urc::DataConnectionActivated {
+                result,
+            })) => {
+                #[cfg(feature = "logging")]
+                log::info!("[URC] DataConnectionActivated {:?}", result);
                 Ok(())
             }
             Some(Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
-                ..
+                profile_id
             })) => {
                 #[cfg(feature = "logging")]
-                log::info!("[URC] DataConnectionDeactivated");
-                Ok(self.set_state(State::Deattached).map(|_| ())?)
+                log::info!("[URC] DataConnectionDeactivated {:?}", profile_id);
+                self.init(false)?;
+                Ok(self.set_state(State::Deregistered).map(|_| ())?)
             }
             Some(Urc::SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable {
                 socket,
@@ -427,7 +456,7 @@ where
                     #[cfg(feature = "logging")]
                     match core::str::from_utf8(&req.as_bytes()) {
                         Ok(s) => log::error!("{:?}: [{:?}]", ate, s),
-                        Err(_) => log::error!("{:?}: [{:?}]", ate, req.as_bytes()),
+                        Err(_) => log::error!("{:?}: {:02x?}", ate, req.as_bytes()),
                     };
                     ate.into()
                 }

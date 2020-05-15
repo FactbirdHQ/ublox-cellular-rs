@@ -1,6 +1,7 @@
 //! Argument and parameter types used by Device and data security Commands and Responses
 
 use atat::atat_derive::AtatEnum;
+use serde::Serialize;
 
 /// Type of operation
 #[derive(Clone, PartialEq, AtatEnum)]
@@ -34,6 +35,20 @@ pub enum SecurityDataType {
     SignatureVerificationPublicKey = 5,
 }
 
+/// Type of the security data
+#[derive(Clone, PartialEq, AtatEnum)]
+pub enum PinningLevel {
+    /// * level 0: pinning based on information comparison of received and configured
+    ///   certificate public key
+    Level0 = 0,
+    /// * level 1: pinning based on binary comparison of received and configured
+    ///   certificate public key
+    Level1 = 1,
+    /// * level 2: pinning based on binary comparison of received and configured
+    ///   certificate
+    Level2 = 2,
+}
+
 /// certificate validation level
 #[derive(Clone, PartialEq, AtatEnum)]
 pub enum CertificateValidationLevel {
@@ -51,12 +66,17 @@ pub enum CertificateValidationLevel {
     ///   Level 2 validation with an additional check of certificate validity
     ///   date.
     RootCertValidationWithIntegrity = 2,
+    /// * 3: level 3 - certificate validation with an additional check on the
+    ///   certificate validity date. CA certificates should be imported with the
+    ///   +USECMNG AT command
+    RootCertValidationWithValidityDate = 3
 }
 
 #[derive(Clone, PartialEq, AtatEnum)]
-pub enum SecurityProfileOperation {
+pub enum SecurityProfileOperation<'a> {
     /// - 0: certificate validation level;
-    CertificateValidationLevel = 0,
+    #[at_arg(value = 0)]
+    CertificateValidationLevel(CertificateValidationLevel),
     /// - 1: SSL/TLS version to use; allowed values for <param_val1>:
     ///     * 0 (factory-programmed value): any; server can use any version for
     ///       the connection.
@@ -66,7 +86,8 @@ pub enum SecurityProfileOperation {
     ///       support TLSv1.1
     ///     * 3: TLSv1.2; connection allowed only to TLS/SSL servers which
     ///       support TLSv1.2
-    SslTslVersion = 1,
+    #[at_arg(value = 1)]
+    SslTslVersion,
     /// - 2: cipher suite; allowed values for <param_val1> define which cipher
     ///   suite will be used:
     ///     * 0 (factory-programmed value): (0x0000) Automatic the cipher suite
@@ -89,33 +110,54 @@ pub enum SecurityProfileOperation {
     ///     * 99: cipher suite selection using IANA enumeration, <byte_1> and
     ///       <byte_2> are strings containing the 2 bytes that compose the IANA
     ///       enumeration, see Table 85.
-    CipherSuite = 2,
+    #[at_arg(value = 2)]
+    CipherSuite(u8),
     /// - 3: trusted root certificate internal name;
     ///     * <param_val1> (string) is the internal name identifying a trusted
     ///       root certificate; the maximum length is 200 characters. The
     ///       factory-programmed value is an empty string.
-    TrustedRootCertificateInternalName = 3,
+    #[at_arg(value = 3)]
+    TrustedRootCertificateInternalName(
+        #[at_arg(len = 200)]
+        &'a str
+    ),
     /// - 4: expected server hostname;
     ///     * <param_val1> (string) is the hostname of the server, used when
     ///       certificate validation level is set to Level 2; the maximum length
     ///       is 256 characters. The factory-programmed value is an empty
     ///       string.
-    ExpectedServerHostname = 4,
+    #[at_arg(value = 4)]
+    ExpectedServerHostname(
+        #[at_arg(len = 256)]
+        &'a str
+    ),
     /// - 5: client certificate internal name;
     ///     * <param_val1> (string) is the internal name identifying a client
     ///       certificate to be sent to the server; the maximum length is 200
     ///       characters. The factory-programmed value is an empty string.
-    ClientCertificateInternalName = 5,
+    #[at_arg(value = 5)]
+    ClientCertificateInternalName(
+        #[at_arg(len = 200)]
+        &'a str
+    ),
     /// - 6: client private key internal name;
     ///     * <param_val1> (string) is the internal name identifying a private
     ///       key to be used; the maximum length is 200 characters. The
     ///       factory-programmed value is an empty string.
-    ClientPrivateKeyInternalName = 6,
+    #[at_arg(value = 6)]
+    ClientPrivateKeyInternalName(
+        #[at_arg(len = 200)]
+        &'a str
+    ),
     /// - 7: client private key password;
     ///     * <param_val1> (string) is the password for the client private key
     ///       if it is password protected; the maximum length is 128 characters.
     ///       The factory-programmed value is an empty string.
-    ClientPrivateKeyPassword = 7,
+    #[at_arg(value = 7)]
+    ClientPrivateKeyPassword(
+        #[at_arg(len = 128)]
+        &'a str
+    ),
     /// - 8: pre-shared key;
     ///     * <preshared_key> (string) is the pre-shared key used for
     ///       connection; the factoryprogrammed value is an empty string. The
@@ -127,7 +169,8 @@ pub enum SecurityProfileOperation {
     ///           maximum length is 64 characters
     ///         - 1: <preshared_key> is an hexadecimal string and its maximum
     ///           length is 128 characters
-    PresharedKey = 8,
+    #[at_arg(value = 8)]
+    PresharedKey,
     ///  - 9: pre-shared key identity;
     ///     * <preshared_key_id> (string) is the pre-shared key identity used
     ///       for connection; the factoryprogrammed value is an empty string.
@@ -139,20 +182,26 @@ pub enum SecurityProfileOperation {
     ///           its maximum length is 128 characters
     ///         - 1: <preshared_key_id> is an hexadecimal string and its maximum
     ///           length is 256 characters
-    PresharedKeyIdentity = 9,
+    #[at_arg(value = 9)]
+    PresharedKeyIdentity,
     ///  - 10: SNI (Server Name Indication);
     ///     * <param_val1> (string) value for the additional negotiation header
     ///       SNI (Server Name Indication) used in SSL/TLS connection
     ///       negotiation; the maximum length is 128 characters. The
     ///       factory-programmed value is an empty string.
-    ServerNameIndication = 10,
+    #[at_arg(value = 10)]
+    ServerNameIndication(
+        #[at_arg(len = 128)]
+        &'a str
+    ),
     ///  - 11: PSK key and PSK key identity generated by RoT (Root of trust);
     ///    allowed values for <param_ val1>:
     ///     * 0 (factory-programmed value): OFF - The PSK and PSK key ID are NOT
     ///       generated by RoT
     ///     * 1: ON - The PSK and PSK key ID are generated by RoT in the process
     ///       of SSL/TLS connection negotiation
-    PskKey = 11,
+    #[at_arg(value = 11)]
+    PskKey(bool),
     ///  - 12: server certificate pinning;
     ///     * <server_certificate> (string) internal name identifying a
     ///       certificate configured to be used for server certificate pinning;
@@ -166,7 +215,12 @@ pub enum SecurityProfileOperation {
     ///           configured certificate public key
     ///         - 2: pinning based on binary comparison of received and
     ///           configured certificate
-    ServerCertificatePinning = 12,
+    #[at_arg(value = 12)]
+    ServerCertificatePinning(
+        #[at_arg(len = 200)]
+        &'a str,
+        PinningLevel
+    ),
     ///  - 13: TLS session resumption;
     ///     * <tag> (number) configures the TLS session resumption. Allowed
     ///       values:
@@ -183,5 +237,6 @@ pub enum SecurityProfileOperation {
     ///               The maximum length is 48 characters
     ///             * <param_val2> (string): base64 encoded session master key.
     ///               The maximum length is 64 characters
-    TlsSessionResumption = 13,
+    #[at_arg(value = 13)]
+    TlsSessionResumption,
 }

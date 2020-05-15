@@ -1,4 +1,8 @@
 use embedded_hal::digital::v2::OutputPin;
+use embedded_nal::{
+    tls::{Tls, TlsConnector, TlsSocket},
+    TcpStack,
+};
 
 use crate::{
     command::device_data_security::{types::*, *},
@@ -51,10 +55,11 @@ where
             data: serde_at::ser::Bytes(certificate),
         })?;
 
-        self.send_at(&SecurityProfileManagerString {
+        self.send_at(&SecurityProfileManager {
             profile_id,
-            op_code: SecurityProfileOperation::ClientCertificateInternalName,
-            arg: name,
+            operation: Some(SecurityProfileOperation::ClientCertificateInternalName(
+                name,
+            )),
         })?;
 
         Ok(())
@@ -74,10 +79,9 @@ where
             data: serde_at::ser::Bytes(root_ca),
         })?;
 
-        self.send_at(&SecurityProfileManagerString {
+        self.send_at(&SecurityProfileManager {
             profile_id,
-            op_code: SecurityProfileOperation::TrustedRootCertificateInternalName,
-            arg: name,
+            operation: Some(SecurityProfileOperation::TrustedRootCertificateInternalName(name)),
         })?;
 
         Ok(())
@@ -103,10 +107,9 @@ where
             data: serde_at::ser::Bytes(private_key),
         })?;
 
-        self.send_at(&SecurityProfileManagerString {
+        self.send_at(&SecurityProfileManager {
             profile_id,
-            op_code: SecurityProfileOperation::ClientPrivateKeyInternalName,
-            arg: name,
+            operation: Some(SecurityProfileOperation::ClientPrivateKeyInternalName(name)),
         })?;
 
         Ok(())
@@ -115,24 +118,21 @@ where
     fn enable_ssl(&self, socket: SocketHandle, profile_id: u8) -> Result<(), Error> {
         self.send_at(&SecurityProfileManager {
             profile_id,
-            op_code: SecurityProfileOperation::CertificateValidationLevel,
-            arg: 3,
+            operation: Some(SecurityProfileOperation::CertificateValidationLevel(
+                CertificateValidationLevel::RootCertValidationWithValidityDate,
+            )),
         })?;
 
         self.send_at(&SecurityProfileManager {
             profile_id,
-            op_code: SecurityProfileOperation::CipherSuite,
-            arg: 0,
+            operation: Some(SecurityProfileOperation::CipherSuite(0)),
         })?;
 
-        self.send_at(&SecurityProfileManagerString {
+        self.send_at(&SecurityProfileManager {
             profile_id,
-            op_code: SecurityProfileOperation::ExpectedServerHostname,
-            // Staging:
-            arg: "a3f8k0ccx04zas.iot.eu-west-1.amazonaws.com",
-            // Playground:
-            // arg: "a69ih9fwq4cti.iot.eu-west-1.amazonaws.com",
-            // arg: "test.mosquitto.org",
+            operation: Some(SecurityProfileOperation::ExpectedServerHostname(
+                "a3f8k0ccx04zas.iot.eu-west-1.amazonaws.com",
+            )),
         })?;
 
         self.send_at(&SetSocketSslState {
@@ -144,3 +144,31 @@ where
         Ok(())
     }
 }
+
+// impl<C, RST, DTR> Tls for GsmClient<C, RST, DTR>
+// where
+//     C: atat::AtatClient,
+//     RST: OutputPin,
+//     DTR: OutputPin,
+// {
+//     fn connect_tls(
+//         &self,
+//         socket: <Self as TcpStack>::TcpSocket,
+//         connector: TlsConnector,
+//         domain: &str,
+//         port: u16,
+//     ) -> Result<TlsSocket<<Self as TcpStack>::TcpSocket>, ()> {
+//         let profile = 0u8;
+
+//         if let Some(root_ca) = connector.root_certificate() {
+//             self.import_root_ca(profile)
+//         }
+
+//         if let Some(ident) = connector.identity() {
+
+//         }
+
+//         self.enable_ssl(socket, 0).map_err(|_| ())?;
+//         Ok(TlsSocket::new(socket))
+//     }
+// }

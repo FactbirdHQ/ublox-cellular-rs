@@ -119,102 +119,24 @@ pub struct SendSecurityDataImport<'a> {
 
 /// 26.1.3 SSL/TLS security layer profile manager +USECPRF
 ///
-/// Manages security profiles for the configuration of the following SSL/TLS
-/// connections properties:
-/// - Certificate validation level:
-///     * Level 0: no certificate validation; the server certificate will not be
-///       checked or verified. No additional certificates are needed.
-///     * Level 1: certificate validation against a specific or a list of
-///       imported trusted root certificates.
-///     * Level 2: certificate validation with an additional URL integrity check
-///       (the server certificate common name must match the server hostname).
-///     * Level 3: certificate validation with an additional check on the
-///       certificate validity date. CA certificates should be imported with the
-///       +USECMNG AT command
-/// - Minimum SSL/TLS version to be used:
-///     * Any
-///     * TLS 1.0
-///     * TLS 1.1
-///     * TLS 1.2
-/// - Exact cipher suite to be used (the cipher suite register of Internet
-///   Assigned Numbers Authority (IANA) is provided in brackets):
-///     * (0x002f) TLS_RSA_WITH_AES_128_CBC_SHA
-///     * (0x003C) TLS_RSA_WITH_AES_128_CBC_SHA256
-///     * (0x0035) TLS_RSA_WITH_AES_256_CBC_SHA
-///     * (0x003D) TLS_RSA_WITH_AES_256_CBC_SHA256
-///     * (0x000a) TLS_RSA_WITH_3DES_EDE_CBC_SHA
-///     * (0x008c) TLS_PSK_WITH_AES_128_CBC_SHA
-///     * (0x008d) TLS_PSK_WITH_AES_256_CBC_SHA
-///     * (0x008b) TLS_PSK_WITH_3DES_EDE_CBC_SHA
-///     * (0x0094) TLS_RSA_PSK_WITH_AES_128_CBC_SHA
-///     * (0x0095) TLS_RSA_PSK_WITH_AES_256_CBC_SHA
-///     * (0x0093) TLS_RSA_PSK_WITH_3DES_EDE_CBC_SHA
-///     * (0x00ae) TLS_PSK_WITH_AES_128_CBC_SHA256
-///     * (0x00af) TLS_PSK_WITH_AES_256_CBC_SHA384
-///     * (0x00b6) TLS_RSA_PSK_WITH_AES_128_CBC_SHA256
-///     * (0x00b7) TLS_RSA_PSK_WITH_AES_256_CBC_SHA384 See Table 84 for the
-///       applicability of cipher suite depending on the module series.
-/// - Additional cipher suite to be used with IANA enumeration set command, see
-///   Syntax description and Table 85
-/// - Certificate to be used for server and mutual authentication:
-///     * The trusted root certificate. The CA certificate should be imported
-///       with the AT+USECMNG command.
-///     * The client certificate that should be imported with the AT+USECMNG
-///       command.
-///     * The client private key that should be imported with the AT+USECMNG
-///       command.
-/// - Expected server hostname, when using certificate validation level 2 or 3.
-/// - Password for the client private key, if it is password protected.
-/// - Pre-shared key used for connection. Defines a pre-shared key and key-name
-///   (PSK), when a TLS_PSK_* cipher suite is used.
-/// - SNI (Server Name Indication). SNI is a feature of SSL/TLS which uses an
-///   additional SSL/TLS extension header to specify the server name to which
-///   the client is connecting to. The extension was introduced to support the
-///   certificate handling used with virtual hosting provided by the various
-///   SSL/TLS enabled servers mostly in cloud based infrastructures. With the
-///   SNI a server has the opportunity to present a different server certificate
-///   (or/and whole SSL/TLS configuration) based on the host indicated by the
-///   SNI extension.
-/// - TLS session resumption. The session resumption feature allows to reuse the
-///   secure session data in order to reestablish a SSL/TLS secure session.
-///   Since the secure session data are available, the SSL/TLS handshake is not
-///   performed during the session resumption. Once the session resumption
-///   feature is enabled, the session resumption type (provided by the server)
-///   and the secure session data (negotiated during the SSL/ TLS handshake) are
-///   displayed via +USECPRF URC message. The session resumption feature
-///   configuration and secure session data are not stored in the NVM, hence the
-///   session resumption may be performed until power cycle.
+/// Manages security profiles for the configuration of the SSL/TLS connection
+/// properties
 ///
 /// **Notes:**
 /// - To set all the parameters in security profile, a set command for each
-///   <op_code> needs to be issued (e.g. certificate validation level, minimum
+///   <operation> needs to be issued (e.g. certificate validation level, minimum
 ///   SSL/TLS version, ...).
 /// - To reset (set to factory-programmed value) all the parameters of a
-///   specific security profile, issue the AT +USECPRF=<profile_id> command.
+///   specific security profile, issue the AT+USECPRF=<profile_id> command
+///   (operation: None).
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USECPRF", NoResponse)]
-pub struct SecurityProfileManager {
+pub struct SecurityProfileManager<'a> {
     /// USECMNG security profile identifier, in range 0-4; if it is not followed
     /// by other parameters the profile settings will be reset (set to
     /// factory-programmed value)
-    #[at_arg(position = 0)]
+    #[at_arg(position = 0, len = 1)]
     pub profile_id: u8,
     #[at_arg(position = 1)]
-    pub op_code: SecurityProfileOperation,
-    #[at_arg(position = 2)]
-    pub arg: u8, // pub op_code: SecurityProfileOperation
-}
-
-#[derive(Clone, AtatCmd)]
-#[at_cmd("+USECPRF", NoResponse)]
-pub struct SecurityProfileManagerString<'a> {
-    /// USECMNG security profile identifier, in range 0-4; if it is not followed
-    /// by other parameters the profile settings will be reset (set to
-    /// factory-programmed value)
-    #[at_arg(position = 0)]
-    pub profile_id: u8,
-    #[at_arg(position = 1)]
-    pub op_code: SecurityProfileOperation,
-    #[at_arg(position = 2, len = 128)]
-    pub arg: &'a str, // pub op_code: SecurityProfileOperation
+    pub operation: Option<SecurityProfileOperation<'a>>,
 }

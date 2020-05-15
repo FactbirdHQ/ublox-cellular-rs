@@ -111,7 +111,7 @@ pub struct GetPacketSwitchedNetworkData {
 #[at_cmd("+CGATT", NoResponse, timeout_ms = 180000, abortable = true)]
 pub struct SetGPRSAttached {
     #[at_arg(position = 0)]
-    pub state: u8,
+    pub state: GPRSAttachedState,
 }
 
 /// 18.14 Read GPRS attach or detach +CGATT
