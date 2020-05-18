@@ -13,7 +13,6 @@ use crate::{
         Urc, *,
     },
     error::Error,
-    prelude::*,
     gprs::APNInfo,
     socket::{SocketHandle, SocketSet, SocketType, TcpSocket, UdpSocket},
 };
@@ -37,7 +36,7 @@ pub struct Config<RST, DTR> {
     low_power_mode: bool,
     flow_control: bool,
     pub(crate) apn_info: APNInfo,
-    pin: String<consts::U4>
+    pin: String<consts::U4>,
 }
 
 impl<RST, DTR> Config<RST, DTR>
@@ -53,7 +52,7 @@ where
             low_power_mode: false,
             flow_control: false,
             apn_info,
-            pin: String::from("")
+            pin: String::from(""),
         }
     }
 
@@ -305,7 +304,7 @@ where
             State::Sending => {
                 return Ok(());
             }
-            s @ _ => {
+            s => {
                 return Err(Error::NetworkState(s));
             }
         }
@@ -326,7 +325,7 @@ where
                             SocketType::Tcp => self
                                 .send_internal(
                                     &ReadSocketData {
-                                        socket: &h,
+                                        socket: h,
                                         length: 0,
                                     },
                                     false,
@@ -341,7 +340,7 @@ where
                             SocketType::Udp => self
                                 .send_internal(
                                     &ReadUDPSocketData {
-                                        socket: &h,
+                                        socket: h,
                                         length: 0,
                                     },
                                     false,
@@ -364,7 +363,7 @@ where
 
         data_available
             .iter()
-            .try_for_each(|(handle, len)| self.socket_ingress(&handle, *len).map(|_| ()))
+            .try_for_each(|(handle, len)| self.socket_ingress(*handle, *len).map(|_| ()))
             .map_err(|e| {
                 #[cfg(feature = "logging")]
                 log::error!("ERROR: {:?}", e);
@@ -387,13 +386,13 @@ where
                 #[cfg(feature = "logging")]
                 log::info!("[URC] SocketClosed {:?}", socket);
                 let mut sockets = self.sockets.try_borrow_mut()?;
-                match sockets.socket_type(&socket) {
+                match sockets.socket_type(socket) {
                     Some(SocketType::Tcp) => {
-                        let mut tcp = sockets.get::<TcpSocket<_>>(&socket)?;
+                        let mut tcp = sockets.get::<TcpSocket<_>>(socket)?;
                         tcp.close();
                     }
                     Some(SocketType::Udp) => {
-                        let mut udp = sockets.get::<UdpSocket<_>>(&socket)?;
+                        let mut udp = sockets.get::<UdpSocket<_>>(socket)?;
                         udp.close();
                     }
                     _ => {}
@@ -402,24 +401,24 @@ where
                 Ok(())
             }
             Some(Urc::DataConnectionActivated(psn::urc::DataConnectionActivated {
-                result,
+                result: _result,
             })) => {
                 #[cfg(feature = "logging")]
-                log::info!("[URC] DataConnectionActivated {:?}", result);
+                log::info!("[URC] DataConnectionActivated {:?}", _result);
                 Ok(())
             }
             Some(Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
-                profile_id
+                profile_id: _profile_id,
             })) => {
                 #[cfg(feature = "logging")]
-                log::info!("[URC] DataConnectionDeactivated {:?}", profile_id);
+                log::info!("[URC] DataConnectionDeactivated {:?}", _profile_id);
                 self.init(false)?;
                 Ok(self.set_state(State::Deregistered).map(|_| ())?)
             }
             Some(Urc::SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable {
                 socket,
                 length,
-            })) => match self.socket_ingress(&socket, length) {
+            })) => match self.socket_ingress(socket, length) {
                 Ok(bytes) if bytes > 0 => {
                     // #[cfg(feature = "logging")]
                     // log::info!("[URC] Ingressed {:?} bytes", bytes);
@@ -429,7 +428,7 @@ where
                 Err(e) => {
                     #[cfg(feature = "logging")]
                     log::error!("[URC] Failed ingress! {:?}", e);
-                    Err(e.into())
+                    Err(e)
                 }
             },
             None => Ok(()),

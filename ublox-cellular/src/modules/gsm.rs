@@ -31,7 +31,9 @@ where
 
         match pin_status.code {
             PinStatusCode::SimPin => {
-                self.send_at(&device_lock::SetPin { pin: self.config.pin() })?;
+                self.send_at(&device_lock::SetPin {
+                    pin: self.config.pin(),
+                })?;
             }
             PinStatusCode::PhSimPin
             | PinStatusCode::SimPuk

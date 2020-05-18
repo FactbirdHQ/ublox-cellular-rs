@@ -7,30 +7,16 @@ impl Serialize for PinStatusCode {
         S: Serializer,
     {
         match *self {
-            PinStatusCode::Ready => Serializer::serialize_bytes(serializer, "READY".as_bytes()),
-            PinStatusCode::SimPin => Serializer::serialize_bytes(serializer, "SIM PIN".as_bytes()),
-            PinStatusCode::SimPuk => Serializer::serialize_bytes(serializer, "SIM PUK".as_bytes()),
-            PinStatusCode::SimPin2 => {
-                Serializer::serialize_bytes(serializer, "SIM PIN2".as_bytes())
-            }
-            PinStatusCode::SimPuk2 => {
-                Serializer::serialize_bytes(serializer, "SIM PUK2".as_bytes())
-            }
-            PinStatusCode::PhNetPin => {
-                Serializer::serialize_bytes(serializer, "PH-NET PIN".as_bytes())
-            }
-            PinStatusCode::PhNetSubPin => {
-                Serializer::serialize_bytes(serializer, "PH-NETSUB PIN".as_bytes())
-            }
-            PinStatusCode::PhSpPin => {
-                Serializer::serialize_bytes(serializer, "PH-SP PIN".as_bytes())
-            }
-            PinStatusCode::PhCorpPin => {
-                Serializer::serialize_bytes(serializer, "PH-CORP PIN".as_bytes())
-            }
-            PinStatusCode::PhSimPin => {
-                Serializer::serialize_bytes(serializer, "PH-SIM PIN".as_bytes())
-            }
+            PinStatusCode::Ready => Serializer::serialize_bytes(serializer, b"READY"),
+            PinStatusCode::SimPin => Serializer::serialize_bytes(serializer, b"SIM PIN"),
+            PinStatusCode::SimPuk => Serializer::serialize_bytes(serializer, b"SIM PUK"),
+            PinStatusCode::SimPin2 => Serializer::serialize_bytes(serializer, b"SIM PIN2"),
+            PinStatusCode::SimPuk2 => Serializer::serialize_bytes(serializer, b"SIM PUK2"),
+            PinStatusCode::PhNetPin => Serializer::serialize_bytes(serializer, b"PH-NET PIN"),
+            PinStatusCode::PhNetSubPin => Serializer::serialize_bytes(serializer, b"PH-NETSUB PIN"),
+            PinStatusCode::PhSpPin => Serializer::serialize_bytes(serializer, b"PH-SP PIN"),
+            PinStatusCode::PhCorpPin => Serializer::serialize_bytes(serializer, b"PH-CORP PIN"),
+            PinStatusCode::PhSimPin => Serializer::serialize_bytes(serializer, b"PH-SIM PIN"),
         }
     }
 }
@@ -126,7 +112,7 @@ impl<'de> Deserialize<'de> for PinStatusCode {
                 }
             }
         }
-        const VARIANTS: &'static [&'static str] = &[
+        const VARIANTS: &[&str] = &[
             "Ready",
             "SimPin",
             "SimPuk",

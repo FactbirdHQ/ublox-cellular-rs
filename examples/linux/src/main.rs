@@ -22,8 +22,8 @@ where
     DTR: OutputPin,
 {
     gsm.init(true)?;
-    gsm.begin("")?;
-    gsm.attach_gprs(APNInfo::new("em"))?;
+    gsm.begin()?;
+    gsm.attach_gprs()?;
     Ok(())
 }
 
@@ -54,7 +54,7 @@ fn main() {
     )
     .build();
 
-    let gsm = GsmClient::<_, Pin, Pin>::new(cell_client, Config::new());
+    let gsm = GsmClient::<_, Pin, Pin>::new(cell_client, Config::new(APNInfo::new("em")));
 
     // Launch reading thread
     thread::Builder::new()

@@ -9,7 +9,6 @@ use crate::GsmClient;
 use typenum::marker_traits::Unsigned;
 
 use crate::{
-    command::ip_transport_layer::responses::SocketErrorResponse,
     hex,
     socket::{SocketHandle, SocketType},
 };
@@ -79,13 +78,13 @@ where
                 // if error != 0 {
                 if let Some(handle) = socket {
                     let mut sockets = self.sockets.try_borrow_mut()?;
-                    match sockets.socket_type(&handle) {
+                    match sockets.socket_type(handle) {
                         Some(SocketType::Tcp) => {
-                            let mut tcp = sockets.get::<TcpSocket<_>>(&handle)?;
+                            let mut tcp = sockets.get::<TcpSocket<_>>(handle)?;
                             tcp.close();
                         }
                         Some(SocketType::Udp) => {
-                            let mut udp = sockets.get::<UdpSocket<_>>(&handle)?;
+                            let mut udp = sockets.get::<UdpSocket<_>>(handle)?;
                             udp.close();
                         }
                         _ => {}
@@ -100,7 +99,7 @@ where
 
     pub(crate) fn socket_ingress(
         &self,
-        socket: &SocketHandle,
+        socket: SocketHandle,
         length: usize,
     ) -> Result<usize, Error> {
         if length == 0 {
@@ -132,11 +131,11 @@ where
                             false,
                         )
                     },
-                    Some(socket.clone()),
+                    Some(socket),
                     0,
                 )?;
 
-                if &socket_data.socket != socket {
+                if socket_data.socket != socket {
                     #[cfg(feature = "logging")]
                     log::error!("WrongSocketType {:?} != {:?}", socket_data.socket, socket);
                     return Err(Error::WrongSocketType);
@@ -178,7 +177,7 @@ where
                     return Err(Error::BadLength);
                 }
 
-                if &socket_data.socket != socket {
+                if socket_data.socket != socket {
                     return Err(Error::WrongSocketType);
                 }
 
@@ -240,7 +239,7 @@ where
             .map_err(|e| nb::Error::Other(e.into()))?;
 
         let udp = sockets
-            .get::<UdpSocket<_>>(&socket)
+            .get::<UdpSocket<_>>(*socket)
             .map_err(|e| nb::Error::Other(Error::Socket(e)))?;
 
         if !udp.is_open() {
@@ -254,7 +253,7 @@ where
                 || {
                     self.send_internal(
                         &PrepareUDPSendToDataBinary {
-                            socket: socket.clone(),
+                            socket: *socket,
                             remote_addr: udp.endpoint.ip(),
                             remote_port: udp.endpoint.port(),
                             length: chunk.len(),
@@ -262,7 +261,7 @@ where
                         false,
                     )
                 },
-                Some(socket.clone()),
+                Some(*socket),
                 0,
             )?;
 
@@ -275,7 +274,7 @@ where
                         false,
                     )
                 },
-                Some(socket.clone()),
+                Some(*socket),
                 0,
             )?;
 
@@ -287,7 +286,7 @@ where
             }
         }
 
-        return Ok(());
+        Ok(())
     }
 
     /// Read a datagram the remote host has sent to us. Returns `Ok(n)`, which
@@ -305,11 +304,11 @@ where
             .try_borrow_mut()
             .map_err(|e| nb::Error::Other(e.into()))?;
         let mut udp = sockets
-            .get::<UdpSocket<_>>(&socket)
+            .get::<UdpSocket<_>>(*socket)
             .map_err(|e| nb::Error::Other(Error::Socket(e)))?;
-        return udp
-            .recv_slice(buffer)
-            .map_err(|e| nb::Error::Other(e.into()));
+
+        udp.recv_slice(buffer)
+            .map_err(|e| nb::Error::Other(e.into()))
     }
 
     /// Close an existing UDP socket.
@@ -317,7 +316,7 @@ where
         self.send_internal(&CloseSocket { socket }, false)?;
 
         let mut sockets = self.sockets.try_borrow_mut()?;
-        let mut udp = sockets.get::<UdpSocket<_>>(&socket)?;
+        let mut udp = sockets.get::<UdpSocket<_>>(socket)?;
         udp.close();
 
         self.handle_socket_error(
@@ -399,7 +398,7 @@ where
         )?;
 
         let mut sockets = self.sockets.try_borrow_mut()?;
-        let mut tcp = sockets.get::<TcpSocket<_>>(&socket)?;
+        let mut tcp = sockets.get::<TcpSocket<_>>(socket)?;
         tcp.set_state(TcpState::Established);
         Ok(tcp.handle())
     }
@@ -411,7 +410,7 @@ where
         }
 
         let mut sockets = self.sockets.try_borrow_mut()?;
-        Ok(sockets.get::<TcpSocket<_>>(&socket)?.is_active())
+        Ok(sockets.get::<TcpSocket<_>>(*socket)?.is_active())
     }
 
     /// Write to the stream. Returns the number of bytes written is returned
@@ -428,13 +427,13 @@ where
                 || {
                     self.send_internal(
                         &PrepareWriteSocketDataBinary {
-                            socket: socket.clone(),
+                            socket: *socket,
                             length: chunk.len(),
                         },
                         false,
                     )
                 },
-                Some(socket.clone()),
+                Some(*socket),
                 0,
             )?;
 
@@ -447,7 +446,7 @@ where
                         false,
                     )
                 },
-                Some(socket.clone()),
+                Some(*socket),
                 0,
             )?;
 
@@ -459,7 +458,7 @@ where
             }
         }
 
-        return Ok(buffer.len());
+        Ok(buffer.len())
     }
 
     /// Read from the stream. Returns `Ok(n)`, which means `n` bytes of
@@ -478,7 +477,7 @@ where
             .map_err(|e| nb::Error::Other(e.into()))?;
 
         let mut tcp = sockets
-            .get::<TcpSocket<_>>(&socket)
+            .get::<TcpSocket<_>>(*socket)
             .map_err(|e| nb::Error::Other(e.into()))?;
 
         tcp.recv_slice(buffer)
@@ -488,7 +487,7 @@ where
     /// Close an existing TCP socket.
     fn close(&self, socket: Self::TcpSocket) -> Result<(), Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut()?;
-        let mut tcp = sockets.get::<TcpSocket<_>>(&socket)?;
+        let mut tcp = sockets.get::<TcpSocket<_>>(socket)?;
         tcp.close();
 
         sockets.remove(socket)?;

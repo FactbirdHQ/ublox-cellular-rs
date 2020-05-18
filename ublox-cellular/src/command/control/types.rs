@@ -64,7 +64,7 @@ pub enum BaudRate {
     B19200 = 19200,
     B38400 = 38400,
     B57600 = 57600,
-    B115200 = 115200,
+    B115200 = 115_200,
 
     #[cfg(any(
         feature = "toby_l2",
@@ -76,7 +76,7 @@ pub enum BaudRate {
         feature = "lara_r2",
         feature = "toby_l4",
     ))]
-    B230400 = 230400,
+    B230400 = 230_400,
     #[cfg(any(
         feature = "toby_l2",
         feature = "mpci_l2",
@@ -87,7 +87,7 @@ pub enum BaudRate {
         feature = "lara_r2",
         feature = "toby_l4",
     ))]
-    B460800 = 460800,
+    B460800 = 460_800,
     #[cfg(any(
         feature = "toby_l2",
         feature = "mpci_l2",
@@ -98,13 +98,13 @@ pub enum BaudRate {
         feature = "lara_r2",
         feature = "toby_l4",
     ))]
-    B921600 = 921600,
+    B921600 = 921_600,
     #[cfg(any(feature = "toby_r2", feature = "lara_r2",))]
-    B3000000 = 3000000,
+    B3000000 = 3_000_000,
     #[cfg(any(feature = "toby_r2", feature = "lara_r2",))]
-    B3250000 = 3250000,
+    B3250000 = 3_250_000,
     #[cfg(any(feature = "toby_r2", feature = "lara_r2",))]
-    B6000000 = 6000000,
+    B6000000 = 6_000_000,
     #[cfg(any(feature = "toby_r2", feature = "lara_r2",))]
-    B6500000 = 6500000,
+    B6500000 = 6_500_000,
 }

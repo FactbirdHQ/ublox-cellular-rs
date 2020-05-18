@@ -210,7 +210,7 @@ impl<T: Default + Clone, N: ArrayLength<T>> RingBuffer<T, N> {
     /// This function may return a slice smaller than the given size
     /// if the free space in the buffer is not contiguous.
     // #[must_use]
-    pub fn enqueue_many<'b>(&'b mut self, size: usize) -> &'b mut [T] {
+    pub fn enqueue_many(&mut self, size: usize) -> &mut [T] {
         self.enqueue_many_with(|buf| {
             let size = cmp::min(size, buf.len());
             (size, &mut buf[..size])
@@ -267,7 +267,7 @@ impl<T: Default + Clone, N: ArrayLength<T>> RingBuffer<T, N> {
     /// This function may return a slice smaller than the given size
     /// if the allocated space in the buffer is not contiguous.
     // #[must_use]
-    pub fn dequeue_many<'b>(&'b mut self, size: usize) -> &'b mut [T] {
+    pub fn dequeue_many(&mut self, size: usize) -> &mut [T] {
         self.dequeue_many_with(|buf| {
             let size = cmp::min(size, buf.len());
             (size, &mut buf[..size])

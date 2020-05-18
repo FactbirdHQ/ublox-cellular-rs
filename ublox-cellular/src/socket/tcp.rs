@@ -151,7 +151,7 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
             // we still can receive indefinitely.
             State::FinWait1 | State::FinWait2 => true,
             // If we have something in the receive buffer, we can receive that.
-            _ if self.rx_buffer.len() > 0 => true,
+            _ if !self.rx_buffer.is_empty() => true,
             _ => false,
         }
     }

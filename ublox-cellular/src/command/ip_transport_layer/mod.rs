@@ -225,9 +225,9 @@ pub struct UDPSendToDataBinary<'a> {
 /// show the remaining number of data bytes of the packet the user is reading.
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USORD", SocketData)]
-pub struct ReadSocketData<'a> {
+pub struct ReadSocketData {
     #[at_arg(position = 0)]
-    pub socket: &'a SocketHandle,
+    pub socket: SocketHandle,
     #[at_arg(position = 1)]
     pub length: usize,
 }
@@ -241,9 +241,9 @@ pub struct ReadSocketData<'a> {
 /// This command can also return the total amount of unread data.
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USORF", UDPSocketData)]
-pub struct ReadUDPSocketData<'a> {
+pub struct ReadUDPSocketData {
     #[at_arg(position = 0)]
-    pub socket: &'a SocketHandle,
+    pub socket: SocketHandle,
     #[at_arg(position = 1)]
     pub length: usize,
 }

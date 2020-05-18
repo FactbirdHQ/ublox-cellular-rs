@@ -18,7 +18,7 @@ fn val(c: u8) -> Result<u8, FromHexError> {
     }
 }
 
-pub fn from_hex<'a>(hex: &'a mut [u8]) -> Result<&'a [u8], FromHexError> {
+pub fn from_hex(hex: &mut [u8]) -> Result<&[u8], FromHexError> {
     if hex.len() % 2 != 0 {
         return Err(FromHexError::OddLength);
     }

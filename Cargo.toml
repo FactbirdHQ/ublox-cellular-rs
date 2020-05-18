@@ -2,9 +2,9 @@
 members = [
     "ublox-cellular",
     "examples/common_lib",
-    "examples/linux",
-    "examples/linux_mqtt",
-    "examples/linux_jobs",
+    # "examples/linux",
+    # "examples/linux_mqtt",
+    # "examples/linux_jobs",
 ]
 
 
@@ -12,6 +12,7 @@ members = [
 # atat = { git = "https://github.com/BlackbirdHQ/atat" }
 serde_at = { git = "https://github.com/BlackbirdHQ/atat" }
 atat = { path = "../atat/atat" }
+# mqttrs = { path = "../mqttrs" }
 # serde_at = { path = "../atat/serde_at" }
 
 [patch.'https://github.com/thejpster/embedded-nal']

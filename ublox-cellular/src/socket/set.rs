@@ -38,7 +38,7 @@ where
         }
     }
 
-    pub fn socket_type(&self, handle: &Handle) -> Option<SocketType> {
+    pub fn socket_type(&self, handle: Handle) -> Option<SocketType> {
         match self.sockets.get(&handle.0) {
             Some(item) => Some(item.socket.get_type()),
             None => None,
@@ -66,7 +66,7 @@ where
     }
 
     /// Get a socket from the set by its handle, as mutable.
-    pub fn get<T: AnySocket<L>>(&mut self, handle: &Handle) -> Result<SocketRef<T>> {
+    pub fn get<T: AnySocket<L>>(&mut self, handle: Handle) -> Result<SocketRef<T>> {
         match self.sockets.get_mut(&handle.0) {
             Some(item) => Ok(T::downcast(SocketRef::new(&mut item.socket))?),
             None => Err(Error::InvalidSocket),
