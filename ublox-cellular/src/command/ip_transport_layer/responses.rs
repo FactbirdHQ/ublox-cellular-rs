@@ -46,6 +46,7 @@ pub struct SocketData {
     #[at_arg(position = 1)]
     pub length: usize,
     #[at_arg(position = 2)]
+    // Note: Data max length is `IngressChunkSize` * 2, due to hex encoding
     pub data: Option<String<<IngressChunkSize as Mul<consts::U2>>::Output>>,
 }
 
@@ -61,7 +62,8 @@ pub struct UDPSocketData {
     #[at_arg(position = 3)]
     pub length: usize,
     #[at_arg(position = 4)]
-    pub data: Option<String<consts::U256>>,
+    // Note: Data max length is `IngressChunkSize` * 2, due to hex encoding
+    pub data: Option<String<<IngressChunkSize as Mul<consts::U2>>::Output>>,
 }
 
 /// 25.25 Socket control +USOCTL

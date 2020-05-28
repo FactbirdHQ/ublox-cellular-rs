@@ -89,10 +89,10 @@ impl<L: ArrayLength<u8>> UdpSocket<L> {
         true
     }
 
-    /// Check whether the receive buffer is not empty.
+    /// Check whether the receive buffer is full.
     #[inline]
     pub fn can_recv(&self) -> bool {
-        !self.rx_buffer.is_empty()
+        !self.rx_buffer.is_full()
     }
 
     // /// Return the maximum number packets the socket can receive.

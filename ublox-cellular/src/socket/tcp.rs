@@ -157,14 +157,14 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     }
 
     /// Check whether the receive half of the full-duplex connection buffer is open
-    /// (see [may_recv](#method.may_recv), and the receive buffer is not empty.
+    /// (see [may_recv](#method.may_recv), and the receive buffer is not full.
     #[inline]
     pub fn can_recv(&self) -> bool {
         if !self.may_recv() {
             return false;
         }
 
-        !self.rx_buffer.is_empty()
+        !self.rx_buffer.is_full()
     }
 
     fn recv_impl<'b, F, R>(&'b mut self, f: F) -> Result<R>

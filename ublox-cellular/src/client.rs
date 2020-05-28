@@ -337,21 +337,21 @@ where
                                         None
                                     }
                                 }),
-                            SocketType::Udp => self
-                                .send_internal(
-                                    &ReadUDPSocketData {
-                                        socket: h,
-                                        length: 0,
-                                    },
-                                    false,
-                                )
-                                .map_or(None, |s| {
-                                    if s.length > 0 {
-                                        Some((h, s.length))
-                                    } else {
-                                        None
-                                    }
-                                }),
+                            // SocketType::Udp => self
+                            //     .send_internal(
+                            //         &ReadUDPSocketData {
+                            //             socket: h,
+                            //             length: 0,
+                            //         },
+                            //         false,
+                            //     )
+                            //     .map_or(None, |s| {
+                            //         if s.length > 0 {
+                            //             Some((h, s.length))
+                            //         } else {
+                            //             None
+                            //         }
+                            //     }),
                             _ => None,
                         }
                     })

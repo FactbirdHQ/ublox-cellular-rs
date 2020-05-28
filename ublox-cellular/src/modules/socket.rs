@@ -117,8 +117,8 @@ where
             Some(SocketType::Tcp) => {
                 // Handle tcp socket
                 let mut tcp = sockets.get::<TcpSocket<_>>(socket)?;
-                if !tcp.may_recv() {
-                    return Err(Error::SocketClosed);
+                if !tcp.can_recv() {
+                    return Err(Error::Busy);
                 }
 
                 let mut socket_data = self.handle_socket_error(
@@ -165,6 +165,10 @@ where
                 // Handle udp socket
                 let mut udp = sockets.get::<UdpSocket<_>>(socket)?;
 
+                if !udp.can_recv() {
+                    return Err(Error::Busy);
+                }
+
                 let mut socket_data = self.send_internal(
                     &ReadUDPSocketData {
                         socket,
@@ -173,15 +177,24 @@ where
                     false,
                 )?;
 
-                if socket_data.length != chunk_size {
-                    return Err(Error::BadLength);
-                }
-
                 if socket_data.socket != socket {
+                    #[cfg(feature = "logging")]
+                    log::error!("WrongSocketType {:?} != {:?}", socket_data.socket, socket);
                     return Err(Error::WrongSocketType);
                 }
 
                 if let Some(ref mut data) = socket_data.data {
+                    if socket_data.length > 0 && data.len() / 2 != socket_data.length {
+                        #[cfg(feature = "logging")]
+                        log::error!(
+                            "BadLength {:?} != {:?}, {:?}",
+                            socket_data.length,
+                            data.len() / 2,
+                            data
+                        );
+                        return Err(Error::BadLength);
+                    }
+
                     Ok(udp.rx_enqueue_slice(
                         hex::from_hex(unsafe { data.as_bytes_mut() })
                             .map_err(|_| Error::InvalidHex)?,
@@ -318,12 +331,6 @@ where
         let mut sockets = self.sockets.try_borrow_mut()?;
         let mut udp = sockets.get::<UdpSocket<_>>(socket)?;
         udp.close();
-
-        self.handle_socket_error(
-            || self.send_internal(&CloseSocket { socket }, false),
-            Some(socket),
-            0,
-        )?;
 
         sockets.remove(socket)?;
 

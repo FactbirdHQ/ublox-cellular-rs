@@ -1,8 +1,4 @@
 use embedded_hal::digital::v2::OutputPin;
-use embedded_nal::{
-    tls::{Tls, TlsConnector, TlsSocket},
-    TcpStack,
-};
 
 use crate::{
     command::device_data_security::{types::*, *},
