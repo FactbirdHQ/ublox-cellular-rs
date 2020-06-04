@@ -44,13 +44,14 @@ dependencies = [
 [[package]]
 name = "atat"
 version = "0.3.0"
+source = "git+https://github.com/BlackbirdHQ/atat?branch=wip/enum-tuples#75f2879bbb42eec9581b1eba9b7f4da7d5d1acaa"
 dependencies = [
  "atat_derive",
  "embedded-hal",
  "heapless",
  "nb",
  "serde",
- "serde_at 0.3.0",
+ "serde_at",
  "typenum",
  "void",
 ]
@@ -58,10 +59,11 @@ dependencies = [
 [[package]]
 name = "atat_derive"
 version = "0.3.0"
+source = "git+https://github.com/BlackbirdHQ/atat?branch=wip/enum-tuples#75f2879bbb42eec9581b1eba9b7f4da7d5d1acaa"
 dependencies = [
  "proc-macro2",
  "quote",
- "serde_at 0.3.0",
+ "serde_at",
  "syn",
 ]
 
@@ -112,6 +114,7 @@ dependencies = [
 [[package]]
 name = "embedded-nal"
 version = "0.1.0"
+source = "git+https://github.com/thejpster/embedded-nal#3eaa7243ab3f81ffd2ba5d912df207fd3f7e14a1"
 dependencies = [
  "heapless",
  "nb",
@@ -306,16 +309,7 @@ dependencies = [
 [[package]]
 name = "serde_at"
 version = "0.3.0"
-source = "git+https://github.com/BlackbirdHQ/atat#98063446ab323c92cb9520f14a98db8153837d3d"
-dependencies = [
- "heapless",
- "log",
- "serde",
-]
-
-[[package]]
-name = "serde_at"
-version = "0.3.0"
+source = "git+https://github.com/BlackbirdHQ/atat?branch=wip/enum-tuples#75f2879bbb42eec9581b1eba9b7f4da7d5d1acaa"
 dependencies = [
  "heapless",
  "log",
@@ -394,7 +388,7 @@ dependencies = [
  "nb",
  "no-std-net",
  "serde",
- "serde_at 0.3.0 (git+https://github.com/BlackbirdHQ/atat)",
+ "serde_at",
  "typenum",
 ]
 

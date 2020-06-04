@@ -10,10 +10,11 @@ members = [
 
 [patch.crates-io]
 # atat = { git = "https://github.com/BlackbirdHQ/atat" }
-serde_at = { git = "https://github.com/BlackbirdHQ/atat" }
-atat = { path = "../atat/atat" }
+serde_at = { git = "https://github.com/BlackbirdHQ/atat", branch = "wip/enum-tuples" }
+atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "wip/enum-tuples" }
+# atat = { path = "../atat/atat" }
 # mqttrs = { path = "../mqttrs" }
 # serde_at = { path = "../atat/serde_at" }
 
-[patch.'https://github.com/thejpster/embedded-nal']
-embedded-nal = { path = "../embedded-nal" }
+# [patch.'https://github.com/thejpster/embedded-nal']
+# embedded-nal = { path = "../embedded-nal" }
