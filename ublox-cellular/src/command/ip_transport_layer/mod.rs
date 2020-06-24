@@ -181,7 +181,7 @@ pub struct WriteSocketDataBinary<'a> {
 /// only. This command allows the reuse of the same socket to send
 /// data to many different remote hosts.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+USOST", NoResponse, timeout_ms = 1000)]
+#[at_cmd("+USOST", NoResponse)]
 pub struct PrepareUDPSendToDataBinary {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,

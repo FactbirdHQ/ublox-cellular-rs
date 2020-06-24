@@ -261,6 +261,29 @@ impl<T: Default + Clone, N: ArrayLength<T>> RingBuffer<T, N> {
         (size, result)
     }
 
+    pub fn dequeue_many_with_wrapping<'b, R, F>(&'b mut self, f: F) -> (usize, R)
+    where
+        F: FnOnce(&'b [T], Option<&'b [T]>) -> (usize, R),
+    {
+        let capacity = self.capacity();
+        let size1 = cmp::min(self.len(), capacity - self.read_at);
+        let size2 = self.len() - size1;
+        let (size, result) = if size2 != 0 {
+            f(&self.storage[self.read_at..self.read_at + size1], Some(&self.storage[..size2]))
+        } else {
+            f(&self.storage[self.read_at..self.read_at + size1], None)
+        };
+
+        assert!(size <= size1 + size2);
+        self.read_at = if capacity > 0 {
+            (self.read_at + size) % capacity
+        } else {
+            0
+        };
+        self.length -= size;
+        (size, result)
+    }
+
     /// Dequeue a slice of elements up to the given size from the buffer,
     /// and return a reference to them.
     ///
@@ -634,6 +657,55 @@ mod test {
         });
         assert_eq!(ring.len(), 0);
         assert_eq!(&ring.storage[..], b"............");
+    }
+
+    #[test]
+    fn test_buffer_dequeue_many_with_wrapping() {
+        let mut ring: RingBuffer<u8, consts::U12> = RingBuffer::from_slice(&[b'.'; 12]);
+
+        assert_eq!(ring.enqueue_slice(b"abcdefghijkl"), 12);
+
+        assert_eq!(
+            ring.dequeue_many_with_wrapping(|a, b| {
+                assert_eq!(a.len(), 12);
+                assert_eq!(b, None);
+                assert_eq!(a, b"abcdefghijkl");
+                (4, true)
+            }),
+            (4, true)
+        );
+        assert_eq!(ring.len(), 8);
+        assert_eq!(cmp::min(ring.len(), ring.capacity() - ring.read_at), 8);
+
+
+        ring.dequeue_many_with_wrapping(|a, b| {
+            assert_eq!(a, b"efghijkl");
+            assert_eq!(b, None);
+            (4, ())
+        });
+        assert_eq!(ring.len(), 4);
+        assert_eq!(cmp::min(ring.len(), ring.capacity() - ring.read_at), 4);
+
+        assert_eq!(ring.enqueue_slice(b"abcd"), 4);
+        assert_eq!(ring.len(), 8);
+        assert_eq!(ring.read_at, 8);
+        assert_eq!(cmp::min(ring.len(), ring.capacity() - ring.read_at), 4);
+
+        ring.dequeue_many_with_wrapping(|a, b| {
+            assert_eq!(a, b"ijkl");
+            assert_eq!(b, Some(&b"abcd"[..]));
+            (4, ())
+        });
+        assert_eq!(ring.len(), 4);
+        assert_eq!(cmp::min(ring.len(), ring.capacity() - ring.read_at), 4);
+
+        ring.dequeue_many_with_wrapping(|a, b| {
+            assert_eq!(a, b"abcd");
+            assert_eq!(b, None);
+            (4, ())
+        });
+        assert_eq!(ring.len(), 0);
+        assert_eq!(cmp::min(ring.len(), ring.capacity() - ring.read_at), 0);
     }
 
     #[test]

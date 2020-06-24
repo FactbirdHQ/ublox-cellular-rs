@@ -7,7 +7,7 @@ use heapless::{consts, String};
 use no_std_net::IpAddr;
 
 /// 25.3 Create Socket +USOCR
-#[derive(Clone, AtatResp)]
+#[derive(Debug, Clone, AtatResp)]
 pub struct CreateSocketResponse {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,

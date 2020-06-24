@@ -20,7 +20,7 @@ use atat::atat_derive::{AtatCmd, AtatResp, AtatUrc};
 pub struct NoResponse;
 
 #[derive(Clone, AtatCmd)]
-#[at_cmd("", NoResponse, timeout_ms = 1000)]
+#[at_cmd("", NoResponse)]
 pub struct AT;
 
 #[derive(Clone, AtatUrc)]

@@ -21,6 +21,7 @@ pub enum Error {
     AT(atat::Error),
     Busy,
     InvalidHex,
+    Dns,
     _Unknown,
 }
 

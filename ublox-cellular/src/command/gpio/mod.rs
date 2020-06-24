@@ -23,7 +23,7 @@ use super::NoResponse;
 /// The test command provides the list of the supported GPIOs, the supported functions and the status of all the
 /// GPIOs.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+UGPIOC", NoResponse, timeout_ms = 10000)]
+#[at_cmd("+UGPIOC", NoResponse)]
 pub struct SetGpioConfiguration {
     /// GPIO pin identifier: pin number
     /// See the GPIO mapping for the available GPIO pins, their mapping and factoryprogrammed values on different u-blox cellular modules series and product version.
@@ -43,5 +43,5 @@ pub struct SetGpioConfiguration {
 /// The test command provides the list of the supported GPIOs, the supported functions and the status of all the
 /// GPIOs.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+UGPIOC?", GpioConfiguration, timeout_ms = 10000)]
+#[at_cmd("+UGPIOC?", GpioConfiguration)]
 pub struct GetGpioConfiguration;

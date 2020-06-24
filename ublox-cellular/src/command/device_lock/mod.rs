@@ -15,7 +15,7 @@ use super::NoResponse;
 /// times, the PUK must be inserted in place of the PIN, followed by the <newpin> which replaces the old pin in
 /// the SIM.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CPIN?", PinStatus, timeout_ms = 10000)]
+#[at_cmd("+CPIN?", PinStatus)]
 pub struct GetPinStatus;
 
 /// 9.1 Enter PIN +CPIN
@@ -24,7 +24,7 @@ pub struct GetPinStatus;
 /// times, the PUK must be inserted in place of the PIN, followed by the <newpin> which replaces the old pin in
 /// the SIM.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CPIN", NoResponse, timeout_ms = 10000)]
+#[at_cmd("+CPIN", NoResponse)]
 pub struct SetPin<'a> {
     #[at_arg(position = 0, len = 4)]
     pub pin: &'a str,
@@ -36,7 +36,7 @@ pub struct SetPin<'a> {
 /// times, the PUK must be inserted in place of the PIN, followed by the <newpin> which replaces the old pin in
 /// the SIM.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CPIN", NoResponse, timeout_ms = 10000)]
+#[at_cmd("+CPIN", NoResponse)]
 pub struct ChangePin<'a> {
     #[at_arg(position = 0, len = 8)]
     pub puk: &'a str,

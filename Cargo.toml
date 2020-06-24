@@ -2,19 +2,16 @@
 members = [
     "ublox-cellular",
     "examples/common_lib",
-    # "examples/linux",
-    # "examples/linux_mqtt",
+    "examples/linux",
+    "examples/linux_mqtt",
     # "examples/linux_jobs",
 ]
 
 
 [patch.crates-io]
-# atat = { git = "https://github.com/BlackbirdHQ/atat" }
-serde_at = { git = "https://github.com/BlackbirdHQ/atat", branch = "wip/enum-tuples" }
-atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "wip/enum-tuples" }
-# atat = { path = "../atat/atat" }
-# mqttrs = { path = "../mqttrs" }
-# serde_at = { path = "../atat/serde_at" }
+serde_at = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
+atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
+mqttrs = { path = "../mqttrs" }
 
 # [patch.'https://github.com/thejpster/embedded-nal']
-# embedded-nal = { path = "../embedded-nal" }
+# embedded-nal = { git = "https://github.com/MathiasKoch/embedded-nal", branch = "factbird_mini" }

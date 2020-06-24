@@ -37,19 +37,15 @@ where
     /// once in a while, as the ublox module will never send the URC again, if
     /// the socket is not read.
     pub(crate) fn poll_cnt(&self, reset: bool) -> u16 {
-        match self.poll_cnt.try_borrow_mut() {
-            Ok(mut pc) => {
-                if reset {
-                    // Reset poll_cnt
-                    *pc = 0;
-                    0
-                } else {
-                    // Increment poll_cnt by one, and return the old value
-                    *pc += 1;
-                    *pc - 1
-                }
-            }
-            Err(_) => 0,
+        if reset {
+            // Reset poll_cnt
+            self.poll_cnt.set(0);
+            0
+        } else {
+            // Increment poll_cnt by one, and return the old value
+            let old = self.poll_cnt.get();
+            self.poll_cnt.set(old + 1);
+            old
         }
     }
 
@@ -87,7 +83,7 @@ where
                             let mut udp = sockets.get::<UdpSocket<_>>(handle)?;
                             udp.close();
                         }
-                        _ => {}
+                        None => {}
                     }
                     sockets.remove(handle)?;
                 }
@@ -108,7 +104,10 @@ where
 
         // Allow room for 2x length (Hex), and command overhead
         let chunk_size = core::cmp::min(length, IngressChunkSize::to_usize());
-        let mut sockets = self.sockets.try_borrow_mut()?;
+        let mut sockets = self
+            .sockets
+            .try_borrow_mut()
+            .map_err(|_| Error::BaudDetection)?;
 
         // Reset poll_cnt
         self.poll_cnt(true);
@@ -203,7 +202,11 @@ where
                     Ok(0)
                 }
             }
-            _ => Err(Error::WrongSocketType),
+            _ => {
+                #[cfg(feature = "logging")]
+                log::error!("SocketNotFound {:?}", socket);
+                Err(Error::SocketNotFound)
+            }
         }
     }
 }
@@ -316,6 +319,7 @@ where
             .sockets
             .try_borrow_mut()
             .map_err(|e| nb::Error::Other(e.into()))?;
+
         let mut udp = sockets
             .get::<UdpSocket<_>>(*socket)
             .map_err(|e| nb::Error::Other(Error::Socket(e)))?;
@@ -353,7 +357,7 @@ where
 
     /// Open a new TCP socket to the given address and port. The socket starts in the unconnected state.
     fn open(&self, _mode: Mode) -> Result<Self::TcpSocket, Self::Error> {
-        if self.get_state()? != crate::client::State::Attached {
+        if self.state.get() != crate::client::State::Attached {
             return Err(Error::Network);
         }
 
@@ -383,11 +387,11 @@ where
         socket: Self::TcpSocket,
         remote: SocketAddr,
     ) -> Result<Self::TcpSocket, Self::Error> {
-        if self.get_state()? != crate::client::State::Attached {
+        if self.state.get() != crate::client::State::Attached {
             return Err(Error::Network);
         }
 
-        self.enable_ssl(socket, 0)?;
+        // self.enable_ssl(socket, 0)?;
 
         self.handle_socket_error(
             || {
@@ -412,7 +416,7 @@ where
 
     /// Check if this socket is still connected
     fn is_connected(&self, socket: &Self::TcpSocket) -> Result<bool, Self::Error> {
-        if self.get_state()? != crate::client::State::Attached {
+        if self.state.get() != crate::client::State::Attached {
             return Ok(false);
         }
 
@@ -489,6 +493,28 @@ where
 
         tcp.recv_slice(buffer)
             .map_err(|e| nb::Error::Other(e.into()))
+    }
+
+    fn read_with<F>(&self, socket: &mut Self::TcpSocket, f: F) -> nb::Result<usize, Self::Error>
+    where
+        F: FnOnce(&[u8], Option<&[u8]>) -> usize,
+    {
+        self.spin()?;
+
+        let mut sockets = self
+            .sockets
+            .try_borrow_mut()
+            .map_err(|e| nb::Error::Other(e.into()))?;
+
+        let mut tcp = sockets
+            .get::<TcpSocket<_>>(*socket)
+            .map_err(|e| nb::Error::Other(e.into()))?;
+
+        tcp.recv_wrapping(|a, b| {
+            let len = f(a, b);
+            (len, Ok(len))
+        })
+        .map_err(|e| nb::Error::Other(e.into()))?
     }
 
     /// Close an existing TCP socket.

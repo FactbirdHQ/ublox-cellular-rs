@@ -1,3 +1,4 @@
+use atat::{ClientBuilder, ComQueue, Queues, ResQueue, UrcQueue};
 use serialport;
 use std::io;
 use std::thread;
@@ -11,6 +12,8 @@ use atat::AtatClient;
 use embedded_hal::digital::v2::OutputPin;
 
 use linux_embedded_hal::Pin;
+
+use heapless::{self, consts, spsc::Queue};
 
 use common::{serial::Serial, timer::SysTimer};
 use std::time::Duration;
@@ -47,12 +50,22 @@ fn main() {
         .expect("Could not open serial port");
     let mut serial_rx = serial_tx.try_clone().expect("Failed to clone serial port");
 
-    let (cell_client, mut ingress) = atat::ClientBuilder::<_, _, atat::NoopUrcMatcher>::new(
+    static mut RES_QUEUE: ResQueue<consts::U256, consts::U5> = Queue(heapless::i::Queue::u8());
+    static mut URC_QUEUE: UrcQueue<consts::U256, consts::U10> = Queue(heapless::i::Queue::u8());
+    static mut COM_QUEUE: ComQueue<consts::U3> = Queue(heapless::i::Queue::u8());
+
+    let queues = Queues {
+        res_queue: unsafe { RES_QUEUE.split() },
+        urc_queue: unsafe { URC_QUEUE.split() },
+        com_queue: unsafe { COM_QUEUE.split() },
+    };
+
+    let (cell_client, mut ingress) = ClientBuilder::<_, _, atat::NoopUrcMatcher, _, _, _, _>::new(
         Serial(serial_tx),
         SysTimer::new(),
         atat::Config::new(atat::Mode::Timeout),
     )
-    .build();
+    .build(queues);
 
     let gsm = GsmClient::<_, Pin, Pin>::new(cell_client, Config::new(APNInfo::new("em")));
 

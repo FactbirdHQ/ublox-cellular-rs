@@ -194,6 +194,13 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
         self.recv_impl(|rx_buffer| rx_buffer.dequeue_many_with(f))
     }
 
+    pub fn recv_wrapping<'b, F, R>(&'b mut self, f: F) -> Result<R>
+    where
+        F: FnOnce(&'b [u8], Option<&'b [u8]>) -> (usize, R),
+    {
+        self.recv_impl(|rx_buffer| rx_buffer.dequeue_many_with_wrapping(f))
+    }
+
     /// Dequeue a sequence of received octets, and fill a slice from it.
     ///
     /// This function returns the amount of bytes actually dequeued, which is limited

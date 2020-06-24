@@ -37,13 +37,13 @@ where
     DTR: OutputPin,
 {
     fn attach_gprs(&self) -> Result<(), Error> {
-        // match self.get_state()? {
+        // match self.state.get() {
         //     State::Registered | State::Registering => return Err(Error::_Unknown),
         //     State::Attaching | State::Attached => return Ok(()),
         //     _ => {}
         // };
 
-        self.set_state(State::Attaching)?;
+        self.state.set(State::Attaching);
 
         // Attach GPRS
         self.send_at(&psn::SetGPRSAttached {
@@ -105,12 +105,12 @@ where
                 })?;
 
             if param_tag != 1 {
-                self.set_state(State::Detached)?;
+                self.state.set(State::Detached);
                 return Err(Error::Network);
             }
         }
 
-        self.set_state(State::Attached)?;
+        self.state.set(State::Attached);
 
         Ok(())
     }
@@ -127,7 +127,7 @@ where
         })?;
         #[cfg(features = "logging")]
         log::info!("Detached!");
-        self.set_state(State::Detached)?;
+        self.state.set(State::Detached);
 
         Ok(())
     }

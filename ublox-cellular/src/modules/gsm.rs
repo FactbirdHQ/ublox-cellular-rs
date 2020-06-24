@@ -25,7 +25,7 @@ where
     DTR: OutputPin,
 {
     fn begin(&self) -> Result<(), Error> {
-        self.set_state(State::Registering)?;
+        self.state.set(State::Registering);
 
         let pin_status = self.send_at(&device_lock::GetPinStatus)?;
 
@@ -67,7 +67,7 @@ where
             .is_access_alive()
         {}
 
-        self.set_state(State::Registered)?;
+        self.state.set(State::Registered);
 
         Ok(())
     }

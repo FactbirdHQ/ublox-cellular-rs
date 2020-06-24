@@ -1,6 +1,6 @@
 use super::{AnySocket, Error, Result, Socket, SocketRef, SocketType};
 
-use heapless::{ArrayLength, LinearMap};
+use heapless::{ArrayLength, Vec};
 use serde::{Deserialize, Serialize};
 
 /// An item of a socket set.
@@ -20,33 +20,54 @@ pub struct Handle(pub usize);
 #[derive(Default)]
 pub struct Set<N, L>
 where
-    N: ArrayLength<(usize, Item<L>)>,
+    N: ArrayLength<Option<Item<L>>>,
     L: ArrayLength<u8>,
 {
-    sockets: LinearMap<usize, Item<L>, N>,
+    pub sockets: Vec<Option<Item<L>>, N>,
 }
 
 impl<N, L> Set<N, L>
 where
-    N: ArrayLength<(usize, Item<L>)>,
+    N: ArrayLength<Option<Item<L>>>,
     L: ArrayLength<u8>,
 {
     /// Create a socket set using the provided storage.
     pub fn new() -> Set<N, L> {
-        Set {
-            sockets: LinearMap::new(),
+        let mut sockets = Vec::new();
+        while sockets.len() < N::to_usize() {
+            sockets.push(None).ok();
         }
+        Set { sockets }
     }
 
+    /// Get the maximum number of sockets the set can hold
+    pub fn capacity(&self) -> usize {
+        N::to_usize()
+    }
+
+    /// Get the current number of initialized sockets, the set is holding
+    pub fn len(&self) -> usize {
+        self.sockets.iter().filter(|a| a.is_some()).count()
+    }
+
+    /// Get the type of a specific socket in the set.
+    ///
+    /// Returned as a [`SocketType`]
     pub fn socket_type(&self, handle: Handle) -> Option<SocketType> {
-        match self.sockets.get(&handle.0) {
+        match self.sockets.iter().find_map(|i| {
+            if let Some(ref s) = i {
+                if s.socket.handle().0 == handle.0 {
+                    Some(s)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }) {
             Some(item) => Some(item.socket.get_type()),
             None => None,
         }
-    }
-
-    pub fn len(&self) -> usize {
-        self.sockets.len()
     }
 
     /// Add a socket to the set with the reference count 1, and return its handle.
@@ -55,19 +76,29 @@ where
         T: Into<Socket<L>>,
     {
         let socket = socket.into();
-        let handle = socket.handle();
-        match self
-            .sockets
-            .insert(socket.handle().0, Item { socket, refs: 1 })
-        {
-            Ok(_) => Ok(handle),
-            _ => Err(Error::SocketSetFull),
+        for slot in self.sockets.iter_mut() {
+            if slot.is_none() {
+                let handle = socket.handle();
+                *slot = Some(Item { socket, refs: 1 });
+                return Ok(handle)
+            }
         }
+        Err(Error::SocketSetFull)
     }
 
     /// Get a socket from the set by its handle, as mutable.
     pub fn get<T: AnySocket<L>>(&mut self, handle: Handle) -> Result<SocketRef<T>> {
-        match self.sockets.get_mut(&handle.0) {
+        match self.sockets.iter_mut().find_map(|i| {
+            if let Some(ref mut s) = i {
+                if s.socket.handle().0 == handle.0 {
+                    Some(s)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }) {
             Some(item) => Ok(T::downcast(SocketRef::new(&mut item.socket))?),
             None => Err(Error::InvalidSocket),
         }
@@ -75,16 +106,34 @@ where
 
     /// Remove a socket from the set, without changing its state.
     pub fn remove(&mut self, handle: Handle) -> Result<Socket<L>> {
-        // net_trace!("[{}]: removing", handle.0);
-        match self.sockets.remove(&handle.0) {
-            Some(item) => Ok(item.socket),
-            None => Err(Error::InvalidSocket),
-        }
+        let index = self
+            .sockets
+            .iter_mut()
+            .position(|i| {
+                if let Some(s) = i {
+                    return s.socket.handle().0 == handle.0;
+                }
+                false
+            }).ok_or(Error::InvalidSocket)?;
+
+        let item: &mut Option<Item<L>> = unsafe { self.sockets.get_unchecked_mut(index) };
+
+        item.take().ok_or(Error::InvalidSocket).map(|item| item.socket)
     }
 
     /// Increase reference count by 1.
     pub fn retain(&mut self, handle: Handle) -> Result<()> {
-        match self.sockets.get_mut(&handle.0) {
+        match self.sockets.iter_mut().find_map(|i| {
+            if let Some(ref mut s) = i {
+                if s.socket.handle().0 == handle.0 {
+                    Some(s)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }) {
             Some(v) => v.refs += 1,
             None => return Err(Error::InvalidSocket),
         };
@@ -93,7 +142,17 @@ where
 
     /// Decrease reference count by 1.
     pub fn release(&mut self, handle: Handle) -> Result<()> {
-        match self.sockets.get_mut(&handle.0) {
+        match self.sockets.iter_mut().find_map(|i| {
+            if let Some(ref mut s) = i {
+                if s.socket.handle().0 == handle.0 {
+                    Some(s)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        }) {
             Some(v) => {
                 if v.refs == 0 {
                     return Err(Error::Illegal);
@@ -135,11 +194,9 @@ where
     //                         socket.close()
     //                     }
     //                 }
-    //                 Socket::__Nonexhaustive(_) => unreachable!(),
     //             }
     //         }
     //         if may_remove {
-    //             // net_trace!("[{}]: pruning", index);
     //             *item = None
     //         }
     //     }
@@ -147,13 +204,26 @@ where
 
     /// Iterate every socket in this set.
     pub fn iter(&self) -> impl Iterator<Item = (Handle, &Socket<L>)> {
-        self.sockets.iter().map(|(k, v)| (Handle(*k), &v.socket))
+        self.sockets.iter().filter_map(|i| {
+            if let Some(Item { ref socket, .. }) = i {
+                Some((Handle(socket.handle().0), socket))
+            } else {
+                None
+            }
+        })
     }
 
-    // /// Iterate every socket in this set, as SocketRef.
+    /// Iterate every socket in this set, as SocketRef.
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Handle, SocketRef<Socket<L>>)> {
-        self.sockets
-            .iter_mut()
-            .map(|(k, v)| (Handle(*k), SocketRef::new(&mut v.socket)))
+        self.sockets.iter_mut().filter_map(|i| {
+            if let Some(Item { ref mut socket, .. }) = i {
+                Some((Handle(socket.handle().0), SocketRef::new(socket)))
+            } else {
+                None
+            }
+        })
     }
 }
+
+#[cfg(test)]
+mod tests {}

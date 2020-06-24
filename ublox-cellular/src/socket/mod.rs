@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 mod meta;
 mod ref_;
 mod ring_buffer;
@@ -16,12 +14,13 @@ pub use tcp::{State as TcpState, TcpSocket};
 #[cfg(feature = "socket-udp")]
 pub use udp::UdpSocket;
 
-pub use self::set::{Handle as SocketHandle, Item as SocketSetItem, Set as SocketSet};
+pub use self::set::{Handle as SocketHandle, Set as SocketSet};
 
 pub use self::ref_::Ref as SocketRef;
 pub(crate) use self::ref_::Session as SocketSession;
 
 /// The error type for the networking stack.
+#[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Error {
     /// An operation cannot proceed because a buffer is empty or full.
@@ -35,9 +34,6 @@ pub enum Error {
 
     SocketSetFull,
     InvalidSocket,
-
-    #[doc(hidden)]
-    __Nonexhaustive,
 }
 
 type Result<T> = core::result::Result<T, Error>;
@@ -52,6 +48,7 @@ type Result<T> = core::result::Result<T, Error>;
 ///
 /// [AnySocket]: trait.AnySocket.html
 /// [SocketSet::get]: struct.SocketSet.html#method.get
+#[non_exhaustive]
 pub enum Socket<L: ArrayLength<u8>> {
     // #[cfg(feature = "socket-raw")]
     // Raw(RawSocket<'a, 'b>),
@@ -64,16 +61,13 @@ pub enum Socket<L: ArrayLength<u8>> {
     Udp(UdpSocket<L>),
     #[cfg(feature = "socket-tcp")]
     Tcp(TcpSocket<L>),
-    #[doc(hidden)]
-    __Nonexhaustive(PhantomData<()>),
 }
 
+#[non_exhaustive]
 #[derive(Debug)]
 pub enum SocketType {
     Udp,
     Tcp,
-    #[doc(hidden)]
-    __Nonexhaustive,
 }
 
 impl<L: ArrayLength<u8>> Socket<L> {
@@ -81,7 +75,6 @@ impl<L: ArrayLength<u8>> Socket<L> {
         match self {
             Socket::Tcp(_) => SocketType::Tcp,
             Socket::Udp(_) => SocketType::Udp,
-            Socket::__Nonexhaustive(_) => SocketType::__Nonexhaustive,
         }
     }
 }
@@ -103,7 +96,6 @@ macro_rules! dispatch_socket {
             Socket::Udp(ref $( $mut_ )* $socket) => $code,
             #[cfg(feature = "socket-tcp")]
             Socket::Tcp(ref $( $mut_ )* $socket) => $code,
-            Socket::__Nonexhaustive(_) => unreachable!()
         }
     };
 }

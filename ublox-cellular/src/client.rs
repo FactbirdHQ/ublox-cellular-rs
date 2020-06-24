@@ -1,5 +1,5 @@
 use atat::AtatClient;
-use core::cell::RefCell;
+use core::cell::{RefCell, Cell};
 use embedded_hal::digital::v2::OutputPin;
 use heapless::{consts, String};
 
@@ -102,10 +102,10 @@ pub struct GsmClient<C, RST, DTR>
 where
     C: AtatClient,
 {
-    initialized: RefCell<bool>,
+    initialized: Cell<bool>,
     pub(crate) config: Config<RST, DTR>,
-    pub(crate) state: RefCell<State>,
-    pub(crate) poll_cnt: RefCell<u16>,
+    pub(crate) state: Cell<State>,
+    pub(crate) poll_cnt: Cell<u16>,
     pub(crate) client: RefCell<C>,
     // Ublox devices can hold a maximum of 6 active sockets
     pub(crate) sockets: RefCell<SocketSet<consts::U2, consts::U2048>>,
@@ -120,22 +120,12 @@ where
     pub fn new(client: C, config: Config<RST, DTR>) -> Self {
         GsmClient {
             config,
-            state: RefCell::new(State::Deregistered),
-            poll_cnt: RefCell::new(0),
-            initialized: RefCell::new(false),
+            state: Cell::new(State::Deregistered),
+            poll_cnt: Cell::new(0),
+            initialized: Cell::new(false),
             client: RefCell::new(client),
             sockets: RefCell::new(SocketSet::new()),
         }
-    }
-
-    pub(crate) fn set_state(&self, state: State) -> Result<State, Error> {
-        let prev_state = self.get_state()?;
-        *self.state.try_borrow_mut().map_err(|_| Error::SetState)? = state;
-        Ok(prev_state)
-    }
-
-    pub fn get_state(&self) -> Result<State, Error> {
-        Ok(*self.state.try_borrow().map_err(|_| Error::SetState)?)
     }
 
     /// Initilize a new ublox device to a known state (restart, wait for startup, set RS232 settings, gpio settings, etc.)
@@ -154,7 +144,7 @@ where
 
         self.autosense()?;
 
-        if *self.initialized.try_borrow()? {
+        if self.initialized.get() {
             return Ok(());
         }
 
@@ -256,11 +246,12 @@ where
         // info!("{:?}", self.send_internal(&GetIndicatorControl)?);
         // info!("{:?}", self.send_internal(&GetIMEI { snt: None })?);
 
-        *self.initialized.try_borrow_mut()? = true;
+        self.initialized.set(true);
 
         Ok(())
     }
 
+    #[inline]
     fn low_power_mode(&self, _enable: bool) -> Result<(), atat::Error> {
         if let Some(ref _dtr) = self.config.dtr_pin {
             // if enable {
@@ -273,6 +264,7 @@ where
         Ok(())
     }
 
+    #[inline]
     fn autosense(&self) -> Result<(), Error> {
         for _ in 0..15 {
             match self.client.try_borrow_mut()?.send(&AT) {
@@ -285,6 +277,7 @@ where
         Err(Error::BaudDetection)
     }
 
+    #[inline]
     fn reset(&self) -> Result<(), Error> {
         self.send_internal(
             &SetModuleFunctionality {
@@ -299,7 +292,7 @@ where
     pub fn spin(&self) -> Result<(), Error> {
         self.handle_urc()?;
 
-        match self.get_state()? {
+        match self.state.get() {
             State::Attached => {}
             State::Sending => {
                 return Ok(());
@@ -413,7 +406,8 @@ where
                 #[cfg(feature = "logging")]
                 log::info!("[URC] DataConnectionDeactivated {:?}", _profile_id);
                 self.init(false)?;
-                Ok(self.set_state(State::Deregistered).map(|_| ())?)
+                self.state.set(State::Deregistered);
+                Ok(())
             }
             Some(Urc::SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable {
                 socket,
@@ -435,6 +429,7 @@ where
         }
     }
 
+    #[inline]
     pub(crate) fn send_internal<A: atat::AtatCmd>(
         &self,
         req: &A,
@@ -464,7 +459,7 @@ where
     }
 
     pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
-        if !*self.initialized.try_borrow()? {
+        if !self.initialized.get() {
             self.init(false)?;
         }
 
