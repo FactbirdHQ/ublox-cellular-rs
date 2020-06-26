@@ -3,9 +3,6 @@
 > no_std driver crate for interfacing with the ublox cellular family over serial
 
 ![CI][workflow]
-[![Crates.io Version][crates-io-badge]][crates-io]
-[![Crates.io Downloads][crates-io-download-badge]][crates-io-download]
-[![chat][chat-badge]][chat]
 
 ---
 
@@ -64,7 +61,7 @@ dual licensed as above, without any additional terms or conditions.
 
 <!-- Badges -->
 [workflow]: https://github.com/BlackbirdHQ/ublox-cellular-rs/workflows/CI/badge.svg
-[crates-io]: https://crates.io/crates/ublox-cellular-rs
+<!-- [crates-io]: https://crates.io/crates/ublox-cellular-rs
 [crates-io-badge]: https://img.shields.io/crates/v/ublox-cellular-rs.svg?maxAge=3600
 [crates-io-download]: https://crates.io/crates/ublox-cellular-rs
-[crates-io-download-badge]: https://img.shields.io/crates/d/ublox-cellular-rs.svg?maxAge=3600
+[crates-io-download-badge]: https://img.shields.io/crates/d/ublox-cellular-rs.svg?maxAge=3600 -->
