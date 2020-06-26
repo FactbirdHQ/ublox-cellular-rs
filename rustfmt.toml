@@ -1,5 +1,3 @@
 tab_spaces = 4
 format_strings = false
 reorder_imports = true
-report_todo = "Always"
-report_fixme = "Always"
