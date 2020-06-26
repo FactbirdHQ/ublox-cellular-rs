@@ -1,9 +1,9 @@
 [workspace]
 members = [
     "ublox-cellular",
-    "examples/common_lib",
-    "examples/linux",
-    "examples/linux_mqtt",
+    # "examples/common_lib",
+    # "examples/linux",
+    # "examples/linux_mqtt",
     # "examples/linux_jobs",
 ]
 
