@@ -202,10 +202,12 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     where
         F: FnOnce(&'b [u8], Option<&'b [u8]>) -> usize,
     {
-        self.recv_impl(|rx_buffer| rx_buffer.dequeue_many_with_wrapping(|a, b| {
-            let len = f(a, b);
-            (len, len)
-        }))
+        self.recv_impl(|rx_buffer| {
+            rx_buffer.dequeue_many_with_wrapping(|a, b| {
+                let len = f(a, b);
+                (len, len)
+            })
+        })
     }
 
     /// Dequeue a sequence of received octets, and fill a slice from it.

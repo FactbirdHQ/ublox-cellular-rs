@@ -1,7 +1,7 @@
 use atat::AtatClient;
-use core::cell::{RefCell, Cell};
+use core::cell::{Cell, RefCell};
 use embedded_hal::digital::v2::OutputPin;
-use heapless::{ArrayLength, consts, String};
+use heapless::{consts, ArrayLength, String};
 
 use crate::{
     command::{
@@ -121,7 +121,11 @@ where
     N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
     L: ArrayLength<u8>,
 {
-    pub fn new(client: C, socket_set: &'static mut SocketSet<N, L>, config: Config<RST, DTR>) -> Self {
+    pub fn new(
+        client: C,
+        socket_set: &'static mut SocketSet<N, L>,
+        config: Config<RST, DTR>,
+    ) -> Self {
         GsmClient {
             config,
             state: Cell::new(State::Deregistered),

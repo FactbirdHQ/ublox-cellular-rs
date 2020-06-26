@@ -80,7 +80,7 @@ where
             if slot.is_none() {
                 let handle = socket.handle();
                 *slot = Some(Item { socket, refs: 1 });
-                return Ok(handle)
+                return Ok(handle);
             }
         }
         Err(Error::SocketSetFull)
@@ -114,11 +114,14 @@ where
                     return s.socket.handle().0 == handle.0;
                 }
                 false
-            }).ok_or(Error::InvalidSocket)?;
+            })
+            .ok_or(Error::InvalidSocket)?;
 
         let item: &mut Option<Item<L>> = unsafe { self.sockets.get_unchecked_mut(index) };
 
-        item.take().ok_or(Error::InvalidSocket).map(|item| item.socket)
+        item.take()
+            .ok_or(Error::InvalidSocket)
+            .map(|item| item.socket)
     }
 
     /// Increase reference count by 1.

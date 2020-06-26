@@ -269,7 +269,10 @@ impl<T: Default + core::fmt::Debug + Clone, N: ArrayLength<T>> RingBuffer<T, N> 
         let size1 = cmp::min(self.len(), capacity - self.read_at);
         let size2 = self.len() - size1;
         let (size, result) = if size2 != 0 {
-            f(&self.storage[self.read_at..self.read_at + size1], Some(&self.storage[..size2]))
+            f(
+                &self.storage[self.read_at..self.read_at + size1],
+                Some(&self.storage[..size2]),
+            )
         } else {
             f(&self.storage[self.read_at..self.read_at + size1], None)
         };
@@ -676,7 +679,6 @@ mod test {
         );
         assert_eq!(ring.len(), 8);
         assert_eq!(cmp::min(ring.len(), ring.capacity() - ring.read_at), 8);
-
 
         ring.dequeue_many_with_wrapping(|a, b| {
             assert_eq!(a, b"efghijkl");

@@ -1,6 +1,6 @@
 use embedded_hal::digital::v2::OutputPin;
 pub use embedded_nal::{Ipv4Addr, Mode, SocketAddr, SocketAddrV4};
-use heapless::{ArrayLength, consts};
+use heapless::{consts, ArrayLength};
 
 use crate::command::ip_transport_layer::{types::*, *};
 use crate::error::Error;
@@ -517,7 +517,7 @@ where
             .map_err(|e| nb::Error::Other(e.into()))?;
 
         tcp.recv_wrapping(|a, b| f(a, b))
-        .map_err(|e| nb::Error::Other(e.into()))
+            .map_err(|e| nb::Error::Other(e.into()))
     }
 
     /// Close an existing TCP socket.
