@@ -1,13 +1,8 @@
 [workspace]
 members = [
     "ublox-cellular",
-    # "examples/common_lib",
-    # "examples/linux",
-    # "examples/linux_mqtt",
+    "examples/common_lib",
+    "examples/linux",
+    "examples/linux_mqtt",
     # "examples/linux_jobs",
 ]
-
-
-[patch.crates-io]
-serde_at = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
-atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }

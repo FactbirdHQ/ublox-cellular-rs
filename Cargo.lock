@@ -43,8 +43,9 @@ dependencies = [
 
 [[package]]
 name = "atat"
-version = "0.3.0"
-source = "git+https://github.com/BlackbirdHQ/atat#dc45e1607862c9fcce0526527475893552a38904"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32bb463325094d10dc0fe460a839a86ff95cbbd0ee7b06bf3bf284626e8434e2"
 dependencies = [
  "atat_derive",
  "embedded-hal",
@@ -59,8 +60,9 @@ dependencies = [
 
 [[package]]
 name = "atat_derive"
-version = "0.3.0"
-source = "git+https://github.com/BlackbirdHQ/atat#dc45e1607862c9fcce0526527475893552a38904"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bffea8fe4f95d40d8ec94dc6e6240c54c559887050ecb876eded24de9c892d2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -358,11 +360,11 @@ dependencies = [
 [[package]]
 name = "mqttrust"
 version = "0.0.5"
+source = "git+https://github.com/BlackbirdHQ/mqttrust?rev=2cdffdb#2cdffdb39bf37af53d1bb213bf1171cb911503ff"
 dependencies = [
  "embedded-hal",
  "embedded-nal",
  "heapless",
- "log",
  "mqttrs",
  "nb",
  "no-std-net",
@@ -480,8 +482,9 @@ dependencies = [
 
 [[package]]
 name = "serde_at"
-version = "0.3.0"
-source = "git+https://github.com/BlackbirdHQ/atat#dc45e1607862c9fcce0526527475893552a38904"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "862874521b98d5ada6c9bb7897f76c00658005c9c4200bbf33dd8a1834004585"
 dependencies = [
  "heapless",
  "log",

@@ -25,11 +25,11 @@ jobs:
         with:
           command: build
           args: -p ublox-cellular-rs --target thumbv7m-none-eabi --all-features
-      # - name: Ensure that examples compile on x86_64
-      #   uses: actions-rs/cargo@v1
-      #   with:
-      #     command: build
-      #     args: --exclude ublox-cellular-rs --workspace --target x86_64-unknown-linux-gnu
+      - name: Ensure that examples compile on x86_64
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --exclude ublox-cellular-rs --workspace --target x86_64-unknown-linux-gnu
       - name: Run tests
         uses: actions-rs/cargo@v1
         with:
