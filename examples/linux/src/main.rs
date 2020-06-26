@@ -5,7 +5,7 @@ use std::thread;
 
 use ublox_cellular::gprs::APNInfo;
 use ublox_cellular::prelude::*;
-use ublox_cellular::sockets::{Ipv4Addr, Mode, SocketAddrV4};
+use ublox_cellular::sockets::{Ipv4Addr, Mode, SocketAddrV4, SocketSet};
 use ublox_cellular::{error::Error as GSMError, Config, GsmClient};
 
 use atat::AtatClient;
@@ -13,22 +13,26 @@ use embedded_hal::digital::v2::OutputPin;
 
 use linux_embedded_hal::Pin;
 
-use heapless::{self, consts, spsc::Queue};
+use heapless::{self, consts, spsc::Queue, ArrayLength};
 
 use common::{serial::Serial, timer::SysTimer};
 use std::time::Duration;
 
-fn attach_gprs<C, RST, DTR>(gsm: &GsmClient<C, RST, DTR>) -> Result<(), GSMError>
+fn attach_gprs<C, RST, DTR, N, L>(gsm: &GsmClient<C, RST, DTR, N, L>) -> Result<(), GSMError>
 where
     C: AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
+    N: ArrayLength<Option<ublox_cellular::sockets::SocketSetItem<L>>>,
+    L: ArrayLength<u8>,
 {
     gsm.init(true)?;
-    gsm.begin()?;
-    gsm.attach_gprs()?;
+    gsm.begin().unwrap();
+    gsm.attach_gprs().unwrap();
     Ok(())
 }
+
+static mut SOCKET_SET: Option<SocketSet<consts::U6, consts::U2048>> = None;
 
 fn main() {
     env_logger::builder()
@@ -67,7 +71,15 @@ fn main() {
     )
     .build(queues);
 
-    let gsm = GsmClient::<_, Pin, Pin>::new(cell_client, Config::new(APNInfo::new("em")));
+    unsafe {
+        SOCKET_SET = Some(SocketSet::new());
+    }
+
+    let gsm = GsmClient::<_, Pin, Pin, _, _>::new(
+        cell_client,
+        unsafe { SOCKET_SET.as_mut().unwrap() },
+        Config::new(APNInfo::new("em")),
+    );
 
     // Launch reading thread
     thread::Builder::new()
@@ -92,7 +104,7 @@ fn main() {
 
     if attach_gprs(&gsm).is_ok() {
         let mut socket = {
-            let soc = <GsmClient<_, _, _> as TcpStack>::open(&gsm, Mode::Blocking)
+            let soc = <GsmClient<_, _, _, _, _> as TcpStack>::open(&gsm, Mode::Blocking)
                 .expect("Cannot open socket!");
 
             gsm.connect(
@@ -107,14 +119,14 @@ fn main() {
         loop {
             thread::sleep(Duration::from_millis(5000));
             let mut buf = [0u8; 256];
-            let read = <GsmClient<_, _, _> as TcpStack>::read(&gsm, &mut socket, &mut buf)
+            let read = <GsmClient<_, _, _, _, _> as TcpStack>::read(&gsm, &mut socket, &mut buf)
                 .expect("Failed to read from socket!");
             if read > 0 {
                 log::info!("Read {:?} bytes from socket layer!  - {:?}", read, unsafe {
                     core::str::from_utf8_unchecked(&buf[..read])
                 });
             }
-            let _wrote = <GsmClient<_, _, _> as TcpStack>::write(
+            let _wrote = <GsmClient<_, _, _, _, _> as TcpStack>::write(
                 &gsm,
                 &mut socket,
                 format!("Whatup {}", cnt).as_bytes(),

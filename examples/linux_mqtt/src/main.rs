@@ -6,7 +6,7 @@ use std::thread;
 
 use ublox_cellular::gprs::APNInfo;
 use ublox_cellular::prelude::*;
-use ublox_cellular::{error::Error as GSMError, Config, GsmClient};
+use ublox_cellular::{error::Error as GSMError, sockets::SocketSet, Config, GsmClient};
 
 use atat::{self, AtatClient, ClientBuilder, ComQueue, Queues, ResQueue, UrcQueue};
 use embedded_hal::digital::v2::OutputPin;
@@ -21,11 +21,13 @@ use heapless::{consts, spsc::Queue, ArrayLength, String, Vec};
 use common::{serial::Serial, timer::SysTimer};
 use std::time::Duration;
 
-fn attach_gprs<C, RST, DTR>(gsm: &GsmClient<C, RST, DTR>) -> Result<(), GSMError>
+fn attach_gprs<C, RST, DTR, N, L>(gsm: &GsmClient<C, RST, DTR, N, L>) -> Result<(), GSMError>
 where
     C: AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
+    N: ArrayLength<Option<ublox_cellular::sockets::SocketSetItem<L>>>,
+    L: ArrayLength<u8>,
 {
     gsm.init(true)?;
     gsm.begin().unwrap();
@@ -33,7 +35,9 @@ where
     Ok(())
 }
 
-static mut Q: Queue<Request<std::vec::Vec<u8>>, consts::U10> = Queue(heapless::i::Queue::new());
+static mut Q: Queue<Request<std::vec::Vec<u8>>, consts::U10, u8> = Queue(heapless::i::Queue::u8());
+
+static mut SOCKET_SET: Option<SocketSet<consts::U6, consts::U2048>> = None;
 
 static mut URC_READY: bool = false;
 
@@ -96,7 +100,15 @@ fn main() {
     .with_custom_urc_matcher(NvicUrcMatcher::new())
     .build(queues);
 
-    let gsm = GsmClient::<_, Pin, Pin>::new(cell_client, Config::new(APNInfo::new("em")));
+    unsafe {
+        SOCKET_SET = Some(SocketSet::new());
+    }
+
+    let gsm = GsmClient::<_, Pin, Pin, _, _>::new(
+        cell_client,
+        unsafe { SOCKET_SET.as_mut().unwrap() },
+        Config::new(APNInfo::new("em")),
+    );
 
     let (mut p, c) = unsafe { Q.split() };
 
@@ -108,7 +120,6 @@ fn main() {
     );
 
     log::info!("{:?}", mqtt_eventloop.options.broker());
-
 
     // Launch reading thread
     thread::Builder::new()

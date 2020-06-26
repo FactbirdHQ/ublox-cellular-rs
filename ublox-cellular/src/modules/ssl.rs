@@ -1,5 +1,3 @@
-use embedded_hal::digital::v2::OutputPin;
-
 use crate::{
     command::device_data_security::{types::*, *},
     command::ip_transport_layer::{types::*, *},
@@ -7,6 +5,8 @@ use crate::{
     socket::SocketHandle,
     GsmClient,
 };
+use embedded_hal::digital::v2::OutputPin;
+use heapless::ArrayLength;
 
 pub trait SSL {
     fn import_certificate(
@@ -26,11 +26,13 @@ pub trait SSL {
     fn enable_ssl(&self, socket: SocketHandle, profile_id: u8) -> Result<(), Error>;
 }
 
-impl<C, RST, DTR> SSL for GsmClient<C, RST, DTR>
+impl<C, RST, DTR, N, L> SSL for GsmClient<C, RST, DTR, N, L>
 where
     C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    L: ArrayLength<u8>,
 {
     fn import_certificate(
         &self,

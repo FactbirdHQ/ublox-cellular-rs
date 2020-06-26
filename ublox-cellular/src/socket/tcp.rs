@@ -11,8 +11,6 @@ pub enum State {
     Closed,
     Listen,
     Established,
-    FinWait1,
-    FinWait2,
     CloseWait,
     TimeWait,
 }
@@ -147,9 +145,6 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     pub fn may_recv(&self) -> bool {
         match self.state {
             State::Established => true,
-            // In FIN-WAIT-1/2, we have closed our transmit half of the connection but
-            // we still can receive indefinitely.
-            State::FinWait1 | State::FinWait2 => true,
             // If we have something in the receive buffer, we can receive that.
             _ if !self.rx_buffer.is_empty() => true,
             _ => false,
@@ -194,11 +189,23 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
         self.recv_impl(|rx_buffer| rx_buffer.dequeue_many_with(f))
     }
 
-    pub fn recv_wrapping<'b, F, R>(&'b mut self, f: F) -> Result<R>
+    /// Call `f` with a slice of octets in the receive buffer, and dequeue the
+    /// amount of elements returned by `f`.
+    ///
+    /// If the buffer read wraps around, the second argument of `f` will be
+    /// `Some()` with the remainder of the buffer, such that the combined slice
+    /// of the two arguments, makes up the full buffer.
+    ///
+    /// This function returns `Err(Error::Illegal) if the receive half of the
+    /// connection is not open; see [may_recv](#method.may_recv).
+    pub fn recv_wrapping<'b, F>(&'b mut self, f: F) -> Result<usize>
     where
-        F: FnOnce(&'b [u8], Option<&'b [u8]>) -> (usize, R),
+        F: FnOnce(&'b [u8], Option<&'b [u8]>) -> usize,
     {
-        self.recv_impl(|rx_buffer| rx_buffer.dequeue_many_with_wrapping(f))
+        self.recv_impl(|rx_buffer| rx_buffer.dequeue_many_with_wrapping(|a, b| {
+            let len = f(a, b);
+            (len, len)
+        }))
     }
 
     /// Dequeue a sequence of received octets, and fill a slice from it.

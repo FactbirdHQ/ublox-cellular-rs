@@ -1,5 +1,3 @@
-use embedded_hal::digital::v2::OutputPin;
-
 use crate::{
     command::{
         device_lock::{self, types::*},
@@ -11,6 +9,8 @@ use crate::{
     error::Error,
     GsmClient, State,
 };
+use embedded_hal::digital::v2::OutputPin;
+use heapless::ArrayLength;
 
 pub trait GSM {
     fn begin(&self) -> Result<(), Error>;
@@ -18,11 +18,13 @@ pub trait GSM {
     fn get_time(&self) -> Result<DateTime, Error>;
 }
 
-impl<C, RST, DTR> GSM for GsmClient<C, RST, DTR>
+impl<C, RST, DTR, N, L> GSM for GsmClient<C, RST, DTR, N, L>
 where
     C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    L: ArrayLength<u8>,
 {
     fn begin(&self) -> Result<(), Error> {
         self.state.set(State::Registering);

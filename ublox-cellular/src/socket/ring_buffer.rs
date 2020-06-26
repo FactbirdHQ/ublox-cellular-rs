@@ -42,7 +42,7 @@ impl<T: Default + Clone, N: ArrayLength<T>> RingBuffer<T, N> {
     // Internal helper for test functions
     fn from_slice(slice: &[T]) -> RingBuffer<T, N>
     where
-        T: Copy,
+        T: Copy + core::fmt::Debug,
     {
         let mut rb = RingBuffer::new();
         rb.enqueue_slice(slice);
@@ -179,7 +179,7 @@ impl<T: Default + Clone, N: ArrayLength<T>> RingBuffer<T, N> {
 
 /// This is the "continuous" ring buffer interface: it operates with element slices,
 /// and boundary conditions (empty/full) simply result in empty slices.
-impl<T: Default + Clone, N: ArrayLength<T>> RingBuffer<T, N> {
+impl<T: Default + core::fmt::Debug + Clone, N: ArrayLength<T>> RingBuffer<T, N> {
     /// Call `f` with the largest contiguous slice of unallocated buffer elements,
     /// and enqueue the amount of elements returned by `f`.
     ///
@@ -431,7 +431,7 @@ impl<T: Default + Clone, N: ArrayLength<T>> RingBuffer<T, N> {
     }
 }
 
-impl<T: Default + Copy, N: ArrayLength<T>> From<Vec<T, N>> for RingBuffer<T, N> {
+impl<T: Default + core::fmt::Debug + Copy, N: ArrayLength<T>> From<Vec<T, N>> for RingBuffer<T, N> {
     fn from(slice: Vec<T, N>) -> RingBuffer<T, N> {
         RingBuffer::from_slice(slice.as_ref())
     }

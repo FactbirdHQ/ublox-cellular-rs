@@ -11,7 +11,7 @@ members = [
 [patch.crates-io]
 serde_at = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
 atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
-mqttrs = { path = "../mqttrs" }
+mqttrs = { git = "https://github.com/MathiasKoch/mqttrs", branch = "wip/alloc-free-encode", default-features = false }
 
 # [patch.'https://github.com/thejpster/embedded-nal']
 # embedded-nal = { git = "https://github.com/MathiasKoch/embedded-nal", branch = "factbird_mini" }

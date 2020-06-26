@@ -1,12 +1,11 @@
-use embedded_hal::digital::v2::OutputPin;
-use heapless::{consts, String};
-use no_std_net::Ipv4Addr;
-
 use crate::{
     command::psn::{self, types::*},
     error::Error,
     GsmClient, State,
 };
+use embedded_hal::digital::v2::OutputPin;
+use heapless::{consts, ArrayLength, String};
+use no_std_net::Ipv4Addr;
 
 #[derive(Debug, Clone, Default)]
 pub struct APNInfo {
@@ -30,11 +29,13 @@ pub trait GPRS {
     fn detach_gprs(&self) -> Result<(), Error>;
 }
 
-impl<C, RST, DTR> GPRS for GsmClient<C, RST, DTR>
+impl<C, RST, DTR, N, L> GPRS for GsmClient<C, RST, DTR, N, L>
 where
     C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    L: ArrayLength<u8>,
 {
     fn attach_gprs(&self) -> Result<(), Error> {
         // match self.state.get() {

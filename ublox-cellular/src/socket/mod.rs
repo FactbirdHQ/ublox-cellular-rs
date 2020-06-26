@@ -14,7 +14,7 @@ pub use tcp::{State as TcpState, TcpSocket};
 #[cfg(feature = "socket-udp")]
 pub use udp::UdpSocket;
 
-pub use self::set::{Handle as SocketHandle, Set as SocketSet};
+pub use self::set::{Handle as SocketHandle, Set as SocketSet, Item as SocketSetItem};
 
 pub use self::ref_::Ref as SocketRef;
 pub(crate) use self::ref_::Session as SocketSession;

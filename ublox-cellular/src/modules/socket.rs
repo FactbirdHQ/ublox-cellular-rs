@@ -1,6 +1,6 @@
 use embedded_hal::digital::v2::OutputPin;
 pub use embedded_nal::{Ipv4Addr, Mode, SocketAddr, SocketAddrV4};
-use heapless::consts;
+use heapless::{ArrayLength, consts};
 
 use crate::command::ip_transport_layer::{types::*, *};
 use crate::error::Error;
@@ -26,11 +26,13 @@ use embedded_nal::TcpStack;
 pub type IngressChunkSize = consts::U256;
 pub type EgressChunkSize = consts::U512;
 
-impl<C, RST, DTR> GsmClient<C, RST, DTR>
+impl<C, RST, DTR, N, L> GsmClient<C, RST, DTR, N, L>
 where
     C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    L: ArrayLength<u8>,
 {
     /// Helper function to manage the internal poll counter, used to poll open
     /// sockets for incoming data, in case a `SocketDataAvailable` URC is missed
@@ -212,11 +214,13 @@ where
 }
 
 #[cfg(feature = "socket-udp")]
-impl<C, RST, DTR> UdpStack for GsmClient<C, RST, DTR>
+impl<C, RST, DTR, N, L> UdpStack for GsmClient<C, RST, DTR, N, L>
 where
     C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    L: ArrayLength<u8>,
 {
     type Error = Error;
 
@@ -343,11 +347,13 @@ where
 }
 
 #[cfg(feature = "socket-tcp")]
-impl<C, RST, DTR> TcpStack for GsmClient<C, RST, DTR>
+impl<C, RST, DTR, N, L> TcpStack for GsmClient<C, RST, DTR, N, L>
 where
     C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    L: ArrayLength<u8>,
 {
     type Error = Error;
 
@@ -391,7 +397,7 @@ where
             return Err(Error::Network);
         }
 
-        // self.enable_ssl(socket, 0)?;
+        self.enable_ssl(socket, 0)?;
 
         self.handle_socket_error(
             || {
@@ -510,11 +516,8 @@ where
             .get::<TcpSocket<_>>(*socket)
             .map_err(|e| nb::Error::Other(e.into()))?;
 
-        tcp.recv_wrapping(|a, b| {
-            let len = f(a, b);
-            (len, Ok(len))
-        })
-        .map_err(|e| nb::Error::Other(e.into()))?
+        tcp.recv_wrapping(|a, b| f(a, b))
+        .map_err(|e| nb::Error::Other(e.into()))
     }
 
     /// Close an existing TCP socket.

@@ -1,7 +1,7 @@
 use atat::AtatClient;
 use core::cell::{RefCell, Cell};
 use embedded_hal::digital::v2::OutputPin;
-use heapless::{consts, String};
+use heapless::{ArrayLength, consts, String};
 
 use crate::{
     command::{
@@ -98,9 +98,11 @@ where
     }
 }
 
-pub struct GsmClient<C, RST, DTR>
+pub struct GsmClient<C, RST, DTR, N, L>
 where
     C: AtatClient,
+    N: 'static + ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    L: 'static + ArrayLength<u8>,
 {
     initialized: Cell<bool>,
     pub(crate) config: Config<RST, DTR>,
@@ -108,23 +110,25 @@ where
     pub(crate) poll_cnt: Cell<u16>,
     pub(crate) client: RefCell<C>,
     // Ublox devices can hold a maximum of 6 active sockets
-    pub(crate) sockets: RefCell<SocketSet<consts::U2, consts::U2048>>,
+    pub(crate) sockets: RefCell<&'static mut SocketSet<N, L>>,
 }
 
-impl<C, RST, DTR> GsmClient<C, RST, DTR>
+impl<C, RST, DTR, N, L> GsmClient<C, RST, DTR, N, L>
 where
     C: AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    L: ArrayLength<u8>,
 {
-    pub fn new(client: C, config: Config<RST, DTR>) -> Self {
+    pub fn new(client: C, socket_set: &'static mut SocketSet<N, L>, config: Config<RST, DTR>) -> Self {
         GsmClient {
             config,
             state: Cell::new(State::Deregistered),
             poll_cnt: Cell::new(0),
             initialized: Cell::new(false),
             client: RefCell::new(client),
-            sockets: RefCell::new(SocketSet::new()),
+            sockets: RefCell::new(socket_set),
         }
     }
 
@@ -304,7 +308,7 @@ where
 
         // Occasionally poll every open socket, in case a `SocketDataAvailable`
         // URC was missed somehow. TODO: rewrite this to readable code
-        let data_available: heapless::Vec<(SocketHandle, usize), consts::U6> = {
+        let data_available: heapless::Vec<(SocketHandle, usize), consts::U4> = {
             let sockets = self.sockets.try_borrow()?;
 
             if sockets.len() > 0 && self.poll_cnt(false) >= 500 {
