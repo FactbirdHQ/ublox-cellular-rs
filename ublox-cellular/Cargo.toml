@@ -27,7 +27,7 @@ log = { version = "0.4", default-features = false, optional = true }
 typenum = "^1"
 
 [features]
-default = ["sara_u2", "socket-udp", "socket-tcp", "logging"]
+default = ["sara_u2", "socket-udp", "socket-tcp"]
 
 topy_l4 = []
 mpci_l2 = []
