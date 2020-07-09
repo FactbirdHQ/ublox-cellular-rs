@@ -6,6 +6,7 @@ use heapless::{consts, ArrayLength, String};
 use crate::{
     command::{
         control::{types::*, *},
+        general::GetCCID,
         gpio::{types::*, *},
         ip_transport_layer::*,
         mobile_control::{types::*, *},
@@ -44,7 +45,7 @@ where
     RST: OutputPin,
     DTR: OutputPin,
 {
-    pub fn new(apn_info: APNInfo) -> Self {
+    pub fn new(apn_info: APNInfo, pin: &str) -> Self {
         Config {
             rst_pin: None,
             dtr_pin: None,
@@ -52,7 +53,7 @@ where
             low_power_mode: false,
             flow_control: false,
             apn_info,
-            pin: String::from(""),
+            pin: String::from(pin),
         }
     }
 
@@ -252,7 +253,8 @@ where
         )?;
 
         // info!("{:?}", self.send_internal(&GetIndicatorControl)?);
-        // info!("{:?}", self.send_internal(&GetIMEI { snt: None })?);
+        #[cfg(feature = "logging")]
+        log::info!("{:?}", self.send_internal(&GetCCID, false)?);
 
         self.initialized.set(true);
 

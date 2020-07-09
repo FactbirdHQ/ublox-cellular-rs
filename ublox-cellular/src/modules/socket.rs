@@ -4,7 +4,7 @@ use heapless::{consts, ArrayLength};
 
 use crate::command::ip_transport_layer::{types::*, *};
 use crate::error::Error;
-use crate::modules::ssl::SSL;
+use crate::modules::{gprs::GPRS, ssl::SSL};
 use crate::GsmClient;
 use typenum::marker_traits::Unsigned;
 
@@ -231,6 +231,11 @@ where
     /// Open a new UDP socket to the given address and port. UDP is connectionless,
     /// so unlike `TcpStack` no `connect()` is required.
     fn open(&self, remote: SocketAddr, _mode: Mode) -> Result<Self::UdpSocket, Self::Error> {
+        if self.state.get() != crate::client::State::Attached || !self.check_gprs_attachment()? {
+            self.state.set(crate::client::State::Detached);
+            return Err(Error::Network);
+        }
+
         let socket_resp = self.handle_socket_error(
             || {
                 self.send_internal(
@@ -363,7 +368,8 @@ where
 
     /// Open a new TCP socket to the given address and port. The socket starts in the unconnected state.
     fn open(&self, _mode: Mode) -> Result<Self::TcpSocket, Self::Error> {
-        if self.state.get() != crate::client::State::Attached {
+        if self.state.get() != crate::client::State::Attached || !self.check_gprs_attachment()? {
+            self.state.set(crate::client::State::Detached);
             return Err(Error::Network);
         }
 

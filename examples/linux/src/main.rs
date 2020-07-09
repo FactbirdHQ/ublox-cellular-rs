@@ -78,7 +78,7 @@ fn main() {
     let gsm = GsmClient::<_, Pin, Pin, _, _>::new(
         cell_client,
         unsafe { SOCKET_SET.as_mut().unwrap() },
-        Config::new(APNInfo::new("em")),
+        Config::new(APNInfo::new("em"), ""),
     );
 
     // Launch reading thread

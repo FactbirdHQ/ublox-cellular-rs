@@ -50,6 +50,11 @@ where
         self.sockets.iter().filter(|a| a.is_some()).count()
     }
 
+    /// Check if the set is currently holding no active sockets
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Get the type of a specific socket in the set.
     ///
     /// Returned as a [`SocketType`]

@@ -19,15 +19,16 @@ heapless = { version = "^0.5", features = ["serde"] }
 no-std-net = { version = "0.3.0", features = ["serde"] }
 embedded-hal = "^0.2"
 nb = "^0.1"
-atat = { version = "^0.3", features = ["derive"] }
-serde_at = { version = "^0.3" }
+atat = { version = "^0.4.1", features = ["derive"] }
+# serde_at = { version = "^0.4.1" }
+serde_at = { git = "https://github.com/BlackbirdHQ/atat", rev = "3b53261"}
 serde = { version = "^1", default-features = false, features = ["derive"] }
 embedded-nal = { git = "https://github.com/MathiasKoch/embedded-nal", branch = "factbird_mini" }
 log = { version = "0.4", default-features = false, optional = true }
 typenum = "^1"
 
 [features]
-default = ["sara_u2", "socket-udp", "socket-tcp", "logging"]
+default = ["sara_u2", "socket-udp", "socket-tcp"]
 
 topy_l4 = []
 mpci_l2 = []

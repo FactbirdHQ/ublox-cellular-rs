@@ -12,7 +12,7 @@ edition = "2018"
 
 [dependencies]
 embedded-hal = "0.2.3"
-atat = { version = "^0.3.0", features = ["derive", "logging"] }
+atat = { version = "^0.4.1", features = ["derive", "logging"] }
 log = { version = "0.4", default-features = false }
 env_logger = "0.7.1"
 linux-embedded-hal = "0.3.0"

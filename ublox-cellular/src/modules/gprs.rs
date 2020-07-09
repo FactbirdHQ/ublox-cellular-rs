@@ -26,6 +26,7 @@ impl APNInfo {
 
 pub trait GPRS {
     fn attach_gprs(&self) -> Result<(), Error>;
+    fn check_gprs_attachment(&self) -> Result<bool, Error>;
     fn detach_gprs(&self) -> Result<(), Error>;
 }
 
@@ -37,6 +38,16 @@ where
     N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
     L: ArrayLength<u8>,
 {
+    fn check_gprs_attachment(&self) -> Result<bool, Error> {
+        let psn::responses::PacketSwitchedNetworkData { param_tag, .. } =
+            self.send_at(&psn::GetPacketSwitchedNetworkData {
+                profile_id: 0,
+                param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+            })?;
+
+        Ok(param_tag == 1)
+    }
+
     fn attach_gprs(&self) -> Result<(), Error> {
         // match self.state.get() {
         //     State::Registered | State::Registering => return Err(Error::_Unknown),
@@ -46,18 +57,16 @@ where
 
         self.state.set(State::Attaching);
 
-        // Attach GPRS
-        self.send_at(&psn::SetGPRSAttached {
-            state: GPRSAttachedState::Attached,
-        })?;
+        let psn::responses::GPRSAttached { state } = self.send_at(&psn::GetGPRSAttached)?;
 
-        let psn::responses::PacketSwitchedNetworkData { param_tag, .. } =
-            self.send_at(&psn::GetPacketSwitchedNetworkData {
-                profile_id: 0,
-                param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+        if state == GPRSAttachedState::Detached {
+            // Attach GPRS
+            self.send_at(&psn::SetGPRSAttached {
+                state: GPRSAttachedState::Attached,
             })?;
+        }
 
-        if param_tag == 0 {
+        if !self.check_gprs_attachment()? {
             // Set APN info
             self.send_at(&psn::SetPacketSwitchedConfig {
                 profile_id: 0,
@@ -99,13 +108,7 @@ where
             })?;
 
             // Check profile status
-            let psn::responses::PacketSwitchedNetworkData { param_tag, .. } =
-                self.send_at(&psn::GetPacketSwitchedNetworkData {
-                    profile_id: 0,
-                    param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
-                })?;
-
-            if param_tag != 1 {
+            if !self.check_gprs_attachment()? {
                 self.state.set(State::Detached);
                 return Err(Error::Network);
             }
@@ -124,7 +127,7 @@ where
         );
         // Detach from network
         self.send_at(&psn::SetGPRSAttached {
-            state: GPRSAttachedState::Detatched,
+            state: GPRSAttachedState::Detached,
         })?;
         #[cfg(features = "logging")]
         log::info!("Detached!");

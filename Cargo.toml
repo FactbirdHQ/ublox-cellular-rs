@@ -6,8 +6,3 @@ members = [
     # "examples/linux_mqtt",
     # "examples/linux_jobs",
 ]
-
-
-[patch.crates-io]
-serde_at = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
-atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
