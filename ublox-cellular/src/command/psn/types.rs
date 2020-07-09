@@ -479,6 +479,6 @@ pub enum PacketSwitchedNetworkDataParam {
 
 #[derive(Debug, Clone, PartialEq, AtatEnum)]
 pub enum GPRSAttachedState {
-    Detatched = 0,
+    Detached = 0,
     Attached = 1,
 }

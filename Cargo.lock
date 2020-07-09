@@ -22,7 +22,7 @@ dependencies = [
  "heapless",
  "nb",
  "serde",
- "serde_at",
+ "serde_at 0.4.1",
  "typenum",
  "void",
 ]
@@ -35,7 +35,7 @@ checksum = "3bffea8fe4f95d40d8ec94dc6e6240c54c559887050ecb876eded24de9c892d2"
 dependencies = [
  "proc-macro2",
  "quote",
- "serde_at",
+ "serde_at 0.4.1",
  "syn",
 ]
 
@@ -175,6 +175,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_at"
+version = "0.4.2-alpha.0"
+source = "git+https://github.com/BlackbirdHQ/atat?rev=3b53261#3b53261ab879039a647a41126f97445fcc3e95f8"
+dependencies = [
+ "heapless",
+ "log",
+ "serde",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.114"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -220,7 +230,7 @@ dependencies = [
  "nb",
  "no-std-net",
  "serde",
- "serde_at",
+ "serde_at 0.4.2-alpha.0",
  "typenum",
 ]
 

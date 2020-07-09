@@ -2,7 +2,6 @@
 // use heapless::{consts::U64, String};
 
 use crate::socket;
-use atat;
 
 #[derive(Debug)]
 pub enum Error {
