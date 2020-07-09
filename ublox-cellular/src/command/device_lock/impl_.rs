@@ -168,5 +168,12 @@ mod test {
                 code: PinStatusCode::Ready
             })
         );
+
+        assert_eq!(
+            from_str("+CPIN: SIM PIN"),
+            Ok(PinStatus {
+                code: PinStatusCode::SimPin
+            })
+        );
     }
 }
