@@ -3,7 +3,7 @@
 
 use crate::socket;
 
-#[derive(Debug)]
+#[derive(Debug, defmt::Format)]
 pub enum Error {
     SetState,
     BadLength,
@@ -15,8 +15,8 @@ pub enum Error {
     SocketNotFound,
     NetworkState(crate::State),
     Socket(socket::Error),
-    BorrowError(core::cell::BorrowError),
-    BorrowMutError(core::cell::BorrowMutError),
+    BorrowError,
+    BorrowMutError,
     AT(atat::Error),
     Busy,
     InvalidHex,
@@ -37,13 +37,13 @@ impl From<socket::Error> for Error {
 }
 
 impl From<core::cell::BorrowMutError> for Error {
-    fn from(e: core::cell::BorrowMutError) -> Self {
-        Error::BorrowMutError(e)
+    fn from(_: core::cell::BorrowMutError) -> Self {
+        Error::BorrowMutError
     }
 }
 
 impl From<core::cell::BorrowError> for Error {
-    fn from(e: core::cell::BorrowError) -> Self {
-        Error::BorrowError(e)
+    fn from(_: core::cell::BorrowError) -> Self {
+        Error::BorrowError
     }
 }

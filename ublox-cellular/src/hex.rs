@@ -9,6 +9,7 @@ pub enum FromHexError {
     OddLength,
 }
 
+/// Decode a single hex char to decimal.
 fn val(c: u8) -> Result<u8, FromHexError> {
     match c {
         b'A'..=b'F' => Ok(c - b'A' + 10),
@@ -18,6 +19,8 @@ fn val(c: u8) -> Result<u8, FromHexError> {
     }
 }
 
+/// Decode hexadecimal bytes to decimal bytes in-place overwriting the first n/2
+/// bytes, and returning them as a slice.
 pub fn from_hex(hex: &mut [u8]) -> Result<&[u8], FromHexError> {
     if hex.len() % 2 != 0 {
         return Err(FromHexError::OddLength);

@@ -13,7 +13,7 @@ pub struct Item<L: ArrayLength<u8>> {
 }
 
 /// A handle, identifying a socket in a set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize, defmt::Format)]
 pub struct Handle(pub usize);
 
 /// An extensible set of sockets.

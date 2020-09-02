@@ -18,7 +18,7 @@ use crate::{
     socket::{SocketHandle, SocketSet, SocketType, TcpSocket, UdpSocket},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, defmt::Format)]
 pub enum State {
     Deregistered,
     Registering,
@@ -252,9 +252,9 @@ where
             false,
         )?;
 
-        // info!("{:?}", self.send_internal(&GetIndicatorControl)?);
-        #[cfg(feature = "logging")]
-        log::info!("{:?}", self.send_internal(&GetCCID, false)?);
+        // defmt::info!("{:?}", self.send_internal(&GetIndicatorControl)?);
+        // FIXME: defmt doesn't currently allow logging u128 types
+        // defmt::info!("{:?}", self.send_internal(&GetCCID, false)?);
 
         self.initialized.set(true);
 
@@ -368,8 +368,7 @@ where
             .iter()
             .try_for_each(|(handle, len)| self.socket_ingress(*handle, *len).map(|_| ()))
             .map_err(|e| {
-                #[cfg(feature = "logging")]
-                log::error!("ERROR: {:?}", e);
+                defmt::error!("ERROR: {:?}", e);
                 e
             })?;
 
@@ -381,13 +380,11 @@ where
 
         match urc {
             Some(Urc::MessageWaitingIndication(_)) => {
-                // #[cfg(feature = "logging")]
-                // log::info!("[URC] MessageWaitingIndication");
+                defmt::info!("[URC] MessageWaitingIndication");
                 Ok(())
             }
             Some(Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket })) => {
-                #[cfg(feature = "logging")]
-                log::info!("[URC] SocketClosed {:?}", socket);
+                defmt::info!("[URC] SocketClosed {:?}", socket);
                 let mut sockets = self.sockets.try_borrow_mut()?;
                 match sockets.socket_type(socket) {
                     Some(SocketType::Tcp) => {
@@ -404,17 +401,15 @@ where
                 Ok(())
             }
             Some(Urc::DataConnectionActivated(psn::urc::DataConnectionActivated {
-                result: _result,
+                result,
             })) => {
-                #[cfg(feature = "logging")]
-                log::info!("[URC] DataConnectionActivated {:?}", _result);
+                defmt::info!("[URC] DataConnectionActivated {:?}", result);
                 Ok(())
             }
             Some(Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
-                profile_id: _profile_id,
+                profile_id,
             })) => {
-                #[cfg(feature = "logging")]
-                log::info!("[URC] DataConnectionDeactivated {:?}", _profile_id);
+                defmt::info!("[URC] DataConnectionDeactivated {:?}", profile_id);
                 self.init(false)?;
                 self.state.set(State::Deregistered);
                 Ok(())
@@ -424,14 +419,12 @@ where
                 length,
             })) => match self.socket_ingress(socket, length) {
                 Ok(bytes) if bytes > 0 => {
-                    // #[cfg(feature = "logging")]
-                    // log::info!("[URC] Ingressed {:?} bytes", bytes);
+                    defmt::info!("[URC] Ingressed {:?} bytes", bytes);
                     Ok(())
                 }
                 Ok(_) => Ok(()),
                 Err(e) => {
-                    #[cfg(feature = "logging")]
-                    log::error!("[URC] Failed ingress! {:?}", e);
+                    defmt::error!("[URC] Failed ingress! {:?}", e);
                     Err(e)
                 }
             },
@@ -446,9 +439,8 @@ where
         check_urc: bool,
     ) -> Result<A::Response, Error> {
         if check_urc {
-            if let Err(_e) = self.handle_urc() {
-                #[cfg(features = "logging")]
-                log::error!("Failed handle URC: {:?}", _e);
+            if let Err(e) = self.handle_urc() {
+                defmt::error!("Failed handle URC: {:?}", e);
             }
         }
 
@@ -457,10 +449,13 @@ where
             .send(req)
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
-                    #[cfg(feature = "logging")]
                     match core::str::from_utf8(&req.as_bytes()) {
-                        Ok(s) => log::error!("{:?}: [{:?}]", ate, s),
-                        Err(_) => log::error!("{:?}: {:02x?}", ate, req.as_bytes()),
+                        Ok(s) => defmt::error!("{:?}: [{:str}]", ate, s),
+                        Err(_) => defmt::error!(
+                            "{:?}: {:?}",
+                            ate,
+                            core::convert::AsRef::<[u8]>::as_ref(&req.as_bytes())
+                        ),
                     };
                     ate.into()
                 }
