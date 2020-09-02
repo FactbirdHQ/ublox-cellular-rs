@@ -400,9 +400,7 @@ where
                 sockets.remove(socket)?;
                 Ok(())
             }
-            Some(Urc::DataConnectionActivated(psn::urc::DataConnectionActivated {
-                result,
-            })) => {
+            Some(Urc::DataConnectionActivated(psn::urc::DataConnectionActivated { result })) => {
                 defmt::info!("[URC] DataConnectionActivated {:?}", result);
                 Ok(())
             }
