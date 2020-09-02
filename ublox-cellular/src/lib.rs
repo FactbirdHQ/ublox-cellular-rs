@@ -21,6 +21,8 @@ pub mod sockets {
     pub use crate::socket::*;
 }
 
+pub use atat;
+
 /// Prelude - Include traits
 pub mod prelude {
     pub use super::gprs::GPRS;
