@@ -477,7 +477,7 @@ pub enum PacketSwitchedNetworkDataParam {
     QoS3GTransferDelay = 24,
 }
 
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, AtatEnum, defmt::Format)]
 pub enum GPRSAttachedState {
     Detached = 0,
     Attached = 1,

@@ -120,8 +120,7 @@ where
     }
 
     fn detach_gprs(&self) -> Result<(), Error> {
-        #[cfg(features = "logging")]
-        log::info!(
+        defmt::info!(
             "Detaching from network, {:?}",
             self.send_at(&psn::GetGPRSAttached)?.state
         );
@@ -129,8 +128,7 @@ where
         self.send_at(&psn::SetGPRSAttached {
             state: GPRSAttachedState::Detached,
         })?;
-        #[cfg(features = "logging")]
-        log::info!("Detached!");
+        defmt::info!("Detached!");
         self.state.set(State::Detached);
 
         Ok(())

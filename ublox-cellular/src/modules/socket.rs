@@ -61,8 +61,7 @@ where
             Ok(r) => Ok(r),
             Err(e @ Error::AT(atat::Error::Timeout)) => {
                 if attempt < 3 {
-                    #[cfg(feature = "logging")]
-                    log::error!("[RETRY] Retrying! {:?}", attempt);
+                    defmt::error!("[RETRY] Retrying! {:?}", attempt);
                     self.handle_socket_error(f, socket, attempt + 1)
                 } else {
                     Err(e)
@@ -137,19 +136,17 @@ where
                 )?;
 
                 if socket_data.socket != socket {
-                    #[cfg(feature = "logging")]
-                    log::error!("WrongSocketType {:?} != {:?}", socket_data.socket, socket);
+                    defmt::error!("WrongSocketType {:?} != {:?}", socket_data.socket, socket);
                     return Err(Error::WrongSocketType);
                 }
 
                 if let Some(ref mut data) = socket_data.data {
                     if socket_data.length > 0 && data.len() / 2 != socket_data.length {
-                        #[cfg(feature = "logging")]
-                        log::error!(
-                            "BadLength {:?} != {:?}, {:?}",
+                        defmt::error!(
+                            "BadLength {:?} != {:?}, {:str}",
                             socket_data.length,
                             data.len() / 2,
-                            data
+                            data.as_str()
                         );
                         return Err(Error::BadLength);
                     }
@@ -179,19 +176,17 @@ where
                 )?;
 
                 if socket_data.socket != socket {
-                    #[cfg(feature = "logging")]
-                    log::error!("WrongSocketType {:?} != {:?}", socket_data.socket, socket);
+                    defmt::error!("WrongSocketType {:?} != {:?}", socket_data.socket, socket);
                     return Err(Error::WrongSocketType);
                 }
 
                 if let Some(ref mut data) = socket_data.data {
                     if socket_data.length > 0 && data.len() / 2 != socket_data.length {
-                        #[cfg(feature = "logging")]
-                        log::error!(
-                            "BadLength {:?} != {:?}, {:?}",
+                        defmt::error!(
+                            "BadLength {:?} != {:?}, {:str}",
                             socket_data.length,
                             data.len() / 2,
-                            data
+                            data.as_str()
                         );
                         return Err(Error::BadLength);
                     }
@@ -205,8 +200,7 @@ where
                 }
             }
             _ => {
-                #[cfg(feature = "logging")]
-                log::error!("SocketNotFound {:?}", socket);
+                defmt::error!("SocketNotFound {:?}", socket);
                 Err(Error::SocketNotFound)
             }
         }
@@ -272,8 +266,7 @@ where
         }
 
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
-            // #[cfg(feature = "logging")]
-            // log::debug!("Sending: {} bytes, {:?}", chunk.len(), chunk);
+            defmt::debug!("Sending: {:?} bytes, {:?}", chunk.len(), chunk);
             self.handle_socket_error(
                 || {
                     self.send_internal(
@@ -444,8 +437,7 @@ where
         }
 
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
-            // #[cfg(feature = "logging")]
-            // log::debug!("Sending: {} bytes, {:?}", chunk.len(), chunk);
+            defmt::debug!("Sending: {:?} bytes, {:?}", chunk.len(), chunk);
             self.handle_socket_error(
                 || {
                     self.send_internal(

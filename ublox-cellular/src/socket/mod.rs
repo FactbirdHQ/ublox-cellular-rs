@@ -21,7 +21,7 @@ pub(crate) use self::ref_::Session as SocketSession;
 
 /// The error type for the networking stack.
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
 pub enum Error {
     /// An operation cannot proceed because a buffer is empty or full.
     Exhausted,
