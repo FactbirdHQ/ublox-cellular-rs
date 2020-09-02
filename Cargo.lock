@@ -13,39 +13,29 @@ dependencies = [
 
 [[package]]
 name = "atat"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "38a55e234522086ed3f0607d25ca18a1b677b34c8b434f89380092a486fb4282"
+version = "0.5.1"
+source = "git+https://github.com/BlackbirdHQ/atat#fd052b9f011f96c7c913bdf4399d25a62d1a9c36"
 dependencies = [
  "atat_derive",
+ "defmt",
  "embedded-hal",
  "heapless",
- "nb 0.1.3",
+ "nb 1.0.0",
  "serde",
- "serde_at 0.4.3",
+ "serde_at",
  "typenum",
  "void",
 ]
 
 [[package]]
 name = "atat_derive"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88c3901835d7681eee6adb3aca491a61a7ce5147abaa4a4ae33d030dfd9c685b"
+version = "0.5.1"
+source = "git+https://github.com/BlackbirdHQ/atat#fd052b9f011f96c7c913bdf4399d25a62d1a9c36"
 dependencies = [
  "proc-macro2",
  "quote",
- "serde_at 0.4.3",
+ "serde_at",
  "syn",
-]
-
-[[package]]
-name = "bbqueue"
-version = "0.4.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2e6ffd9a6d04298eb55d5ac6d0fde48c2f991468b5ba8aa263fe2d1ea7288c0a"
-dependencies = [
- "generic-array 0.13.2",
 ]
 
 [[package]]
@@ -53,12 +43,6 @@ name = "byteorder"
 version = "1.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "08c48aae112d48ed9f069b33538ea9e3e90aa263cfa3d1c24309612b1f7472de"
-
-[[package]]
-name = "cfg-if"
-version = "0.1.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
 name = "common"
@@ -107,7 +91,7 @@ source = "git+https://github.com/MathiasKoch/embedded-nal?branch=factbird_mini#4
 dependencies = [
  "heapless",
  "nb 0.1.3",
- "no-std-net",
+ "no-std-net 0.3.0",
 ]
 
 [[package]]
@@ -151,15 +135,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "log"
-version = "0.4.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
-dependencies = [
- "cfg-if",
-]
-
-[[package]]
 name = "nb"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -181,6 +156,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "20bf2ff9890c6783fae66e7099ef99d0b49dca0ec032fba421397735d7dad6ea"
 dependencies = [
  "byteorder",
+]
+
+[[package]]
+name = "no-std-net"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2178127478ae4ee9be7180bc9c3bffb6354dd7238400db567102f98c413a9f35"
+dependencies = [
  "serde",
 ]
 
@@ -213,22 +196,10 @@ dependencies = [
 
 [[package]]
 name = "serde_at"
-version = "0.4.2-alpha.0"
-source = "git+https://github.com/BlackbirdHQ/atat?rev=3b53261#3b53261ab879039a647a41126f97445fcc3e95f8"
+version = "0.5.1"
+source = "git+https://github.com/BlackbirdHQ/atat#fd052b9f011f96c7c913bdf4399d25a62d1a9c36"
 dependencies = [
  "heapless",
- "log",
- "serde",
-]
-
-[[package]]
-name = "serde_at"
-version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd86c6ae3528716233d1ab39b3033f24719d69817c808dc40be39d32008ec801"
-dependencies = [
- "heapless",
- "log",
  "serde",
 ]
 
@@ -271,15 +242,14 @@ name = "ublox-cellular-rs"
 version = "0.0.1"
 dependencies = [
  "atat",
- "bbqueue",
  "defmt",
  "embedded-hal",
  "embedded-nal",
  "heapless",
  "nb 1.0.0",
- "no-std-net",
+ "no-std-net 0.4.0",
  "serde",
- "serde_at 0.4.2-alpha.0",
+ "serde_at",
  "typenum",
 ]
 
