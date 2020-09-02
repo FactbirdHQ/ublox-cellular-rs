@@ -13,30 +13,29 @@ dependencies = [
 
 [[package]]
 name = "atat"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "32bb463325094d10dc0fe460a839a86ff95cbbd0ee7b06bf3bf284626e8434e2"
+checksum = "38a55e234522086ed3f0607d25ca18a1b677b34c8b434f89380092a486fb4282"
 dependencies = [
  "atat_derive",
  "embedded-hal",
  "heapless",
- "log",
- "nb",
+ "nb 0.1.3",
  "serde",
- "serde_at 0.4.1",
+ "serde_at 0.4.3",
  "typenum",
  "void",
 ]
 
 [[package]]
 name = "atat_derive"
-version = "0.4.1"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3bffea8fe4f95d40d8ec94dc6e6240c54c559887050ecb876eded24de9c892d2"
+checksum = "88c3901835d7681eee6adb3aca491a61a7ce5147abaa4a4ae33d030dfd9c685b"
 dependencies = [
  "proc-macro2",
  "quote",
- "serde_at 0.4.1",
+ "serde_at 0.4.3",
  "syn",
 ]
 
@@ -53,32 +52,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4785bdd1c96b2a846b2bd7cc02e86b6b3dbf14e7e53446c4f54c92a361040822"
 
 [[package]]
-name = "common_lib"
-version = "0.0.1"
-dependencies = [
- "embedded-hal",
- "nb",
- "serialport",
- "void",
-]
-
-[[package]]
 name = "embedded-hal"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fa998ce59ec9765d15216393af37a58961ddcefb14c753b4816ba2191d865fcb"
 dependencies = [
- "nb",
+ "nb 0.1.3",
  "void",
 ]
 
 [[package]]
 name = "embedded-nal"
 version = "0.1.0"
-source = "git+https://github.com/MathiasKoch/embedded-nal?branch=factbird_mini#456401d7652b57069cd1ddb5b12586655ad9f11d"
+source = "git+https://github.com/MathiasKoch/embedded-nal?rev=456401d#456401d7652b57069cd1ddb5b12586655ad9f11d"
 dependencies = [
  "heapless",
- "nb",
+ "nb 0.1.3",
  "no-std-net",
 ]
 
@@ -123,51 +112,28 @@ dependencies = [
 ]
 
 [[package]]
-name = "linux_example"
-version = "0.0.1"
-dependencies = [
- "atat",
- "common_lib",
- "embedded-hal",
- "env_logger",
- "heapless",
- "linux-embedded-hal",
- "log",
- "serialport",
- "ublox-cellular-rs",
-]
-
-[[package]]
-name = "linux_mqtt_example"
-version = "0.0.1"
-dependencies = [
- "atat",
- "common_lib",
- "embedded-hal",
- "env_logger",
- "heapless",
- "linux-embedded-hal",
- "log",
- "mqttrust",
- "nb",
- "serialport",
- "ublox-cellular-rs",
-]
-
-[[package]]
 name = "log"
-version = "0.4.8"
+version = "0.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "14b6052be84e6b71ab17edffc2eeabf5c2c3ae1fdb464aae35ac50c67a44e1f7"
+checksum = "4fabed175da42fed1fa0746b0ea71f412aa9d35e76e95e59b192c64b9dc2bf8b"
 dependencies = [
  "cfg-if",
 ]
 
 [[package]]
 name = "nb"
-version = "0.1.2"
+version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b1411551beb3c11dedfb0a90a0fa256b47d28b9ec2cdff34c25a2fa59e45dbdc"
+checksum = "801d31da0513b6ec5214e9bf433a77966320625a37860f910be265be6e18d06f"
+dependencies = [
+ "nb 1.0.0",
+]
+
+[[package]]
+name = "nb"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "546c37ac5d9e56f55e73b677106873d9d9f5190605e41a856503623648488cae"
 
 [[package]]
 name = "no-std-net"
@@ -181,9 +147,9 @@ dependencies = [
 
 [[package]]
 name = "proc-macro2"
-version = "1.0.18"
+version = "1.0.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "beae6331a816b1f65d04c45b078fd8e6c93e8071771f41b8163255bbd8d7c8fa"
+checksum = "04f5f085b5d71e2188cb8271e5da0161ad52c3f227a661a3c135fdf28e258b12"
 dependencies = [
  "unicode-xid",
 ]
@@ -199,22 +165,11 @@ dependencies = [
 
 [[package]]
 name = "serde"
-version = "1.0.114"
+version = "1.0.115"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5317f7588f0a5078ee60ef675ef96735a1442132dc645eb1d12c018620ed8cd3"
+checksum = "e54c9a88f2da7238af84b5101443f0c0d0a3bbdc455e34a5c9497b1903ed55d5"
 dependencies = [
  "serde_derive",
-]
-
-[[package]]
-name = "serde_at"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "862874521b98d5ada6c9bb7897f76c00658005c9c4200bbf33dd8a1834004585"
-dependencies = [
- "heapless",
- "log",
- "serde",
 ]
 
 [[package]]
@@ -228,10 +183,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "serde_derive"
-version = "1.0.114"
+name = "serde_at"
+version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a0be94b04690fbaed37cddffc5c134bf537c8e3329d53e982fe04c374978f8e"
+checksum = "fd86c6ae3528716233d1ab39b3033f24719d69817c808dc40be39d32008ec801"
+dependencies = [
+ "heapless",
+ "log",
+ "serde",
+]
+
+[[package]]
+name = "serde_derive"
+version = "1.0.115"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "609feed1d0a73cc36a0182a840a9b37b4a82f0b1150369f0536a9e3f2a31dc48"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -240,15 +206,15 @@ dependencies = [
 
 [[package]]
 name = "stable_deref_trait"
-version = "1.1.1"
+version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dba1a27d3efae4351c8051072d619e3ade2820635c3958d826bfea39d59b54c8"
+checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "syn"
-version = "1.0.33"
+version = "1.0.39"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8d5d96e8cbb005d6959f119f773bfaebb5684296108fb32600c00cde305b2cd"
+checksum = "891d8d6567fe7c7f8835a3a98af4208f3846fba258c1bc3c31d6e506239f11f9"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -270,7 +236,7 @@ dependencies = [
  "embedded-nal",
  "heapless",
  "log",
- "nb",
+ "nb 0.1.3",
  "no-std-net",
  "serde",
  "serde_at 0.4.2-alpha.0",
