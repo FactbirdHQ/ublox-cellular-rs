@@ -7,5 +7,4 @@ target/
 .vscode
 **/*secrets*
 
-**/Cargo.lock
 Cargo.lock
