@@ -16,7 +16,7 @@ doctest = false
 
 [dependencies]
 heapless = { version = "^0.5", features = ["serde"] }
-no-std-net = { version = "0.4", features = ["serde"] }
+no-std-net = { version = "*", features = ["serde"] }
 embedded-hal = "^0.2"
 nb = "^1"
 # atat = { version = "^0.5.1", features = ["derive"] }
