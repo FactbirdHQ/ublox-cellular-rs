@@ -23,7 +23,7 @@ atat = { version = "^0.4.1", features = ["derive"] }
 # serde_at = { version = "^0.4.1" }
 serde_at = { git = "https://github.com/BlackbirdHQ/atat", rev = "3b53261"}
 serde = { version = "^1", default-features = false, features = ["derive"] }
-embedded-nal = { git = "https://github.com/MathiasKoch/embedded-nal", rev = "456401d" }
+embedded-nal = { git = "https://github.com/MathiasKoch/embedded-nal", branch = "factbird_mini" }
 log = { version = "0.4", default-features = false, optional = true }
 typenum = "^1"
 
