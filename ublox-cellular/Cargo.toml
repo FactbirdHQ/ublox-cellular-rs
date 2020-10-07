@@ -16,7 +16,7 @@ doctest = false
 
 [dependencies]
 heapless = { version = "^0.5", features = ["serde"] }
-no-std-net = { version = "0.3.0", features = ["serde"] }
+no-std-net = { version = "0.4.0", features = ["serde"] }
 embedded-hal = { git = "https://github.com/MathiasKoch/embedded-hal", branch = "feature/alternative-storage" }
 nb = "^1"
 # atat = { version = "^0.5.1", features = ["derive"] }
