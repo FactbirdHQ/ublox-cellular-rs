@@ -1,6 +1,6 @@
 use atat::AtatClient;
 use core::fmt::Write;
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::digital::OutputPin;
 use embedded_nal::{AddrType, Dns};
 use heapless::{consts, ArrayLength, String};
 use no_std_net::IpAddr;

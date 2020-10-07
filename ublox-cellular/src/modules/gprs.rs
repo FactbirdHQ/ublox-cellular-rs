@@ -3,7 +3,7 @@ use crate::{
     error::Error,
     GsmClient, State,
 };
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::digital::OutputPin;
 use heapless::{consts, ArrayLength, String};
 use no_std_net::Ipv4Addr;
 

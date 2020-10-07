@@ -1,4 +1,4 @@
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::digital::OutputPin;
 pub use embedded_nal::{Ipv4Addr, Mode, SocketAddr, SocketAddrV4};
 use heapless::{consts, ArrayLength};
 

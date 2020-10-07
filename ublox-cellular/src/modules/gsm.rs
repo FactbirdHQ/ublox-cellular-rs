@@ -9,7 +9,7 @@ use crate::{
     error::Error,
     GsmClient, State,
 };
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::digital::OutputPin;
 use heapless::ArrayLength;
 
 pub trait GSM {

@@ -1,6 +1,6 @@
 use atat::AtatClient;
 use core::cell::{Cell, RefCell};
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::digital::OutputPin;
 use heapless::{consts, ArrayLength, String};
 
 use crate::{

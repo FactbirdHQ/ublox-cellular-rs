@@ -5,7 +5,7 @@ use crate::{
     socket::SocketHandle,
     GsmClient,
 };
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::digital::OutputPin;
 use heapless::ArrayLength;
 
 pub trait SSL {
