@@ -317,7 +317,7 @@ where
         {
             match self.socket_ingress(SocketHandle(*socket), *available) {
                 Ok(bytes) => {
-                    *available = *available - bytes;
+                    *available -= bytes;
                     defmt::trace!(
                         "[Socket({:u8})] Ingressed {:usize} bytes, {:usize} remaining",
                         socket,
