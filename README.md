@@ -2,7 +2,13 @@
 
 > no_std driver crate for interfacing with the ublox cellular family over serial
 
-![CI][workflow]
+![Test][test]
+[![Code coverage][codecov-badge]][codecov]
+![No Std][no-std-badge]
+<!--
+[![Crates.io Version][crates-io-badge]][crates-io]
+[![Crates.io Downloads][crates-io-download-badge]][crates-io-download]
+-->
 
 ---
 
@@ -40,7 +46,12 @@ The samples can be built using `cargo build -p linux_example --target x86_64-unk
   - `leon_g1`
 - `socket-tcp`: Enabled by default. Adds TCP socket capabilities, and implements [`TcpStack`] trait.
 - `socket-udp`: Enabled by default. Adds UDP socket capabilities, and implements [`UdpStack`] trait.
-- `logging`: Disabled by default. Add log statements on various log levels to aid debugging.
+- `defmt-default`: Disabled by default. Add log statements on trace (dev) or info (release) log levels to aid debugging.
+- `defmt-trace`: Disabled by default. Add log statements on trace log levels to aid debugging.
+- `defmt-debug`: Disabled by default. Add log statements on debug log levels to aid debugging.
+- `defmt-info`: Disabled by default. Add log statements on info log levels to aid debugging.
+- `defmt-warn`: Disabled by default. Add log statements on warn log levels to aid debugging.
+- `defmt-error`: Disabled by default. Add log statements on error log levels to aid debugging.
 
 
 ## License
@@ -59,9 +70,15 @@ Unless you explicitly state otherwise, any contribution intentionally submitted
 for inclusion in the work by you, as defined in the Apache-2.0 license, shall be
 dual licensed as above, without any additional terms or conditions.
 
+
 <!-- Badges -->
-[workflow]: https://github.com/BlackbirdHQ/ublox-cellular-rs/workflows/CI/badge.svg
-<!-- [crates-io]: https://crates.io/crates/ublox-cellular-rs
+[test]: https://github.com/BlackbirdHQ/ublox-cellular-rs/workflows/Test/badge.svg
+[no-std-badge]: https://img.shields.io/badge/no__std-yes-blue
+[codecov-badge]: https://codecov.io/gh/BlackbirdHQ/ublox-cellular-rs/branch/master/graph/badge.svg
+[codecov]: https://codecov.io/gh/BlackbirdHQ/ublox-cellular-rs
+<!--
+[crates-io]: https://crates.io/crates/ublox-cellular-rs
 [crates-io-badge]: https://img.shields.io/crates/v/ublox-cellular-rs.svg?maxAge=3600
 [crates-io-download]: https://crates.io/crates/ublox-cellular-rs
-[crates-io-download-badge]: https://img.shields.io/crates/d/ublox-cellular-rs.svg?maxAge=3600 -->
+[crates-io-download-badge]: https://img.shields.io/crates/d/ublox-cellular-rs.svg?maxAge=3600
+-->
