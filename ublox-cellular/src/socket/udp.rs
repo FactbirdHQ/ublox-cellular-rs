@@ -21,7 +21,7 @@ pub struct UdpSocket<L: ArrayLength<u8>> {
 
 impl<L: ArrayLength<u8>> UdpSocket<L> {
     /// Create an UDP socket with the given buffers.
-    pub fn new(socket_id: usize) -> UdpSocket<L> {
+    pub fn new(socket_id: u8) -> UdpSocket<L> {
         UdpSocket {
             meta: SocketMeta {
                 handle: SocketHandle(socket_id),

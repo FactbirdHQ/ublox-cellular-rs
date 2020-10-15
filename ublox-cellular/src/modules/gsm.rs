@@ -10,7 +10,7 @@ use crate::{
     GsmClient, State,
 };
 use embedded_hal::digital::OutputPin;
-use heapless::ArrayLength;
+use heapless::{ArrayLength, Bucket, Pos, PowerOfTwo};
 
 pub trait GSM {
     fn begin(&self) -> Result<(), Error>;
@@ -23,7 +23,10 @@ where
     C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
-    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>
+        + PowerOfTwo,
     L: ArrayLength<u8>,
 {
     fn begin(&self) -> Result<(), Error> {

@@ -26,7 +26,7 @@ pub struct Item<L: ArrayLength<u8>> {
     Deserialize,
     defmt::Format,
 )]
-pub struct Handle(pub usize);
+pub struct Handle(pub u8);
 
 /// An extensible set of sockets.
 #[derive(Default)]

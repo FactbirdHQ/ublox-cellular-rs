@@ -1,14 +1,12 @@
 use atat::AtatClient;
 use core::cell::{Cell, RefCell};
 use embedded_hal::digital::OutputPin;
-use heapless::{consts, ArrayLength, String};
+use heapless::{consts, ArrayLength, Bucket, FnvIndexMap, IndexMap, Pos, PowerOfTwo, String};
 
 use crate::{
     command::{
         control::{types::*, *},
-        general::GetCCID,
         gpio::{types::*, *},
-        ip_transport_layer::*,
         mobile_control::{types::*, *},
         system_features::{types::*, *},
         Urc, *,
@@ -17,6 +15,7 @@ use crate::{
     gprs::APNInfo,
     socket::{SocketHandle, SocketSet, SocketType, TcpSocket, UdpSocket},
 };
+use general::GetCCID;
 
 #[derive(Debug, Clone, Copy, PartialEq, defmt::Format)]
 pub enum State {
@@ -102,13 +101,16 @@ where
 pub struct GsmClient<C, RST, DTR, N, L>
 where
     C: AtatClient,
-    N: 'static + ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    N: 'static
+        + ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
 {
     initialized: Cell<bool>,
     pub(crate) config: Config<RST, DTR>,
     pub(crate) state: Cell<State>,
-    pub(crate) poll_cnt: Cell<u16>,
+    pub(crate) data_available: RefCell<FnvIndexMap<u8, usize, N>>,
     pub(crate) client: RefCell<C>,
     // Ublox devices can hold a maximum of 6 active sockets
     pub(crate) sockets: RefCell<&'static mut SocketSet<N, L>>,
@@ -119,7 +121,10 @@ where
     C: AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
-    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>
+        + PowerOfTwo,
     L: ArrayLength<u8>,
 {
     pub fn new(
@@ -130,7 +135,7 @@ where
         GsmClient {
             config,
             state: Cell::new(State::Deregistered),
-            poll_cnt: Cell::new(0),
+            data_available: RefCell::new(IndexMap::new()),
             initialized: Cell::new(false),
             client: RefCell::new(client),
             sockets: RefCell::new(socket_set),
@@ -139,6 +144,7 @@ where
 
     /// Initilize a new ublox device to a known state (restart, wait for startup, set RS232 settings, gpio settings, etc.)
     pub fn init(&self, restart: bool) -> Result<(), Error> {
+        defmt::info!("Initializing!");
         if restart && self.config.rst_pin.is_some() {
             if let Some(ref _rst) = self.config.rst_pin {
                 // rst.set_high().ok();
@@ -254,7 +260,8 @@ where
 
         // defmt::info!("{:?}", self.send_internal(&GetIndicatorControl)?);
         // FIXME: defmt doesn't currently allow logging u128 types
-        // defmt::info!("{:?}", self.send_internal(&GetCCID, false)?);
+        let ccid = self.send_internal(&GetCCID, false)?.ccid;
+        defmt::info!("{:?}", ccid.to_le_bytes());
 
         self.initialized.set(true);
 
@@ -300,77 +307,35 @@ where
     }
 
     pub fn spin(&self) -> Result<(), Error> {
-        self.handle_urc()?;
+        self.handle_urc().ok();
 
-        match self.state.get() {
-            State::Attached => {}
-            State::Sending => {
-                return Ok(());
-            }
-            s => {
-                return Err(Error::NetworkState(s));
-            }
+        for (socket, available) in self
+            .data_available
+            .try_borrow_mut()?
+            .iter_mut()
+            .filter(|(_, l)| **l > 0)
+        {
+            match self.socket_ingress(SocketHandle(*socket), *available) {
+                Ok(bytes) => {
+                    *available = *available - bytes;
+                    defmt::trace!(
+                        "[Socket({:u8})] Ingressed {:usize} bytes, {:usize} remaining",
+                        socket,
+                        bytes,
+                        available
+                    );
+                    Ok(())
+                }
+                Err(Error::BufferFull) => {
+                    defmt::warn!("[Socket({:u8})] Ingress buffer full", socket);
+                    Ok(())
+                }
+                Err(e) => {
+                    defmt::error!("[Socket({:u8})] Failed ingress! {:?}", socket, e);
+                    Err(e)
+                }
+            }?;
         }
-
-        // Occasionally poll every open socket, in case a `SocketDataAvailable`
-        // URC was missed somehow. TODO: rewrite this to readable code
-        let data_available: heapless::Vec<(SocketHandle, usize), consts::U4> = {
-            let sockets = self.sockets.try_borrow()?;
-
-            if sockets.len() > 0 && self.poll_cnt(false) >= 500 {
-                self.poll_cnt(true);
-
-                sockets
-                    .iter()
-                    .filter_map(|(h, s)| {
-                        // Figure out if socket is TCP or UDP
-                        match s.get_type() {
-                            SocketType::Tcp => self
-                                .send_internal(
-                                    &ReadSocketData {
-                                        socket: h,
-                                        length: 0,
-                                    },
-                                    false,
-                                )
-                                .map_or(None, |s| {
-                                    if s.length > 0 {
-                                        Some((h, s.length))
-                                    } else {
-                                        None
-                                    }
-                                }),
-                            // SocketType::Udp => self
-                            //     .send_internal(
-                            //         &ReadUDPSocketData {
-                            //             socket: h,
-                            //             length: 0,
-                            //         },
-                            //         false,
-                            //     )
-                            //     .map_or(None, |s| {
-                            //         if s.length > 0 {
-                            //             Some((h, s.length))
-                            //         } else {
-                            //             None
-                            //         }
-                            //     }),
-                            _ => None,
-                        }
-                    })
-                    .collect()
-            } else {
-                heapless::Vec::new()
-            }
-        };
-
-        data_available
-            .iter()
-            .try_for_each(|(handle, len)| self.socket_ingress(*handle, *len).map(|_| ()))
-            .map_err(|e| {
-                defmt::error!("ERROR: {:?}", e);
-                e
-            })?;
 
         Ok(())
     }
@@ -384,7 +349,7 @@ where
                 Ok(())
             }
             Some(Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket })) => {
-                defmt::info!("[URC] SocketClosed {:?}", socket);
+                defmt::info!("[URC] SocketClosed {:u8}", socket.0);
                 let mut sockets = self.sockets.try_borrow_mut()?;
                 match sockets.socket_type(socket) {
                     Some(SocketType::Tcp) => {
@@ -401,13 +366,13 @@ where
                 Ok(())
             }
             Some(Urc::DataConnectionActivated(psn::urc::DataConnectionActivated { result })) => {
-                defmt::info!("[URC] DataConnectionActivated {:?}", result);
+                defmt::info!("[URC] DataConnectionActivated {:u8}", result);
                 Ok(())
             }
             Some(Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
                 profile_id,
             })) => {
-                defmt::info!("[URC] DataConnectionDeactivated {:?}", profile_id);
+                defmt::info!("[URC] DataConnectionDeactivated {:u8}", profile_id);
                 self.init(false)?;
                 self.state.set(State::Deregistered);
                 Ok(())
@@ -415,17 +380,19 @@ where
             Some(Urc::SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable {
                 socket,
                 length,
-            })) => match self.socket_ingress(socket, length) {
-                Ok(bytes) if bytes > 0 => {
-                    defmt::info!("[URC] Ingressed {:?} bytes", bytes);
-                    Ok(())
-                }
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    defmt::error!("[URC] Failed ingress! {:?}", e);
-                    Err(e)
-                }
-            },
+            })) => {
+                defmt::trace!(
+                    "[Socket({:u8})] {:u16} bytes available",
+                    socket.0,
+                    length as u16
+                );
+
+                self.data_available
+                    .try_borrow_mut()?
+                    .insert(socket.0 as u8, length)
+                    .map(drop)
+                    .map_err(|_| Error::SocketNotFound)
+            }
             None => Ok(()),
         }
     }
@@ -450,9 +417,9 @@ where
                     match core::str::from_utf8(&req.as_bytes()) {
                         Ok(s) => defmt::error!("{:?}: [{:str}]", ate, s),
                         Err(_) => defmt::error!(
-                            "{:?}: {:?}",
+                            "{:?}:",
                             ate,
-                            core::convert::AsRef::<[u8]>::as_ref(&req.as_bytes())
+                            // core::convert::AsRef::<[u8]>::as_ref(&req.as_bytes())
                         ),
                     };
                     ate.into()

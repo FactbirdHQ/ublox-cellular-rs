@@ -36,7 +36,7 @@ pub struct TcpSocket<L: ArrayLength<u8>> {
 impl<L: ArrayLength<u8>> TcpSocket<L> {
     #[allow(unused_comparisons)] // small usize platforms always pass rx_capacity check
     /// Create a socket using the given buffers.
-    pub fn new(socket_id: usize) -> TcpSocket<L> {
+    pub fn new(socket_id: u8) -> TcpSocket<L> {
         TcpSocket {
             meta: SocketMeta {
                 handle: SocketHandle(socket_id),

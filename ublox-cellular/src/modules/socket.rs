@@ -1,6 +1,6 @@
 use embedded_hal::digital::OutputPin;
 pub use embedded_nal::{Ipv4Addr, Mode, SocketAddr, SocketAddrV4};
-use heapless::{consts, ArrayLength};
+use heapless::{consts, ArrayLength, Bucket, Pos, PowerOfTwo};
 
 use crate::command::ip_transport_layer::{types::*, *};
 use crate::error::Error;
@@ -31,26 +31,12 @@ where
     C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
-    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>
+        + PowerOfTwo,
     L: ArrayLength<u8>,
 {
-    /// Helper function to manage the internal poll counter, used to poll open
-    /// sockets for incoming data, in case a `SocketDataAvailable` URC is missed
-    /// once in a while, as the ublox module will never send the URC again, if
-    /// the socket is not read.
-    pub(crate) fn poll_cnt(&self, reset: bool) -> u16 {
-        if reset {
-            // Reset poll_cnt
-            self.poll_cnt.set(0);
-            0
-        } else {
-            // Increment poll_cnt by one, and return the old value
-            let old = self.poll_cnt.get();
-            self.poll_cnt.set(old + 1);
-            old
-        }
-    }
-
     pub(crate) fn handle_socket_error<A: atat::AtatResp, F: Fn() -> Result<A, Error>>(
         &self,
         f: F,
@@ -71,6 +57,7 @@ where
                 // let SocketErrorResponse { error } = self
                 //     .send_internal(&GetSocketError, false)
                 //     .unwrap_or_else(|_e| SocketErrorResponse { error: 110 });
+                defmt::warn!("[SocketError] InvalidResponse!, attempt {:?}", attempt);
 
                 // if error != 0 {
                 if let Some(handle) = socket {
@@ -100,33 +87,31 @@ where
         length: usize,
     ) -> Result<usize, Error> {
         if length == 0 {
+            defmt::warn!("Attempting to ingress 0 bytes!");
             return Ok(0);
         }
 
         // Allow room for 2x length (Hex), and command overhead
-        let chunk_size = core::cmp::min(length, IngressChunkSize::to_usize());
         let mut sockets = self
             .sockets
             .try_borrow_mut()
-            .map_err(|_| Error::BaudDetection)?;
-
-        // Reset poll_cnt
-        self.poll_cnt(true);
+            .map_err(|_| Error::BorrowMutError)?;
 
         match sockets.socket_type(socket) {
             Some(SocketType::Tcp) => {
                 // Handle tcp socket
                 let mut tcp = sockets.get::<TcpSocket<_>>(socket)?;
                 if !tcp.can_recv() {
-                    return Err(Error::Busy);
+                    return Err(Error::BufferFull);
                 }
 
+                // Allow room for 2x length (Hex), and command overhead
                 let mut socket_data = self.handle_socket_error(
                     || {
                         self.send_internal(
                             &ReadSocketData {
                                 socket,
-                                length: chunk_size,
+                                length: core::cmp::min(length, IngressChunkSize::to_usize()),
                             },
                             false,
                         )
@@ -156,6 +141,7 @@ where
                             .map_err(|_| Error::InvalidHex)?,
                     ))
                 } else {
+                    defmt::warn!("No .data field on socket response!");
                     Ok(0)
                 }
             }
@@ -164,13 +150,14 @@ where
                 let mut udp = sockets.get::<UdpSocket<_>>(socket)?;
 
                 if !udp.can_recv() {
-                    return Err(Error::Busy);
+                    return Err(Error::BufferFull);
                 }
 
+                // Allow room for 2x length (Hex), and command overhead
                 let mut socket_data = self.send_internal(
                     &ReadUDPSocketData {
                         socket,
-                        length: chunk_size,
+                        length: core::cmp::min(length, IngressChunkSize::to_usize()),
                     },
                     false,
                 )?;
@@ -213,7 +200,10 @@ where
     C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
-    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>
+        + PowerOfTwo,
     L: ArrayLength<u8>,
 {
     type Error = Error;
@@ -266,7 +256,7 @@ where
         }
 
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
-            defmt::debug!("Sending: {:?} bytes, {:?}", chunk.len(), chunk);
+            defmt::trace!("Sending: {:?} bytes, {:?}", chunk.len(), chunk);
             self.handle_socket_error(
                 || {
                     self.send_internal(
@@ -350,7 +340,10 @@ where
     C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
-    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>
+        + PowerOfTwo,
     L: ArrayLength<u8>,
 {
     type Error = Error;
@@ -437,7 +430,7 @@ where
         }
 
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
-            defmt::debug!("Sending: {:?} bytes, {:?}", chunk.len(), chunk);
+            defmt::trace!("Sending: {:?} bytes, {:?}", chunk.len(), chunk);
             self.handle_socket_error(
                 || {
                     self.send_internal(

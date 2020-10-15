@@ -19,6 +19,7 @@ pub enum Error {
     BorrowMutError,
     AT(atat::Error),
     Busy,
+    BufferFull,
     InvalidHex,
     Dns,
     _Unknown,

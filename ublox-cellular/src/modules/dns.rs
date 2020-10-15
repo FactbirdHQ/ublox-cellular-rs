@@ -2,7 +2,7 @@ use atat::AtatClient;
 use core::fmt::Write;
 use embedded_hal::digital::OutputPin;
 use embedded_nal::{AddrType, Dns};
-use heapless::{consts, ArrayLength, String};
+use heapless::{consts, ArrayLength, Bucket, Pos, PowerOfTwo, String};
 use no_std_net::IpAddr;
 
 use crate::{
@@ -16,7 +16,10 @@ where
     C: AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
-    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>
+        + PowerOfTwo,
     L: ArrayLength<u8>,
 {
     type Error = Error;

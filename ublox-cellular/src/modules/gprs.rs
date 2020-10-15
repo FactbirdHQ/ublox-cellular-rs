@@ -4,7 +4,7 @@ use crate::{
     GsmClient, State,
 };
 use embedded_hal::digital::OutputPin;
-use heapless::{consts, ArrayLength, String};
+use heapless::{consts, ArrayLength, Bucket, Pos, PowerOfTwo, String};
 use no_std_net::Ipv4Addr;
 
 #[derive(Debug, Clone, Default)]
@@ -35,7 +35,10 @@ where
     C: atat::AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
-    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>
+        + PowerOfTwo,
     L: ArrayLength<u8>,
 {
     fn check_gprs_attachment(&self) -> Result<bool, Error> {
