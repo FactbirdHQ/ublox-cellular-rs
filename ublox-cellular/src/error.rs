@@ -22,6 +22,7 @@ pub enum Error {
     BufferFull,
     InvalidHex,
     Dns,
+    Uninitialized,
     _Unknown,
 }
 

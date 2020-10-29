@@ -27,6 +27,8 @@ pub struct AT;
 pub enum Urc {
     #[at_urc("+UUSORD")]
     SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable),
+    #[at_urc("+UUSORF")]
+    SocketDataAvailableUDP(ip_transport_layer::urc::SocketDataAvailable),
     #[at_urc("+UUPSDA")]
     DataConnectionActivated(psn::urc::DataConnectionActivated),
     #[at_urc("+UUPSDD")]
@@ -35,6 +37,14 @@ pub enum Urc {
     SocketClosed(ip_transport_layer::urc::SocketClosed),
     #[at_urc("+UMWI")]
     MessageWaitingIndication(sms::urc::MessageWaitingIndication),
+    #[at_urc("+CREG")]
+    NetworkRegistration(network_service::urc::NetworkRegistration),
+    #[at_urc("+CGREG")]
+    GPRSNetworkRegistration(psn::urc::GPRSNetworkRegistration),
+    #[at_urc("+CEREG")]
+    EPSNetworkRegistration(psn::urc::EPSNetworkRegistration),
+    #[at_urc("+UREG")]
+    ExtendedPSNetworkRegistration(psn::urc::ExtendedPSNetworkRegistration),
 }
 
 impl atat::AtatLen for crate::sockets::SocketHandle {

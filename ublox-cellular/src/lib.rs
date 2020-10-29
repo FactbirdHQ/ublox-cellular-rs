@@ -5,6 +5,8 @@ pub mod command;
 pub mod error;
 mod hex;
 mod modules;
+// mod state;
+mod module_cfg;
 
 #[cfg(any(feature = "socket-udp", feature = "socket-tcp"))]
 mod socket;

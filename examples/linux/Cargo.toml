@@ -20,4 +20,4 @@ serialport = "3.3.0"
 heapless = "0.5.5"
 
 common_lib = { path = "../common_lib" }
-ublox-cellular-rs = { path = "../../ublox-cellular", features = ["logging"] }
+ublox-cellular-rs = { path = "../../ublox-cellular" }

@@ -4,12 +4,11 @@ use crate::{
         general,
         ip_transport_layer::{self, types::*},
         mobile_control::{self, responses::*, types::*},
-        network_service,
     },
     error::Error,
-    GsmClient, State,
+    GsmClient,
 };
-use embedded_hal::digital::OutputPin;
+use embedded_hal::{blocking::delay::DelayMs, digital::{OutputPin, InputPin}};
 use heapless::{ArrayLength, Bucket, Pos, PowerOfTwo};
 
 pub trait GSM {
@@ -18,11 +17,14 @@ pub trait GSM {
     fn get_time(&self) -> Result<DateTime, Error>;
 }
 
-impl<C, RST, DTR, N, L> GSM for GsmClient<C, RST, DTR, N, L>
+impl<C, DLY, N, L, RST, DTR, PWR, VINT> GSM for GsmClient<C, DLY, N, L, RST, DTR, PWR, VINT>
 where
     C: atat::AtatClient,
+    DLY: DelayMs<u32>,
     RST: OutputPin,
+    PWR: OutputPin,
     DTR: OutputPin,
+    VINT: InputPin,
     N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>
@@ -30,48 +32,40 @@ where
     L: ArrayLength<u8>,
 {
     fn begin(&self) -> Result<(), Error> {
-        self.state.set(State::Registering);
 
-        let pin_status = self.send_at(&device_lock::GetPinStatus)?;
+        // let pin_status = self.send_at(&device_lock::GetPinStatus)?;
 
-        match pin_status.code {
-            PinStatusCode::SimPin => {
-                self.send_at(&device_lock::SetPin {
-                    pin: self.config.pin(),
-                })?;
-            }
-            PinStatusCode::PhSimPin
-            | PinStatusCode::SimPuk
-            | PinStatusCode::SimPin2
-            | PinStatusCode::SimPuk2
-            | PinStatusCode::PhNetPin
-            | PinStatusCode::PhNetSubPin
-            | PinStatusCode::PhSpPin
-            | PinStatusCode::PhCorpPin => {
-                defmt::info!("Pin NOT Ready!");
-                return Err(Error::Pin);
-            }
-            PinStatusCode::Ready => {}
+        // match pin_status.code {
+        //     PinStatusCode::SimPin => {
+        //         self.send_at(&device_lock::SetPin {
+        //             pin: self.config.pin(),
+        //         })?;
+        //     }
+        //     PinStatusCode::PhSimPin
+        //     | PinStatusCode::SimPuk
+        //     | PinStatusCode::SimPin2
+        //     | PinStatusCode::SimPuk2
+        //     | PinStatusCode::PhNetPin
+        //     | PinStatusCode::PhNetSubPin
+        //     | PinStatusCode::PhSpPin
+        //     | PinStatusCode::PhCorpPin => {
+        //         defmt::info!("Pin NOT Ready!");
+        //         return Err(Error::Pin);
+        //     }
+        //     PinStatusCode::Ready => {}
+        // }
+
+        // while self.send_at(&general::GetCCID).is_err() {}
+
+        if self.config.hex_mode {
+            self.send_at(&ip_transport_layer::SetHexMode {
+                hex_mode_disable: HexMode::Enabled,
+            })?;
+        } else {
+            self.send_at(&ip_transport_layer::SetHexMode {
+                hex_mode_disable: HexMode::Disabled,
+            })?;
         }
-
-        while self.send_at(&general::GetCCID).is_err() {}
-
-        self.send_at(&ip_transport_layer::SetHexMode {
-            hex_mode_disable: HexMode::Enabled,
-        })?;
-
-        self.send_at(&mobile_control::SetAutomaticTimezoneUpdate {
-            on_off: AutomaticTimezone::EnabledLocal,
-        })?;
-
-        while !self
-            .send_at(&network_service::GetNetworkRegistrationStatus)?
-            .stat
-            .registration_ok()?
-            .is_access_alive()
-        {}
-
-        self.state.set(State::Registered);
 
         Ok(())
     }

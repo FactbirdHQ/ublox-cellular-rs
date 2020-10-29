@@ -21,27 +21,33 @@ embedded-hal = { git = "https://github.com/MathiasKoch/embedded-hal", branch = "
 nb = "^1"
 # atat = { version = "^0.5.1", features = ["derive"] }
 # serde_at = { version = "^0.5.1" }
-atat = { git = "https://github.com/BlackbirdHQ/atat", features = ["derive"], branch = "factbird-mini-1.0" }
-serde_at = { git = "https://github.com/BlackbirdHQ/atat", branch = "factbird-mini-1.0"  }
+# atat = { git = "https://github.com/BlackbirdHQ/atat", features = ["derive"], branch = "factbird-mini-1.0" }
+atat = { path = "../../atat/atat", features = ["derive"] }
+serde_at = { git = "https://github.com/BlackbirdHQ/atat", branch = "factbird-mini-1.0" }
 serde = { version = "^1", default-features = false, features = ["derive"] }
 embedded-nal = { git = "https://github.com/MathiasKoch/embedded-nal", branch = "factbird-mini-1.0" }
 typenum = "^1"
-defmt = { git = "https://github.com/knurling-rs/defmt", branch = "main" }
+defmt = { git = "https://github.com/knurling-rs/defmt", rev = "be7f4a7cbe8a61e005f55fed1a41b11f85cb8ed6" }
 
 [features]
-default = ["sara_u2", "socket-udp", "socket-tcp"]
+default = [
+    "toby-r2",
+    "socket-udp",
+    "socket-tcp",
+    "atat/defmt-debug"
+]
 
-topy_l4 = []
-mpci_l2 = []
-lisa_u2 = []
-sara_g3 = []
-sara_g4 = []
-sara_u2 = []
-sara_u1 = []
-toby_l2 = []
-toby_r2 = []
-lara_r2 = []
-leon_g1 = []
+topy-l4 = []
+mpci-l2 = []
+lisa-u2 = []
+sara-g3 = []
+sara-g4 = []
+sara-u2 = []
+sara-u1 = []
+toby-l2 = []
+toby-r2 = []
+lara-r2 = []
+leon-g1 = []
 
 socket-tcp = []
 socket-udp = []

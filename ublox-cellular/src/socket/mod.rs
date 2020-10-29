@@ -70,6 +70,7 @@ pub enum SocketType {
     Tcp,
 }
 
+
 impl<L: ArrayLength<u8>> Socket<L> {
     pub fn get_type(&self) -> SocketType {
         match self {
@@ -77,6 +78,60 @@ impl<L: ArrayLength<u8>> Socket<L> {
             Socket::Udp(_) => SocketType::Udp,
         }
     }
+
+    pub fn available_data(&self) -> usize {
+        match self {
+            Socket::Tcp(s) => s.get_available_data(),
+            Socket::Udp(s) => s.get_available_data(),
+        }
+    }
+
+    pub fn set_available_data(&mut self, available_data: usize) {
+        match self {
+            Socket::Tcp(s) => s.set_available_data(available_data),
+            Socket::Udp(s) => s.set_available_data(available_data),
+        }
+    }
+
+    pub fn rx_window(&self) -> usize {
+        match self {
+            Socket::Tcp(s) => s.rx_window(),
+            Socket::Udp(s) => s.rx_window(),
+        }
+    }
+
+    // TODO: Fun idea:
+    // pub fn ingress_with<F, A>(&mut self, f: F) -> Result<()>
+    // where
+    //     A: AtatCmd,
+    //     F: FnOnce(&impl AtatCmd) -> A::Response,
+    // {
+    //     if self.available_data() == 0 {
+    //         return Ok(());
+    //     }
+
+    //     match self {
+    //         Socket::Tcp(s) => {
+    //             if !s.can_recv() {
+    //                 return Err(Error::SocketSetFull);
+    //             }
+
+    //             let cmd = SocketReadCmd(ReadSocketData {
+    //                 socket: self.handle(),
+    //                 length: core::cmp::min(self.available_data(), IngressChunkSize::to_usize()),
+    //             });
+    //             f(cmd);
+    //         }
+    //         Socket::Udp(s) => {
+    //             let cmd = SocketReadCmd(ReadSocketData {
+    //                 socket: self.handle(),
+    //                 length: core::cmp::min(self.available_data(), IngressChunkSize::to_usize()),
+    //             });
+    //             f(cmd);
+    //         }
+    //     }
+    //     Ok(())
+    // }
 }
 
 macro_rules! dispatch_socket {

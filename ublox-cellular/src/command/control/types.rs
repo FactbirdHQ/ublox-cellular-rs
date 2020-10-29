@@ -2,6 +2,32 @@
 
 use atat::atat_derive::AtatEnum;
 
+/// Indicates the behavior of circuit 109
+#[derive(Clone, PartialEq, AtatEnum)]
+pub enum Circuit109Behaviour {
+    /// 0: DCE always presents ON condition on circuit 109
+    AlwaysPresent = 0,
+    /// 1 (default value and factory-programmed value): circuit 109 changes in
+    /// accordance with the Carrier detect status; ON if the Carrier is
+    /// detected, OFF otherwise
+    ChangesWithCarrier = 1,
+}
+
+/// Indicates the behavior of circuit 108
+#[derive(Clone, PartialEq, AtatEnum)]
+pub enum Circuit108Behaviour {
+    /// 0: the DCE ignores circuit 108/2
+    Ignore = 0,
+    /// 1 (default value and factory-programmed value): upon an ON-to-OFF
+    /// transition of circuit 108/2, the DCE enters online command state and
+    /// issues the final result code
+    OnlineCommandState = 1,
+    /// 2: upon an ON-to-OFF transition of circuit 108/2, the DCE performs an
+    /// orderly cleardown of the call. The automatic answer is disabled while
+    /// circuit 108/2 remains OFF
+    OrderlyCleardown = 2,
+}
+
 #[derive(Clone, PartialEq, AtatEnum)]
 pub enum FlowControl {
     /// - 0: disable DTE flow control
@@ -29,35 +55,35 @@ pub enum SoftwareFlowControl {
 #[at_enum(u32)]
 pub enum BaudRate {
     #[cfg(any(
-        feature = "toby_l2",
-        feature = "mpci_l2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2",
-        feature = "toby_l4",
-        feature = "leon_g1",
-        feature = "sara_g3",
-        feature = "sara_g4"
+        feature = "toby-l2",
+        feature = "mpci-l2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2",
+        feature = "toby-l4",
+        feature = "leon-g1",
+        feature = "sara-g3",
+        feature = "sara-g4"
     ))]
     B0 = 0,
-    #[cfg(any(feature = "lisa_u1", feature = "lisa_u2", feature = "sara_u2",))]
+    #[cfg(any(feature = "lisa-u1", feature = "lisa-u2", feature = "sara-u2",))]
     B1200 = 1200,
     #[cfg(any(
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "leon_g1",
-        feature = "sara_g3",
-        feature = "sara_g4"
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "leon-g1",
+        feature = "sara-g3",
+        feature = "sara-g4"
     ))]
     B2400 = 2400,
     #[cfg(any(
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "leon_g1",
-        feature = "sara_g3",
-        feature = "sara_g4"
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "leon-g1",
+        feature = "sara-g3",
+        feature = "sara-g4"
     ))]
     B4800 = 4800,
     B9600 = 9600,
@@ -67,44 +93,44 @@ pub enum BaudRate {
     B115200 = 115_200,
 
     #[cfg(any(
-        feature = "toby_l2",
-        feature = "mpci_l2",
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2",
-        feature = "toby_l4",
+        feature = "toby-l2",
+        feature = "mpci-l2",
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2",
+        feature = "toby-l4",
     ))]
     B230400 = 230_400,
     #[cfg(any(
-        feature = "toby_l2",
-        feature = "mpci_l2",
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2",
-        feature = "toby_l4",
+        feature = "toby-l2",
+        feature = "mpci-l2",
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2",
+        feature = "toby-l4",
     ))]
     B460800 = 460_800,
     #[cfg(any(
-        feature = "toby_l2",
-        feature = "mpci_l2",
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2",
-        feature = "toby_l4",
+        feature = "toby-l2",
+        feature = "mpci-l2",
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2",
+        feature = "toby-l4",
     ))]
     B921600 = 921_600,
-    #[cfg(any(feature = "toby_r2", feature = "lara_r2",))]
+    #[cfg(any(feature = "toby-r2", feature = "lara-r2",))]
     B3000000 = 3_000_000,
-    #[cfg(any(feature = "toby_r2", feature = "lara_r2",))]
+    #[cfg(any(feature = "toby-r2", feature = "lara-r2",))]
     B3250000 = 3_250_000,
-    #[cfg(any(feature = "toby_r2", feature = "lara_r2",))]
+    #[cfg(any(feature = "toby-r2", feature = "lara-r2",))]
     B6000000 = 6_000_000,
-    #[cfg(any(feature = "toby_r2", feature = "lara_r2",))]
+    #[cfg(any(feature = "toby-r2", feature = "lara-r2",))]
     B6500000 = 6_500_000,
 }

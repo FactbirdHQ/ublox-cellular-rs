@@ -1,6 +1,6 @@
 use atat::AtatClient;
 use core::fmt::Write;
-use embedded_hal::digital::OutputPin;
+use embedded_hal::{blocking::delay::DelayMs, digital::{OutputPin, InputPin}};
 use embedded_nal::{AddrType, Dns};
 use heapless::{consts, ArrayLength, Bucket, Pos, PowerOfTwo, String};
 use no_std_net::IpAddr;
@@ -11,11 +11,14 @@ use crate::{
     GsmClient,
 };
 
-impl<C, RST, DTR, N, L> Dns for GsmClient<C, RST, DTR, N, L>
+impl<C, DLY, N, L, RST, DTR, PWR, VINT> Dns for GsmClient<C, DLY, N, L, RST, DTR, PWR, VINT>
 where
     C: AtatClient,
+    DLY: DelayMs<u32>,
     RST: OutputPin,
+    PWR: OutputPin,
     DTR: OutputPin,
+    VINT: InputPin,
     N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>

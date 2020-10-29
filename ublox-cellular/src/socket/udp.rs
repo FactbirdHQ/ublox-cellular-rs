@@ -16,6 +16,7 @@ pub type SocketBuffer<N> = RingBuffer<u8, N>;
 pub struct UdpSocket<L: ArrayLength<u8>> {
     pub(crate) meta: SocketMeta,
     pub(crate) endpoint: SocketAddr,
+    available_data: usize,
     rx_buffer: SocketBuffer<L>,
 }
 
@@ -27,6 +28,7 @@ impl<L: ArrayLength<u8>> UdpSocket<L> {
                 handle: SocketHandle(socket_id),
             },
             endpoint: SocketAddrV4::new(Ipv4Addr::unspecified(), 0).into(),
+            available_data: 0,
             rx_buffer: SocketBuffer::new(),
         }
     }
@@ -41,6 +43,20 @@ impl<L: ArrayLength<u8>> UdpSocket<L> {
     #[inline]
     pub fn endpoint(&self) -> SocketAddr {
         self.endpoint
+    }
+
+    /// Set available data.
+    pub fn set_available_data(&mut self, available_data: usize) {
+        self.available_data = available_data;
+    }
+
+    /// Get the number of bytes available to ingress.
+    pub fn get_available_data(&self) -> usize {
+        self.available_data
+    }
+
+    pub fn rx_window(&self) -> usize {
+        self.rx_buffer.window()
     }
 
     /// Bind the socket to the given endpoint.

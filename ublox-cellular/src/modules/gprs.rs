@@ -1,15 +1,26 @@
 use crate::{
     command::psn::{self, types::*},
     error::Error,
-    GsmClient, State,
+    GsmClient,
 };
-use embedded_hal::digital::OutputPin;
+use embedded_hal::{blocking::delay::DelayMs, digital::{OutputPin, InputPin}};
 use heapless::{consts, ArrayLength, Bucket, Pos, PowerOfTwo, String};
-use no_std_net::Ipv4Addr;
+
+#[derive(Debug, Clone)]
+pub enum Apn {
+    Given(String<consts::U99>),
+    Automatic,
+}
+
+impl Default for Apn {
+    fn default() -> Self {
+        Apn::Automatic
+    }
+}
 
 #[derive(Debug, Clone, Default)]
 pub struct APNInfo {
-    pub apn: String<consts::U99>,
+    pub apn: Apn,
     pub user_name: Option<String<consts::U64>>,
     pub password: Option<String<consts::U64>>,
 }
@@ -17,7 +28,7 @@ pub struct APNInfo {
 impl APNInfo {
     pub fn new(apn: &str) -> Self {
         APNInfo {
-            apn: String::from(apn),
+            apn: Apn::Given(String::from(apn)),
             user_name: None,
             password: None,
         }
@@ -30,11 +41,14 @@ pub trait GPRS {
     fn detach_gprs(&self) -> Result<(), Error>;
 }
 
-impl<C, RST, DTR, N, L> GPRS for GsmClient<C, RST, DTR, N, L>
+impl<C, DLY, N, L, RST, DTR, PWR, VINT> GPRS for GsmClient<C, DLY, N, L, RST, DTR, PWR, VINT>
 where
     C: atat::AtatClient,
+    DLY: DelayMs<u32>,
     RST: OutputPin,
+    PWR: OutputPin,
     DTR: OutputPin,
+    VINT: InputPin,
     N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>
@@ -52,72 +66,77 @@ where
     }
 
     fn attach_gprs(&self) -> Result<(), Error> {
-        // match self.state.get() {
-        //     State::Registered | State::Registering => return Err(Error::_Unknown),
-        //     State::Attaching | State::Attached => return Ok(()),
-        //     _ => {}
-        // };
+        // let PDPContextState { status } = self.send_at(&psn::GetPDPContextState)?;
+        // if status == PDPContextStatus::Deactivated {
+        //     self.send_at(&psn::SetPDPContextState {
+        //         status: PDPContextStatus::Deactivated
+        //     })?;
+        //     self.send_at(&psn::SetPDPContextState {
+        //         status: PDPContextStatus::Activated
+        //     })?;
+        // }
 
-        self.state.set(State::Attaching);
+        self.nwk_registration()?;
+        self.try_connect(&self.config.apn_info)?;
+        // let psn::responses::GPRSAttached { state } = self.send_at(&psn::GetGPRSAttached)?;
 
-        let psn::responses::GPRSAttached { state } = self.send_at(&psn::GetGPRSAttached)?;
+        // if state == GPRSAttachedState::Detached {
+        //     // Attach GPRS
+        //     self.send_at(&psn::SetGPRSAttached {
+        //         state: GPRSAttachedState::Attached,
+        //     })?;
+        // }
 
-        if state == GPRSAttachedState::Detached {
-            // Attach GPRS
-            self.send_at(&psn::SetGPRSAttached {
-                state: GPRSAttachedState::Attached,
-            })?;
-        }
+        // if !self.check_gprs_attachment()? {
+        //     // Set APN info
+        //     let apn = match self.config.apn_info.apn {
+        //         Apn::Given(ref apn) => apn.clone(),
+        //         Apn::Automatic => unimplemented!(),
+        //     };
+        //     self.send_at(&psn::SetPacketSwitchedConfig {
+        //         profile_id: 0,
+        //         param: PacketSwitchedParam::APN(apn),
+        //     })?;
 
-        if !self.check_gprs_attachment()? {
-            // Set APN info
-            self.send_at(&psn::SetPacketSwitchedConfig {
-                profile_id: 0,
-                param: PacketSwitchedParam::APN(self.config.apn_info.apn.clone()),
-            })?;
+        //     // Set auth mode
+        //     // self.send_at(&psn::SetPacketSwitchedConfig {
+        //     //     profile_id: 0,
+        //     //     param: PacketSwitchedParam::Authentication(AuthenticationType::None),
+        //     // })?;
 
-            // Set auth mode
-            self.send_at(&psn::SetPacketSwitchedConfig {
-                profile_id: 0,
-                param: PacketSwitchedParam::Authentication(AuthenticationType::Auto),
-            })?;
+        //     // // Set username
+        //     // if let Some(ref user_name) = self.config.apn_info.user_name {
+        //     //     self.send_at(&psn::SetPacketSwitchedConfig {
+        //     //         profile_id: 0,
+        //     //         param: PacketSwitchedParam::Username(user_name.clone()),
+        //     //     })?;
+        //     // }
 
-            // Set username
-            if let Some(ref user_name) = self.config.apn_info.user_name {
-                self.send_at(&psn::SetPacketSwitchedConfig {
-                    profile_id: 0,
-                    param: PacketSwitchedParam::Username(user_name.clone()),
-                })?;
-            }
+        //     // // Set password
+        //     // if let Some(ref password) = self.config.apn_info.password {
+        //     //     self.send_at(&psn::SetPacketSwitchedConfig {
+        //     //         profile_id: 0,
+        //     //         param: PacketSwitchedParam::Password(password.clone()),
+        //     //     })?;
+        //     // }
 
-            // Set password
-            if let Some(ref password) = self.config.apn_info.password {
-                self.send_at(&psn::SetPacketSwitchedConfig {
-                    profile_id: 0,
-                    param: PacketSwitchedParam::Password(password.clone()),
-                })?;
-            }
+        //     // // Set dynamic IP
+        //     // self.send_at(&psn::SetPacketSwitchedConfig {
+        //     //     profile_id: 0,
+        //     //     param: PacketSwitchedParam::IPAddress(Ipv4Addr::unspecified().into()),
+        //     // })?;
 
-            // Set dynamic IP
-            self.send_at(&psn::SetPacketSwitchedConfig {
-                profile_id: 0,
-                param: PacketSwitchedParam::IPAddress(Ipv4Addr::unspecified().into()),
-            })?;
+        //     // Activate IP
+        //     self.send_at(&psn::SetPacketSwitchedAction {
+        //         profile_id: 0,
+        //         action: PacketSwitchedAction::Activate,
+        //     })?;
 
-            // Activate IP
-            self.send_at(&psn::SetPacketSwitchedAction {
-                profile_id: 0,
-                action: PacketSwitchedAction::Activate,
-            })?;
-
-            // Check profile status
-            if !self.check_gprs_attachment()? {
-                self.state.set(State::Detached);
-                return Err(Error::Network);
-            }
-        }
-
-        self.state.set(State::Attached);
+        //     // Check profile status
+        //     if !self.check_gprs_attachment()? {
+        //         return Err(Error::Network);
+        //     }
+        // }
 
         Ok(())
     }
@@ -132,7 +151,6 @@ where
             state: GPRSAttachedState::Detached,
         })?;
         defmt::info!("Detached!");
-        self.state.set(State::Detached);
 
         Ok(())
     }

@@ -6,34 +6,34 @@ pub enum Functionality {
     /// Sets the MT to minimum functionality (disable both transmit and receive RF
     /// circuits by deactivating both CS and PS services)
     #[cfg(any(
-        feature = "toby_l2",
-        feature = "mpci_l2",
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2",
-        feature = "toby_l4",
-        feature = "leon_g1",
-        feature = "sara_g3",
-        feature = "sara_g4"
+        feature = "toby-l2",
+        feature = "mpci-l2",
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2",
+        feature = "toby-l4",
+        feature = "leon-g1",
+        feature = "sara-g3",
+        feature = "sara-g4"
     ))]
     Minimum = 0,
 
     /// (factory-programmed value): sets the MT to full functionality, e.g. from airplane
     /// mode or minimum functionality
     #[cfg(any(
-        feature = "toby_l2",
-        feature = "mpci_l2",
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2",
-        feature = "toby_l4",
-        feature = "leon_g1",
-        feature = "sara_g3",
-        feature = "sara_g4"
+        feature = "toby-l2",
+        feature = "mpci-l2",
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2",
+        feature = "toby-l4",
+        feature = "leon-g1",
+        feature = "sara-g3",
+        feature = "sara-g4"
     ))]
     Full = 1,
 
@@ -41,113 +41,113 @@ pub enum Functionality {
     /// services and sets the MT into airplane mode. Airplane mode is persistent between
     /// power cycles triggered by +CFUN=16 or +CPWROFF (where supported)
     #[cfg(any(
-        feature = "toby_l2",
-        feature = "mpci_l2",
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2",
-        feature = "toby_l4"
+        feature = "toby-l2",
+        feature = "mpci-l2",
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2",
+        feature = "toby-l4"
     ))]
     AirplaneMode = 4,
 
     /// Enables the SIM toolkit interface in dedicated mode and fetching of proactive
     /// commands by SIM Application Toolkit from the SIM card
     #[cfg(any(
-        feature = "toby_l2",
-        feature = "mpci_l2",
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2",
-        feature = "toby_l4",
-        feature = "leon_g1",
-        feature = "sara_g3",
-        feature = "sara_g4"
+        feature = "toby-l2",
+        feature = "mpci-l2",
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2",
+        feature = "toby-l4",
+        feature = "leon-g1",
+        feature = "sara-g3",
+        feature = "sara-g4"
     ))]
     DedicatedMode = 6,
 
     /// Disables the SIM toolkit interface and fetching of proactive commands by
     /// SIM Application Toolkit from the SIM card
     #[cfg(any(
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2",
-        feature = "toby_l4",
-        feature = "leon_g1",
-        feature = "sara_g3",
-        feature = "sara_g4"
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2",
+        feature = "toby-l4",
+        feature = "leon-g1",
+        feature = "sara-g3",
+        feature = "sara-g4"
     ))]
     DisableSimToolkit = 7,
     #[cfg(any(
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2",
-        feature = "toby_l4",
-        feature = "leon_g1",
-        feature = "sara_g3",
-        feature = "sara_g4"
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2",
+        feature = "toby-l4",
+        feature = "leon-g1",
+        feature = "sara-g3",
+        feature = "sara-g4"
     ))]
     DisableSimToolkit_ = 8,
 
     /// Enables the SIM toolkit interface in raw mode and fetching of proactive
     /// commands by SIM Application Toolkit from the SIM card
     #[cfg(any(
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2"
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2"
     ))]
     RawMode = 9,
 
     /// MT silent reset (with detach from network and saving of NVM parameters),
     /// without reset of the SIM card
     #[cfg(any(
-        feature = "toby_l2",
-        feature = "mpci_l2",
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2",
-        feature = "toby_l4",
-        feature = "leon_g1",
-        feature = "sara_g3",
-        feature = "sara_g4"
+        feature = "toby-l2",
+        feature = "mpci-l2",
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2",
+        feature = "toby-l4",
+        feature = "leon-g1",
+        feature = "sara-g3",
+        feature = "sara-g4"
     ))]
     SilentReset = 15,
 
     /// MT silent reset (with detach from network and saving of NVM parameters), with
     /// reset of the SIM card
     #[cfg(any(
-        feature = "lisa_u1",
-        feature = "lisa_u2",
-        feature = "sara_u2",
-        feature = "toby_r2",
-        feature = "lara_r2",
-        feature = "toby_l4",
-        feature = "leon_g1",
-        feature = "sara_g3",
-        feature = "sara_g4"
+        feature = "lisa-u1",
+        feature = "lisa-u2",
+        feature = "sara-u2",
+        feature = "toby-r2",
+        feature = "lara-r2",
+        feature = "toby-l4",
+        feature = "leon-g1",
+        feature = "sara-g3",
+        feature = "sara-g4"
     ))]
     SilentResetWithSimReset = 16,
 
     /// Sets the MT to minimum functionality by deactivating CS and PS services and
     /// the SIM card
-    #[cfg(any(feature = "toby_l2", feature = "mpci_l2", feature = "toby_l4"))]
+    #[cfg(any(feature = "toby-l2", feature = "mpci-l2", feature = "toby-l4"))]
     MinimumWithoutSim = 19,
 
     /// Sets the MT in a deep low power state "HALT" (with detach from the network
     /// and saving of the NVM parameters); the only way to wake up the module is a power
     /// cycle or a module reset
-    #[cfg(any(feature = "toby_l2", feature = "mpci_l2"))]
+    #[cfg(any(feature = "toby-l2", feature = "mpci-l2"))]
     Halt = 127,
 }
 

@@ -5,7 +5,7 @@ use crate::{
     socket::SocketHandle,
     GsmClient,
 };
-use embedded_hal::digital::OutputPin;
+use embedded_hal::{blocking::delay::DelayMs, digital::{OutputPin, InputPin}};
 use heapless::{ArrayLength, Bucket, Pos, PowerOfTwo};
 
 pub trait SSL {
@@ -26,11 +26,14 @@ pub trait SSL {
     fn enable_ssl(&self, socket: SocketHandle, profile_id: u8) -> Result<(), Error>;
 }
 
-impl<C, RST, DTR, N, L> SSL for GsmClient<C, RST, DTR, N, L>
+impl<C, DLY, N, L, RST, DTR, PWR, VINT> SSL for GsmClient<C, DLY, N, L, RST, DTR, PWR, VINT>
 where
     C: atat::AtatClient,
+    DLY: DelayMs<u32>,
     RST: OutputPin,
+    PWR: OutputPin,
     DTR: OutputPin,
+    VINT: InputPin,
     N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>
