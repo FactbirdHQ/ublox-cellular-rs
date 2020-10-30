@@ -1,5 +1,5 @@
 use atat::AtatClient;
-use core::cell::{Cell, RefCell};
+use core::cell::RefCell;
 use embedded_hal::{
     blocking::delay::DelayMs,
     digital::{InputPin, OutputPin},
@@ -14,23 +14,25 @@ use crate::{
         Urc, *,
     },
     error::Error,
-    gprs::{APNInfo, Apn},
+    gprs::APNInfo,
     module_cfg::constants::{CONTEXT_ID, PROFILE_ID},
     socket::SocketSet,
 };
+use ip_transport_layer::{types::HexMode, SetHexMode};
 use network_service::{
     types::{NetworkRegistrationStat, NetworkRegistrationUrcConfig, OperatorSelectionMode},
     GetOperatorSelection, SetNetworkRegistrationStatus, SetOperatorSelection,
 };
 use psn::{
+    responses::GPRSAttached,
     types::{
         EPSNetworkRegistrationStat, EPSNetworkRegistrationUrcConfig, GPRSAttachedState,
         GPRSNetworkRegistrationStat, GPRSNetworkRegistrationUrcConfig, PDPContextStatus,
         PacketSwitchedAction,
     },
-    GetEPSNetworkRegistrationStatus, GetGPRSAttached, GetGPRSNetworkRegistrationStatus,
-    SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus, SetPDPContextDefinition,
-    SetPDPContextState, SetPacketSwitchedAction, SetPacketSwitchedConfig,
+    GetGPRSAttached, SetEPSNetworkRegistrationStatus, SetGPRSAttached,
+    SetGPRSNetworkRegistrationStatus, SetPDPContextState, SetPacketSwitchedAction,
+    SetPacketSwitchedConfig,
 };
 use sms::{types::MessageWaitingMode, SetMessageWaitingIndication};
 
@@ -38,11 +40,54 @@ use sms::{types::MessageWaitingMode, SetMessageWaitingIndication};
 pub enum State {
     Init,
     PowerOn,
-    DeviceReady,
+    Configure,
     SimPin,
     SignalQuality,
     RegisteringNetwork,
     AttachingNetwork,
+    ActivatingContext,
+    Ready,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, defmt::Format)]
+pub struct StateMachine {
+    timeout: Option<u32>,
+    retry_count: u8,
+    inner: State,
+}
+
+impl StateMachine {
+    fn new() -> Self {
+        StateMachine {
+            timeout: None,
+            retry_count: 0,
+            inner: State::Init,
+        }
+    }
+
+    fn get_state(&self) -> State {
+        self.inner
+    }
+
+    fn set_state(&mut self, new_state: State) {
+        defmt::debug!("State transition: {:?} -> {:?}", self.inner, new_state);
+        self.inner = new_state;
+    }
+
+    fn is_retry(&self) -> bool {
+        self.retry_count > 0
+    }
+
+    fn retry_or_fail(&mut self) -> nb::Result<(), Error> {
+        // Handle retry based on exponential backoff here
+
+        if self.retry_count < 10 {
+            self.retry_count += 1;
+            Err(nb::Error::WouldBlock)
+        } else {
+            Err(nb::Error::Other(Error::StateTimeout))
+        }
+    }
 }
 
 pub struct RANStatus([NetworkStatus; 4]);
@@ -67,10 +112,8 @@ impl RANStatus {
 
     /// Check if any Radio Access Network is registered
     pub fn is_registered(&self) -> bool {
-        self.0
-            .iter()
-            .enumerate()
-            .any(|(_, &x)| x == NetworkStatus::Registered)
+        self.get(RadioAccessNetwork::Utran) == NetworkStatus::Registered
+            || self.get(RadioAccessNetwork::Eutran) == NetworkStatus::Registered
     }
 }
 
@@ -298,9 +341,8 @@ where
         + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
 {
-    initialized: Cell<bool>,
-    pub(crate) state: Cell<State>,
-    pub(crate) config: Config<RST, DTR, PWR, VINT>,
+    pub(crate) fsm: RefCell<StateMachine>,
+    pub(crate) config: RefCell<Config<RST, DTR, PWR, VINT>>,
     pub(crate) delay: RefCell<DLY>,
     pub(crate) network_status: RefCell<RANStatus>,
     pub(crate) client: RefCell<C>,
@@ -329,53 +371,43 @@ where
         config: Config<RST, DTR, PWR, VINT>,
     ) -> Self {
         GsmClient {
-            config,
+            config: RefCell::new(config),
             delay: RefCell::new(delay),
             network_status: RefCell::new(RANStatus::new()),
-            initialized: Cell::new(false),
-            state: Cell::new(State::Init),
+            fsm: RefCell::new(StateMachine::new()),
             client: RefCell::new(client),
             sockets: RefCell::new(socket_set),
         }
     }
 
-    /// Initialize a new ublox device to a known state (restart, wait for
-    /// startup, set RS232 settings, gpio settings, etc.)
-    pub fn initialize(&mut self, leave_pwr_alone: bool) -> Result<(), Error> {
-        if !self.initialized.get() {
-            defmt::info!(
-                "Initialising with PWR_ON pin: {:bool} and VInt pin: {:bool}",
-                self.config.pwr_pin.is_some(),
-                self.config.vint_pin.is_some()
-            );
+    fn initialize(&self, leave_pwr_alone: bool) -> Result<(), Error> {
+        defmt::info!(
+            "Initialising with PWR_ON pin: {:bool} and VInt pin: {:bool}",
+            self.config.try_borrow()?.pwr_pin.is_some(),
+            self.config.try_borrow()?.vint_pin.is_some()
+        );
 
-            match self.config.pwr_pin {
-                Some(ref mut pwr) if !leave_pwr_alone => {
-                    pwr.try_set_high().ok();
-                }
-                _ => {}
+        match self.config.try_borrow_mut()?.pwr_pin {
+            Some(ref mut pwr) if !leave_pwr_alone => {
+                pwr.try_set_high().ok();
             }
-
-            self.initialized.set(true);
+            _ => {}
         }
-
-        self.power_on()?;
 
         Ok(())
     }
 
-    fn power_on(&mut self) -> Result<(), Error> {
-        let vint_value = match self.config.vint_pin {
+    fn power_on(&self) -> Result<(), Error> {
+        let vint_value = match self.config.try_borrow_mut()?.vint_pin {
             Some(ref _vint) => false,
             _ => false,
         };
 
         if vint_value || self.is_alive(1).is_ok() {
             defmt::debug!("powering on, module is already on, flushing config...");
-            self.configure()?;
         } else {
             defmt::debug!("powering on.");
-            if let Some(ref mut pwr) = self.config.pwr_pin {
+            if let Some(ref mut pwr) = self.config.try_borrow_mut()?.pwr_pin {
                 pwr.try_set_low().ok();
                 self.delay
                     .try_borrow_mut()?
@@ -391,7 +423,6 @@ where
                 .try_delay_ms(crate::module_cfg::constants::BOOT_WAIT_TIME_MS)
                 .map_err(|_| Error::Busy)?;
             self.is_alive(10)?;
-            self.configure()?;
         }
         Ok(())
     }
@@ -417,7 +448,7 @@ where
     }
 
     fn configure(&self) -> Result<(), Error> {
-        if self.config.baud_rate > 230_400_u32 {
+        if self.config.try_borrow()?.baud_rate > 230_400_u32 {
             // Needs a way to reconfigure uart baud rate temporarily
             // Relevant issue: https://github.com/rust-embedded/embedded-hal/issues/79
             return Err(Error::_Unknown);
@@ -473,12 +504,21 @@ where
             false,
         )?;
 
-        // self.send_internal(
-        //     &mobile_control::SetAutomaticTimezoneUpdate {
-        //         on_off: AutomaticTimezone::EnabledLocal,
-        //     },
-        //     false,
-        // )?;
+        if self.config.try_borrow()?.hex_mode {
+            self.send_internal(
+                &SetHexMode {
+                    hex_mode_disable: HexMode::Enabled,
+                },
+                false,
+            )?;
+        } else {
+            self.send_internal(
+                &SetHexMode {
+                    hex_mode_disable: HexMode::Disabled,
+                },
+                false,
+            )?;
+        }
 
         // self.send_internal(&general::IdentificationInformation { n: 9 }, true)?;
 
@@ -491,7 +531,7 @@ where
             false,
         )?;
 
-        if self.config.flow_control {
+        if self.config.try_borrow()?.flow_control {
             self.send_internal(
                 &SetFlowControl {
                     value: FlowControl::RtsCts,
@@ -529,19 +569,168 @@ where
         Ok(())
     }
 
-    pub fn spin(&self) -> Result<(), Error> {
+    pub fn spin(&self) -> nb::Result<(), Error> {
         self.handle_urc().ok();
 
-        // TODO: check registration and re-register if needed
+        let mut fsm = self
+            .fsm
+            .try_borrow_mut()
+            .map_err(|e| nb::Error::Other(e.into()))?;
 
-        if self.network_status.borrow().is_registered() {
-            self.sockets
-                .try_borrow_mut()?
-                .iter_mut()
-                .try_for_each(|(_, socket)| self.socket_ingress(socket))?;
-        }
+        let new_state = match fsm.get_state() {
+            State::Init => match self.initialize(true) {
+                Ok(()) => State::PowerOn,
+                Err(_) => return fsm.retry_or_fail(),
+            },
+            State::PowerOn => match self.power_on() {
+                Ok(()) => State::Configure,
+                Err(_) => return fsm.retry_or_fail(),
+            },
+            State::Configure => match self.configure() {
+                Ok(()) => State::SimPin,
+                Err(_) => return fsm.retry_or_fail(),
+            },
+            State::SimPin => {
+                self.send_internal(
+                    &SetNetworkRegistrationStatus {
+                        n: NetworkRegistrationUrcConfig::UrcEnabled,
+                    },
+                    true,
+                )?;
 
-        Ok(())
+                self.send_internal(
+                    &SetGPRSNetworkRegistrationStatus {
+                        n: GPRSNetworkRegistrationUrcConfig::UrcEnabled,
+                    },
+                    true,
+                )?;
+
+                self.send_internal(
+                    &SetEPSNetworkRegistrationStatus {
+                        n: EPSNetworkRegistrationUrcConfig::UrcEnabled,
+                    },
+                    true,
+                )?;
+
+                // TODO: Handle SIM Pin insert here
+
+                // let APNInfo {
+                //     apn,
+                //     user_name,
+                //     password,
+                // } = &self.config.apn_info;
+
+                // let apn = match apn {
+                //     Apn::Given(apn) => apn.as_str(),
+                //     Apn::Automatic => {
+                //         // Lookup APN in DB!
+                //         unimplemented!()
+                //     }
+                // };
+
+                // Set up authentication mode, if required
+                // if user_name.is_some() || password.is_some() {
+                //     // TODO: `AT+UAUTHREQ=` here
+                //     {
+                //         cid: CONTEXT_ID,
+                //         auth_type: AuthType::Automatic,
+                //         username: apn_info.user_name.unwrap_or_default(),
+                //         password: apn_info.user_name.unwrap_or_default(),
+                //     }
+                // }
+
+                // Now come out of airplane mode and try to register
+                self.send_internal(
+                    &SetModuleFunctionality {
+                        fun: Functionality::Full,
+                        rst: None,
+                    },
+                    true,
+                )?;
+
+                // self.send_internal(
+                //     &mobile_control::SetAutomaticTimezoneUpdate {
+                //         on_off: AutomaticTimezone::EnabledLocal,
+                //     },
+                //     true,
+                // )?;
+
+                State::SignalQuality
+            }
+            State::SignalQuality => State::RegisteringNetwork,
+            State::RegisteringNetwork => {
+                if !self
+                    .network_status
+                    .try_borrow()
+                    .map_err(|e| nb::Error::Other(e.into()))?
+                    .is_registered()
+                {
+                    if !fsm.is_retry() {
+                        self.network_registration(None)?;
+                    }
+
+                    return fsm.retry_or_fail();
+                }
+                State::AttachingNetwork
+            }
+            State::AttachingNetwork => {
+                if self.attach().is_err() {
+                    return fsm.retry_or_fail();
+                }
+                State::ActivatingContext
+            }
+            State::ActivatingContext => {
+                // Activate a PDP context
+                //TODO: Check AT+CGACT? to verify that `CONTEXT_ID` is active
+
+                // If not active, help it on its way.
+                self.send_internal(
+                    &SetPDPContextState {
+                        status: PDPContextStatus::Activated,
+                        cid: Some(CONTEXT_ID),
+                    },
+                    true,
+                )?;
+
+                // PDP context active
+                self.send_internal(
+                    &SetPacketSwitchedConfig {
+                        profile_id: PROFILE_ID,
+                        param: psn::types::PacketSwitchedParam::MapProfile(CONTEXT_ID),
+                    },
+                    true,
+                )?;
+
+                if self
+                    .send_internal(
+                        &SetPacketSwitchedAction {
+                            profile_id: PROFILE_ID,
+                            action: PacketSwitchedAction::Activate,
+                        },
+                        true,
+                    )
+                    .is_err()
+                {
+                    defmt::warn!("Failed UPSDA!");
+                    return fsm.retry_or_fail();
+                }
+
+                State::Ready
+            }
+            State::Ready => {
+                self.sockets
+                    .try_borrow_mut()
+                    .map_err(|e| nb::Error::Other(e.into()))?
+                    .iter_mut()
+                    .try_for_each(|(_, socket)| self.socket_ingress(socket))?;
+
+                return Ok(());
+            }
+        };
+
+        fsm.set_state(new_state);
+
+        Err(nb::Error::WouldBlock)
     }
 
     fn handle_urc(&self) -> Result<(), Error> {
@@ -621,197 +810,52 @@ where
         }
     }
 
-    pub fn nwk_registration(&self) -> Result<(), Error> {
-        if !self.network_status.try_borrow()?.is_registered() {
-            self.send_internal(
-                &SetNetworkRegistrationStatus {
-                    n: NetworkRegistrationUrcConfig::UrcDisabled,
-                },
-                true,
-            )?;
+    pub fn network_registration(&self, plmn: Option<&str>) -> Result<(), Error> {
+        match plmn {
+            Some(p) => {
+                defmt::debug!("Manual network registration to {:str}", p);
+                // TODO: https://github.com/ARMmbed/mbed-os/blob/master/connectivity/cellular/source/framework/AT/AT_CellularNetwork.cpp#L227
+                // self.send_internal(
+                //     &SetOperatorSelection {
+                //         mode: OperatorSelectionMode::Manual,
+                //     },
+                //     true,
+                // )?;
+            }
+            None => {
+                defmt::debug!("Automatic network registration");
+                let cops = self.send_internal(&GetOperatorSelection, true)?;
 
-            self.send_internal(
-                &SetGPRSNetworkRegistrationStatus {
-                    n: GPRSNetworkRegistrationUrcConfig::UrcEnabled,
-                },
-                true,
-            )?;
-
-            self.send_internal(
-                &SetEPSNetworkRegistrationStatus {
-                    n: EPSNetworkRegistrationUrcConfig::UrcEnabled,
-                },
-                true,
-            )?;
-
-            let cops = self.send_internal(&GetOperatorSelection, true)?;
-
-            match cops.mode {
-                OperatorSelectionMode::Automatic => {}
-                _ => {
-                    self.send_internal(
-                        &SetOperatorSelection {
-                            mode: OperatorSelectionMode::Automatic,
-                        },
-                        true,
-                    )?;
+                match cops.mode {
+                    OperatorSelectionMode::Automatic => {}
+                    _ => {
+                        self.send_internal(
+                            &SetOperatorSelection {
+                                mode: OperatorSelectionMode::Automatic,
+                            },
+                            true,
+                        )?;
+                    }
                 }
             }
-
-            defmt::info!("Done preparing connect..");
         }
+
         Ok(())
     }
 
-    pub fn try_connect(&self, apn_info: &APNInfo) -> Result<(), Error> {
-        defmt::info!("Attempting connect..");
-        // Set up context definition
-        match apn_info.apn {
-            Apn::Given(ref apn) => {
-                self.send_internal(
-                    &SetPDPContextDefinition {
-                        cid: CONTEXT_ID,
-                        PDP_type: "IP",
-                        apn: apn.as_str(),
-                    },
-                    true,
-                )?;
-            }
-            Apn::Automatic => {
-                // Lookup APN in DB!
-            }
+    pub fn attach(&self) -> Result<(), Error> {
+        let GPRSAttached { state } = self.send_internal(&GetGPRSAttached, true)?;
+
+        if state != GPRSAttachedState::Attached {
+            defmt::debug!("Network attach");
+            self.send_internal(
+                &SetGPRSAttached {
+                    state: GPRSAttachedState::Attached,
+                },
+                true,
+            )?;
         }
-
-        // Set up authentication mode, if required
-        if apn_info.user_name.is_some() || apn_info.password.is_some() {
-            // TODO: `AT+UAUTHREQ=` here
-            // {
-            //     cid: CONTEXT_ID,
-            //     auth_type: AuthType::Automatic,
-            //     username: apn_info.user_name.unwrap_or_default(),
-            //     password: apn_info.user_name.unwrap_or_default(),
-            // }
-        }
-
-        // Now come out of airplane mode and try to register
-        self.send_internal(
-            &SetModuleFunctionality {
-                fun: Functionality::Full,
-                rst: None,
-            },
-            true,
-        )?;
-
-        // Wait for registration to succeed
-        let mut i: u8 = 0;
-        while i < 180 && !self.network_status.try_borrow()?.is_registered() {
-            let (ran, status) = match i % 2 {
-                // 0 => self
-                //     .send_internal(&GetNetworkRegistrationStatus, true)
-                //     .map(|s| (RadioAccessNetwork::Geran, s.stat.into()))?,
-                0 => self
-                    .send_internal(&GetGPRSNetworkRegistrationStatus, true)
-                    .map(|s| (RadioAccessNetwork::Utran, s.stat.into()))?,
-                _ => self
-                    .send_internal(&GetEPSNetworkRegistrationStatus, true)
-                    .map(|s| (RadioAccessNetwork::Eutran, s.stat.into()))?,
-            };
-
-            self.network_status.try_borrow_mut()?.set(ran, status);
-
-            // delay 1000 ms
-            self.delay
-                .try_borrow_mut()?
-                .try_delay_ms(1000)
-                .map_err(|_| Error::Busy)?;
-
-            i += 1;
-        }
-
-        if self.network_status.try_borrow()?.is_registered() {
-            // Network is registered!
-
-            // Now, technically speaking, EUTRAN should be good to go, PDP context
-            // and everything, and we should only have to activate a PDP context on
-            // GERAN.  However, for reasons I don't understand, SARA-R4 can be
-            // registered but not attached (i.e. AT+CGATT returns 0) on both RATs
-            // (unh?).  Phil Ware, who knows about these things, always goes through
-            // (a) register, (b) wait for AT+CGATT to return 1 and then (c) check
-            // that a context is active with AT+CGACT (even for EUTRAN). Since this
-            // sequence works for both RANs, it's best to be consistent. Wait for
-            // AT+CGATT to return 1 SARA R4/N4 AT Command Manual UBX-17003787,
-            // section 13.5
-            let mut attempt: u8 = 0;
-            while self.send_internal(&GetGPRSAttached, true)?.state != GPRSAttachedState::Attached
-                && attempt < 10
-            {
-                // delay 1000 ms
-                self.delay
-                    .try_borrow_mut()?
-                    .try_delay_ms(1000)
-                    .map_err(|_| Error::Busy)?;
-
-                attempt += 1;
-            }
-
-            if attempt < 10 {
-                // Activate a PDP context
-                //TODO: Check AT+CGACT? to verify that `CONTEXT_ID` is active
-
-                // If not active, help it on its way.
-                self.delay
-                    .try_borrow_mut()?
-                    .try_delay_ms(1000)
-                    .map_err(|_| Error::Busy)?;
-
-                self.send_internal(
-                    &SetPDPContextState {
-                        status: PDPContextStatus::Activated,
-                        cid: Some(CONTEXT_ID),
-                    },
-                    true,
-                )?;
-
-                // PDP context active
-                self.send_internal(
-                    &SetPacketSwitchedConfig {
-                        profile_id: PROFILE_ID,
-                        param: psn::types::PacketSwitchedParam::MapProfile(CONTEXT_ID),
-                    },
-                    true,
-                )?;
-
-                for _ in 0..10 {
-                    match self.send_internal(
-                        &SetPacketSwitchedAction {
-                            profile_id: PROFILE_ID,
-                            action: PacketSwitchedAction::Activate,
-                        },
-                        true,
-                    ) {
-                        Ok(_) => return Ok(()),
-                        Err(_) => {
-                            defmt::warn!("Failed UPSDA!");
-                        }
-                    }
-
-                    self.delay
-                        .try_borrow_mut()?
-                        .try_delay_ms(1000)
-                        .map_err(|_| Error::Busy)?;
-                }
-            }
-        }
-
-        self.send_internal(
-            &SetModuleFunctionality {
-                fun: Functionality::AirplaneMode,
-                rst: None,
-            },
-            true,
-        )?;
-
-        Err(Error::_Unknown)
+        Ok(())
     }
 
     #[inline]
@@ -846,7 +890,7 @@ where
     }
 
     pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
-        if !self.initialized.get() {
+        if self.fsm.try_borrow()?.get_state() == State::Init {
             return Err(Error::Uninitialized);
         }
 

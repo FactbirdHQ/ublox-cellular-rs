@@ -76,8 +76,8 @@ where
         //     })?;
         // }
 
-        self.nwk_registration()?;
-        self.try_connect(&self.config.apn_info)?;
+        // self.nwk_registration()?;
+        // self.try_connect(&self.config.apn_info)?;
         // let psn::responses::GPRSAttached { state } = self.send_at(&psn::GetGPRSAttached)?;
 
         // if state == GPRSAttachedState::Detached {

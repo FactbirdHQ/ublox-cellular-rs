@@ -57,23 +57,23 @@ where
 
         // while self.send_at(&general::GetCCID).is_err() {}
 
-        if self.config.hex_mode {
-            self.send_at(&ip_transport_layer::SetHexMode {
-                hex_mode_disable: HexMode::Enabled,
-            })?;
-        } else {
-            self.send_at(&ip_transport_layer::SetHexMode {
-                hex_mode_disable: HexMode::Disabled,
-            })?;
-        }
+        // if self.config.try_borrow()?.hex_mode {
+        //     self.send_at(&ip_transport_layer::SetHexMode {
+        //         hex_mode_disable: HexMode::Enabled,
+        //     })?;
+        // } else {
+        //     self.send_at(&ip_transport_layer::SetHexMode {
+        //         hex_mode_disable: HexMode::Disabled,
+        //     })?;
+        // }
 
         Ok(())
     }
 
     fn shutdown(&self, secure: bool) -> Result<(), Error> {
-        if secure {
-            self.send_at(&mobile_control::ModuleSwitchOff)?;
-        }
+        // if secure {
+        //     self.send_at(&mobile_control::ModuleSwitchOff)?;
+        // }
         Ok(())
     }
 

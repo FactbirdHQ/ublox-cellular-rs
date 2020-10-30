@@ -23,6 +23,7 @@ pub enum Error {
     InvalidHex,
     Dns,
     Uninitialized,
+    StateTimeout,
     _Unknown,
 }
 

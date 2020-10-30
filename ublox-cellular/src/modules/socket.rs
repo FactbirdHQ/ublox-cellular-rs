@@ -140,7 +140,7 @@ where
                         return Err(Error::BadLength);
                     }
 
-                    let demangled = if self.config.hex_mode {
+                    let demangled = if self.config.try_borrow()?.hex_mode {
                         hex::from_hex(unsafe { data.as_bytes_mut() })
                             .map_err(|_| Error::InvalidHex)?
                     } else {
@@ -188,7 +188,7 @@ where
                         return Err(Error::BadLength);
                     }
 
-                    let demangled = if self.config.hex_mode {
+                    let demangled = if self.config.try_borrow()?.hex_mode {
                         hex::from_hex(unsafe { data.as_bytes_mut() })
                             .map_err(|_| Error::InvalidHex)?
                     } else {
