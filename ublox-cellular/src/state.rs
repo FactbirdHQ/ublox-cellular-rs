@@ -62,12 +62,12 @@ impl StateMachine {
         CNT::Time: From<u32>,
     {
         // Handle retry based on exponential backoff here
-        if self.is_retry() {
-            if self.retry_count >= self.max_retry_attempts {
-                // Max attempts reached! Bail with a timeout error
-                return nb::Error::Other(Error::StateTimeout);
-            }
+        if self.is_retry() && self.retry_count >= self.max_retry_attempts {
+            // Max attempts reached! Bail with a timeout error
+            return nb::Error::Other(Error::StateTimeout);
         }
+
+        // TODO: Change to a poor-mans exponential
         let backoff_time = (self.retry_count as u32 + 1) * 1000;
 
         if let Err(_) = timer.try_start(backoff_time) {
