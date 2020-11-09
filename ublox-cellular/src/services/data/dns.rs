@@ -1,28 +1,21 @@
 use atat::AtatClient;
 use core::fmt::Write;
-use embedded_hal::{blocking::delay::DelayMs, digital::{OutputPin, InputPin}};
 use embedded_nal::{AddrType, Dns};
-use heapless::{consts, ArrayLength, Bucket, Pos, PowerOfTwo, String};
+use heapless::{consts, ArrayLength, Bucket, Pos, String};
 use no_std_net::IpAddr;
 
+use super::{socket::SocketSetItem, DataService, Error};
 use crate::{
     command::dns::{self, types::ResolutionType},
-    error::Error,
-    GsmClient,
 };
 
-impl<C, DLY, N, L, RST, DTR, PWR, VINT> Dns for GsmClient<C, DLY, N, L, RST, DTR, PWR, VINT>
+
+impl<'a, C, N, L> Dns for DataService<'a, C, N, L>
 where
     C: AtatClient,
-    DLY: DelayMs<u32>,
-    RST: OutputPin,
-    PWR: OutputPin,
-    DTR: OutputPin,
-    VINT: InputPin,
-    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>
+    N: ArrayLength<Option<SocketSetItem<L>>>
         + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>
-        + PowerOfTwo,
+        + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     type Error = Error;
@@ -31,10 +24,13 @@ where
         let mut ip_str = String::<consts::U256>::new();
         write!(&mut ip_str, "{}", ip_addr).map_err(|_| Error::BadLength)?;
 
-        let resp = self.send_at(&dns::ResolveNameIp {
-            resolution_type: ResolutionType::IpToDomainName,
-            ip_domain_string: &ip_str,
-        })?;
+        let resp = self.network.send_internal(
+            &dns::ResolveNameIp {
+                resolution_type: ResolutionType::IpToDomainName,
+                ip_domain_string: &ip_str,
+            },
+            true,
+        )?;
 
         Ok(String::from(resp.ip_domain_string.as_str()))
     }
@@ -44,10 +40,13 @@ where
             return Err(Error::Dns);
         }
 
-        let resp = self.send_at(&dns::ResolveNameIp {
-            resolution_type: ResolutionType::DomainNameToIp,
-            ip_domain_string: hostname,
-        })?;
+        let resp = self.network.send_internal(
+            &dns::ResolveNameIp {
+                resolution_type: ResolutionType::DomainNameToIp,
+                ip_domain_string: hostname,
+            },
+            true,
+        )?;
 
         resp.ip_domain_string.parse().map_err(|_e| Error::Dns)
     }

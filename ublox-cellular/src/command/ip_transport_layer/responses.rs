@@ -1,6 +1,6 @@
 //! Responses for Internet protocol transport layer Commands
 use super::types::*;
-use crate::sockets::{IngressChunkSize, SocketHandle};
+use crate::services::data::{socket::SocketHandle, IngressChunkSize};
 use atat::atat_derive::AtatResp;
 use core::ops::Mul;
 use heapless::{consts, String};

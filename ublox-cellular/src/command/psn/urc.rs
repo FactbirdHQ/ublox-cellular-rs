@@ -1,17 +1,23 @@
 //! Unsolicited responses for Packet Switched Data Services Commands
 use super::types::*;
+use crate::network::ProfileId;
 use atat::atat_derive::AtatResp;
+use embedded_nal::IpAddr;
 
+/// +UUPSDA
 #[derive(Clone, AtatResp)]
 pub struct DataConnectionActivated {
     #[at_arg(position = 0)]
     pub result: u8,
+    #[at_arg(position = 1, len = 39)]
+    pub ip_addr: Option<IpAddr>,
 }
 
+/// +UUPSDD
 #[derive(Clone, AtatResp)]
 pub struct DataConnectionDeactivated {
     #[at_arg(position = 0)]
-    pub profile_id: u8,
+    pub profile_id: ProfileId,
 }
 
 /// 18.27 GPRS network registration status +CGREG

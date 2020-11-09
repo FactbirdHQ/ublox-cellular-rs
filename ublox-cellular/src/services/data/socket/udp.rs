@@ -2,8 +2,7 @@ use core::cmp::min;
 
 use heapless::ArrayLength;
 
-use super::{Error, Result};
-use crate::socket::{RingBuffer, Socket, SocketHandle, SocketMeta};
+use super::{Error, Result, RingBuffer, Socket, SocketHandle, SocketMeta};
 pub use embedded_nal::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 /// A UDP socket ring buffer.
@@ -91,18 +90,9 @@ impl<L: ArrayLength<u8>> UdpSocket<L> {
     #[inline]
     pub fn is_open(&self) -> bool {
         match self.endpoint {
-            SocketAddr::V4(ipv4) => {
-                if ipv4.port() == 0 {
-                    return false;
-                }
-            }
-            SocketAddr::V6(ipv6) => {
-                if ipv6.port() == 0 {
-                    return false;
-                }
-            }
+            SocketAddr::V4(ipv4) => ipv4.port() != 0,
+            SocketAddr::V6(ipv6) => ipv6.port() != 0,
         }
-        true
     }
 
     /// Check whether the receive buffer is full.

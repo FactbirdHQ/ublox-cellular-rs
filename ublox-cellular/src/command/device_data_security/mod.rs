@@ -47,6 +47,7 @@ use responses::*;
 use types::*;
 
 use super::NoResponse;
+use crate::services::data::ssl::SecurityProfileId;
 
 /// 26.1.2 SSL/TLS certificates and private keys manager +USECMNG
 ///
@@ -136,7 +137,7 @@ pub struct SecurityProfileManager<'a> {
     /// by other parameters the profile settings will be reset (set to
     /// factory-programmed value)
     #[at_arg(position = 0, len = 1)]
-    pub profile_id: u8,
+    pub profile_id: SecurityProfileId,
     #[at_arg(position = 1)]
     pub operation: Option<SecurityProfileOperation<'a>>,
 }

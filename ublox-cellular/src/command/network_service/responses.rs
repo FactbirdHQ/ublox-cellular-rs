@@ -1,7 +1,7 @@
 //! Responses for Network service Commands
 use super::types::*;
 use atat::atat_derive::AtatResp;
-use heapless::{String, consts};
+use heapless::{consts, String};
 
 /// 7.5 Operator selection +COPS
 #[derive(Clone, AtatResp)]
@@ -13,7 +13,7 @@ pub struct OperatorSelection {
     #[at_arg(position = 2)]
     pub oper: Option<String<consts::U24>>,
     #[at_arg(position = 3)]
-    pub stat: Option<u8>
+    pub act: Option<u8>,
 }
 
 /// 7.8 Radio Access Technology (RAT) selection +URAT

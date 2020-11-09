@@ -9,9 +9,9 @@ use heapless::ArrayLength;
 // #[cfg(feature = "socket-raw")]
 // use crate::socket::RawSocket;
 #[cfg(feature = "socket-tcp")]
-use crate::socket::TcpSocket;
+use super::TcpSocket;
 #[cfg(feature = "socket-udp")]
-use crate::socket::UdpSocket;
+use super::UdpSocket;
 
 /// A trait for tracking a socket usage session.
 ///

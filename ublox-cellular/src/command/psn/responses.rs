@@ -1,5 +1,6 @@
 //! Responses for Packet Switched Data Services Commands
 use super::types::*;
+use crate::network::ProfileId;
 use atat::atat_derive::AtatResp;
 
 // 18.7 Packet switched data configuration +UPSD Sets or reads all the
@@ -11,7 +12,7 @@ use atat::atat_derive::AtatResp;
 #[derive(AtatResp)]
 pub struct PacketSwitchedConfig {
     #[at_arg(position = 0)]
-    pub profile_id: u8,
+    pub profile_id: ProfileId,
     #[at_arg(position = 1)]
     pub param: PacketSwitchedParam,
 }
@@ -23,7 +24,7 @@ pub struct PacketSwitchedConfig {
 #[derive(Debug, AtatResp)]
 pub struct PacketSwitchedNetworkData {
     #[at_arg(position = 0)]
-    pub profile: u8,
+    pub profile: ProfileId,
     #[at_arg(position = 1)]
     pub param: PacketSwitchedNetworkDataParam,
     #[at_arg(position = 2)]
@@ -48,7 +49,7 @@ pub struct GPRSAttached {
 #[derive(Clone, AtatResp)]
 pub struct PDPContextState {
     #[at_arg(position = 0)]
-    pub status: PDPContextStatus
+    pub status: PDPContextStatus,
 }
 
 /// 18.27 GPRS network registration status +CGREG

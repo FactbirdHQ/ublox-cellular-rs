@@ -72,7 +72,7 @@ pub enum RatPreferred {
     /// • 2: UTRAN
     Utran = 2,
     /// • 3: LTE
-    Lte = 3
+    Lte = 3,
 }
 
 /// Indicates the radio access technology

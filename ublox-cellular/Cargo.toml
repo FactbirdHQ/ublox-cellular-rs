@@ -17,6 +17,7 @@ doctest = false
 [dependencies]
 heapless = { version = "^0.5", features = ["serde"] }
 no-std-net = { version = "0.4.0", features = ["serde"] }
+# embedded-hal = { version = "1.0.0-alpha.3" }
 embedded-hal = { git = "https://github.com/MathiasKoch/embedded-hal", branch = "feature/alternative-storage" }
 nb = "^1"
 # atat = { version = "^0.5.1", features = ["derive"] }
@@ -28,13 +29,15 @@ serde = { version = "^1", default-features = false, features = ["derive"] }
 embedded-nal = { git = "https://github.com/MathiasKoch/embedded-nal", branch = "factbird-mini-1.0" }
 typenum = "^1"
 defmt = { git = "https://github.com/knurling-rs/defmt", rev = "be7f4a7cbe8a61e005f55fed1a41b11f85cb8ed6" }
+hash32 = "*"
+hash32-derive = "*"
 
 [features]
 default = [
     "toby-r2",
     "socket-udp",
     "socket-tcp",
-    "atat/defmt-debug"
+    "atat/defmt-info"
 ]
 
 topy-l4 = []

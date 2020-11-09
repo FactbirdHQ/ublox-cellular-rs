@@ -1,5 +1,5 @@
 use super::types::*;
-use crate::error::Error;
+use crate::network::Error;
 
 impl NetworkRegistrationStat {
     pub fn is_access_alive(&self) -> bool {
@@ -12,7 +12,7 @@ impl NetworkRegistrationStat {
 
     pub fn registration_ok(self) -> Result<Self, Error> {
         match self {
-            NetworkRegistrationStat::RegistrationDenied => Err(Error::Network),
+            NetworkRegistrationStat::RegistrationDenied => Err(Error::RegistrationDenied),
             _ => Ok(self),
         }
     }

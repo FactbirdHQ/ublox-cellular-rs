@@ -47,6 +47,6 @@ pub enum Urc {
     ExtendedPSNetworkRegistration(psn::urc::ExtendedPSNetworkRegistration),
 }
 
-impl atat::AtatLen for crate::sockets::SocketHandle {
+impl atat::AtatLen for crate::services::data::socket::SocketHandle {
     type Len = heapless::consts::U1;
 }

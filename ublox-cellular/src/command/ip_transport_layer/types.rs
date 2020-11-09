@@ -1,4 +1,5 @@
 //! Argument and parameter types used by Internet protocol transport layer Commands and Responses
+use crate::services::data::ssl::SecurityProfileId;
 use atat::atat_derive::AtatEnum;
 
 #[derive(Clone, PartialEq, AtatEnum)]
@@ -8,13 +9,15 @@ pub enum SocketProtocol {
 }
 
 #[derive(Clone, PartialEq, AtatEnum)]
-// TODO: Enabled(u8), once serde_at handles tuples, see https://github.com/BlackbirdHQ/atat/issues/37
+#[at_enum(u8)]
 pub enum SslTlsStatus {
     /// 0 (default value): disable the SSL/TLS on the socket
-    Disabled = 0,
+    #[at_arg(value = 0)]
+    Disabled,
     /// 1: enable the SSL/TLS on the socket; a USECMNG profile can be specified
     /// with the <usecmng_profile_id> parameter.
-    Enabled = 1,
+    #[at_arg(value = 1)]
+    Enabled(SecurityProfileId),
 }
 
 /// Enables/disables the HEX mode for +USOWR, +USOST, +USORD and +USORF AT

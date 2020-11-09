@@ -27,9 +27,9 @@ pub mod urc;
 use atat::atat_derive::AtatCmd;
 use responses::*;
 use types::*;
-use heapless::{String, consts};
 
 use super::NoResponse;
+use crate::network::{ContextId, ProfileId};
 
 /// 18.4 PDP context definition +CGDCONT
 ///
@@ -78,11 +78,11 @@ use super::NoResponse;
 #[at_cmd("+CGDCONT", NoResponse)]
 pub struct SetPDPContextDefinition<'a> {
     #[at_arg(position = 0)]
-    pub cid: u8,
+    pub cid: ContextId,
     #[at_arg(position = 1, len = 6)]
-    pub PDP_type: &'a str,
+    pub pdp_type: &'a str,
     #[at_arg(position = 2, len = 99)]
-    pub apn: &'a str
+    pub apn: &'a str,
 }
 
 /// 18.7 Set Packet switched data configuration +UPSD
@@ -96,7 +96,7 @@ pub struct SetPDPContextDefinition<'a> {
 #[at_cmd("+UPSD", NoResponse)]
 pub struct SetPacketSwitchedConfig {
     #[at_arg(position = 0)]
-    pub profile_id: u8,
+    pub profile_id: ProfileId,
     #[at_arg(position = 1)]
     pub param: PacketSwitchedParam,
 }
@@ -112,7 +112,7 @@ pub struct SetPacketSwitchedConfig {
 #[at_cmd("+UPSD", PacketSwitchedConfig)]
 pub struct GetPacketSwitchedConfig {
     #[at_arg(position = 0)]
-    pub profile_id: u8,
+    pub profile_id: ProfileId,
     #[at_arg(position = 1)]
     pub param: PacketSwitchedParamReq, // NOTE: Currently reading all at once is unsupported!
 }
@@ -133,7 +133,7 @@ pub struct GetPacketSwitchedConfig {
 #[at_cmd("+UPSDA", NoResponse, timeout_ms = 180000, abortable = true)]
 pub struct SetPacketSwitchedAction {
     #[at_arg(position = 0)]
-    pub profile_id: u8,
+    pub profile_id: ProfileId,
     #[at_arg(position = 1)]
     pub action: PacketSwitchedAction,
 }
@@ -147,7 +147,7 @@ pub struct SetPacketSwitchedAction {
 #[at_cmd("+UPSND", PacketSwitchedNetworkData)]
 pub struct GetPacketSwitchedNetworkData {
     #[at_arg(position = 0)]
-    pub profile_id: u8,
+    pub profile_id: ProfileId,
     #[at_arg(position = 1)]
     pub param: PacketSwitchedNetworkDataParam,
 }
@@ -171,7 +171,7 @@ pub struct SetGPRSAttached {
 
 /// 18.14 Read GPRS attach or detach +CGATT
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CGATT?", GPRSAttached, timeout_ms = 180000, abortable = true)]
+#[at_cmd("+CGATT?", GPRSAttached, timeout_ms = 10000, abortable = true)]
 pub struct GetGPRSAttached;
 
 /// 18.16 PDP context activate or deactivate +CGACT
@@ -225,7 +225,7 @@ pub struct SetPDPContextState {
     #[at_arg(position = 0)]
     pub status: PDPContextStatus,
     #[at_arg(position = 1)]
-    pub cid: Option<u8>
+    pub cid: Option<ContextId>,
 }
 
 /// 18.14 Read PDP context state +CGACT
@@ -345,3 +345,35 @@ pub struct SetEPSNetworkRegistrationStatus {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+CEREG?", EPSNetworkRegistrationStatus)]
 pub struct GetEPSNetworkRegistrationStatus;
+
+/// 18.39 Configure the authentication parameters of a PDP/EPS bearer +UAUTHREQ
+///
+/// Configures the authentication parameters of a defined PDP/EPS bearer. The
+/// authentication parameters will be sent during the context activation phase
+/// as a protocol configuration options (PCO) information element.
+///
+/// **NOTES:**
+/// - **LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 / SARA-G3** - When <auth_type>=3
+///   is set, AT+CGACT=1,<cid> may trigger at most 3 PDP context activation
+///   requests for <cid> to the protocol stack. The first request for <cid> is
+///   done with no authentication. If the PDP context activation fails, a second
+///   attempt is triggered with PAP authentication. If the second PDP context
+///   activation fails, a third attempt is triggered with CHAP authentication.
+///   These 3 PDP context activation requests are not to be confused with the
+///   effective number of request PDP context activations sent to the network
+///   (see the 3GPP TS 24.008 [12]).
+/// - **TOBY-L4 / TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 /
+///   SARA-G4 / SARA-G3** - The command returns an error result code if the
+///   input <cid> is already active or not yet defined.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+UAUTHREQ", NoResponse)]
+pub struct SetAuthParameters<'a> {
+    #[at_arg(position = 0)]
+    pub cid: ContextId,
+    #[at_arg(position = 1)]
+    pub auth_type: AuthenticationType,
+    #[at_arg(position = 2, len = 64)]
+    pub username: &'a str,
+    #[at_arg(position = 3, len = 64)]
+    pub password: &'a str,
+}

@@ -70,7 +70,6 @@ pub enum SocketType {
     Tcp,
 }
 
-
 impl<L: ArrayLength<u8>> Socket<L> {
     pub fn get_type(&self) -> SocketType {
         match self {
@@ -93,6 +92,13 @@ impl<L: ArrayLength<u8>> Socket<L> {
         }
     }
 
+    pub fn rx_enqueue_slice(&mut self, data: &[u8]) -> usize {
+        match self {
+            Socket::Tcp(s) => s.rx_enqueue_slice(data),
+            Socket::Udp(s) => s.rx_enqueue_slice(data),
+        }
+    }
+
     pub fn rx_window(&self) -> usize {
         match self {
             Socket::Tcp(s) => s.rx_window(),
@@ -100,38 +106,12 @@ impl<L: ArrayLength<u8>> Socket<L> {
         }
     }
 
-    // TODO: Fun idea:
-    // pub fn ingress_with<F, A>(&mut self, f: F) -> Result<()>
-    // where
-    //     A: AtatCmd,
-    //     F: FnOnce(&impl AtatCmd) -> A::Response,
-    // {
-    //     if self.available_data() == 0 {
-    //         return Ok(());
-    //     }
-
-    //     match self {
-    //         Socket::Tcp(s) => {
-    //             if !s.can_recv() {
-    //                 return Err(Error::SocketSetFull);
-    //             }
-
-    //             let cmd = SocketReadCmd(ReadSocketData {
-    //                 socket: self.handle(),
-    //                 length: core::cmp::min(self.available_data(), IngressChunkSize::to_usize()),
-    //             });
-    //             f(cmd);
-    //         }
-    //         Socket::Udp(s) => {
-    //             let cmd = SocketReadCmd(ReadSocketData {
-    //                 socket: self.handle(),
-    //                 length: core::cmp::min(self.available_data(), IngressChunkSize::to_usize()),
-    //             });
-    //             f(cmd);
-    //         }
-    //     }
-    //     Ok(())
-    // }
+    pub fn can_recv(&self) -> bool {
+        match self {
+            Socket::Tcp(s) => s.can_recv(),
+            Socket::Udp(s) => s.can_recv(),
+        }
+    }
 }
 
 macro_rules! dispatch_socket {
@@ -165,10 +145,6 @@ impl<L: ArrayLength<u8>> Socket<L> {
     pub(crate) fn meta(&self) -> &SocketMeta {
         dispatch_socket!(self, |socket| &socket.meta)
     }
-
-    // pub(crate) fn meta_mut(&mut self) -> &mut SocketMeta {
-    //     dispatch_socket!(mut self, |socket| &mut socket.meta)
-    // }
 }
 
 impl<L: ArrayLength<u8>> SocketSession for Socket<L> {
@@ -204,10 +180,7 @@ macro_rules! from_socket {
 
 // #[cfg(feature = "socket-raw")]
 // from_socket!(RawSocket, Raw);
-// #[cfg(all(
-//     feature = "socket-icmp",
-//     any(feature = "proto-ipv4", feature = "proto-ipv6")
-// ))]
+// #[cfg(feature = "socket-icmp")]
 // from_socket!(IcmpSocket, Icmp);
 #[cfg(feature = "socket-udp")]
 from_socket!(UdpSocket<L>, Udp);

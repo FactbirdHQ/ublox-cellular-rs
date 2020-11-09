@@ -5,11 +5,10 @@ pub mod responses;
 pub mod types;
 pub mod urc;
 
+use super::NoResponse;
 use atat::atat_derive::AtatCmd;
 use responses::*;
 use types::*;
-use super::NoResponse;
-
 
 /// 7.5 Operator selection +COPS
 #[derive(Clone, AtatCmd)]

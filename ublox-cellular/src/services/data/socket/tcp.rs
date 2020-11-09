@@ -1,7 +1,6 @@
 use heapless::ArrayLength;
 
-use super::{Error, Result};
-use crate::socket::{RingBuffer, Socket, SocketHandle, SocketMeta};
+use super::{Error, Result, RingBuffer, Socket, SocketHandle, SocketMeta};
 
 /// A TCP socket ring buffer.
 pub type SocketBuffer<N> = RingBuffer<u8, N>;

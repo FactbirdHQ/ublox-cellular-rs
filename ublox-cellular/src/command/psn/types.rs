@@ -1,3 +1,4 @@
+use crate::network::ContextId;
 use atat::atat_derive::AtatEnum;
 use heapless::{consts, String};
 use no_std_net::IpAddr;
@@ -8,7 +9,7 @@ pub enum PDPContextStatus {
     /// 0: deactivated
     Deactivated = 0,
     /// 1: activated
-    Activated = 1
+    Activated = 1,
 }
 
 #[derive(Clone, PartialEq, AtatEnum)]
@@ -38,10 +39,7 @@ pub enum PacketSwitchedParam {
     /// notation form (2001:DB8:: address compression is allowed). The
     /// factory-programmed value is "0.0.0.0".
     #[at_arg(value = 4)]
-    DNS1(
-            #[at_arg(len = 45)]
-            IpAddr
-        ),
+    DNS1(#[at_arg(len = 45)] IpAddr),
     /// • 5: DNS2 - <param_val> is the text string of the secondary DNS address.
     /// IPv4 DNS addresses are specified in dotted decimal notation form (i.e.
     /// four numbers in range 0-255 separated by periods, e.g.
@@ -49,10 +47,7 @@ pub enum PacketSwitchedParam {
     /// notation form (2001:DB8:: address compression is allowed). The
     /// factory-programmed value is "0.0.0.0".
     #[at_arg(value = 5)]
-    DNS2(
-            #[at_arg(len = 45)]
-            IpAddr
-        ),
+    DNS2(#[at_arg(len = 45)] IpAddr),
     /// • 6: authentication - the <param_val> parameter selects the
     /// authentication type:
     #[at_arg(value = 6)]
@@ -64,10 +59,7 @@ pub enum PacketSwitchedParam {
     /// "0.0.0.0" means dynamic IP address assigned during PDP context
     /// activation
     #[at_arg(value = 7)]
-    IPAddress(
-            #[at_arg(len = 45)]
-            IpAddr
-        ),
+    IPAddress(#[at_arg(len = 45)] IpAddr),
     /// • 8: data compression - the <param_val> parameter refers to the default
     /// parameter named d_comp and selects the data compression type:
     #[at_arg(value = 8)]
@@ -199,7 +191,7 @@ pub enum PacketSwitchedParam {
     /// current profile to <cid> 6 o 7: map the current profile to <cid> 7 o 8:
     /// map the current profile to <cid> 8 CurrentProfileMap(u8),
     #[at_arg(value = 100)]
-    MapProfile(u8)
+    MapProfile(ContextId),
 }
 
 #[derive(Clone, PartialEq, AtatEnum)]
