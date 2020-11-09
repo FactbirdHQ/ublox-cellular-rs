@@ -1,4 +1,9 @@
-use crate::{APNInfo, command::{network_service, psn, Urc}, error::GenericError, state::{RANStatus, RadioAccessNetwork}};
+use crate::{
+    command::{network_service, psn, Urc},
+    error::GenericError,
+    state::{RANStatus, RadioAccessNetwork},
+    APNInfo,
+};
 use atat::{atat_derive::AtatLen, AtatClient};
 use core::cell::{BorrowError, BorrowMutError, Cell, RefCell};
 use hash32_derive::Hash32;
@@ -275,8 +280,7 @@ where
                 }) => {
                     defmt::info!("[URC] DataConnectionDeactivated {:?}", profile_id);
                     // Set the state of `profile_id`!
-                    self
-                        .set_profile_state(profile_id, ProfileState::Deactivated)
+                    self.set_profile_state(profile_id, ProfileState::Deactivated)
                         .ok();
                 }
                 Urc::MessageWaitingIndication(_) => {

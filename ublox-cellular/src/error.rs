@@ -47,17 +47,17 @@ impl From<DataServiceError> for Error {
         match e {
             DataServiceError::Generic(g) => Error::Generic(g),
             DataServiceError::Network(g) => Error::Network(g),
-            _ => Error::DataService(e)
+            _ => Error::DataService(e),
         }
     }
 }
 
 impl From<NetworkError> for Error {
     fn from(e: NetworkError) -> Self {
-         // Unwrap generic errors
-         match e {
+        // Unwrap generic errors
+        match e {
             NetworkError::Generic(g) => Error::Generic(g),
-            _ => Error::Network(e)
+            _ => Error::Network(e),
         }
     }
 }

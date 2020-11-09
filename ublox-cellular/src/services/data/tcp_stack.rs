@@ -108,12 +108,15 @@ where
             //     .try_delay_ms(50)
             //     .map_err(|_| Error::Busy)?;
 
-            let response = self.network.send_internal(
-                &WriteSocketDataBinary {
-                    data: serde_at::ser::Bytes(chunk),
-                },
-                false,
-            ).map_err(|e| nb::Error::Other(e.into()))?;
+            let response = self
+                .network
+                .send_internal(
+                    &WriteSocketDataBinary {
+                        data: serde_at::ser::Bytes(chunk),
+                    },
+                    false,
+                )
+                .map_err(|e| nb::Error::Other(e.into()))?;
 
             if response.length != chunk.len() {
                 return Err(nb::Error::Other(Error::BadLength));

@@ -5,10 +5,7 @@ use heapless::{consts, ArrayLength, Bucket, Pos, String};
 use no_std_net::IpAddr;
 
 use super::{socket::SocketSetItem, DataService, Error};
-use crate::{
-    command::dns::{self, types::ResolutionType},
-};
-
+use crate::command::dns::{self, types::ResolutionType};
 
 impl<'a, C, N, L> Dns for DataService<'a, C, N, L>
 where

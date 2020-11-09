@@ -1,7 +1,7 @@
-use core::cell::{BorrowError, BorrowMutError};
-use crate::network::Error as NetworkError;
-use crate::error::GenericError;
 use super::socket::Error as SocketError;
+use crate::error::GenericError;
+use crate::network::Error as NetworkError;
+use core::cell::{BorrowError, BorrowMutError};
 
 #[derive(Debug, defmt::Format)]
 pub enum Error {
@@ -20,14 +20,14 @@ pub enum Error {
 
     Generic(GenericError),
 
-    _Unknown
+    _Unknown,
 }
 
 impl From<NetworkError> for Error {
     fn from(e: NetworkError) -> Self {
         match e {
             NetworkError::Generic(g) => Error::Generic(g),
-            _ => Error::Network(e)
+            _ => Error::Network(e),
         }
     }
 }

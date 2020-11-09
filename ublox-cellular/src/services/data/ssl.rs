@@ -1,7 +1,6 @@
 use super::{
     socket::{SocketHandle, SocketSetItem},
-    DataService,
-    Error,
+    DataService, Error,
 };
 use crate::{
     command::device_data_security::{types::*, *},
