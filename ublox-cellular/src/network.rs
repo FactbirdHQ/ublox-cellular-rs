@@ -1,4 +1,6 @@
 use crate::{
+    command::network_service::responses::OperatorSelection,
+    command::network_service::types::RatAct,
     command::{network_service, psn, Urc},
     error::GenericError,
     state::{RANStatus, RadioAccessNetwork},
@@ -184,15 +186,19 @@ where
                 // )?;
             }
             None => {
-                defmt::debug!("Automatic network registration");
-                let cops = self.send_internal(&GetOperatorSelection, true)?;
+                let OperatorSelection {
+                    mode, oper, act, ..
+                } = self.send_internal(&GetOperatorSelection, true)?;
 
-                // FIXME: Is this correct?
-                // if cops.act.is_some() {
-                //     return Ok(());
-                // }
+                if let Some(oper) = oper {
+                    defmt::info!(
+                        "Connection with operator: \"{:str}\" using network technology: {:?}",
+                        oper.as_str(),
+                        act
+                    );
+                }
 
-                match cops.mode {
+                match mode {
                     OperatorSelectionMode::Automatic => {}
                     _ => {
                         self.send_internal(
@@ -322,5 +328,55 @@ where
                 }
                 nb::Error::WouldBlock => Error::_Unknown,
             })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    struct AtClient {
+        n_urcs_dequeued: u8,
+    }
+
+    impl AtatClient for AtClient {
+        fn send<A: atat::AtatCmd>(&mut self, cmd: &A) -> nb::Result<A::Response, atat::Error> {
+            unreachable!()
+        }
+
+        fn peek_urc_with<URC: atat::AtatUrc, F: FnOnce(URC::Response) -> bool>(&mut self, f: F) {
+            if let Ok(urc) = URC::parse(b"+UREG:0") {
+                if f(urc) {
+                    self.n_urcs_dequeued += 1;
+                }
+            }
+        }
+
+        fn check_response<A: atat::AtatCmd>(
+            &mut self,
+            cmd: &A,
+        ) -> nb::Result<A::Response, atat::Error> {
+            unreachable!()
+        }
+
+        fn get_mode(&self) -> atat::Mode {
+            unreachable!()
+        }
+    }
+
+    #[test]
+    fn unhandled_urcs() {
+        let tx = AtTx::new(AtClient { n_urcs_dequeued: 0 }, 5);
+
+        tx.handle_urc(|_| false);
+        assert_eq!(tx.client.borrow().n_urcs_dequeued, 0);
+        tx.handle_urc(|_| false);
+        tx.handle_urc(|_| false);
+        tx.handle_urc(|_| false);
+        tx.handle_urc(|_| false);
+        tx.handle_urc(|_| false);
+        assert_eq!(tx.client.borrow().n_urcs_dequeued, 1);
+        tx.handle_urc(|_| false);
+        assert_eq!(tx.client.borrow().n_urcs_dequeued, 1);
     }
 }

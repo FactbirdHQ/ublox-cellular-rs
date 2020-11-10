@@ -13,7 +13,7 @@ pub struct OperatorSelection {
     #[at_arg(position = 2)]
     pub oper: Option<String<consts::U24>>,
     #[at_arg(position = 3)]
-    pub act: Option<u8>,
+    pub act: Option<RatAct>,
 }
 
 /// 7.8 Radio Access Technology (RAT) selection +URAT

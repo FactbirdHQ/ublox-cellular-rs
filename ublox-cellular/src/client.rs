@@ -311,6 +311,15 @@ where
                 self.enable_network_urcs()?;
                 // TODO: Handle SIM Pin here
 
+                self.network.send_internal(
+                    &psn::SetPDPContextDefinition {
+                        cid: crate::ContextId(1),
+                        pdp_type: "IP",
+                        apn: "em",
+                    },
+                    true,
+                ).map_err(|e| nb::Error::Other(e.into()))?;
+
                 // Now come out of airplane mode and try to register
                 self.network
                     .send_internal(
@@ -337,6 +346,7 @@ where
                     .network
                     .send_internal(&GetCCID, true)
                     .map_err(|e| nb::Error::Other(e.into()))?;
+
                 defmt::info!("CCID: {:?}", ccid.to_le_bytes());
 
                 Ok(State::RegisteringNetwork)

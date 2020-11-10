@@ -24,6 +24,30 @@ pub enum OperatorSelectionMode {
     /// • 8: network timing advance search
     NetworkTimingAdvanceSearch = 8,
 }
+/// Indicates the radio access technology
+#[derive(Clone, PartialEq, AtatEnum, defmt::Format)]
+pub enum RatAct {
+    /// • 0: GSM
+    Gsm = 0,
+    /// • 1: GSM COMPACT
+    GsmCompact = 1,
+    /// • 2: UTRAN
+    Utran = 2,
+    /// • 3: GSM/GPRS with EDGE availability
+    GsmGprsEdge = 3,
+    /// • 4: UTRAN with HSDPA availability
+    UtranHspda = 4,
+    /// • 5: UTRAN with HSUPA availability
+    UtranHsupa = 5,
+    /// • 6: UTRAN with HSDPA and HSUPA availability
+    UtranHspdaHsupa = 6,
+    /// • 7: LTE
+    Lte = 7,
+    /// • 8: EC-GSM-IoT (A/Gb mode)
+    EcGsmIot = 8,
+    /// • 9: E-UTRAN (NB-S1 mode)
+    Eutran = 9,
+}
 
 #[derive(Clone, PartialEq, AtatEnum)]
 pub enum NetworkRegistrationUrcConfig {

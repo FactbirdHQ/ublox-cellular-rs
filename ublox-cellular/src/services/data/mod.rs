@@ -8,9 +8,7 @@ mod udp_stack;
 
 mod hex;
 
-use crate::{
-    client::Device,
-    command::{
+use crate::{client::Device, command::network_service::GetOperatorSelection, command::psn::SetPDPContextDefinition, command::{
         general::{responses::CIMI, GetCIMI},
         ip_transport_layer::{
             self,
@@ -18,10 +16,7 @@ use crate::{
             ReadSocketData, ReadUDPSocketData,
         },
         psn, Urc,
-    },
-    error::Error as DeviceError,
-    network::{ContextId, Network, ProfileId, ProfileState},
-};
+    }, error::Error as DeviceError, command::network_service::types::RatAct, network::{ContextId, Network, ProfileId, ProfileState}};
 use apn::{APNInfo, Apn};
 use atat::{typenum::Unsigned, AtatClient};
 use core::cell::RefCell;
@@ -203,7 +198,16 @@ where
                             // Err(nb::Error::WouldBlock)
                             Err(nb::Error::Other(Error::InvalidApn))
                         }
-                        a @ _ => a,
+                        Ok(()) => {
+                            // Ok(()) indicates that an LTE context is already active
+                            defmt::debug!("[ProfileState] Shortcut LTE context!");
+
+                            self.network
+                                .finish_activating_profile_state()
+                                .map_err(|e| nb::Error::Other(e.into()))?;
+                            Ok(())
+                        }
+                        Err(nb::Error::WouldBlock) => Err(nb::Error::WouldBlock),
                     }
                 }
                 ProfileState::Activating(_, _) => Err(nb::Error::WouldBlock),
@@ -246,20 +250,19 @@ where
             .get_profile_state(profile_id)
             .map_err(|e| nb::Error::Other(e.into()))?
         {
-            if let Apn::Given(apn) = apn.apn {
-                self.network
-                    .send_internal(
-                        &SetPacketSwitchedConfig {
-                            profile_id,
-                            param: PacketSwitchedParam::APN(apn),
-                        },
-                        true,
-                    )
-                    .map_err(|e| nb::Error::Other(e.into()))?;
-            }
-
             // FIXME: Figure out which of these two approaches to use when, and why?
             if false {
+                if let Apn::Given(apn) = apn.apn {
+                    self.network
+                        .send_internal(
+                            &SetPacketSwitchedConfig {
+                                profile_id,
+                                param: PacketSwitchedParam::APN(apn),
+                            },
+                            true,
+                        )
+                        .map_err(|e| nb::Error::Other(e.into()))?;
+                }
                 if let Some(user_name) = apn.user_name {
                     self.network
                         .send_internal(
@@ -296,6 +299,28 @@ where
                     )
                     .map_err(|e| nb::Error::Other(e.into()))?;
             } else {
+                let cops = self
+                    .network
+                    .send_internal(&GetOperatorSelection, true)
+                    .map_err(|e| nb::Error::Other(e.into()))?;
+
+                if let Some(RatAct::Lte) = cops.act {
+                    return Ok(());
+                }
+
+                if let Apn::Given(apn) = apn.apn {
+                    self.network
+                        .send_internal(
+                            &SetPDPContextDefinition {
+                                cid,
+                                pdp_type: "IP",
+                                apn: apn.as_str(),
+                            },
+                            true,
+                        )
+                        .map_err(|e| nb::Error::Other(e.into()))?;
+                }
+
                 self.network
                     .send_internal(
                         &SetAuthParameters {
@@ -307,7 +332,6 @@ where
                         true,
                     )
                     .map_err(|e| nb::Error::Other(e.into()))?;
-
                 self.network
                     .send_internal(
                         &SetPacketSwitchedConfig {
@@ -394,6 +418,10 @@ where
                 true
             })
             .map_err(|e| Error::Network(e.into()))
+    }
+
+    pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
+        Ok(self.network.send_internal(cmd, true)?)
     }
 
     pub(crate) fn socket_ingress(&self, mut socket: SocketRef<Socket<L>>) -> Result<(), Error> {
