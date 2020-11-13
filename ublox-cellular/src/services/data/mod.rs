@@ -11,7 +11,6 @@ mod hex;
 use crate::{
     client::Device,
     command::psn::types::PDPContextStatus,
-    command::psn::SetPDPContextDefinition,
     command::psn::SetPDPContextState,
     command::{
         general::{responses::CIMI, GetCIMI},
@@ -432,7 +431,7 @@ where
                 }
                 true
             })
-            .map_err(|e| Error::Network(e.into()))
+            .map_err(|e| Error::Network(e))
     }
 
     pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {

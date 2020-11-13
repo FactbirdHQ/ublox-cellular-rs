@@ -16,10 +16,7 @@ use crate::{
         network_service::SetRadioAccessTechnology,
         psn::responses::GPRSAttached,
         psn::GetGPRSAttached,
-        psn::{
-            types::GPRSAttachedState, types::PacketSwitchedParam, SetPDPContextDefinition,
-            SetPacketSwitchedConfig,
-        },
+        psn::{types::GPRSAttachedState, types::PacketSwitchedParam, SetPacketSwitchedConfig},
         system_features::{types::*, *},
         *,
     },
@@ -28,7 +25,7 @@ use crate::{
     network::{AtTx, Error as NetworkError, Network},
     services::data::socket::{SocketSet, SocketSetItem},
     state::StateMachine,
-    ContextId, ProfileId, State,
+    ProfileId, State,
 };
 use general::{responses::CCID, GetCCID};
 use ip_transport_layer::{types::HexMode, SetHexMode};

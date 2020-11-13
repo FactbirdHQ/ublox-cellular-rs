@@ -76,22 +76,6 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
         self.available_data
     }
 
-    /// Return whether the socket is open.
-    ///
-    /// This function returns true if the socket will process incoming or dispatch outgoing
-    /// packets. Note that this does not mean that it is possible to send or receive data through
-    /// the socket; for that, use [can_send](#method.can_send) or [can_recv](#method.can_recv).
-    ///
-    /// In terms of the TCP state machine, the socket must not be in the `Closed`
-    /// or `ShutdownForRead` states.
-    #[inline]
-    pub fn is_open(&self) -> bool {
-        match self.state {
-            State::ShutdownForRead => false,
-            _ => true,
-        }
-    }
-
     /// Return whether a connection is active.
     ///
     /// This function returns true if the socket is actively exchanging packets
@@ -106,10 +90,7 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     /// `ShutdownForRead` state.
     #[inline]
     pub fn is_active(&self) -> bool {
-        match self.state {
-            State::ShutdownForRead => false,
-            _ => true,
-        }
+        !matches!(self.state, State::ShutdownForRead)
     }
 
     /// Return whether the transmit half of the full-duplex connection is open.
@@ -123,13 +104,9 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     /// `ShutdownForRead` state.
     #[inline]
     pub fn may_send(&self) -> bool {
-        match self.state {
-            State::Connected => true,
-            // In `ShutdownForRead`, the remote endpoint has closed our receive half of the connection
-            // but we still can transmit indefinitely.
-            State::ShutdownForRead => true,
-            _ => false,
-        }
+        // In `ShutdownForRead`, the remote endpoint has closed our receive half of the connection
+        // but we still can transmit indefinitely.
+        matches!(self.state, State::Connected | State::ShutdownForRead)
     }
 
     /// Return whether the receive half of the full-duplex connection is open.

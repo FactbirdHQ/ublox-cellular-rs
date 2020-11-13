@@ -71,7 +71,7 @@ impl StateMachine {
         // TODO: Change to a poor-mans exponential
         let backoff_time = (self.retry_count as u32 + 1) * 1000;
 
-        if let Err(_) = timer.try_start(backoff_time) {
+        if timer.try_start(backoff_time).is_err() {
             return nb::Error::Other(Error::_Unknown);
         }
 
@@ -173,21 +173,16 @@ impl RegistrationStatus {
     pub fn is_roaming(&self) -> bool {
         use RegistrationStatus::*;
 
-        match self {
-            RegisteredRoaming | RegisteredSMSOnlyRoaming | RegisteredCSFBNotPreferredRoaming => {
-                true
-            }
-            _ => false,
-        }
+        matches!(
+            self,
+            RegisteredRoaming | RegisteredSMSOnlyRoaming | RegisteredCSFBNotPreferredRoaming
+        )
     }
 
     pub fn is_attempting(&self) -> bool {
         use RegistrationStatus::*;
 
-        match self {
-            NotRegistered | RegistrationDenied => false,
-            _ => true,
-        }
+        !matches!(self, NotRegistered | RegistrationDenied)
     }
 }
 

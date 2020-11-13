@@ -30,7 +30,7 @@ where
 
     /// Open a new TCP socket to the given address and port. The socket starts in the unconnected state.
     fn open(&self, _mode: Mode) -> Result<Self::TcpSocket, Self::Error> {
-        if !self.network.is_registered()?.is_some() {
+        if self.network.is_registered()?.is_none() {
             return Err(Error::Network(NetworkError::_Unknown));
         }
 
