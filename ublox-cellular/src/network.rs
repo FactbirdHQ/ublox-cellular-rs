@@ -417,7 +417,7 @@ mod tests {
     }
 
     impl AtatClient for AtClient {
-        fn send<A: atat::AtatCmd>(&mut self, cmd: &A) -> nb::Result<A::Response, atat::Error> {
+        fn send<A: atat::AtatCmd>(&mut self, _cmd: &A) -> nb::Result<A::Response, atat::Error> {
             unreachable!()
         }
 
@@ -431,7 +431,7 @@ mod tests {
 
         fn check_response<A: atat::AtatCmd>(
             &mut self,
-            cmd: &A,
+            _cmd: &A,
         ) -> nb::Result<A::Response, atat::Error> {
             unreachable!()
         }
@@ -445,15 +445,15 @@ mod tests {
     fn unhandled_urcs() {
         let tx = AtTx::new(AtClient { n_urcs_dequeued: 0 }, 5);
 
-        tx.handle_urc(|_| false);
+        tx.handle_urc(|_| false).unwrap();
         assert_eq!(tx.client.borrow().n_urcs_dequeued, 0);
-        tx.handle_urc(|_| false);
-        tx.handle_urc(|_| false);
-        tx.handle_urc(|_| false);
-        tx.handle_urc(|_| false);
-        tx.handle_urc(|_| false);
+        tx.handle_urc(|_| false).unwrap();
+        tx.handle_urc(|_| false).unwrap();
+        tx.handle_urc(|_| false).unwrap();
+        tx.handle_urc(|_| false).unwrap();
+        tx.handle_urc(|_| false).unwrap();
         assert_eq!(tx.client.borrow().n_urcs_dequeued, 1);
-        tx.handle_urc(|_| false);
+        tx.handle_urc(|_| false).unwrap();
         assert_eq!(tx.client.borrow().n_urcs_dequeued, 1);
     }
 }

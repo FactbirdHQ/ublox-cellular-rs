@@ -122,6 +122,7 @@ impl RANStatus {
     }
 
     /// Check if we are currently roaming on any Radio Access Network
+    #[allow(dead_code)]
     pub fn is_roaming(&self) -> bool {
         self.get(RadioAccessNetwork::Utran).is_roaming()
             || self.get(RadioAccessNetwork::Eutran).is_roaming()
