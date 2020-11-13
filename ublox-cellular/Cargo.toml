@@ -1,6 +1,6 @@
 [package]
 name = "ublox-cellular-rs"
-version = "0.0.1"
+version = "0.1.0"
 authors = ["Mathias Koch <mk@blackbird.online>"]
 description = "Driver crate for u-blox cellular devices, implementation follows 'UBX-13002752 - R65'"
 readme = "../README.md"
