@@ -166,8 +166,9 @@ pub struct PrepareWriteSocketDataBinary {
     force_receive_state = true
 )]
 pub struct WriteSocketDataBinary<'a> {
+    // FIXME:
     // #[at_arg(position = 0, len = EgressChunkSize::to_usize())]
-    #[at_arg(position = 0, len = 512)]
+    #[at_arg(position = 0, len = 1024)]
     pub data: serde_at::ser::Bytes<'a>,
 }
 

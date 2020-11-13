@@ -1,7 +1,8 @@
 //! Responses for Packet Switched Data Services Commands
 use super::types::*;
-use crate::network::ProfileId;
+use crate::{command::network_service::types::RatAct, network::ProfileId};
 use atat::atat_derive::AtatResp;
+use heapless::{consts, String};
 
 // 18.7 Packet switched data configuration +UPSD Sets or reads all the
 //  parameters in a specific packet switched data (PSD) profile. The command is
@@ -59,12 +60,14 @@ pub struct GPRSNetworkRegistrationStatus {
     pub n: GPRSNetworkRegistrationUrcConfig,
     #[at_arg(position = 1)]
     pub stat: GPRSNetworkRegistrationStat,
-    // #[at_arg(position = 2)]
-    // pub lac: Option<String<consts::U32>>,
-    // #[at_arg(position = 3)]
-    // pub ci: Option<String<consts::U32>>,
-    // #[at_arg(position = 4)]
-    // pub act_status: Option<u8>,
+    #[at_arg(position = 2)]
+    pub lac: Option<String<consts::U4>>,
+    #[at_arg(position = 3)]
+    pub ci: Option<String<consts::U8>>,
+    #[at_arg(position = 4)]
+    pub act: Option<RatAct>,
+    #[at_arg(position = 5)]
+    pub rac: Option<String<consts::U2>>,
 }
 
 /// 18.28 Extended network registration status +UREG
@@ -83,10 +86,10 @@ pub struct EPSNetworkRegistrationStatus {
     pub n: EPSNetworkRegistrationUrcConfig,
     #[at_arg(position = 1)]
     pub stat: EPSNetworkRegistrationStat,
-    // #[at_arg(position = 2)]
-    // pub lac: Option<String<consts::U32>>,
-    // #[at_arg(position = 3)]
-    // pub ci: Option<String<consts::U32>>,
-    // #[at_arg(position = 4)]
-    // pub act_status: Option<u8>,
+    #[at_arg(position = 2)]
+    pub tac: Option<String<consts::U4>>,
+    #[at_arg(position = 3)]
+    pub ci: Option<String<consts::U8>>,
+    #[at_arg(position = 4)]
+    pub act: Option<RatAct>,
 }

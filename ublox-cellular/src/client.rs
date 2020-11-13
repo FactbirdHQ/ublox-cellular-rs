@@ -8,22 +8,34 @@ use embedded_hal::{
 use heapless::{ArrayLength, Bucket, Pos};
 
 use crate::{
+    command::device_lock::GetPinStatus,
+    command::device_lock::{responses::PinStatus, types::PinStatusCode},
     command::{
         control::{types::*, *},
         mobile_control::{types::*, *},
+        network_service::SetRadioAccessTechnology,
+        psn::responses::GPRSAttached,
+        psn::GetGPRSAttached,
+        psn::{
+            types::GPRSAttachedState, types::PacketSwitchedParam, SetPDPContextDefinition,
+            SetPacketSwitchedConfig,
+        },
         system_features::{types::*, *},
         *,
     },
     config::{Config, NoPin},
     error::Error,
-    network::{AtTx, Network},
+    network::{AtTx, Error as NetworkError, Network},
     services::data::socket::{SocketSet, SocketSetItem},
     state::StateMachine,
-    State,
+    ContextId, ProfileId, State,
 };
 use general::{responses::CCID, GetCCID};
 use ip_transport_layer::{types::HexMode, SetHexMode};
-use network_service::{types::NetworkRegistrationUrcConfig, SetNetworkRegistrationStatus};
+use network_service::{
+    types::{NetworkRegistrationUrcConfig, RadioAccessTechnologySelected, RatPreferred},
+    SetNetworkRegistrationStatus,
+};
 use psn::{
     types::{EPSNetworkRegistrationUrcConfig, GPRSNetworkRegistrationUrcConfig},
     SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
@@ -111,7 +123,7 @@ where
                 pwr.try_set_high().ok();
             } else {
                 // Software restart
-                self.restart()?;
+                self.restart(false)?;
             }
             self.delay
                 .try_delay_ms(crate::module_cfg::constants::BOOT_WAIT_TIME_MS)
@@ -187,7 +199,7 @@ where
             false,
         )?;
 
-        // TODO: switch off UART power saving until it is integrated into this API
+        // Switch off UART power saving until it is integrated into this API
         self.network.send_internal(
             &SetPowerSavingControl {
                 mode: PowerSavingMode::Disabled,
@@ -250,18 +262,28 @@ where
     }
 
     #[inline]
-    pub(crate) fn restart(&self) -> Result<(), Error> {
-        self.network.send_internal(
-            &SetModuleFunctionality {
-                fun: Functionality::SilentReset,
-                rst: None,
-            },
-            false,
-        )?;
+    pub(crate) fn restart(&self, sim_reset: bool) -> Result<(), Error> {
+        if sim_reset {
+            self.network.send_internal(
+                &SetModuleFunctionality {
+                    fun: Functionality::SilentResetWithSimReset,
+                    rst: None,
+                },
+                false,
+            )?;
+        } else {
+            self.network.send_internal(
+                &SetModuleFunctionality {
+                    fun: Functionality::SilentReset,
+                    rst: None,
+                },
+                false,
+            )?;
+        }
         Ok(())
     }
 
-    pub(crate) fn enable_network_urcs(&self) -> Result<(), Error> {
+    pub(crate) fn enable_registration_urcs(&self) -> Result<(), Error> {
         self.network.send_internal(
             &SetNetworkRegistrationStatus {
                 n: NetworkRegistrationUrcConfig::UrcEnabled,
@@ -271,14 +293,14 @@ where
 
         self.network.send_internal(
             &SetGPRSNetworkRegistrationStatus {
-                n: GPRSNetworkRegistrationUrcConfig::UrcEnabled,
+                n: GPRSNetworkRegistrationUrcConfig::UrcVerbose,
             },
             true,
         )?;
 
         self.network.send_internal(
             &SetEPSNetworkRegistrationStatus {
-                n: EPSNetworkRegistrationUrcConfig::UrcEnabled,
+                n: EPSNetworkRegistrationUrcConfig::UrcVerbose,
             },
             true,
         )?;
@@ -304,23 +326,34 @@ where
                 Err(_) => Err(State::PowerOn),
             },
             State::Configure => match self.configure() {
-                Ok(()) => Ok(State::SimPin),
+                Ok(()) => Ok(State::DeviceReady),
                 Err(_) => Err(State::PowerOn),
             },
-            State::SimPin => {
-                self.enable_network_urcs()?;
-                // TODO: Handle SIM Pin here
+            State::DeviceReady => {
+                self.network
+                    .send_internal(
+                        &SetRadioAccessTechnology {
+                            selected_act: RadioAccessTechnologySelected::GsmUmtsLte(
+                                RatPreferred::Lte,
+                                RatPreferred::Utran,
+                            ),
+                        },
+                        true,
+                    )
+                    .map_err(|e| nb::Error::Other(e.into()))?;
 
-                self.network.send_internal(
-                    &psn::SetPDPContextDefinition {
-                        cid: crate::ContextId(1),
-                        pdp_type: "IP",
-                        apn: "em",
-                    },
-                    true,
-                ).map_err(|e| nb::Error::Other(e.into()))?;
+                // TODO: Set default initial bearer for LTE
+                self.network
+                    .send_internal(
+                        &SetPacketSwitchedConfig {
+                            profile_id: ProfileId(0),
+                            param: PacketSwitchedParam::APN(heapless::String::from("em")),
+                        },
+                        true,
+                    )
+                    .map_err(|e| nb::Error::Other(e.into()))?;
 
-                // Now come out of airplane mode and try to register
+                // Now come out of airplane mode
                 self.network
                     .send_internal(
                         &SetModuleFunctionality {
@@ -331,15 +364,54 @@ where
                     )
                     .map_err(|e| nb::Error::Other(e.into()))?;
 
-                // FIXME:
-                // self.network.send_internal(
-                //     &mobile_control::SetAutomaticTimezoneUpdate {
-                //         on_off: AutomaticTimezone::EnabledLocal,
-                //     },
-                //     true,
-                // )?;
+                Ok(State::SimPin)
+            }
+            State::SimPin => {
+                self.enable_registration_urcs()?;
 
-                Ok(State::SignalQuality)
+                let PinStatus { code } = self
+                    .network
+                    .send_internal(&GetPinStatus, true)
+                    .map_err(|e| nb::Error::Other(e.into()))?;
+
+                if code == PinStatusCode::Ready {
+                    self.network.attached.set(false);
+                    self.network.pdp_context_active.set(false);
+
+                    // TODO: check if context was already activated
+                    // let PDPContextState { status } =
+                    //     self.network.send_internal(&GetPDPContextState, true)?;
+                    if false {
+                        defmt::debug!("Active context found");
+                        self.network.pdp_context_active.set(true);
+                    }
+
+                    // Check if modem is already attached to a network
+                    if let GPRSAttached {
+                        state: GPRSAttachedState::Attached,
+                    } = self
+                        .network
+                        .send_internal(&GetGPRSAttached, true)
+                        .map_err(|e| nb::Error::Other(e.into()))?
+                    {
+                        defmt::debug!("Cellular already attached");
+                        self.network.attached.set(true);
+                    }
+
+                    // FIXME:
+                    // self.network.send_internal(
+                    //     &mobile_control::SetAutomaticTimezoneUpdate {
+                    //         on_off: AutomaticTimezone::EnabledLocal,
+                    //     },
+                    //     true,
+                    // )?;
+
+                    Ok(State::SignalQuality)
+                } else {
+                    // TODO: Handle SIM Pin here
+                    defmt::error!("PIN status not ready!!");
+                    Err(State::PowerOn)
+                }
             }
             State::SignalQuality => {
                 let CCID { ccid } = self
@@ -353,6 +425,15 @@ where
             }
             State::RegisteringNetwork => match self.network.register(None) {
                 Ok(_) => Ok(State::AttachingNetwork),
+                Err(nb::Error::Other(NetworkError::RegistrationDenied)) => {
+                    self.restart(true)?;
+                    self.delay
+                        .try_delay_ms(crate::module_cfg::constants::BOOT_WAIT_TIME_MS)
+                        .map_err(|_| Error::Busy)?;
+
+                    self.fsm.set_max_retry_attempts(0);
+                    Err(State::PowerOn)
+                }
                 Err(_) => Err(State::PowerOn),
             },
             State::AttachingNetwork => match self.network.attach() {
@@ -364,15 +445,15 @@ where
                 .is_registered()
                 .map_err(|e| nb::Error::Other(e.into()))?
             {
-                true => {
+                Some(_) => {
                     // Reset the retry attempts on connected, as this
                     // essentially is a success path.
                     self.fsm.reset();
                     return Ok(());
                 }
-                false => {
+                None => {
                     // If registration status changed from "Registered", check
-                    // up to 3 times to make sure, and back to registering if
+                    // up to 3 times to make sure, and go back to registering if
                     // it's still disconnected.
                     self.fsm.set_max_retry_attempts(3);
                     Err(State::RegisteringNetwork)
@@ -395,6 +476,8 @@ where
     }
 
     pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
+        // At any point after init state, we should be able to fully send AT
+        // commands.
         if self.fsm.get_state() == State::Init {
             return Err(Error::Uninitialized);
         }

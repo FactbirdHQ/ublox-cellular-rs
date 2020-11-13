@@ -1,13 +1,14 @@
 use crate::{
     command::network_service::responses::OperatorSelection,
-    command::network_service::types::RatAct,
     command::{network_service, psn, Urc},
     error::GenericError,
+    state::RegistrationStatus,
     state::{RANStatus, RadioAccessNetwork},
     APNInfo,
 };
 use atat::{atat_derive::AtatLen, AtatClient};
 use core::cell::{BorrowError, BorrowMutError, Cell, RefCell};
+use embedded_nal::IpAddr;
 use hash32_derive::Hash32;
 use heapless::{consts, FnvIndexMap, IndexMap};
 use network_service::{types::OperatorSelectionMode, GetOperatorSelection, SetOperatorSelection};
@@ -51,7 +52,7 @@ pub enum ProfileState {
     Unknown,
     Deactivated,
     Activating(ContextId, APNInfo),
-    Active(ContextId),
+    Active(ContextId, Option<IpAddr>),
 }
 
 pub struct AtTx<C> {
@@ -90,6 +91,8 @@ impl<C: AtatClient> AtTx<C> {
 
 pub struct Network<C> {
     pub(crate) ran_status: RefCell<RANStatus>,
+    pub(crate) pdp_context_active: Cell<bool>,
+    pub(crate) attached: Cell<bool>,
     // NOTE: Currently only a single profile is supported at a time!
     pub(crate) profile_status: RefCell<FnvIndexMap<ProfileId, ProfileState, consts::U1>>,
     pub(crate) at_tx: AtTx<C>,
@@ -109,13 +112,15 @@ where
         Network {
             ran_status: RefCell::new(RANStatus::new()),
             profile_status: RefCell::new(profile_status),
+            attached: Cell::new(false),
+            pdp_context_active: Cell::new(false),
             at_tx,
         }
     }
 
     pub fn context_active(&self, profile_id: ProfileId, cid: ContextId) -> Result<bool, Error> {
         if let Some(state) = self.profile_status.try_borrow()?.get(&profile_id) {
-            Ok(if let ProfileState::Active(active_cid) = state {
+            Ok(if let ProfileState::Active(active_cid, _) = state {
                 active_cid == &cid
             } else {
                 false
@@ -125,7 +130,7 @@ where
         }
     }
 
-    pub fn finish_activating_profile_state(&self) -> Result<(), Error> {
+    pub fn finish_activating_profile_state(&self, ip_addr: Option<IpAddr>) -> Result<(), Error> {
         let (profile_id, cid) = self
             .profile_status
             .try_borrow_mut()?
@@ -139,7 +144,7 @@ where
             })
             .ok_or(Error::_Unknown)?;
 
-        self.set_profile_state(profile_id, ProfileState::Active(cid))
+        self.set_profile_state(profile_id, ProfileState::Active(cid, ip_addr))
     }
 
     pub fn get_profile_state(&self, profile_id: ProfileId) -> Result<ProfileState, Error> {
@@ -163,15 +168,52 @@ where
         }
     }
 
-    pub fn is_registered(&self) -> Result<bool, Error> {
+    pub fn update_network_registration(
+        &self,
+        plmn: Option<&str>,
+    ) -> Result<Option<RegistrationStatus>, Error> {
+        // accept only CGREG/CEREG. CREG is for circuit switch network changed. If we accept CREG attach will fail if also
+        // CGREG/CEREG is not registered.
+        let GPRSNetworkRegistrationStatus { stat, .. } =
+            self.send_internal(&GetGPRSNetworkRegistrationStatus, true)?;
+        if let Ok(mut status) = self.ran_status.try_borrow_mut() {
+            status.set(RadioAccessNetwork::Utran, stat.into());
+        }
+
+        let EPSNetworkRegistrationStatus { stat, .. } =
+            self.send_internal(&GetEPSNetworkRegistrationStatus, true)?;
+        if let Ok(mut status) = self.ran_status.try_borrow_mut() {
+            status.set(RadioAccessNetwork::Eutran, stat.into());
+        }
+
+        // in manual registering we are forcing registration to certain network so we don't accept active context or attached
+        // as indication that device is registered to correct network.
+        if plmn.is_some() {
+            return self.is_registered();
+        }
+
+        if let Some(registration_status) = self.is_registered()? {
+            Ok(Some(registration_status))
+        } else if self.attached.get() || self.pdp_context_active.get() {
+            Ok(Some(RegistrationStatus::AlreadyRegistered))
+        } else {
+            Ok(None)
+        }
+    }
+
+    pub fn is_registered(&self) -> Result<Option<RegistrationStatus>, Error> {
         Ok(self.ran_status.try_borrow()?.is_registered())
     }
 
-    pub fn register(&self, plmn: Option<&str>) -> nb::Result<(), Error> {
-        if self.is_registered()? {
-            return Ok(());
-        }
+    pub fn is_denied(&self) -> Result<bool, Error> {
+        Ok(self.ran_status.try_borrow()?.is_denied())
+    }
 
+    pub fn is_attempting(&self) -> Result<bool, Error> {
+        Ok(self.ran_status.try_borrow()?.is_attempting())
+    }
+
+    pub fn set_registration(&self, plmn: Option<&str>) -> nb::Result<(), Error> {
         match plmn {
             Some(p) => {
                 defmt::debug!("Manual network registration to {:str}", p);
@@ -209,39 +251,60 @@ where
                         )?;
                     }
                 }
+                return Ok(());
             }
-        }
-
-        let GPRSNetworkRegistrationStatus { stat, .. } =
-            self.send_internal(&GetGPRSNetworkRegistrationStatus, true)?;
-        if let Ok(mut status) = self.ran_status.try_borrow_mut() {
-            status.set(RadioAccessNetwork::Utran, stat.into());
-        }
-
-        let EPSNetworkRegistrationStatus { stat, .. } =
-            self.send_internal(&GetEPSNetworkRegistrationStatus, true)?;
-        if let Ok(mut status) = self.ran_status.try_borrow_mut() {
-            status.set(RadioAccessNetwork::Eutran, stat.into());
-        }
-
-        if self.is_registered()? {
-            Ok(())
-        } else {
-            Err(nb::Error::WouldBlock)
         }
     }
 
-    pub fn attach(&self) -> Result<(), Error> {
-        let GPRSAttached { state } = self.send_internal(&GetGPRSAttached, true)?;
+    pub fn register(&self, plmn: Option<&str>) -> nb::Result<(), Error> {
+        if let Some(registration_status) = self.update_network_registration(plmn)? {
+            if !registration_status.is_roaming()
+                && (self.attached.get() || self.pdp_context_active.get())
+            {
+                // there was already activated context or attached to network, and registration status is not registered, set to already registered.
+                // _cb_data.status_data = RegistrationStatus::AlreadyRegistered;
+                defmt::info!("Already registered!");
+            }
+            return Ok(());
+        }
 
-        if state != GPRSAttachedState::Attached {
-            defmt::debug!("Network attach");
-            self.send_internal(
-                &SetGPRSAttached {
-                    state: GPRSAttachedState::Attached,
-                },
-                true,
-            )?;
+        if self.is_denied()? {
+            return Err(nb::Error::Other(Error::RegistrationDenied));
+        }
+
+        // if !self.is_attempting()? {
+        //     if let OperatorSelection {
+        //         mode: OperatorSelectionMode::Manual,
+        //         ..
+        //     } = self.send_internal(&GetOperatorSelection, true)?
+        //     {
+        //         self.send_internal(
+        //             &SetOperatorSelection {
+        //                 mode: OperatorSelectionMode::Manual,
+        //             },
+        //             true,
+        //         )?;
+        //     }
+        // }
+
+        self.set_registration(plmn)?;
+
+        Err(nb::Error::WouldBlock)
+    }
+
+    pub fn attach(&self) -> Result<(), Error> {
+        if !self.attached.get() {
+            let GPRSAttached { state } = self.send_internal(&GetGPRSAttached, true)?;
+
+            if state != GPRSAttachedState::Attached {
+                defmt::debug!("Network attach");
+                self.send_internal(
+                    &SetGPRSAttached {
+                        state: GPRSAttachedState::Attached,
+                    },
+                    true,
+                )?;
+            }
         }
         Ok(())
     }
@@ -254,14 +317,28 @@ where
                 }) => {
                     defmt::info!("[URC] ExtendedPSNetworkRegistration {:?}", state);
                 }
-                Urc::GPRSNetworkRegistration(psn::urc::GPRSNetworkRegistration { stat }) => {
-                    defmt::info!("[URC] GPRSNetworkRegistration {:?}", stat);
+                Urc::GPRSNetworkRegistration(psn::urc::GPRSNetworkRegistration {
+                    stat,
+                    act,
+                    ..
+                }) => {
+                    defmt::info!("[URC] GPRSNetworkRegistration {:?} {:?}", stat, act);
                     if let Ok(mut status) = self.ran_status.try_borrow_mut() {
                         status.set(RadioAccessNetwork::Utran, stat.into());
                     }
                 }
-                Urc::EPSNetworkRegistration(psn::urc::EPSNetworkRegistration { stat }) => {
-                    defmt::info!("[URC] EPSNetworkRegistration {:?}", stat);
+                Urc::EPSNetworkRegistration(psn::urc::EPSNetworkRegistration {
+                    stat,
+                    act,
+                    reject_cause,
+                    ..
+                }) => {
+                    defmt::info!(
+                        "[URC] EPSNetworkRegistration {:?} {:?} {:?}",
+                        stat,
+                        act,
+                        reject_cause
+                    );
                     if let Ok(mut status) = self.ran_status.try_borrow_mut() {
                         status.set(RadioAccessNetwork::Eutran, stat.into());
                     }
@@ -274,11 +351,11 @@ where
                 }
                 Urc::DataConnectionActivated(psn::urc::DataConnectionActivated {
                     result,
-                    ip_addr: _,
+                    ip_addr,
                 }) => {
                     defmt::info!("[URC] DataConnectionActivated {:u8}", result);
                     if result == 0 {
-                        self.finish_activating_profile_state().ok();
+                        self.finish_activating_profile_state(ip_addr).ok();
                     }
                 }
                 Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {

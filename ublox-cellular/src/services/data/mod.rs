@@ -8,7 +8,12 @@ mod udp_stack;
 
 mod hex;
 
-use crate::{client::Device, command::network_service::GetOperatorSelection, command::psn::SetPDPContextDefinition, command::{
+use crate::{
+    client::Device,
+    command::psn::types::PDPContextStatus,
+    command::psn::SetPDPContextDefinition,
+    command::psn::SetPDPContextState,
+    command::{
         general::{responses::CIMI, GetCIMI},
         ip_transport_layer::{
             self,
@@ -16,7 +21,10 @@ use crate::{client::Device, command::network_service::GetOperatorSelection, comm
             ReadSocketData, ReadUDPSocketData,
         },
         psn, Urc,
-    }, error::Error as DeviceError, command::network_service::types::RatAct, network::{ContextId, Network, ProfileId, ProfileState}};
+    },
+    error::Error as DeviceError,
+    network::{ContextId, Network, ProfileId, ProfileState},
+};
 use apn::{APNInfo, Apn};
 use atat::{typenum::Unsigned, AtatClient};
 use core::cell::RefCell;
@@ -31,14 +39,16 @@ use heapless::{ArrayLength, Bucket, Pos, String};
 use psn::{
     responses::PacketSwitchedNetworkData,
     types::{
-        AuthenticationType, PDPContextStatus, PacketSwitchedAction, PacketSwitchedNetworkDataParam,
+        AuthenticationType, PacketSwitchedAction, PacketSwitchedNetworkDataParam,
         PacketSwitchedParam,
     },
-    GetPacketSwitchedNetworkData, SetAuthParameters, SetPDPContextState, SetPacketSwitchedAction,
+    GetPacketSwitchedNetworkData, SetAuthParameters, SetPacketSwitchedAction,
     SetPacketSwitchedConfig,
 };
 use socket::{Error as SocketError, Socket, SocketRef, SocketSet, SocketSetItem, SocketType};
 
+// NOTE: If these are changed, remember to change the corresponding `Bytes` len
+// in commands for now.
 pub type IngressChunkSize = heapless::consts::U256;
 pub type EgressChunkSize = heapless::consts::U1024;
 
@@ -118,7 +128,7 @@ where
         // Check if context is active, and create if not
         data_service.define_context(profile_id, cid, apn_info)?;
 
-        // At this point [`data_service`] will always have a valid and active PDP context!
+        // At this point [`data_service`] will always have a valid and active data context!
 
         // Attempt to ingress data from every open socket, into it's
         // internal rx buffer
@@ -196,6 +206,10 @@ where
                             //     ProfileState::Activating(apn_info_from_db),
                             // )?;
                             // Err(nb::Error::WouldBlock)
+                            self.network
+                                .set_profile_state(profile_id, ProfileState::Deactivated)
+                                .map_err(|e| nb::Error::Other(e.into()))?;
+
                             Err(nb::Error::Other(Error::InvalidApn))
                         }
                         Ok(()) => {
@@ -203,7 +217,7 @@ where
                             defmt::debug!("[ProfileState] Shortcut LTE context!");
 
                             self.network
-                                .finish_activating_profile_state()
+                                .finish_activating_profile_state(None)
                                 .map_err(|e| nb::Error::Other(e.into()))?;
                             Ok(())
                         }
@@ -211,13 +225,13 @@ where
                     }
                 }
                 ProfileState::Activating(_, _) => Err(nb::Error::WouldBlock),
-                ProfileState::Active(c) if c != cid => {
+                ProfileState::Active(c, _ip_addr) if c != cid => {
                     defmt::debug!("[ProfileState] Active(c != cid)");
 
                     // Profile is already active, with a different ContextId. Return Error
                     Err(nb::Error::Other(Error::_Unknown))
                 }
-                ProfileState::Active(_) => {
+                ProfileState::Active(_, _) => {
                     defmt::error!("[ProfileState] Active(c == cid). SHOULD NEVER HAPPEN!");
                     Ok(())
                 }
@@ -229,7 +243,7 @@ where
     }
 
     fn is_profile_active(&self, profile_id: ProfileId) -> Result<bool, Error> {
-        if let ProfileState::Active(_) = self.network.get_profile_state(profile_id)? {
+        if let ProfileState::Active(_, _) = self.network.get_profile_state(profile_id)? {
             return Ok(true);
         }
 
@@ -299,27 +313,28 @@ where
                     )
                     .map_err(|e| nb::Error::Other(e.into()))?;
             } else {
-                let cops = self
-                    .network
-                    .send_internal(&GetOperatorSelection, true)
-                    .map_err(|e| nb::Error::Other(e.into()))?;
+                // let cops = self
+                //     .network
+                //     .send_internal(&GetOperatorSelection, true)
+                //     .map_err(|e| nb::Error::Other(e.into()))?;
 
-                if let Some(RatAct::Lte) = cops.act {
-                    return Ok(());
-                }
+                // if let Some(RatAct::Lte) = cops.act {
+                //     defmt::warn!("Shortcutting activation due to LTE network!");
+                //     return Ok(());
+                // }
 
-                if let Apn::Given(apn) = apn.apn {
-                    self.network
-                        .send_internal(
-                            &SetPDPContextDefinition {
-                                cid,
-                                pdp_type: "IP",
-                                apn: apn.as_str(),
-                            },
-                            true,
-                        )
-                        .map_err(|e| nb::Error::Other(e.into()))?;
-                }
+                // if let Apn::Given(apn) = apn.apn {
+                //     self.network
+                //         .send_internal(
+                //             &SetPDPContextDefinition {
+                //                 cid,
+                //                 pdp_type: "IP",
+                //                 apn: apn.as_str(),
+                //             },
+                //             true,
+                //         )
+                //         .map_err(|e| nb::Error::Other(e.into()))?;
+                // }
 
                 self.network
                     .send_internal(

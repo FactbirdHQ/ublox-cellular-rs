@@ -8,6 +8,7 @@ pub enum State {
     Init,
     PowerOn,
     Configure,
+    DeviceReady,
     SimPin,
     SignalQuality,
     RegisteringNetwork,
@@ -85,15 +86,15 @@ impl StateMachine {
     }
 }
 
-pub struct RANStatus([NetworkStatus; 4]);
+pub struct RANStatus([RegistrationStatus; 4]);
 
 impl RANStatus {
     pub fn new() -> Self {
-        Self([NetworkStatus::Unknown; 4])
+        Self([RegistrationStatus::StatusNotAvailable; 4])
     }
 
     /// Set the network status of a given Radio Access Network
-    pub fn set(&mut self, ran: RadioAccessNetwork, status: NetworkStatus) {
+    pub fn set(&mut self, ran: RadioAccessNetwork, status: RegistrationStatus) {
         if let Some(s) = self.0.get_mut(ran as usize) {
             defmt::debug!("Setting {:?} to {:?}", ran, status);
             *s = status;
@@ -101,79 +102,147 @@ impl RANStatus {
     }
 
     /// Get the network status of a given Radio Access Network
-    pub fn get(&self, ran: RadioAccessNetwork) -> NetworkStatus {
-        *self.0.get(ran as usize).unwrap_or(&NetworkStatus::Unknown)
+    pub fn get(&self, ran: RadioAccessNetwork) -> RegistrationStatus {
+        *self
+            .0
+            .get(ran as usize)
+            .unwrap_or(&RegistrationStatus::Unknown)
     }
 
     /// Check if any Radio Access Network is registered
-    pub fn is_registered(&self) -> bool {
-        self.get(RadioAccessNetwork::Utran) == NetworkStatus::Registered
-            || self.get(RadioAccessNetwork::Eutran) == NetworkStatus::Registered
+    pub fn is_registered(&self) -> Option<RegistrationStatus> {
+        if let Some(utran) = self.get(RadioAccessNetwork::Utran).is_registered() {
+            return Some(utran);
+        }
+        if let Some(eutran) = self.get(RadioAccessNetwork::Eutran).is_registered() {
+            return Some(eutran);
+        }
+
+        None
+    }
+
+    /// Check if we are currently roaming on any Radio Access Network
+    pub fn is_roaming(&self) -> bool {
+        self.get(RadioAccessNetwork::Utran).is_roaming()
+            || self.get(RadioAccessNetwork::Eutran).is_roaming()
+    }
+
+    /// Check if we are currently denied registration on any Radio Access Network
+    pub fn is_denied(&self) -> bool {
+        self.get(RadioAccessNetwork::Utran) == RegistrationStatus::RegistrationDenied
+            || self.get(RadioAccessNetwork::Eutran) == RegistrationStatus::RegistrationDenied
+        // || self.get(RadioAccessNetwork::Utran) == RegistrationStatus::NotRegistered
+        // || self.get(RadioAccessNetwork::Eutran) == RegistrationStatus::NotRegistered
+    }
+
+    pub fn is_attempting(&self) -> bool {
+        self.get(RadioAccessNetwork::Utran).is_attempting()
+            || self.get(RadioAccessNetwork::Eutran).is_attempting()
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, defmt::Format)]
-pub enum NetworkStatus {
+pub enum RegistrationStatus {
     /// State is unknown/uninitialized
-    Unknown,
-    /// Searching
-    Searching,
-    /// Registered on the home network
-    Registered,
-    /// Registration denied
-    RegistrationDenied,
-    /// Out of coverage
-    OutOfCoverage,
-    /// Registered on a roaming network
+    StatusNotAvailable,
+    /// Not registered
     NotRegistered,
-    /// Emergency service only
-    EmergencyOnly,
+    RegisteredHomeNetwork,
+    SearchingNetwork,
+    RegistrationDenied,
+    Unknown,
+    RegisteredRoaming,
+    RegisteredSMSOnlyHome,
+    RegisteredSMSOnlyRoaming,
+    AttachedEmergencyOnly,
+    RegisteredCSFBNotPreferredHome,
+    RegisteredCSFBNotPreferredRoaming,
+    AlreadyRegistered,
 }
 
-/// Convert the 3GPP registration status from a CREG URC to NetworkStatus.
-impl From<NetworkRegistrationStat> for NetworkStatus {
+impl RegistrationStatus {
+    pub fn is_registered(&self) -> Option<RegistrationStatus> {
+        use RegistrationStatus::*;
+
+        match self {
+            RegisteredHomeNetwork | RegisteredRoaming => Some(*self),
+            _ => None,
+        }
+    }
+
+    pub fn is_roaming(&self) -> bool {
+        use RegistrationStatus::*;
+
+        match self {
+            RegisteredRoaming | RegisteredSMSOnlyRoaming | RegisteredCSFBNotPreferredRoaming => {
+                true
+            }
+            _ => false,
+        }
+    }
+
+    pub fn is_attempting(&self) -> bool {
+        use RegistrationStatus::*;
+
+        match self {
+            NotRegistered | RegistrationDenied => false,
+            _ => true,
+        }
+    }
+}
+
+/// Convert the 3GPP registration status from a CREG URC to RegistrationStatus.
+impl From<NetworkRegistrationStat> for RegistrationStatus {
     fn from(v: NetworkRegistrationStat) -> Self {
+        use NetworkRegistrationStat::*;
+
         match v {
-            NetworkRegistrationStat::NotRegistered => NetworkStatus::NotRegistered,
-            NetworkRegistrationStat::Registered => NetworkStatus::Registered,
-            NetworkRegistrationStat::NotRegisteredSearching => NetworkStatus::Searching,
-            NetworkRegistrationStat::RegistrationDenied => NetworkStatus::RegistrationDenied,
-            NetworkRegistrationStat::Unknown => NetworkStatus::OutOfCoverage,
-            NetworkRegistrationStat::RegisteredRoaming => NetworkStatus::Registered,
-            NetworkRegistrationStat::RegisteredSmsOnly => NetworkStatus::NotRegistered,
-            NetworkRegistrationStat::RegisteredSmsOnlyRoaming => NetworkStatus::NotRegistered,
-            NetworkRegistrationStat::RegisteredCsfbNotPerferred => NetworkStatus::Registered,
-            NetworkRegistrationStat::RegisteredCsfbNotPerferredRoaming => NetworkStatus::Registered,
+            NotRegistered => RegistrationStatus::NotRegistered,
+            Registered => RegistrationStatus::RegisteredHomeNetwork,
+            NotRegisteredSearching => RegistrationStatus::SearchingNetwork,
+            RegistrationDenied => RegistrationStatus::RegistrationDenied,
+            Unknown => RegistrationStatus::Unknown,
+            RegisteredRoaming => RegistrationStatus::RegisteredRoaming,
+            RegisteredSmsOnly => RegistrationStatus::RegisteredSMSOnlyHome,
+            RegisteredSmsOnlyRoaming => RegistrationStatus::RegisteredSMSOnlyRoaming,
+            RegisteredCsfbNotPerferred => RegistrationStatus::RegisteredCSFBNotPreferredHome,
+            RegisteredCsfbNotPerferredRoaming => {
+                RegistrationStatus::RegisteredCSFBNotPreferredRoaming
+            }
         }
     }
 }
 
-/// Convert the 3GPP registration status from a CGREG URC to NetworkStatus.
-impl From<GPRSNetworkRegistrationStat> for NetworkStatus {
+/// Convert the 3GPP registration status from a CGREG URC to RegistrationStatus.
+impl From<GPRSNetworkRegistrationStat> for RegistrationStatus {
     fn from(v: GPRSNetworkRegistrationStat) -> Self {
+        use GPRSNetworkRegistrationStat::*;
+
         match v {
-            GPRSNetworkRegistrationStat::NotRegistered => NetworkStatus::NotRegistered,
-            GPRSNetworkRegistrationStat::Registered => NetworkStatus::Registered,
-            GPRSNetworkRegistrationStat::NotRegisteredSearching => NetworkStatus::Searching,
-            GPRSNetworkRegistrationStat::RegistrationDenied => NetworkStatus::RegistrationDenied,
-            GPRSNetworkRegistrationStat::Unknown => NetworkStatus::OutOfCoverage,
-            GPRSNetworkRegistrationStat::RegisteredRoaming => NetworkStatus::Registered,
-            GPRSNetworkRegistrationStat::AttachedEmergencyOnly => NetworkStatus::EmergencyOnly,
+            NotRegistered => RegistrationStatus::NotRegistered,
+            Registered => RegistrationStatus::RegisteredHomeNetwork,
+            NotRegisteredSearching => RegistrationStatus::SearchingNetwork,
+            RegistrationDenied => RegistrationStatus::RegistrationDenied,
+            Unknown => RegistrationStatus::Unknown,
+            RegisteredRoaming => RegistrationStatus::RegisteredRoaming,
+            AttachedEmergencyOnly => RegistrationStatus::AttachedEmergencyOnly,
         }
     }
 }
 
-/// Convert the 3GPP registration status from a CEREG URC to NetworkStatus.
-impl From<EPSNetworkRegistrationStat> for NetworkStatus {
+/// Convert the 3GPP registration status from a CEREG URC to RegistrationStatus.
+impl From<EPSNetworkRegistrationStat> for RegistrationStatus {
     fn from(v: EPSNetworkRegistrationStat) -> Self {
+        use EPSNetworkRegistrationStat::*;
+
         match v {
-            EPSNetworkRegistrationStat::NotRegistered => NetworkStatus::NotRegistered,
-            EPSNetworkRegistrationStat::Registered => NetworkStatus::Registered,
-            EPSNetworkRegistrationStat::NotRegisteredSearching => NetworkStatus::Searching,
-            EPSNetworkRegistrationStat::RegistrationDenied => NetworkStatus::RegistrationDenied,
-            EPSNetworkRegistrationStat::Unknown => NetworkStatus::OutOfCoverage,
-            EPSNetworkRegistrationStat::RegisteredRoaming => NetworkStatus::Registered,
-            EPSNetworkRegistrationStat::AttachedEmergencyOnly => NetworkStatus::EmergencyOnly,
+            NotRegistered => RegistrationStatus::NotRegistered,
+            Registered => RegistrationStatus::RegisteredHomeNetwork,
+            NotRegisteredSearching => RegistrationStatus::SearchingNetwork,
+            RegistrationDenied => RegistrationStatus::RegistrationDenied,
+            Unknown => RegistrationStatus::Unknown,
+            RegisteredRoaming => RegistrationStatus::RegisteredRoaming,
+            AttachedEmergencyOnly => RegistrationStatus::AttachedEmergencyOnly,
         }
     }
 }
