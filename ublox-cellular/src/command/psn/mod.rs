@@ -233,6 +233,25 @@ pub struct SetPDPContextState {
 #[at_cmd("+CGACT?", PDPContextState, timeout_ms = 150000, abortable = true)]
 pub struct GetPDPContextState;
 
+/// 18.26 Packet switched event reporting +CGEREP
+///
+/// Configures sending of URCs from MT to the DTE, in case of certain events
+/// occurring in the packet switched MT or the network. By means of the <mode>
+/// parameter, it is possible to control the processing of the URCs codes
+/// specified within this command. The <bfr> parameter allows to control the
+/// effect on buffered codes when the <mode> parameter is set to 1 (discard URCs
+/// when V.24 link is reserved) or 2 (buffer URCs in the MT when link reserved
+/// and flush them to the DTE when the link becomes available).
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+CGEREP", NoResponse)]
+pub struct SetPacketSwitchedEventReporting {
+    #[at_arg(position = 0)]
+    pub mode: PSEventReportingMode,
+    #[at_arg(position = 1)]
+    pub bfr: Option<u8>
+}
+
+
 /// 18.27 GPRS network registration status +CGREG
 ///
 /// Configures the GPRS network registration information. Depending on the <n>

@@ -119,77 +119,80 @@ pub enum PacketSwitchedParam {
     /// is 0. • 27: 3G QoS maximum uplink bit rate - <param_val> is the value
     /// for the maximum uplink bit rate in kb/s. The factory-programmed value is
     /// 0. • 28: 3G QoS maximum SDU size - <param_val> is the value for the
-    /// maximum SDU size in octets. The factory-programmed value is 0. • 29: 3G
-    /// QoS residual bit error rate - <param_val> selects the acceptable value
-    /// for the residual bit error rate: o 0 (factory-programmed value):
-    /// subscribed o 1: 5E2 o 2: 1E2 o 3: 5E3 o 4: 4E3 o 5: 1E3 o 6: 1E4 o 7:
-    /// 1E5 o 8: 1E6 o 9: 6E8 • 30: 3G QoS SDU error ratio - <param_val> selects
-    /// the acceptable value for the SDU error ratio: o 0 (factory-programmed
-    /// value): subscribed o 1: 1E2 o 2: 7E3 o 3: 1E3 o 4: 1E4 o 5: 1E5 o 6: 1E6
-    /// o 7: 1E1 • 31: 3G QoS signalling indicator - <param_val> selects the
-    /// acceptable value for the signalling indicator: o 0 (factory-programmed
-    /// value): subscribed o 1: signalling indicator 1 • 32: 3G QoS source
-    /// statistics descriptor - <param_val> selects the acceptable value for the
-    /// source statistics descriptor: o 0 (factory-programmed value): subscribed
-    /// o 1: source statistics descriptor 1 • 33: 3G QoS traffic class -
-    /// <param_val> selects the acceptable value for the traffic class: o 0
-    /// (factory-programmed value): subscribed o 1: conversational o 2:
-    /// streaming o 3: interactive o 4: background • 34: 3G QoS traffic priority
+    ///    maximum SDU size in octets. The factory-programmed value is 0. • 29:
+    ///    3G QoS residual bit error rate - <param_val> selects the acceptable
+    ///    value for the residual bit error rate: o 0 (factory-programmed
+    ///    value): subscribed o 1: 5E2 o 2: 1E2 o 3: 5E3 o 4: 4E3 o 5: 1E3 o 6:
+    ///    1E4 o 7: 1E5 o 8: 1E6 o 9: 6E8 • 30: 3G QoS SDU error ratio -
+    ///    <param_val> selects the acceptable value for the SDU error ratio: o 0
+    ///    (factory-programmed value): subscribed o 1: 1E2 o 2: 7E3 o 3: 1E3 o
+    ///    4: 1E4 o 5: 1E5 o 6: 1E6 o 7: 1E1 • 31: 3G QoS signalling indicator -
+    ///    <param_val> selects the acceptable value for the signalling
+    ///    indicator: o 0 (factory-programmed value): subscribed o 1: signalling
+    ///    indicator 1 • 32: 3G QoS source statistics descriptor - <param_val>
+    ///    selects the acceptable value for the source statistics descriptor: o
+    ///    0 (factory-programmed value): subscribed o 1: source statistics
+    ///    descriptor 1 • 33: 3G QoS traffic class - <param_val> selects the
+    ///    acceptable value for the traffic class: o 0 (factory-programmed
+    ///    value): subscribed o 1: conversational o 2: streaming o 3:
+    ///    interactive o 4: background • 34: 3G QoS traffic priority
     /// - <param_val> selects the acceptable value for the traffic priority: o 0
-    /// (factory-programmed value): subscribed o 1: priority 1 o 2: priority 2 o
-    /// 3: priority 3 • 35: 3G QoS transfer delay - <param_val> is the value for
-    /// the transfer delay in milliseconds. The factory-programmed value is 0. •
-    /// 36: 3G minimum QoS delivery order - <param_val> selects the acceptable
-    /// value for the delivery order: o 0 (factory-programmed value): subscribed
-    /// o 1: enable o 2: disable • 37: 3G minimum QoS erroneous SDU delivery -
-    /// <param_val> selects the acceptable value for the erroneous SDU delivery:
-    /// o 0 (factory-programmed value): subscribed o 1: no detection o 2: enable
-    /// o 3: disable • 38: 3G minimum QoS extended guaranteed downlink bit rate
+    ///   (factory-programmed value): subscribed o 1: priority 1 o 2: priority 2
+    ///   o 3: priority 3 • 35: 3G QoS transfer delay - <param_val> is the value
+    ///   for the transfer delay in milliseconds. The factory-programmed value
+    ///   is 0. • 36: 3G minimum QoS delivery order - <param_val> selects the
+    ///   acceptable value for the delivery order: o 0 (factory-programmed
+    ///   value): subscribed o 1: enable o 2: disable • 37: 3G minimum QoS
+    ///   erroneous SDU delivery - <param_val> selects the acceptable value for
+    ///   the erroneous SDU delivery: o 0 (factory-programmed value): subscribed
+    ///   o 1: no detection o 2: enable o 3: disable • 38: 3G minimum QoS
+    ///   extended guaranteed downlink bit rate
     /// - <param_val> is the value for the extended guaranteed downlink bit rate
-    /// in kb/s. The factoryprogrammed value is 0. • 39: 3G minimum QoS extended
-    /// maximum downlink bit rate - <param_val> is the value for the extended
-    /// maximum downlink bit rate in kb/s. The factory-programmed value is 0. •
-    /// 40: 3G minimum QoS guaranteed downlink bit rate - <param_val> is the
-    /// value for the guaranteed downlink bit rate in kb/s. The
-    /// factory-programmed value is 0. • 41: 3G minimum QoS guaranteed uplink
-    /// bit rate - <param_val> is the value for the guaranteed uplink bit rate
-    /// in kb/s. The factory-programmed value is 0. • 42: 3G minimum QoS maximum
-    /// downlink bit rate - <param_val> is the value for the maximum downlink
-    /// bit rate in kb/s. The factory-programmed value is 0. • 43: 3G minimum
-    /// QoS maximum uplink bit rate - <param_val> is the value for the maximum
-    /// uplink bit rate in kb/s. The factory-programmed value is 0. • 44: 3G
-    /// minimum QoS maximum SDU size - <param_val> is the value for the maximum
-    /// SDU size in octets. The factory-programmed value is 0. • 45: 3G minimum
-    /// QoS residual bit error rate - <param_val> selects the acceptable value
-    /// for the residual bit error rate: o 0 (factory-programmed value):
-    /// subscribed o 1: 5E2 o 2: 1E2 o 3: 5E3 o 4: 4E3 o 5: 1E3 o 6: 1E4 o 7:
-    /// 1E5 o 8: 1E6 o 9: 6E8 • 46: 3G minimum QoS SDU error ratio - <param_val>
-    /// selects the acceptable value for the SDU error ratio: o 0
-    /// (factory-programmed value): subscribed o 1: 1E2 o 2: 7E3 o 3: 1E3 o 4:
-    /// 1E4 o 5: 1E5 o 6: 1E6 o 7: 1E1 • 47: 3G minimum QoS signalling indicator
+    ///   in kb/s. The factoryprogrammed value is 0. • 39: 3G minimum QoS
+    ///   extended maximum downlink bit rate - <param_val> is the value for the
+    ///   extended maximum downlink bit rate in kb/s. The factory-programmed
+    ///   value is 0. • 40: 3G minimum QoS guaranteed downlink bit rate -
+    ///   <param_val> is the value for the guaranteed downlink bit rate in kb/s.
+    ///   The factory-programmed value is 0. • 41: 3G minimum QoS guaranteed
+    ///   uplink bit rate - <param_val> is the value for the guaranteed uplink
+    ///   bit rate in kb/s. The factory-programmed value is 0. • 42: 3G minimum
+    ///   QoS maximum downlink bit rate - <param_val> is the value for the
+    ///   maximum downlink bit rate in kb/s. The factory-programmed value is 0.
+    ///   • 43: 3G minimum QoS maximum uplink bit rate - <param_val> is the
+    ///   value for the maximum uplink bit rate in kb/s. The factory-programmed
+    ///   value is 0. • 44: 3G minimum QoS maximum SDU size - <param_val> is the
+    ///   value for the maximum SDU size in octets. The factory-programmed value
+    ///   is 0. • 45: 3G minimum QoS residual bit error rate - <param_val>
+    ///   selects the acceptable value for the residual bit error rate: o 0
+    ///   (factory-programmed value): subscribed o 1: 5E2 o 2: 1E2 o 3: 5E3 o 4:
+    ///   4E3 o 5: 1E3 o 6: 1E4 o 7: 1E5 o 8: 1E6 o 9: 6E8 • 46: 3G minimum QoS
+    ///   SDU error ratio - <param_val> selects the acceptable value for the SDU
+    ///   error ratio: o 0 (factory-programmed value): subscribed o 1: 1E2 o 2:
+    ///   7E3 o 3: 1E3 o 4: 1E4 o 5: 1E5 o 6: 1E6 o 7: 1E1 • 47: 3G minimum QoS
+    ///   signalling indicator
     /// - <param_val> selects the acceptable value for the signalling indicator:
-    /// o 0 (factory-programmed value): subscribed o 1: signalling indicator 1 •
-    /// 48: 3G minimum QoS source statistics descriptor - <param_val> selects
-    /// the acceptable value for the source statistics descriptor: o 0
-    /// (factory-programmed value): subscribed o 1: source statistics descriptor
-    /// 1 • 49: 3G minimum QoS traffic class - <param_val> selects the
-    /// acceptable value for the traffic class: o 0 (factory-programmed value):
-    /// subscribed o 1: conversational o 2: streaming o 3: interactive o 4:
-    /// background • 50: 3G minimum QoS traffic priority - <param_val> selects
-    /// the acceptable value for the traffic priority: o 0 (factory-programmed
-    /// value): subscribed o 1: priority 1 o 2: priority 2 o 3: priority 3 • 51:
-    /// 3G Minimum QoS transfer delay - <param_val> is the value for the
-    /// transfer delay in milliseconds. The factory-programmed value is 0.
-    /// QoSDelay3G(u32),
+    ///   o 0 (factory-programmed value): subscribed o 1: signalling indicator 1
+    ///   • 48: 3G minimum QoS source statistics descriptor - <param_val>
+    ///   selects the acceptable value for the source statistics descriptor: o 0
+    ///   (factory-programmed value): subscribed o 1: source statistics
+    ///   descriptor 1 • 49: 3G minimum QoS traffic class - <param_val> selects
+    ///   the acceptable value for the traffic class: o 0 (factory-programmed
+    ///   value): subscribed o 1: conversational o 2: streaming o 3: interactive
+    ///   o 4: background • 50: 3G minimum QoS traffic priority - <param_val>
+    ///   selects the acceptable value for the traffic priority: o 0
+    ///   (factory-programmed value): subscribed o 1: priority 1 o 2: priority 2
+    ///   o 3: priority 3 • 51: 3G Minimum QoS transfer delay - <param_val> is
+    ///   the value for the transfer delay in milliseconds. The
+    ///   factory-programmed value is 0. QoSDelay3G(u32),
     #[at_arg(value = 255)]
     UNUSED,
-    /// • 100: map the +UPSD profile to the specified <cid> in
-    /// the +CGDCONT table. o 0: map the current profile to default bearer PDP
-    /// ID o 1: map the current profile to <cid> 1 o 2: map the current profile
-    /// to <cid> 2 o 3: map the current profile to <cid> 3 o 4: map the current
-    /// profile to <cid> 4 o 5: map the current profile to <cid> 5 o 6: map the
-    /// current profile to <cid> 6 o 7: map the current profile to <cid> 7 o 8:
-    /// map the current profile to <cid> 8 CurrentProfileMap(u8),
+    /// • 100: map the +UPSD profile to the specified <cid> in the +CGDCONT
+    /// table. o 0: map the current profile to default bearer PDP ID o 1: map
+    /// the current profile to <cid> 1 o 2: map the current profile to <cid> 2 o
+    /// 3: map the current profile to <cid> 3 o 4: map the current profile to
+    /// <cid> 4 o 5: map the current profile to <cid> 5 o 6: map the current
+    /// profile to <cid> 6 o 7: map the current profile to <cid> 7 o 8: map the
+    /// current profile to <cid> 8 CurrentProfileMap(u8),
     #[at_arg(value = 100)]
     MapProfile(ContextId),
 }
@@ -287,68 +290,71 @@ pub enum PacketSwitchedParamReq {
     /// is 0. • 27: 3G QoS maximum uplink bit rate - <param_val> is the value
     /// for the maximum uplink bit rate in kb/s. The factory-programmed value is
     /// 0. • 28: 3G QoS maximum SDU size - <param_val> is the value for the
-    /// maximum SDU size in octets. The factory-programmed value is 0. • 29: 3G
-    /// QoS residual bit error rate - <param_val> selects the acceptable value
-    /// for the residual bit error rate: o 0 (factory-programmed value):
-    /// subscribed o 1: 5E2 o 2: 1E2 o 3: 5E3 o 4: 4E3 o 5: 1E3 o 6: 1E4 o 7:
-    /// 1E5 o 8: 1E6 o 9: 6E8 • 30: 3G QoS SDU error ratio - <param_val> selects
-    /// the acceptable value for the SDU error ratio: o 0 (factory-programmed
-    /// value): subscribed o 1: 1E2 o 2: 7E3 o 3: 1E3 o 4: 1E4 o 5: 1E5 o 6: 1E6
-    /// o 7: 1E1 • 31: 3G QoS signalling indicator - <param_val> selects the
-    /// acceptable value for the signalling indicator: o 0 (factory-programmed
-    /// value): subscribed o 1: signalling indicator 1 • 32: 3G QoS source
-    /// statistics descriptor - <param_val> selects the acceptable value for the
-    /// source statistics descriptor: o 0 (factory-programmed value): subscribed
-    /// o 1: source statistics descriptor 1 • 33: 3G QoS traffic class -
-    /// <param_val> selects the acceptable value for the traffic class: o 0
-    /// (factory-programmed value): subscribed o 1: conversational o 2:
-    /// streaming o 3: interactive o 4: background • 34: 3G QoS traffic priority
+    ///    maximum SDU size in octets. The factory-programmed value is 0. • 29:
+    ///    3G QoS residual bit error rate - <param_val> selects the acceptable
+    ///    value for the residual bit error rate: o 0 (factory-programmed
+    ///    value): subscribed o 1: 5E2 o 2: 1E2 o 3: 5E3 o 4: 4E3 o 5: 1E3 o 6:
+    ///    1E4 o 7: 1E5 o 8: 1E6 o 9: 6E8 • 30: 3G QoS SDU error ratio -
+    ///    <param_val> selects the acceptable value for the SDU error ratio: o 0
+    ///    (factory-programmed value): subscribed o 1: 1E2 o 2: 7E3 o 3: 1E3 o
+    ///    4: 1E4 o 5: 1E5 o 6: 1E6 o 7: 1E1 • 31: 3G QoS signalling indicator -
+    ///    <param_val> selects the acceptable value for the signalling
+    ///    indicator: o 0 (factory-programmed value): subscribed o 1: signalling
+    ///    indicator 1 • 32: 3G QoS source statistics descriptor - <param_val>
+    ///    selects the acceptable value for the source statistics descriptor: o
+    ///    0 (factory-programmed value): subscribed o 1: source statistics
+    ///    descriptor 1 • 33: 3G QoS traffic class - <param_val> selects the
+    ///    acceptable value for the traffic class: o 0 (factory-programmed
+    ///    value): subscribed o 1: conversational o 2: streaming o 3:
+    ///    interactive o 4: background • 34: 3G QoS traffic priority
     /// - <param_val> selects the acceptable value for the traffic priority: o 0
-    /// (factory-programmed value): subscribed o 1: priority 1 o 2: priority 2 o
-    /// 3: priority 3 • 35: 3G QoS transfer delay - <param_val> is the value for
-    /// the transfer delay in milliseconds. The factory-programmed value is 0. •
-    /// 36: 3G minimum QoS delivery order - <param_val> selects the acceptable
-    /// value for the delivery order: o 0 (factory-programmed value): subscribed
-    /// o 1: enable o 2: disable • 37: 3G minimum QoS erroneous SDU delivery -
-    /// <param_val> selects the acceptable value for the erroneous SDU delivery:
-    /// o 0 (factory-programmed value): subscribed o 1: no detection o 2: enable
-    /// o 3: disable • 38: 3G minimum QoS extended guaranteed downlink bit rate
+    ///   (factory-programmed value): subscribed o 1: priority 1 o 2: priority 2
+    ///   o 3: priority 3 • 35: 3G QoS transfer delay - <param_val> is the value
+    ///   for the transfer delay in milliseconds. The factory-programmed value
+    ///   is 0. • 36: 3G minimum QoS delivery order - <param_val> selects the
+    ///   acceptable value for the delivery order: o 0 (factory-programmed
+    ///   value): subscribed o 1: enable o 2: disable • 37: 3G minimum QoS
+    ///   erroneous SDU delivery - <param_val> selects the acceptable value for
+    ///   the erroneous SDU delivery: o 0 (factory-programmed value): subscribed
+    ///   o 1: no detection o 2: enable o 3: disable • 38: 3G minimum QoS
+    ///   extended guaranteed downlink bit rate
     /// - <param_val> is the value for the extended guaranteed downlink bit rate
-    /// in kb/s. The factoryprogrammed value is 0. • 39: 3G minimum QoS extended
-    /// maximum downlink bit rate - <param_val> is the value for the extended
-    /// maximum downlink bit rate in kb/s. The factory-programmed value is 0. •
-    /// 40: 3G minimum QoS guaranteed downlink bit rate - <param_val> is the
-    /// value for the guaranteed downlink bit rate in kb/s. The
-    /// factory-programmed value is 0. • 41: 3G minimum QoS guaranteed uplink
-    /// bit rate - <param_val> is the value for the guaranteed uplink bit rate
-    /// in kb/s. The factory-programmed value is 0. • 42: 3G minimum QoS maximum
-    /// downlink bit rate - <param_val> is the value for the maximum downlink
-    /// bit rate in kb/s. The factory-programmed value is 0. • 43: 3G minimum
-    /// QoS maximum uplink bit rate - <param_val> is the value for the maximum
-    /// uplink bit rate in kb/s. The factory-programmed value is 0. • 44: 3G
-    /// minimum QoS maximum SDU size - <param_val> is the value for the maximum
-    /// SDU size in octets. The factory-programmed value is 0. • 45: 3G minimum
-    /// QoS residual bit error rate - <param_val> selects the acceptable value
-    /// for the residual bit error rate: o 0 (factory-programmed value):
-    /// subscribed o 1: 5E2 o 2: 1E2 o 3: 5E3 o 4: 4E3 o 5: 1E3 o 6: 1E4 o 7:
-    /// 1E5 o 8: 1E6 o 9: 6E8 • 46: 3G minimum QoS SDU error ratio - <param_val>
-    /// selects the acceptable value for the SDU error ratio: o 0
-    /// (factory-programmed value): subscribed o 1: 1E2 o 2: 7E3 o 3: 1E3 o 4:
-    /// 1E4 o 5: 1E5 o 6: 1E6 o 7: 1E1 • 47: 3G minimum QoS signalling indicator
+    ///   in kb/s. The factoryprogrammed value is 0. • 39: 3G minimum QoS
+    ///   extended maximum downlink bit rate - <param_val> is the value for the
+    ///   extended maximum downlink bit rate in kb/s. The factory-programmed
+    ///   value is 0. • 40: 3G minimum QoS guaranteed downlink bit rate -
+    ///   <param_val> is the value for the guaranteed downlink bit rate in kb/s.
+    ///   The factory-programmed value is 0. • 41: 3G minimum QoS guaranteed
+    ///   uplink bit rate - <param_val> is the value for the guaranteed uplink
+    ///   bit rate in kb/s. The factory-programmed value is 0. • 42: 3G minimum
+    ///   QoS maximum downlink bit rate - <param_val> is the value for the
+    ///   maximum downlink bit rate in kb/s. The factory-programmed value is 0.
+    ///   • 43: 3G minimum QoS maximum uplink bit rate - <param_val> is the
+    ///   value for the maximum uplink bit rate in kb/s. The factory-programmed
+    ///   value is 0. • 44: 3G minimum QoS maximum SDU size - <param_val> is the
+    ///   value for the maximum SDU size in octets. The factory-programmed value
+    ///   is 0. • 45: 3G minimum QoS residual bit error rate - <param_val>
+    ///   selects the acceptable value for the residual bit error rate: o 0
+    ///   (factory-programmed value): subscribed o 1: 5E2 o 2: 1E2 o 3: 5E3 o 4:
+    ///   4E3 o 5: 1E3 o 6: 1E4 o 7: 1E5 o 8: 1E6 o 9: 6E8 • 46: 3G minimum QoS
+    ///   SDU error ratio - <param_val> selects the acceptable value for the SDU
+    ///   error ratio: o 0 (factory-programmed value): subscribed o 1: 1E2 o 2:
+    ///   7E3 o 3: 1E3 o 4: 1E4 o 5: 1E5 o 6: 1E6 o 7: 1E1 • 47: 3G minimum QoS
+    ///   signalling indicator
     /// - <param_val> selects the acceptable value for the signalling indicator:
-    /// o 0 (factory-programmed value): subscribed o 1: signalling indicator 1 •
-    /// 48: 3G minimum QoS source statistics descriptor - <param_val> selects
-    /// the acceptable value for the source statistics descriptor: o 0
-    /// (factory-programmed value): subscribed o 1: source statistics descriptor
-    /// 1 • 49: 3G minimum QoS traffic class - <param_val> selects the
-    /// acceptable value for the traffic class: o 0 (factory-programmed value):
-    /// subscribed o 1: conversational o 2: streaming o 3: interactive o 4:
-    /// background • 50: 3G minimum QoS traffic priority - <param_val> selects
-    /// the acceptable value for the traffic priority: o 0 (factory-programmed
-    /// value): subscribed o 1: priority 1 o 2: priority 2 o 3: priority 3 • 51:
-    /// 3G Minimum QoS transfer delay - <param_val> is the value for the
-    /// transfer delay in milliseconds. The factory-programmed value is 0.
-    /// QoSDelay3G(u32),
+    ///   o 0 (factory-programmed value): subscribed o 1: signalling indicator 1
+    ///   • 48: 3G minimum QoS source statistics descriptor - <param_val>
+    ///   selects the acceptable value for the source statistics descriptor: o 0
+    ///   (factory-programmed value): subscribed o 1: source statistics
+    ///   descriptor 1 • 49: 3G minimum QoS traffic class - <param_val> selects
+    ///   the acceptable value for the traffic class: o 0 (factory-programmed
+    ///   value): subscribed o 1: conversational o 2: streaming o 3: interactive
+    ///   o 4: background • 50: 3G minimum QoS traffic priority - <param_val>
+    ///   selects the acceptable value for the traffic priority: o 0
+    ///   (factory-programmed value): subscribed o 1: priority 1 o 2: priority 2
+    ///   o 3: priority 3 • 51: 3G Minimum QoS transfer delay - <param_val> is
+    ///   the value for the transfer delay in milliseconds. The
+    ///   factory-programmed value is 0. QoSDelay3G(u32),
     UNUSED = 255,
     /// • 100: map the +UPSD profile to the specified <cid> in the +CGDCONT
     /// table. o 0: map the current profile to default bearer PDP ID o 1: map
@@ -511,7 +517,8 @@ pub enum GPRSAttachedState {
 
 #[derive(Clone, PartialEq, AtatEnum)]
 pub enum GPRSNetworkRegistrationUrcConfig {
-    /// • 0 (default value and factory-programmed value): network registration URC disabled
+    /// • 0 (default value and factory-programmed value): network registration
+    /// URC disabled
     UrcDisabled = 0,
     /// • 1: network registration URC enabled
     UrcEnabled = 1,
@@ -519,13 +526,30 @@ pub enum GPRSNetworkRegistrationUrcConfig {
     UrcVerbose = 2,
 }
 
+/// Controls the processing of URCs specified within this command.
+#[derive(Clone, PartialEq, AtatEnum)]
+pub enum PSEventReportingMode {
+    /// • 0 (default value): buffer URCs in the MT; if the buffer is full the
+    /// oldest ones will be discarded
+    CircularBufferUrcs = 0,
+    /// • 1: discard URCs when V.24 link is reserved (online); otherwise forward
+    /// them directly to the DTE
+    DiscardUrcs = 1,
+    /// • 2: buffer URCs in the MT when link reserved (online) and flush them to
+    /// the DTE when the link becomes available; otherwise forward them directly
+    /// to the DTE
+    BufferUrcs = 2,
+}
+
 #[derive(Debug, Clone, PartialEq, AtatEnum, defmt::Format)]
 pub enum GPRSNetworkRegistrationStat {
-    /// • 0: not registered, the MT is not currently searching an operator to register to
+    /// • 0: not registered, the MT is not currently searching an operator to
+    /// register to
     NotRegistered = 0,
     /// • 1: registered, home network
     Registered = 1,
-    /// • 2: not registered, but MT is currently searching a new operator to register to
+    /// • 2: not registered, but MT is currently searching a new operator to
+    /// register to
     NotRegisteredSearching = 2,
     /// • 3: registration denied
     RegistrationDenied = 3,
@@ -533,7 +557,10 @@ pub enum GPRSNetworkRegistrationStat {
     Unknown = 4,
     /// • 5: registered, roaming
     RegisteredRoaming = 5,
-    /// • 8: attached for emergency bearer services only (see 3GPP TS 24.008 [12] and 3GPP TS 24.301 [69] that specify the condition when the MS is considered as attached for emergency bearer services) (applicable only when <AcT> indicates 2,4,5,6)
+    /// • 8: attached for emergency bearer services only (see 3GPP TS 24.008
+    /// [12] and 3GPP TS 24.301 [69] that specify the condition when the MS is
+    /// considered as attached for emergency bearer services) (applicable only
+    /// when <AcT> indicates 2,4,5,6)
     AttachedEmergencyOnly = 8,
 }
 #[derive(Clone, PartialEq, AtatEnum)]
@@ -578,9 +605,16 @@ pub enum EPSNetworkRegistrationUrcConfig {
     /// • 2: network registration and location information URC +CEREG:
     /// <stat>[,[<tac>],[<ci>],[<AcT>]] enabled
     UrcVerbose = 2,
-    // • 3: network registration, location information and EMM cause value information URC +CEREG: <stat>[,[<tac>],[<ci>],[<AcT>][,<cause_type>,<reject_cause>]] enabled
-    // • 4: PSM, network registration and location information information URC +CEREG: <stat>[,[<tac>],[<ci>],[<AcT>][,,[,[<Assigned_Active_Time>[,<Assigned_Periodic_TAU>]]]]] enabled
-    // • 5: PSM, network registration, location information and EMM cause value information URC +CEREG: <stat>[,[<tac>],[<ci>],[<AcT>][,[<cause_type>],[<reject_cause>][,[<Assigned_Active_Time>,[<Assigned_Periodic_TAU>]]]]] enabled
+    // • 3: network registration, location information and EMM cause value
+    // information URC +CEREG:
+    // <stat>[,[<tac>],[<ci>],[<AcT>][,<cause_type>,<reject_cause>]] enabled •
+    // 4: PSM, network registration and location information information URC
+    // +CEREG:
+    // <stat>[,[<tac>],[<ci>],[<AcT>][,,[,[<Assigned_Active_Time>[,<Assigned_Periodic_TAU>]]]]]
+    // enabled • 5: PSM, network registration, location information and EMM
+    // cause value information URC +CEREG:
+    // <stat>[,[<tac>],[<ci>],[<AcT>][,[<cause_type>],[<reject_cause>][,[<Assigned_Active_Time>,[<Assigned_Periodic_TAU>]]]]]
+    // enabled
 }
 
 /// EPS registration status

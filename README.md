@@ -19,6 +19,15 @@ A driver crate for AT-command based serial ublox cellular modules, built on top 
 
 ## [Documentation](https://docs.rs/ublox-cellular-rs/latest)
 
+Relevant docs:
+- https://www.u-blox.com/en/docs/UBX-20015573
+- https://www.u-blox.com/en/docs/UBX-13001820
+
+Relevant repos:
+- https://github.com/u-blox/cellular
+- https://github.com/ARMmbed/mbed-os/blob/master/connectivity/drivers/cellular
+
+
 ## Tests
 
 > The crate is covered by tests. These tests can be run by `cargo test --tests --all-features`, and are run by the CI on every push.

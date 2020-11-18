@@ -15,8 +15,8 @@ use crate::{
         mobile_control::{types::*, *},
         network_service::SetRadioAccessTechnology,
         psn::responses::GPRSAttached,
+        psn::types::GPRSAttachedState,
         psn::GetGPRSAttached,
-        psn::{types::GPRSAttachedState, types::PacketSwitchedParam, SetPacketSwitchedConfig},
         system_features::{types::*, *},
         *,
     },
@@ -25,7 +25,7 @@ use crate::{
     network::{AtTx, Error as NetworkError, Network},
     services::data::socket::{SocketSet, SocketSetItem},
     state::StateMachine,
-    ProfileId, State,
+    State,
 };
 use general::{responses::CCID, GetCCID};
 use ip_transport_layer::{types::HexMode, SetHexMode};
@@ -232,6 +232,7 @@ where
             false,
         )?;
 
+        // Tell module whether we support flow control
         if self.config.flow_control {
             self.network.send_internal(
                 &SetFlowControl {
@@ -248,6 +249,7 @@ where
             )?;
         }
 
+        // Disable Message Waiting URCs (UMWI)
         self.network.send_internal(
             &SetMessageWaitingIndication {
                 mode: MessageWaitingMode::Disabled,
@@ -339,17 +341,6 @@ where
                     )
                     .map_err(|e| nb::Error::Other(e.into()))?;
 
-                // TODO: Set default initial bearer for LTE
-                self.network
-                    .send_internal(
-                        &SetPacketSwitchedConfig {
-                            profile_id: ProfileId(0),
-                            param: PacketSwitchedParam::APN(heapless::String::from("em")),
-                        },
-                        true,
-                    )
-                    .map_err(|e| nb::Error::Other(e.into()))?;
-
                 // Now come out of airplane mode
                 self.network
                     .send_internal(
@@ -403,6 +394,13 @@ where
                     //     true,
                     // )?;
 
+                    // if packet domain event reporting is not set it's not a
+                    // stopper. We might lack some events when we are dropped
+                    // from the network.
+                    if self.network.set_packet_domain_event_reporting(true).is_err() {
+                        defmt::warn!("Packet domain event reporting set failed");
+                    }
+
                     Ok(State::SignalQuality)
                 } else {
                     // TODO: Handle SIM Pin here
@@ -450,9 +448,9 @@ where
                 }
                 None => {
                     // If registration status changed from "Registered", check
-                    // up to 3 times to make sure, and go back to registering if
+                    // up to 2 times to make sure, and go back to registering if
                     // it's still disconnected.
-                    self.fsm.set_max_retry_attempts(3);
+                    self.fsm.set_max_retry_attempts(2);
                     Err(State::RegisteringNetwork)
                 }
             },

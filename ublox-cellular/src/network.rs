@@ -1,5 +1,6 @@
 use crate::{
     command::network_service::responses::OperatorSelection,
+    command::psn::SetPacketSwitchedEventReporting,
     command::{network_service, psn, Urc},
     error::GenericError,
     state::RegistrationStatus,
@@ -15,6 +16,7 @@ use network_service::{types::OperatorSelectionMode, GetOperatorSelection, SetOpe
 use psn::{
     responses::{EPSNetworkRegistrationStatus, GPRSAttached, GPRSNetworkRegistrationStatus},
     types::GPRSAttachedState,
+    types::PSEventReportingMode,
     GetEPSNetworkRegistrationStatus, GetGPRSAttached, GetGPRSNetworkRegistrationStatus,
     SetGPRSAttached,
 };
@@ -309,9 +311,39 @@ where
         Ok(())
     }
 
+    pub fn set_packet_domain_event_reporting(&self, enable: bool) -> Result<(), Error> {
+        let mode = if enable {
+            PSEventReportingMode::CircularBufferUrcs
+        } else {
+            PSEventReportingMode::DiscardUrcs
+        };
+
+        self.send_internal(&SetPacketSwitchedEventReporting { mode, bfr: None }, true)?;
+
+        Ok(())
+    }
+
     pub(crate) fn handle_urc(&self) -> Result<(), Error> {
         self.at_tx.handle_urc(|urc| {
             match urc {
+                Urc::NetworkDetach => {
+                    defmt::info!("Network Detach URC!");
+                }
+                Urc::MobileStationDetach => {
+                    defmt::info!("ME Detach URC!");
+                }
+                Urc::NetworkDeactivate => {
+                    defmt::info!("Network Deactivate URC!");
+                }
+                Urc::MobileStationDeactivate => {
+                    defmt::info!("ME Deactivate URC!");
+                }
+                Urc::NetworkPDNDeactivate => {
+                    defmt::info!("Network PDN Deactivate URC!");
+                }
+                Urc::MobileStationPDNDeactivate => {
+                    defmt::info!("ME PDN Deactivate URC!");
+                }
                 Urc::ExtendedPSNetworkRegistration(psn::urc::ExtendedPSNetworkRegistration {
                     state,
                 }) => {

@@ -8,11 +8,7 @@ mod udp_stack;
 
 mod hex;
 
-use crate::{
-    client::Device,
-    command::psn::types::PDPContextStatus,
-    command::psn::SetPDPContextState,
-    command::{
+use crate::{client::Device, command::psn::SetPDPContextState, command::psn::types::PDPContextStatus, command::{
         general::{responses::CIMI, GetCIMI},
         ip_transport_layer::{
             self,
@@ -20,10 +16,7 @@ use crate::{
             ReadSocketData, ReadUDPSocketData,
         },
         psn, Urc,
-    },
-    error::Error as DeviceError,
-    network::{ContextId, Network, ProfileId, ProfileState},
-};
+    }, error::Error as DeviceError, command::psn::SetPDPContextDefinition, network::{ContextId, Network, ProfileId, ProfileState}};
 use apn::{APNInfo, Apn};
 use atat::{typenum::Unsigned, AtatClient};
 use core::cell::RefCell;
@@ -322,18 +315,18 @@ where
                 //     return Ok(());
                 // }
 
-                // if let Apn::Given(apn) = apn.apn {
-                //     self.network
-                //         .send_internal(
-                //             &SetPDPContextDefinition {
-                //                 cid,
-                //                 pdp_type: "IP",
-                //                 apn: apn.as_str(),
-                //             },
-                //             true,
-                //         )
-                //         .map_err(|e| nb::Error::Other(e.into()))?;
-                // }
+                if let Apn::Given(apn) = apn.apn {
+                    self.network
+                        .send_internal(
+                            &SetPDPContextDefinition {
+                                cid,
+                                pdp_type: "IP",
+                                apn: apn.as_str(),
+                            },
+                            true,
+                        )
+                        .map_err(|e| nb::Error::Other(e.into()))?;
+                }
 
                 self.network
                     .send_internal(
