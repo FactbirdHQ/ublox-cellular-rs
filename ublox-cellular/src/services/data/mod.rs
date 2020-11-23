@@ -8,7 +8,12 @@ mod udp_stack;
 
 mod hex;
 
-use crate::{client::Device, command::psn::SetPDPContextState, command::psn::types::PDPContextStatus, command::{
+use crate::{
+    client::Device,
+    command::psn::types::PDPContextStatus,
+    command::psn::SetPDPContextDefinition,
+    command::psn::SetPDPContextState,
+    command::{
         general::{responses::CIMI, GetCIMI},
         ip_transport_layer::{
             self,
@@ -16,7 +21,10 @@ use crate::{client::Device, command::psn::SetPDPContextState, command::psn::type
             ReadSocketData, ReadUDPSocketData,
         },
         psn, Urc,
-    }, error::Error as DeviceError, command::psn::SetPDPContextDefinition, network::{ContextId, Network, ProfileId, ProfileState}};
+    },
+    error::Error as DeviceError,
+    network::{ContextId, Network, ProfileId, ProfileState},
+};
 use apn::{APNInfo, Apn};
 use atat::{typenum::Unsigned, AtatClient};
 use core::cell::RefCell;
@@ -239,15 +247,18 @@ where
             return Ok(true);
         }
 
-        let PacketSwitchedNetworkData { param_tag, .. } = self.network.send_internal(
+        if let Ok(PacketSwitchedNetworkData { param_tag, .. }) = self.network.send_internal(
             &GetPacketSwitchedNetworkData {
                 profile_id,
                 param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
             },
             true,
-        )?;
-
-        Ok(param_tag == 1)
+        ) {
+            Ok(param_tag == 1)
+        } else {
+            // Just return false in case of errors or timeouts
+            Ok(false)
+        }
     }
 
     fn activate_profile(&self, profile_id: ProfileId) -> nb::Result<(), Error> {
@@ -305,16 +316,6 @@ where
                     )
                     .map_err(|e| nb::Error::Other(e.into()))?;
             } else {
-                // let cops = self
-                //     .network
-                //     .send_internal(&GetOperatorSelection, true)
-                //     .map_err(|e| nb::Error::Other(e.into()))?;
-
-                // if let Some(RatAct::Lte) = cops.act {
-                //     defmt::warn!("Shortcutting activation due to LTE network!");
-                //     return Ok(());
-                // }
-
                 if let Apn::Given(apn) = apn.apn {
                     self.network
                         .send_internal(
@@ -379,6 +380,7 @@ where
 
             Err(nb::Error::WouldBlock)
         } else {
+            defmt::error!("ProfileState ERROR");
             Err(nb::Error::Other(Error::_Unknown))
         }
     }
@@ -424,7 +426,7 @@ where
                 }
                 true
             })
-            .map_err(|e| Error::Network(e))
+            .map_err(Error::Network)
     }
 
     pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {

@@ -24,6 +24,8 @@ use crate::{
     error::Error,
     network::{AtTx, Error as NetworkError, Network},
     services::data::socket::{SocketSet, SocketSetItem},
+    state::Event,
+    state::RadioAccessNetwork,
     state::StateMachine,
     State,
 };
@@ -285,7 +287,7 @@ where
     pub(crate) fn enable_registration_urcs(&self) -> Result<(), Error> {
         self.network.send_internal(
             &SetNetworkRegistrationStatus {
-                n: NetworkRegistrationUrcConfig::UrcEnabled,
+                n: NetworkRegistrationUrcConfig::UrcDisabled,
             },
             true,
         )?;
@@ -308,6 +310,57 @@ where
 
     pub fn spin(&mut self) -> nb::Result<(), Error> {
         self.network.handle_urc().ok();
+
+        while let Some(event) = self
+            .network
+            .get_event()
+            .map_err(|e| nb::Error::Other(e.into()))?
+        {
+            match event {
+                Event::Disconnected => {
+                    defmt::info!("[EVENT] Disconnected");
+                    self.fsm.set_state(State::Init);
+                    self.network
+                        .clear_events()
+                        .map_err(|e| nb::Error::Other(e.into()))?;
+                }
+                Event::CellularRegistrationStatusChanged(reg_type, status) => {
+                    defmt::info!(
+                        "[EVENT] CellularRegistrationStatusChanged {:?} {:?}",
+                        reg_type,
+                        status
+                    );
+                    if matches!(
+                        self.fsm.get_state(),
+                        State::RegisteringNetwork
+                            | State::SignalQuality
+                            | State::AttachingNetwork
+                            | State::Connected
+                    ) && reg_type != RadioAccessNetwork::Geran
+                        && status.is_registered().is_some()
+                    {
+                        self.fsm.set_state(State::AttachingNetwork);
+                        self.network
+                            .clear_events()
+                            .map_err(|e| nb::Error::Other(e.into()))?;
+                    }
+                }
+                Event::CellularRadioAccessTechnologyChanged(reg_type, rat) => {
+                    defmt::info!(
+                        "[EVENT] CellularRadioAccessTechnologyChanged {:?} {:?}",
+                        reg_type,
+                        rat
+                    );
+                    // TODO: What to do here??
+                }
+                Event::CellularCellIDChanged(cell_id) => {
+                    defmt::info!(
+                        "[EVENT] CellularCellIDChanged {:str}",
+                        cell_id.unwrap_or_default().as_str()
+                    );
+                }
+            }
+        }
 
         if self.fsm.is_retry() {
             if let Err(nb::Error::WouldBlock) = self.delay.try_wait() {
@@ -397,7 +450,11 @@ where
                     // if packet domain event reporting is not set it's not a
                     // stopper. We might lack some events when we are dropped
                     // from the network.
-                    if self.network.set_packet_domain_event_reporting(true).is_err() {
+                    if self
+                        .network
+                        .set_packet_domain_event_reporting(true)
+                        .is_err()
+                    {
                         defmt::warn!("Packet domain event reporting set failed");
                     }
 
@@ -435,25 +492,12 @@ where
                 Ok(_) => Ok(State::Connected),
                 Err(_) => Err(State::PowerOn),
             },
-            State::Connected => match self
-                .network
-                .is_registered()
-                .map_err(|e| nb::Error::Other(e.into()))?
-            {
-                Some(_) => {
-                    // Reset the retry attempts on connected, as this
-                    // essentially is a success path.
-                    self.fsm.reset();
-                    return Ok(());
-                }
-                None => {
-                    // If registration status changed from "Registered", check
-                    // up to 2 times to make sure, and go back to registering if
-                    // it's still disconnected.
-                    self.fsm.set_max_retry_attempts(2);
-                    Err(State::RegisteringNetwork)
-                }
-            },
+            State::Connected => {
+                // Reset the retry attempts on connected, as this
+                // essentially is a success path.
+                self.fsm.reset();
+                return Ok(());
+            }
         };
 
         match new_state {

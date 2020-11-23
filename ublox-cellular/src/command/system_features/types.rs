@@ -35,3 +35,25 @@ pub enum PowerSavingMode {
 
 #[derive(Clone, PartialEq, AtatLen, Serialize, Deserialize)]
 pub struct Seconds(pub u32);
+
+/// FS factory restore type
+#[derive(Clone, Copy, PartialEq, AtatEnum)]
+pub enum FSFactoryRestoreType {
+    /// • 0 (factory-programmed value): no factory restore
+    NoRestore = 0,
+    /// • 1: FS flash sectors erased
+    FSFlashSectors = 1,
+    /// • 2: all files stored in FS deleted
+    AllFiles = 2,
+}
+
+/// NVM factory restore type:
+#[derive(Clone, Copy, PartialEq, AtatEnum)]
+pub enum NVMFactoryRestoreType {
+    /// • 0 (factory-programmed value): no factory restore
+    NoRestore = 0,
+    /// • 1: NVM flash sectors erased
+    NVMFlashSectors = 1,
+    /// • 2: for internal use only
+    InternalUseOnly = 2,
+}

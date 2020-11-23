@@ -248,9 +248,8 @@ pub struct SetPacketSwitchedEventReporting {
     #[at_arg(position = 0)]
     pub mode: PSEventReportingMode,
     #[at_arg(position = 1)]
-    pub bfr: Option<u8>
+    pub bfr: Option<u8>,
 }
-
 
 /// 18.27 GPRS network registration status +CGREG
 ///

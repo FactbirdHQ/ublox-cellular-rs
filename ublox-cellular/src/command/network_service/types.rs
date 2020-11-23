@@ -25,7 +25,7 @@ pub enum OperatorSelectionMode {
     NetworkTimingAdvanceSearch = 8,
 }
 /// Indicates the radio access technology
-#[derive(Clone, PartialEq, AtatEnum, defmt::Format)]
+#[derive(Clone, Copy, PartialEq, AtatEnum, defmt::Format)]
 pub enum RatAct {
     /// • 0: GSM
     Gsm = 0,
@@ -47,6 +47,7 @@ pub enum RatAct {
     EcGsmIot = 8,
     /// • 9: E-UTRAN (NB-S1 mode)
     Eutran = 9,
+    Unknown = 10,
 }
 
 #[derive(Clone, PartialEq, AtatEnum)]

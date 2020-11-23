@@ -1,7 +1,15 @@
-use crate::{command::*, error::Error};
+use crate::{
+    command::network_service,
+    command::network_service::types::RatAct,
+    command::psn::responses::GPRSNetworkRegistrationStatus,
+    command::psn::types::GPRSNetworkRegistrationStat,
+    command::psn::{responses::EPSNetworkRegistrationStatus, urc::GPRSNetworkRegistration},
+    command::psn::{types::EPSNetworkRegistrationStat, urc::EPSNetworkRegistration},
+    error::Error,
+};
 use embedded_hal::timer::CountDown;
+use heapless::{consts, String, Vec};
 use network_service::types::NetworkRegistrationStat;
-use psn::types::{EPSNetworkRegistrationStat, GPRSNetworkRegistrationStat};
 
 #[derive(Debug, Clone, Copy, PartialEq, defmt::Format)]
 pub enum State {
@@ -24,8 +32,8 @@ pub struct StateMachine {
 }
 
 impl StateMachine {
-    pub(crate) fn new() -> Self {
-        StateMachine {
+    pub(crate) const fn new() -> Self {
+        Self {
             max_retry_attempts: 10,
             retry_count: 0,
             inner: State::Init,
@@ -41,7 +49,7 @@ impl StateMachine {
         self.retry_count = 0;
     }
 
-    pub(crate) fn get_state(&self) -> State {
+    pub(crate) const fn get_state(self) -> State {
         self.inner
     }
 
@@ -53,7 +61,7 @@ impl StateMachine {
         self.inner = new_state;
     }
 
-    pub(crate) fn is_retry(&self) -> bool {
+    pub(crate) const fn is_retry(self) -> bool {
         self.retry_count > 0
     }
 
@@ -69,15 +77,17 @@ impl StateMachine {
         }
 
         // TODO: Change to a poor-mans exponential
-        let backoff_time = (self.retry_count as u32 + 1) * 1000;
+        let backoff_time = (u32::from(self.retry_count) + 1) * 1000;
 
         if timer.try_start(backoff_time).is_err() {
+            defmt::error!("Failed to start retry_timer!!");
             return nb::Error::Other(Error::_Unknown);
         }
 
         defmt::warn!(
-            "[RETRY] current attempt: {:u8}, retrying state in {:u32} ms...",
+            "[RETRY] current attempt: {:u8}, retrying state({:?}) in {:u32} ms...",
             self.retry_count,
+            self.inner,
             backoff_time
         );
 
@@ -86,59 +96,166 @@ impl StateMachine {
     }
 }
 
-pub struct RANStatus([RegistrationStatus; 4]);
+pub struct RegistrationParams {
+    reg_type: RadioAccessNetwork,
+    status: RegistrationStatus,
+    act: RatAct,
 
-impl RANStatus {
-    pub fn new() -> Self {
-        Self([RegistrationStatus::StatusNotAvailable; 4])
-    }
+    cell_id: Option<String<consts::U8>>,
+    lac: Option<String<consts::U4>>,
+    // active_time: Option<u16>,
+    // periodic_tau: Option<u16>,
+}
 
-    /// Set the network status of a given Radio Access Network
-    pub fn set(&mut self, ran: RadioAccessNetwork, status: RegistrationStatus) {
-        if let Some(s) = self.0.get_mut(ran as usize) {
-            defmt::debug!("Setting {:?} to {:?}", ran, status);
-            *s = status;
+#[derive(Default)]
+pub struct Registration {
+    params: RegistrationParams,
+    pub events: Vec<Event, consts::U10>,
+}
+
+pub enum Event {
+    Disconnected,
+    CellularRadioAccessTechnologyChanged(RadioAccessNetwork, RatAct),
+    CellularRegistrationStatusChanged(RadioAccessNetwork, RegistrationStatus),
+    CellularCellIDChanged(Option<String<consts::U8>>),
+}
+
+impl Default for RegistrationParams {
+    fn default() -> Self {
+        Self {
+            reg_type: RadioAccessNetwork::UnknownUnused,
+            status: RegistrationStatus::StatusNotAvailable,
+            act: RatAct::Unknown,
+            cell_id: None,
+            lac: None,
+            // active_time: None,
+            // periodic_tau: None,
         }
     }
+}
 
-    /// Get the network status of a given Radio Access Network
-    pub fn get(&self, ran: RadioAccessNetwork) -> RegistrationStatus {
-        *self
-            .0
-            .get(ran as usize)
-            .unwrap_or(&RegistrationStatus::Unknown)
+impl Registration {
+    pub fn set_params(&mut self, new_params: RegistrationParams) {
+        self.params = new_params;
+    }
+
+    pub fn compare_and_set(&mut self, new_params: RegistrationParams) {
+        if self.params.act != new_params.act {
+            self.params.act = new_params.act;
+            self.events
+                .push(Event::CellularRadioAccessTechnologyChanged(
+                    new_params.reg_type,
+                    self.params.act,
+                ))
+                .ok();
+        }
+        if self.params.status != new_params.status || self.params.reg_type != new_params.reg_type {
+            let prev_status = self.params.status;
+
+            self.params.status = new_params.status;
+            self.events
+                .push(Event::CellularRegistrationStatusChanged(
+                    new_params.reg_type,
+                    self.params.status,
+                ))
+                .ok();
+
+            if new_params.status == RegistrationStatus::NotRegistered
+                && prev_status.is_registered().is_some()
+                && new_params.reg_type != RadioAccessNetwork::Geran
+            {
+                self.events.push(Event::Disconnected).ok();
+            }
+        }
+        if new_params.cell_id.is_some() && self.params.cell_id != new_params.cell_id {
+            self.params.cell_id = new_params.cell_id.clone();
+            self.params.lac = new_params.lac;
+            self.events
+                .push(Event::CellularCellIDChanged(new_params.cell_id))
+                .ok();
+        }
+
+        self.params.reg_type = new_params.reg_type;
     }
 
     /// Check if any Radio Access Network is registered
-    pub fn is_registered(&self) -> Option<RegistrationStatus> {
-        if let Some(utran) = self.get(RadioAccessNetwork::Utran).is_registered() {
-            return Some(utran);
+    pub const fn is_registered(&self) -> Option<RegistrationStatus> {
+        self.params.status.is_registered()
+    }
+
+    /// Check if any Radio Access Network is registered
+    pub const fn is_denied(&self) -> bool {
+        self.params.status.is_denied()
+    }
+}
+
+impl From<network_service::urc::NetworkRegistration> for RegistrationParams {
+    fn from(v: network_service::urc::NetworkRegistration) -> Self {
+        Self {
+            reg_type: RadioAccessNetwork::Geran,
+            status: v.stat.into(),
+            act: RatAct::Gsm,
+            cell_id: None,
+            lac: None,
+            // active_time: None,
+            // periodic_tau: None,
         }
-        if let Some(eutran) = self.get(RadioAccessNetwork::Eutran).is_registered() {
-            return Some(eutran);
+    }
+}
+
+impl From<GPRSNetworkRegistration> for RegistrationParams {
+    fn from(v: GPRSNetworkRegistration) -> Self {
+        Self {
+            reg_type: RadioAccessNetwork::Utran,
+            status: v.stat.into(),
+            act: v.act.unwrap_or(RatAct::Unknown),
+            cell_id: v.ci,
+            lac: v.lac,
+            // active_time: None,
+            // periodic_tau: None,
         }
-
-        None
     }
+}
 
-    /// Check if we are currently roaming on any Radio Access Network
-    #[allow(dead_code)]
-    pub fn is_roaming(&self) -> bool {
-        self.get(RadioAccessNetwork::Utran).is_roaming()
-            || self.get(RadioAccessNetwork::Eutran).is_roaming()
+impl From<GPRSNetworkRegistrationStatus> for RegistrationParams {
+    fn from(v: GPRSNetworkRegistrationStatus) -> Self {
+        Self {
+            reg_type: RadioAccessNetwork::Utran,
+            status: v.stat.into(),
+            act: v.act.unwrap_or(RatAct::Unknown),
+            cell_id: v.ci,
+            lac: v.lac,
+            // active_time: None,
+            // periodic_tau: None,
+        }
     }
+}
 
-    /// Check if we are currently denied registration on any Radio Access Network
-    pub fn is_denied(&self) -> bool {
-        self.get(RadioAccessNetwork::Utran) == RegistrationStatus::RegistrationDenied
-            || self.get(RadioAccessNetwork::Eutran) == RegistrationStatus::RegistrationDenied
-        // || self.get(RadioAccessNetwork::Utran) == RegistrationStatus::NotRegistered
-        // || self.get(RadioAccessNetwork::Eutran) == RegistrationStatus::NotRegistered
+impl From<EPSNetworkRegistration> for RegistrationParams {
+    fn from(v: EPSNetworkRegistration) -> Self {
+        Self {
+            reg_type: RadioAccessNetwork::Eutran,
+            status: v.stat.into(),
+            act: v.act.unwrap_or(RatAct::Unknown),
+            cell_id: v.ci,
+            lac: v.tac,
+            // active_time: None,
+            // periodic_tau: None,
+        }
     }
+}
 
-    pub fn is_attempting(&self) -> bool {
-        self.get(RadioAccessNetwork::Utran).is_attempting()
-            || self.get(RadioAccessNetwork::Eutran).is_attempting()
+impl From<EPSNetworkRegistrationStatus> for RegistrationParams {
+    fn from(v: EPSNetworkRegistrationStatus) -> Self {
+        Self {
+            reg_type: RadioAccessNetwork::Eutran,
+            status: v.stat.into(),
+            act: v.act.unwrap_or(RatAct::Unknown),
+            cell_id: v.ci,
+            lac: v.tac,
+            // active_time: None,
+            // periodic_tau: None,
+        }
     }
 }
 
@@ -162,88 +279,84 @@ pub enum RegistrationStatus {
 }
 
 impl RegistrationStatus {
-    pub fn is_registered(&self) -> Option<RegistrationStatus> {
-        use RegistrationStatus::*;
-
+    pub const fn is_registered(self) -> Option<Self> {
         match self {
-            RegisteredHomeNetwork | RegisteredRoaming => Some(*self),
+            Self::RegisteredHomeNetwork | Self::RegisteredRoaming => Some(self),
             _ => None,
         }
     }
 
-    pub fn is_roaming(&self) -> bool {
-        use RegistrationStatus::*;
-
+    pub const fn is_roaming(self) -> bool {
         matches!(
             self,
-            RegisteredRoaming | RegisteredSMSOnlyRoaming | RegisteredCSFBNotPreferredRoaming
+            Self::RegisteredRoaming
+                | Self::RegisteredSMSOnlyRoaming
+                | Self::RegisteredCSFBNotPreferredRoaming
         )
     }
 
-    pub fn is_attempting(&self) -> bool {
-        use RegistrationStatus::*;
+    pub const fn is_attempting(self) -> bool {
+        !matches!(self, Self::NotRegistered | Self::RegistrationDenied)
+    }
 
-        !matches!(self, NotRegistered | RegistrationDenied)
+    pub const fn is_denied(self) -> bool {
+        matches!(self, Self::RegistrationDenied)
     }
 }
 
-/// Convert the 3GPP registration status from a CREG URC to RegistrationStatus.
+/// Convert the 3GPP registration status from a CREG URC to [`RegistrationStatus`].
 impl From<NetworkRegistrationStat> for RegistrationStatus {
     fn from(v: NetworkRegistrationStat) -> Self {
-        use NetworkRegistrationStat::*;
-
         match v {
-            NotRegistered => RegistrationStatus::NotRegistered,
-            Registered => RegistrationStatus::RegisteredHomeNetwork,
-            NotRegisteredSearching => RegistrationStatus::SearchingNetwork,
-            RegistrationDenied => RegistrationStatus::RegistrationDenied,
-            Unknown => RegistrationStatus::Unknown,
-            RegisteredRoaming => RegistrationStatus::RegisteredRoaming,
-            RegisteredSmsOnly => RegistrationStatus::RegisteredSMSOnlyHome,
-            RegisteredSmsOnlyRoaming => RegistrationStatus::RegisteredSMSOnlyRoaming,
-            RegisteredCsfbNotPerferred => RegistrationStatus::RegisteredCSFBNotPreferredHome,
-            RegisteredCsfbNotPerferredRoaming => {
-                RegistrationStatus::RegisteredCSFBNotPreferredRoaming
+            NetworkRegistrationStat::NotRegistered => Self::NotRegistered,
+            NetworkRegistrationStat::Registered => Self::RegisteredHomeNetwork,
+            NetworkRegistrationStat::NotRegisteredSearching => Self::SearchingNetwork,
+            NetworkRegistrationStat::RegistrationDenied => Self::RegistrationDenied,
+            NetworkRegistrationStat::Unknown => Self::Unknown,
+            NetworkRegistrationStat::RegisteredRoaming => Self::RegisteredRoaming,
+            NetworkRegistrationStat::RegisteredSmsOnly => Self::RegisteredSMSOnlyHome,
+            NetworkRegistrationStat::RegisteredSmsOnlyRoaming => Self::RegisteredSMSOnlyRoaming,
+            NetworkRegistrationStat::RegisteredCsfbNotPerferred => {
+                Self::RegisteredCSFBNotPreferredHome
+            }
+            NetworkRegistrationStat::RegisteredCsfbNotPerferredRoaming => {
+                Self::RegisteredCSFBNotPreferredRoaming
             }
         }
     }
 }
 
-/// Convert the 3GPP registration status from a CGREG URC to RegistrationStatus.
+/// Convert the 3GPP registration status from a CGREG URC to [`RegistrationStatus`].
 impl From<GPRSNetworkRegistrationStat> for RegistrationStatus {
     fn from(v: GPRSNetworkRegistrationStat) -> Self {
-        use GPRSNetworkRegistrationStat::*;
-
         match v {
-            NotRegistered => RegistrationStatus::NotRegistered,
-            Registered => RegistrationStatus::RegisteredHomeNetwork,
-            NotRegisteredSearching => RegistrationStatus::SearchingNetwork,
-            RegistrationDenied => RegistrationStatus::RegistrationDenied,
-            Unknown => RegistrationStatus::Unknown,
-            RegisteredRoaming => RegistrationStatus::RegisteredRoaming,
-            AttachedEmergencyOnly => RegistrationStatus::AttachedEmergencyOnly,
+            GPRSNetworkRegistrationStat::NotRegistered => Self::NotRegistered,
+            GPRSNetworkRegistrationStat::Registered => Self::RegisteredHomeNetwork,
+            GPRSNetworkRegistrationStat::NotRegisteredSearching => Self::SearchingNetwork,
+            GPRSNetworkRegistrationStat::RegistrationDenied => Self::RegistrationDenied,
+            GPRSNetworkRegistrationStat::Unknown => Self::Unknown,
+            GPRSNetworkRegistrationStat::RegisteredRoaming => Self::RegisteredRoaming,
+            GPRSNetworkRegistrationStat::AttachedEmergencyOnly => Self::AttachedEmergencyOnly,
         }
     }
 }
 
-/// Convert the 3GPP registration status from a CEREG URC to RegistrationStatus.
+/// Convert the 3GPP registration status from a CEREG URC to [`RegistrationStatus`].
 impl From<EPSNetworkRegistrationStat> for RegistrationStatus {
     fn from(v: EPSNetworkRegistrationStat) -> Self {
-        use EPSNetworkRegistrationStat::*;
-
         match v {
-            NotRegistered => RegistrationStatus::NotRegistered,
-            Registered => RegistrationStatus::RegisteredHomeNetwork,
-            NotRegisteredSearching => RegistrationStatus::SearchingNetwork,
-            RegistrationDenied => RegistrationStatus::RegistrationDenied,
-            Unknown => RegistrationStatus::Unknown,
-            RegisteredRoaming => RegistrationStatus::RegisteredRoaming,
-            AttachedEmergencyOnly => RegistrationStatus::AttachedEmergencyOnly,
+            EPSNetworkRegistrationStat::NotRegistered => Self::NotRegistered,
+            EPSNetworkRegistrationStat::Registered => Self::RegisteredHomeNetwork,
+            EPSNetworkRegistrationStat::NotRegisteredSearching => Self::SearchingNetwork,
+            EPSNetworkRegistrationStat::RegistrationDenied => Self::RegistrationDenied,
+            EPSNetworkRegistrationStat::Unknown => Self::Unknown,
+            EPSNetworkRegistrationStat::RegisteredRoaming => Self::RegisteredRoaming,
+            EPSNetworkRegistrationStat::AttachedEmergencyOnly => Self::AttachedEmergencyOnly,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, defmt::Format)]
 pub enum RadioAccessNetwork {
     UnknownUnused = 0,
     Geran = 1,
@@ -254,10 +367,10 @@ pub enum RadioAccessNetwork {
 impl From<usize> for RadioAccessNetwork {
     fn from(v: usize) -> Self {
         match v {
-            1 => RadioAccessNetwork::Geran,
-            2 => RadioAccessNetwork::Utran,
-            3 => RadioAccessNetwork::Eutran,
-            _ => RadioAccessNetwork::UnknownUnused,
+            1 => Self::Geran,
+            2 => Self::Utran,
+            3 => Self::Eutran,
+            _ => Self::UnknownUnused,
         }
     }
 }

@@ -29,7 +29,7 @@ pub struct GPRSNetworkRegistration {
     #[at_arg(position = 2)]
     pub lac: Option<String<consts::U4>>,
     #[at_arg(position = 3)]
-    pub ci: Option<String<consts::U4>>,
+    pub ci: Option<String<consts::U8>>,
     #[at_arg(position = 4)]
     pub act: Option<RatAct>,
     #[at_arg(position = 5)]

@@ -7,7 +7,6 @@ use crate::command::ip_transport_layer::{
     types::SocketProtocol, CloseSocket, CreateSocket, PrepareUDPSendToDataBinary,
     UDPSendToDataBinary,
 };
-use crate::network::Error as NetworkError;
 use atat::typenum::Unsigned;
 use embedded_nal::{Mode, SocketAddr, UdpStack};
 use heapless::{ArrayLength, Bucket, Pos};
@@ -30,10 +29,6 @@ where
     /// Open a new UDP socket to the given address and port. UDP is connectionless,
     /// so unlike `TcpStack` no `connect()` is required.
     fn open(&self, remote: SocketAddr, _mode: Mode) -> Result<Self::UdpSocket, Self::Error> {
-        if self.network.is_registered()?.is_none() {
-            return Err(Error::Network(NetworkError::_Unknown));
-        }
-
         let socket_resp = self.network.send_internal(
             &CreateSocket {
                 protocol: SocketProtocol::UDP,

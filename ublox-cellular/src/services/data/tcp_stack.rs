@@ -8,7 +8,6 @@ use crate::command::ip_transport_layer::{
     types::SocketProtocol, CloseSocket, ConnectSocket, CreateSocket, PrepareWriteSocketDataBinary,
     WriteSocketDataBinary,
 };
-use crate::network::Error as NetworkError;
 use atat::typenum::Unsigned;
 use embedded_nal::{Mode, SocketAddr, TcpStack};
 use heapless::{ArrayLength, Bucket, Pos};
@@ -30,10 +29,6 @@ where
 
     /// Open a new TCP socket to the given address and port. The socket starts in the unconnected state.
     fn open(&self, _mode: Mode) -> Result<Self::TcpSocket, Self::Error> {
-        if self.network.is_registered()?.is_none() {
-            return Err(Error::Network(NetworkError::_Unknown));
-        }
-
         let socket_resp = self.network.send_internal(
             &CreateSocket {
                 protocol: SocketProtocol::TCP,
