@@ -2,8 +2,7 @@ use core::cmp::min;
 
 use heapless::ArrayLength;
 
-use super::{Error, Result};
-use crate::socket::{RingBuffer, Socket, SocketHandle, SocketMeta};
+use super::{Error, Result, RingBuffer, Socket, SocketHandle, SocketMeta};
 pub use embedded_nal::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 /// A UDP socket ring buffer.
@@ -16,17 +15,19 @@ pub type SocketBuffer<N> = RingBuffer<u8, N>;
 pub struct UdpSocket<L: ArrayLength<u8>> {
     pub(crate) meta: SocketMeta,
     pub(crate) endpoint: SocketAddr,
+    available_data: usize,
     rx_buffer: SocketBuffer<L>,
 }
 
 impl<L: ArrayLength<u8>> UdpSocket<L> {
     /// Create an UDP socket with the given buffers.
-    pub fn new(socket_id: usize) -> UdpSocket<L> {
+    pub fn new(socket_id: u8) -> UdpSocket<L> {
         UdpSocket {
             meta: SocketMeta {
                 handle: SocketHandle(socket_id),
             },
             endpoint: SocketAddrV4::new(Ipv4Addr::unspecified(), 0).into(),
+            available_data: 0,
             rx_buffer: SocketBuffer::new(),
         }
     }
@@ -41,6 +42,20 @@ impl<L: ArrayLength<u8>> UdpSocket<L> {
     #[inline]
     pub fn endpoint(&self) -> SocketAddr {
         self.endpoint
+    }
+
+    /// Set available data.
+    pub fn set_available_data(&mut self, available_data: usize) {
+        self.available_data = available_data;
+    }
+
+    /// Get the number of bytes available to ingress.
+    pub fn get_available_data(&self) -> usize {
+        self.available_data
+    }
+
+    pub fn rx_window(&self) -> usize {
+        self.rx_buffer.window()
     }
 
     /// Bind the socket to the given endpoint.
@@ -75,18 +90,9 @@ impl<L: ArrayLength<u8>> UdpSocket<L> {
     #[inline]
     pub fn is_open(&self) -> bool {
         match self.endpoint {
-            SocketAddr::V4(ipv4) => {
-                if ipv4.port() == 0 {
-                    return false;
-                }
-            }
-            SocketAddr::V6(ipv6) => {
-                if ipv6.port() == 0 {
-                    return false;
-                }
-            }
+            SocketAddr::V4(ipv4) => ipv4.port() != 0,
+            SocketAddr::V6(ipv6) => ipv6.port() != 0,
         }
-        true
     }
 
     /// Check whether the receive buffer is full.

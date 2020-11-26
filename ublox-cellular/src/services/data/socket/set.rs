@@ -13,8 +13,20 @@ pub struct Item<L: ArrayLength<u8>> {
 }
 
 /// A handle, identifying a socket in a set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Default, Serialize, Deserialize)]
-pub struct Handle(pub usize);
+#[derive(
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Default,
+    Serialize,
+    Deserialize,
+    defmt::Format,
+)]
+pub struct Handle(pub u8);
 
 /// An extensible set of sockets.
 #[derive(Default)]
@@ -172,43 +184,15 @@ where
         }
     }
 
-    // /// Prune the sockets in this set.
-    // ///
-    // /// Pruning affects sockets with reference count 0. Open sockets are closed.
-    // /// Closed sockets are removed and dropped.
-    // pub fn prune(&mut self) {
-    //     for (_, item) in self.sockets.iter_mut() {
-    //         let mut may_remove = false;
-    //         if let Item {
-    //             refs: 0,
-    //             ref mut socket,
-    //         } = item
-    //         {
-    //             match *socket {
-    //                 #[cfg(feature = "socket-raw")]
-    //                 Socket::Raw(_) => may_remove = true,
-    //                 #[cfg(all(
-    //                     feature = "socket-icmp",
-    //                     any(feature = "proto-ipv4", feature = "proto-ipv6")
-    //                 ))]
-    //                 Socket::Icmp(_) => may_remove = true,
-    //                 #[cfg(feature = "socket-udp")]
-    //                 Socket::Udp(_) => may_remove = true,
-    //                 #[cfg(feature = "socket-tcp")]
-    //                 Socket::Tcp(ref mut socket) => {
-    //                     if socket.state() == TcpState::Closed {
-    //                         may_remove = true
-    //                     } else {
-    //                         socket.close()
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //         if may_remove {
-    //             *item = None
-    //         }
-    //     }
-    // }
+    /// Prune the sockets in this set.
+    ///
+    /// Pruning affects sockets with reference count 0. Open sockets are closed.
+    /// Closed sockets are removed and dropped.
+    pub fn prune(&mut self) {
+        self.sockets.iter_mut().for_each(|item| {
+            item.take();
+        })
+    }
 
     /// Iterate every socket in this set.
     pub fn iter(&self) -> impl Iterator<Item = (Handle, &Socket<L>)> {

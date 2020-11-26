@@ -11,7 +11,7 @@ use responses::*;
 use types::*;
 
 use super::NoResponse;
-use crate::sockets::SocketHandle;
+use crate::services::data::socket::SocketHandle;
 
 /// 25.3 Create Socket +USOCR
 ///
@@ -54,8 +54,6 @@ pub struct SetSocketSslState {
     pub socket: SocketHandle,
     #[at_arg(position = 1)]
     pub ssl_tls_status: SslTlsStatus,
-    #[at_arg(position = 2)]
-    pub profile_id: u8,
 }
 
 /// 25.7 Close Socket +USOCL
@@ -168,8 +166,9 @@ pub struct PrepareWriteSocketDataBinary {
     force_receive_state = true
 )]
 pub struct WriteSocketDataBinary<'a> {
+    // FIXME:
     // #[at_arg(position = 0, len = EgressChunkSize::to_usize())]
-    #[at_arg(position = 0, len = 512)]
+    #[at_arg(position = 0, len = 1024)]
     pub data: serde_at::ser::Bytes<'a>,
 }
 

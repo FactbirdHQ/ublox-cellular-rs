@@ -27,7 +27,7 @@ pub struct ModuleSwitchOff;
 ///
 /// Selects the level of functionality <fun> in the MT.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CFUN", NoResponse, timeout_ms = 180000)]
+#[at_cmd("+CFUN", NoResponse, timeout_ms = 8000)]
 pub struct SetModuleFunctionality {
     #[at_arg(position = 0)]
     pub fun: Functionality,
@@ -39,7 +39,7 @@ pub struct SetModuleFunctionality {
 ///
 /// Selects the level of functionality <fun> in the MT.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CFUN?", ModuleFunctionality, timeout_ms = 180000)]
+#[at_cmd("+CFUN?", ModuleFunctionality, timeout_ms = 8000)]
 pub struct GetModuleFunctionality;
 
 /// 5.4 Indicator control +CIND

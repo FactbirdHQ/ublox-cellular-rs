@@ -20,65 +20,97 @@ pub enum GpioInPull {
     PullDown = 2,
 }
 
+// #[derive(Clone, PartialEq, AtatEnum)]
+// pub enum GpioNumber {
+//     #[cfg(feature = "toby-r2")]
+//     Gpio1,
+
+// }
+
 #[derive(Clone, PartialEq, AtatEnum)]
 pub enum GpioMode {
     /// • 0: output
-    // TODO: Correctly handle these in serde_at, see https://github.com/BlackbirdHQ/atat/issues/37
-    // Output(GpioOutValue),
-    Output = 0,
+    #[at_arg(value = 0)]
+    Output(GpioOutValue),
     /// • 1: input
-    // Input(GpioInPull),
-    Input = 1,
+    #[at_arg(value = 1)]
+    Input(GpioInPull),
     /// • 2: network status indication
-    NetworkStatus = 2,
+    #[at_arg(value = 2)]
+    NetworkStatus,
     /// • 3: external GNSS supply enable
-    ExternalGnssSupplyEnable = 3,
+    #[at_arg(value = 3)]
+    ExternalGnssSupplyEnable,
     /// • 4: external GNSS data ready
-    ExternalGnssDataReady = 4,
+    #[at_arg(value = 4)]
+    ExternalGnssDataReady,
     /// • 5: external GNSS RTC sharing
-    ExternalGnssRtcSharing = 5,
+    #[at_arg(value = 5)]
+    ExternalGnssRtcSharing,
     /// • 6: jamming detection indication
-    JammingDetection = 6,
+    #[at_arg(value = 6)]
+    JammingDetection,
     /// • 7: SIM card detection
-    SimDetection = 7,
+    #[at_arg(value = 7)]
+    SimDetection,
     /// • 8: headset detection
-    HeadsetDetection = 8,
+    #[at_arg(value = 8)]
+    HeadsetDetection,
     /// • 9: GSM Tx burst indication
-    GsmTxIndication = 9,
+    #[at_arg(value = 9)]
+    GsmTxIndication,
     /// • 10: module operating status indication
-    ModuleOperatingStatus = 10,
+    #[at_arg(value = 10)]
+    ModuleOperatingStatus,
     /// • 11: module functionality status indication
-    ModuleFunctionalityStatus = 11,
+    #[at_arg(value = 11)]
+    ModuleFunctionalityStatus,
     /// • 12: I2S digital audio interface
-    I2SDigitalAudio = 12,
+    #[at_arg(value = 12)]
+    I2SDigitalAudio,
     /// • 13: SPI serial interface
-    SpiSerial = 13,
+    #[at_arg(value = 13)]
+    SpiSerial,
     /// • 14: master clock generation
-    MasterClockGeneration = 14,
+    #[at_arg(value = 14)]
+    MasterClockGeneration,
     /// • 15: UART (DSR, DTR, DCD e RI) interface
-    Uart = 15,
+    #[at_arg(value = 15)]
+    Uart,
     /// • 16: Wi-Fi enable
-    WifiEnable = 16,
+    #[at_arg(value = 16)]
+    WifiEnable,
     /// • 18: ring indication
-    RingIndication = 18,
+    #[at_arg(value = 18)]
+    RingIndication,
     /// • 19: last gasp enable
-    LastGaspEnable = 19,
+    #[at_arg(value = 19)]
+    LastGaspEnable,
     /// • 20: external GNSS antenna / LNA control enable
-    ExternalGnssAntenna = 20,
+    #[at_arg(value = 20)]
+    ExternalGnssAntenna,
     /// • 21: time pulse GNSS
-    TimePulseGnss = 21,
+    #[at_arg(value = 21)]
+    TimePulseGnss,
     /// • 22: time pulse modem
-    TimePulseModem = 22,
+    #[at_arg(value = 22)]
+    TimePulseModem,
     /// • 23: time stamp of external interrupt
-    TimestampExternalInterrupt = 23,
+    #[at_arg(value = 23)]
+    TimestampExternalInterrupt,
     /// • 24: fast power-off
-    FastPoweroff = 24,
+    #[at_arg(value = 24)]
+    FastPoweroff,
     /// • 25: LwM2M pulse
-    Lwm2mPulse = 25,
+    #[at_arg(value = 25)]
+    Lwm2mPulse,
     /// • 26: hardware flow control (RTS, CTS)
-    HardwareFlowControl = 26,
+    #[at_arg(value = 26)]
+    HardwareFlowControl,
     /// • 32: 32.768 kHz output
-    ClockOutput = 32,
+    #[at_arg(value = 32)]
+    ClockOutput,
     /// • 255: pad disabled
-    PadDisabled = 255,
+    #[at_arg(value = 255)]
+    PadDisabled,
 }

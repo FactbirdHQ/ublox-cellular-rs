@@ -20,3 +20,13 @@ pub enum MessageIndicationType {
     /// • 7: reserved for future use
     Reserved = 7,
 }
+
+/// Indicates whether the +UMWI URC is enabled or not
+#[derive(Clone, PartialEq, AtatEnum)]
+pub enum MessageWaitingMode {
+    /// • 0: disable the +UMWI URC
+    Disabled = 0,
+    /// • 1 (factory-programmed value): enable the +UMWI URC
+    #[at_arg(default)]
+    Enabled = 1,
+}

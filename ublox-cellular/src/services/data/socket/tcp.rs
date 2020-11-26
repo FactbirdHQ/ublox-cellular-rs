@@ -1,23 +1,30 @@
 use heapless::ArrayLength;
 
-use super::{Error, Result};
-use crate::socket::{RingBuffer, Socket, SocketHandle, SocketMeta};
+use super::{Error, Result, RingBuffer, Socket, SocketHandle, SocketMeta};
 
 /// A TCP socket ring buffer.
 pub type SocketBuffer<N> = RingBuffer<u8, N>;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, defmt::Format)]
 pub enum State {
-    Closed,
-    Listen,
-    Established,
-    CloseWait,
-    TimeWait,
+    /// Freshly created, unsullied
+    Created,
+    /// TCP connected or UDP has an address
+    Connected,
+    /// Block all reads
+    ShutdownForRead,
+    /// Block all writes
+    ShutdownForWrite,
+    /// Block all reads and writes
+    ShutdownForReadWrite,
+    /// Block all reads and writes, waiting for far end to complete closure, can
+    /// be tidied up.
+    Closing,
 }
 
 impl Default for State {
     fn default() -> Self {
-        State::Closed
+        State::Created
     }
 }
 
@@ -30,18 +37,19 @@ impl Default for State {
 pub struct TcpSocket<L: ArrayLength<u8>> {
     pub(crate) meta: SocketMeta,
     state: State,
+    available_data: usize,
     rx_buffer: SocketBuffer<L>,
 }
 
 impl<L: ArrayLength<u8>> TcpSocket<L> {
-    #[allow(unused_comparisons)] // small usize platforms always pass rx_capacity check
     /// Create a socket using the given buffers.
-    pub fn new(socket_id: usize) -> TcpSocket<L> {
+    pub fn new(socket_id: u8) -> TcpSocket<L> {
         TcpSocket {
             meta: SocketMeta {
                 handle: SocketHandle(socket_id),
             },
-            state: State::Closed,
+            state: State::default(),
+            available_data: 0,
             rx_buffer: SocketBuffer::new(),
         }
     }
@@ -58,59 +66,31 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
         self.state
     }
 
-    /// Close the connection.
-    pub fn close(&mut self) {
-        self.set_state(State::Closed);
+    /// Set available data.
+    pub fn set_available_data(&mut self, available_data: usize) {
+        self.available_data = available_data;
     }
 
-    /// Return whether the socket is passively listening for incoming connections.
-    ///
-    /// In terms of the TCP state machine, the socket must be in the `LISTEN` state.
-    #[inline]
-    pub fn is_listening(&self) -> bool {
-        match self.state {
-            State::Listen => true,
-            _ => false,
-        }
-    }
-
-    /// Return whether the socket is open.
-    ///
-    /// This function returns true if the socket will process incoming or dispatch outgoing
-    /// packets. Note that this does not mean that it is possible to send or receive data through
-    /// the socket; for that, use [can_send](#method.can_send) or [can_recv](#method.can_recv).
-    ///
-    /// In terms of the TCP state machine, the socket must not be in the `CLOSED`
-    /// or `TIME-WAIT` states.
-    #[inline]
-    pub fn is_open(&self) -> bool {
-        match self.state {
-            State::Closed => false,
-            State::TimeWait => false,
-            _ => true,
-        }
+    /// Get the number of bytes available to ingress.
+    pub fn get_available_data(&self) -> usize {
+        self.available_data
     }
 
     /// Return whether a connection is active.
     ///
-    /// This function returns true if the socket is actively exchanging packets with
-    /// a remote endpoint. Note that this does not mean that it is possible to send or receive
-    /// data through the socket; for that, use [can_send](#method.can_send) or
-    /// [can_recv](#method.can_recv).
+    /// This function returns true if the socket is actively exchanging packets
+    /// with a remote endpoint. Note that this does not mean that it is possible
+    /// to send or receive data through the socket; for that, use
+    /// [can_send](#method.can_send) or [can_recv](#method.can_recv).
     ///
-    /// If a connection is established, [abort](#method.close) will send a reset to
-    /// the remote endpoint.
+    /// If a connection is established, [abort](#method.close) will send a reset
+    /// to the remote endpoint.
     ///
-    /// In terms of the TCP state machine, the socket must be in the `CLOSED`, `TIME-WAIT`,
-    /// or `LISTEN` state.
+    /// In terms of the TCP state machine, the socket must be in the `Closed` or
+    /// `ShutdownForRead` state.
     #[inline]
     pub fn is_active(&self) -> bool {
-        match self.state {
-            State::Closed => false,
-            State::TimeWait => false,
-            State::Listen => false,
-            _ => true,
-        }
+        !matches!(self.state, State::ShutdownForRead)
     }
 
     /// Return whether the transmit half of the full-duplex connection is open.
@@ -120,17 +100,13 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     /// of the transmit buffer, and even if it returns true, [send](#method.send) may
     /// not be able to enqueue any octets.
     ///
-    /// In terms of the TCP state machine, the socket must be in the `ESTABLISHED` or
-    /// `CLOSE-WAIT` state.
+    /// In terms of the TCP state machine, the socket must be in the `Connected` or
+    /// `ShutdownForRead` state.
     #[inline]
     pub fn may_send(&self) -> bool {
-        match self.state {
-            State::Established => true,
-            // In CLOSE-WAIT, the remote endpoint has closed our receive half of the connection
-            // but we still can transmit indefinitely.
-            State::CloseWait => true,
-            _ => false,
-        }
+        // In `ShutdownForRead`, the remote endpoint has closed our receive half of the connection
+        // but we still can transmit indefinitely.
+        matches!(self.state, State::Connected | State::ShutdownForRead)
     }
 
     /// Return whether the receive half of the full-duplex connection is open.
@@ -139,12 +115,13 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     /// It will return true while there is data in the receive buffer, and if there isn't,
     /// as long as the remote endpoint has not closed the connection.
     ///
-    /// In terms of the TCP state machine, the socket must be in the `ESTABLISHED`,
+    /// In terms of the TCP state machine, the socket must be in the `Connected`,
     /// `FIN-WAIT-1`, or `FIN-WAIT-2` state, or have data in the receive buffer instead.
     #[inline]
     pub fn may_recv(&self) -> bool {
         match self.state {
-            State::Established => true,
+            State::Connected => true,
+            State::ShutdownForWrite => true,
             // If we have something in the receive buffer, we can receive that.
             _ if !self.rx_buffer.is_empty() => true,
             _ => false,
@@ -234,6 +211,10 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
         }
 
         Ok(self.rx_buffer.get_allocated(0, size))
+    }
+
+    pub fn rx_window(&self) -> usize {
+        self.rx_buffer.window()
     }
 
     /// Peek at a sequence of received octets without removing them from

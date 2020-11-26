@@ -10,6 +10,33 @@ use types::*;
 
 use super::NoResponse;
 
+/// 15.2 Circuit 109 behavior &C
+///
+/// Controls how the state of RS232 circuit 109 - Data Carrier Detect (DCD) -
+/// relates to the detection of received line signal from the remote end.
+///
+/// **NOTES:**
+/// - **LARA-R211 / SARA-U201-04A / SARA-U201-04B / SARA-U201-04X /
+///   SARA-G450-01C / SARA-G340-02S / SARA-G340-02X / SARA-G350-02A /
+///   SARA-G350-02S / SARA-G350-02X** - On the AUX UART interface the command is
+///   not effective.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("&C", NoResponse, value_sep = false)]
+pub struct SetCircuit109Behaviour {
+    #[at_arg(position = 0)]
+    pub value: Circuit109Behaviour,
+}
+
+/// 15.3 Circuit 108/2 behavior &D
+///
+/// Controls how the state of RS232 circuit 108/2 - Data Terminal Ready (DTR) -
+/// relates to changes from ON to OFF condition during on-line data state.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("&D", NoResponse, value_sep = false)]
+pub struct SetCircuit108Behaviour {
+    #[at_arg(position = 0)]
+    pub value: Circuit108Behaviour,
+}
 /// 15.5 Flow control &K
 ///
 /// Controls the flow control mechanism. The following settings are allowed:

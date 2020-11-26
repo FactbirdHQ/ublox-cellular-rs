@@ -39,6 +39,13 @@ pub struct IdentificationInformation {
     pub n: u8,
 }
 
+/// 4.11 International mobile subscriber identification +CIMI
+///
+/// Request the IMSI (International Mobile Subscriber Identity)
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+CIMI", CIMI)]
+pub struct GetCIMI;
+
 /// 4.12 Card identification +CCID
 ///
 /// Returns the ICCID (Integrated Circuit Card ID) of the SIM-card. ICCID is a serial number identifying the SIM.

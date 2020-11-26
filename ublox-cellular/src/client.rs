@@ -1,168 +1,162 @@
 use atat::AtatClient;
-use core::cell::{Cell, RefCell};
-use embedded_hal::digital::v2::OutputPin;
-use heapless::{consts, ArrayLength, String};
+use core::cell::RefCell;
+use embedded_hal::{
+    blocking::delay::DelayMs,
+    digital::{InputPin, OutputPin},
+    timer::CountDown,
+};
+use heapless::{ArrayLength, Bucket, Pos};
 
 use crate::{
+    command::device_lock::GetPinStatus,
+    command::device_lock::{responses::PinStatus, types::PinStatusCode},
     command::{
         control::{types::*, *},
-        general::GetCCID,
-        gpio::{types::*, *},
-        ip_transport_layer::*,
         mobile_control::{types::*, *},
+        network_service::SetRadioAccessTechnology,
+        psn::responses::GPRSAttached,
+        psn::types::GPRSAttachedState,
+        psn::GetGPRSAttached,
         system_features::{types::*, *},
-        Urc, *,
+        *,
     },
+    config::{Config, NoPin},
     error::Error,
-    gprs::APNInfo,
-    socket::{SocketHandle, SocketSet, SocketType, TcpSocket, UdpSocket},
+    network::{AtTx, Error as NetworkError, Network},
+    services::data::socket::{SocketSet, SocketSetItem},
+    state::Event,
+    state::RadioAccessNetwork,
+    state::StateMachine,
+    State,
 };
+use general::{responses::CCID, GetCCID};
+use ip_transport_layer::{types::HexMode, SetHexMode};
+use network_service::{
+    types::{NetworkRegistrationUrcConfig, RadioAccessTechnologySelected, RatPreferred},
+    SetNetworkRegistrationStatus,
+};
+use psn::{
+    types::{EPSNetworkRegistrationUrcConfig, GPRSNetworkRegistrationUrcConfig},
+    SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
+};
+use sms::{types::MessageWaitingMode, SetMessageWaitingIndication};
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum State {
-    Deregistered,
-    Registering,
-    Registered,
-    Detached,
-    Attaching,
-    Attached,
-    Sending,
-}
-
-#[derive(Debug, Default)]
-pub struct Config<RST, DTR> {
-    rst_pin: Option<RST>,
-    dtr_pin: Option<DTR>,
-    baud_rate: u32,
-    low_power_mode: bool,
-    flow_control: bool,
-    pub(crate) apn_info: APNInfo,
-    pin: String<consts::U4>,
-}
-
-impl<RST, DTR> Config<RST, DTR>
-where
-    RST: OutputPin,
-    DTR: OutputPin,
-{
-    pub fn new(apn_info: APNInfo, pin: &str) -> Self {
-        Config {
-            rst_pin: None,
-            dtr_pin: None,
-            baud_rate: 115_200_u32,
-            low_power_mode: false,
-            flow_control: false,
-            apn_info,
-            pin: String::from(pin),
-        }
-    }
-
-    pub fn with_rst(self, rst_pin: RST) -> Self {
-        Config {
-            rst_pin: Some(rst_pin),
-            ..self
-        }
-    }
-
-    pub fn with_dtr(self, dtr_pin: DTR) -> Self {
-        Config {
-            dtr_pin: Some(dtr_pin),
-            ..self
-        }
-    }
-
-    pub fn baud_rate<B: Into<u32>>(self, baud_rate: B) -> Self {
-        // FIXME: Validate baudrates
-
-        Config {
-            baud_rate: baud_rate.into(),
-            ..self
-        }
-    }
-
-    pub fn with_flow_control(self) -> Self {
-        Config {
-            flow_control: true,
-            ..self
-        }
-    }
-
-    pub fn low_power_mode(self) -> Self {
-        Config {
-            low_power_mode: true,
-            ..self
-        }
-    }
-
-    pub fn pin(&self) -> &str {
-        &self.pin
-    }
-}
-
-pub struct GsmClient<C, RST, DTR, N, L>
+pub struct Device<C, DLY, N, L, RST = NoPin, DTR = NoPin, PWR = NoPin, VINT = NoPin>
 where
     C: AtatClient,
-    N: 'static + ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    DLY: DelayMs<u32> + CountDown,
+    N: 'static
+        + ArrayLength<Option<SocketSetItem<L>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
 {
-    initialized: Cell<bool>,
-    pub(crate) config: Config<RST, DTR>,
-    pub(crate) state: Cell<State>,
-    pub(crate) poll_cnt: Cell<u16>,
-    pub(crate) client: RefCell<C>,
+    pub(crate) fsm: StateMachine,
+    pub(crate) config: Config<RST, DTR, PWR, VINT>,
+    pub(crate) delay: DLY,
+    pub(crate) network: Network<C>,
     // Ublox devices can hold a maximum of 6 active sockets
-    pub(crate) sockets: RefCell<&'static mut SocketSet<N, L>>,
+    pub(crate) sockets: Option<RefCell<&'static mut SocketSet<N, L>>>,
 }
 
-impl<C, RST, DTR, N, L> GsmClient<C, RST, DTR, N, L>
+impl<C, DLY, N, L, RST, DTR, PWR, VINT> Device<C, DLY, N, L, RST, DTR, PWR, VINT>
 where
     C: AtatClient,
+    DLY: DelayMs<u32> + CountDown,
+    DLY::Time: From<u32>,
     RST: OutputPin,
+    PWR: OutputPin,
     DTR: OutputPin,
-    N: ArrayLength<Option<crate::sockets::SocketSetItem<L>>>,
+    VINT: InputPin,
+    N: ArrayLength<Option<SocketSetItem<L>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
-    pub fn new(
-        client: C,
-        socket_set: &'static mut SocketSet<N, L>,
-        config: Config<RST, DTR>,
-    ) -> Self {
-        GsmClient {
+    pub fn new(client: C, delay: DLY, config: Config<RST, DTR, PWR, VINT>) -> Self {
+        Device {
+            fsm: StateMachine::new(),
             config,
-            state: Cell::new(State::Deregistered),
-            poll_cnt: Cell::new(0),
-            initialized: Cell::new(false),
-            client: RefCell::new(client),
-            sockets: RefCell::new(socket_set),
+            delay,
+            network: Network::new(AtTx::new(client, 20)),
+            sockets: None,
         }
     }
 
-    /// Initilize a new ublox device to a known state (restart, wait for startup, set RS232 settings, gpio settings, etc.)
-    pub fn init(&self, restart: bool) -> Result<(), Error> {
-        if restart && self.config.rst_pin.is_some() {
-            if let Some(ref _rst) = self.config.rst_pin {
-                // rst.set_high().ok();
-                // delay(1000);
-                // rst.set_low().ok();
+    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<N, L>) {
+        self.sockets = Some(RefCell::new(socket_set));
+    }
+
+    pub(crate) fn initialize(&mut self, leave_pwr_alone: bool) -> Result<(), Error> {
+        defmt::info!(
+            "Initialising with PWR_ON pin: {:bool} and VInt pin: {:bool}",
+            self.config.pwr_pin.is_some(),
+            self.config.vint_pin.is_some()
+        );
+
+        match self.config.pwr_pin {
+            Some(ref mut pwr) if !leave_pwr_alone => {
+                pwr.try_set_high().ok();
             }
+            _ => {}
+        }
+
+        Ok(())
+    }
+
+    pub(crate) fn power_on(&mut self) -> Result<(), Error> {
+        let vint_value = match self.config.vint_pin {
+            Some(ref _vint) => false,
+            _ => false,
+        };
+
+        if vint_value || self.is_alive(1).is_ok() {
+            defmt::debug!("powering on, module is already on, flushing config...");
         } else {
-            self.autosense()?;
-
-            self.reset()?;
+            defmt::debug!("powering on.");
+            if let Some(ref mut pwr) = self.config.pwr_pin {
+                pwr.try_set_low().ok();
+                self.delay
+                    .try_delay_ms(crate::module_cfg::constants::PWR_ON_PULL_TIME_MS)
+                    .map_err(|_| Error::Busy)?;
+                pwr.try_set_high().ok();
+            } else {
+                // Software restart
+                self.restart(false)?;
+            }
+            self.delay
+                .try_delay_ms(crate::module_cfg::constants::BOOT_WAIT_TIME_MS)
+                .map_err(|_| Error::Busy)?;
+            self.is_alive(10)?;
         }
+        Ok(())
+    }
 
-        self.autosense()?;
-
-        if self.initialized.get() {
-            return Ok(());
+    /// Check that the cellular module is alive.
+    ///
+    /// See if the cellular module is responding at the AT interface by poking
+    /// it with "AT" up to "attempts" times, waiting 1 second for an "OK"
+    /// response each time
+    pub(crate) fn is_alive(&self, attempts: u8) -> Result<(), Error> {
+        let mut error = Error::BaudDetection;
+        for _ in 0..attempts {
+            match self.network.send_internal(&AT, false) {
+                Ok(_) => {
+                    return Ok(());
+                }
+                Err(e) => error = e.into(),
+            };
         }
+        Err(error)
+    }
 
+    pub(crate) fn configure(&self) -> Result<(), Error> {
         if self.config.baud_rate > 230_400_u32 {
             // Needs a way to reconfigure uart baud rate temporarily
             // Relevant issue: https://github.com/rust-embedded/embedded-hal/issues/79
             return Err(Error::_Unknown);
 
-            // self.send_internal(
+            // self.network.send_internal(
             //     &SetDataRate {
             //         rate: BaudRate::B115200,
             //     },
@@ -177,18 +171,79 @@ where
             // delay(100);
             // UART begin(self.config.baud_rate)
 
-            // self.autosense()?;
+            // self.is_alive()?;
         }
 
+        // Extended errors on
+        self.network.send_internal(
+            &SetReportMobileTerminationError {
+                n: TerminationErrorMode::Disabled,
+            },
+            false,
+        )?;
+
+        // DCD circuit (109) changes in accordance with the carrier
+        self.network.send_internal(
+            &SetCircuit109Behaviour {
+                value: Circuit109Behaviour::ChangesWithCarrier,
+            },
+            false,
+        )?;
+
+        // Ignore changes to DTR
+        self.network.send_internal(
+            &SetCircuit108Behaviour {
+                value: Circuit108Behaviour::Ignore,
+            },
+            false,
+        )?;
+
+        // Switch off UART power saving until it is integrated into this API
+        self.network.send_internal(
+            &SetPowerSavingControl {
+                mode: PowerSavingMode::Disabled,
+                timeout: None,
+            },
+            false,
+        )?;
+
+        if self.config.hex_mode {
+            self.network.send_internal(
+                &SetHexMode {
+                    hex_mode_disable: HexMode::Enabled,
+                },
+                false,
+            )?;
+        } else {
+            self.network.send_internal(
+                &SetHexMode {
+                    hex_mode_disable: HexMode::Disabled,
+                },
+                false,
+            )?;
+        }
+
+        // self.network.send_internal(&general::IdentificationInformation { n: 9 }, true)?;
+
+        // Stay in airplane mode until commanded to register
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun: Functionality::AirplaneMode,
+                rst: None,
+            },
+            false,
+        )?;
+
+        // Tell module whether we support flow control
         if self.config.flow_control {
-            self.send_internal(
+            self.network.send_internal(
                 &SetFlowControl {
                     value: FlowControl::RtsCts,
                 },
                 false,
             )?;
         } else {
-            self.send_internal(
+            self.network.send_internal(
                 &SetFlowControl {
                     value: FlowControl::Disabled,
                 },
@@ -196,283 +251,276 @@ where
             )?;
         }
 
-        if self.config.dtr_pin.is_some() && self.config.low_power_mode {
-            self.low_power_mode(self.config.low_power_mode)?;
+        // Disable Message Waiting URCs (UMWI)
+        self.network.send_internal(
+            &SetMessageWaitingIndication {
+                mode: MessageWaitingMode::Disabled,
+            },
+            false,
+        )?;
 
-            self.send_internal(
-                &SetPowerSavingControl {
-                    mode: PowerSavingMode::CtrlByDtr,
-                    timeout: None,
+        Ok(())
+    }
+
+    #[inline]
+    pub(crate) fn restart(&self, sim_reset: bool) -> Result<(), Error> {
+        if sim_reset {
+            self.network.send_internal(
+                &SetModuleFunctionality {
+                    fun: Functionality::SilentResetWithSimReset,
+                    rst: None,
                 },
                 false,
             )?;
         } else {
-            self.send_internal(
-                &SetPowerSavingControl {
-                    mode: PowerSavingMode::Disabled,
-                    timeout: None,
+            self.network.send_internal(
+                &SetModuleFunctionality {
+                    fun: Functionality::SilentReset,
+                    rst: None,
                 },
                 false,
             )?;
         }
-
-        self.send_internal(
-            &SetReportMobileTerminationError {
-                n: TerminationErrorMode::Disabled,
-            },
-            false,
-        )?;
-
-        // self.send_internal(
-        //     &general::IdentificationInformation {
-        //         n: 9,
-        //     },
-        //     true,
-        // )?;
-
-        self.send_internal(
-            &SetGpioConfiguration {
-                gpio_id: 42,
-                gpio_mode: GpioMode::PadDisabled,
-            },
-            false,
-        )?;
-        self.send_internal(
-            &SetGpioConfiguration {
-                gpio_id: 16,
-                gpio_mode: GpioMode::GsmTxIndication,
-            },
-            false,
-        )?;
-        self.send_internal(
-            &SetGpioConfiguration {
-                gpio_id: 23,
-                gpio_mode: GpioMode::NetworkStatus,
-            },
-            false,
-        )?;
-
-        // info!("{:?}", self.send_internal(&GetIndicatorControl)?);
-        #[cfg(feature = "logging")]
-        log::info!("{:?}", self.send_internal(&GetCCID, false)?);
-
-        self.initialized.set(true);
-
         Ok(())
     }
 
-    #[inline]
-    fn low_power_mode(&self, _enable: bool) -> Result<(), atat::Error> {
-        if let Some(ref _dtr) = self.config.dtr_pin {
-            // if enable {
-            // dtr.set_high().ok();
-            // } else {
-            // dtr.set_low().ok();
-            // }
-            return Ok(());
-        }
+    pub(crate) fn enable_registration_urcs(&self) -> Result<(), Error> {
+        self.network.send_internal(
+            &SetNetworkRegistrationStatus {
+                n: NetworkRegistrationUrcConfig::UrcDisabled,
+            },
+            true,
+        )?;
+
+        self.network.send_internal(
+            &SetGPRSNetworkRegistrationStatus {
+                n: GPRSNetworkRegistrationUrcConfig::UrcVerbose,
+            },
+            true,
+        )?;
+
+        self.network.send_internal(
+            &SetEPSNetworkRegistrationStatus {
+                n: EPSNetworkRegistrationUrcConfig::UrcVerbose,
+            },
+            true,
+        )?;
         Ok(())
     }
 
-    #[inline]
-    fn autosense(&self) -> Result<(), Error> {
-        for _ in 0..15 {
-            match self.client.try_borrow_mut()?.send(&AT) {
-                Ok(_) => {
-                    return Ok(());
+    pub fn spin(&mut self) -> nb::Result<(), Error> {
+        self.network.handle_urc().ok();
+
+        while let Some(event) = self
+            .network
+            .get_event()
+            .map_err(|e| nb::Error::Other(e.into()))?
+        {
+            match event {
+                Event::Disconnected => {
+                    defmt::info!("[EVENT] Disconnected");
+                    self.fsm.set_state(State::Init);
+                    self.network
+                        .clear_events()
+                        .map_err(|e| nb::Error::Other(e.into()))?;
                 }
-                Err(_e) => {}
-            };
+                Event::CellularRegistrationStatusChanged(reg_type, status) => {
+                    defmt::info!(
+                        "[EVENT] CellularRegistrationStatusChanged {:?} {:?}",
+                        reg_type,
+                        status
+                    );
+                    if matches!(
+                        self.fsm.get_state(),
+                        State::RegisteringNetwork
+                            | State::SignalQuality
+                            | State::AttachingNetwork
+                            | State::Connected
+                    ) && reg_type != RadioAccessNetwork::Geran
+                        && status.is_registered().is_some()
+                    {
+                        self.fsm.set_state(State::AttachingNetwork);
+                        self.network
+                            .clear_events()
+                            .map_err(|e| nb::Error::Other(e.into()))?;
+                    }
+                }
+                Event::CellularRadioAccessTechnologyChanged(reg_type, rat) => {
+                    defmt::info!(
+                        "[EVENT] CellularRadioAccessTechnologyChanged {:?} {:?}",
+                        reg_type,
+                        rat
+                    );
+                    // TODO: What to do here??
+                }
+                Event::CellularCellIDChanged(cell_id) => {
+                    defmt::info!(
+                        "[EVENT] CellularCellIDChanged {:str}",
+                        cell_id.unwrap_or_default().as_str()
+                    );
+                }
+            }
         }
-        Err(Error::BaudDetection)
-    }
 
-    #[inline]
-    fn reset(&self) -> Result<(), Error> {
-        self.send_internal(
-            &SetModuleFunctionality {
-                fun: Functionality::SilentResetWithSimReset,
-                rst: None,
+        if self.fsm.is_retry() {
+            if let Err(nb::Error::WouldBlock) = self.delay.try_wait() {
+                return Err(nb::Error::WouldBlock);
+            }
+        }
+
+        let new_state = match self.fsm.get_state() {
+            State::Init => match self.initialize(true) {
+                Ok(()) => Ok(State::PowerOn),
+                Err(_) => Err(State::Init),
             },
-            false,
-        )?;
-        Ok(())
-    }
+            State::PowerOn => match self.power_on() {
+                Ok(()) => Ok(State::Configure),
+                Err(_) => Err(State::PowerOn),
+            },
+            State::Configure => match self.configure() {
+                Ok(()) => Ok(State::DeviceReady),
+                Err(_) => Err(State::PowerOn),
+            },
+            State::DeviceReady => {
+                self.network
+                    .send_internal(
+                        &SetRadioAccessTechnology {
+                            selected_act: RadioAccessTechnologySelected::GsmUmtsLte(
+                                RatPreferred::Lte,
+                                RatPreferred::Utran,
+                            ),
+                        },
+                        true,
+                    )
+                    .map_err(|e| nb::Error::Other(e.into()))?;
 
-    pub fn spin(&self) -> Result<(), Error> {
-        self.handle_urc()?;
+                // Now come out of airplane mode
+                self.network
+                    .send_internal(
+                        &SetModuleFunctionality {
+                            fun: Functionality::Full,
+                            rst: None,
+                        },
+                        true,
+                    )
+                    .map_err(|e| nb::Error::Other(e.into()))?;
 
-        match self.state.get() {
-            State::Attached => {}
-            State::Sending => {
+                Ok(State::SimPin)
+            }
+            State::SimPin => {
+                self.enable_registration_urcs()?;
+
+                let PinStatus { code } = self
+                    .network
+                    .send_internal(&GetPinStatus, true)
+                    .map_err(|e| nb::Error::Other(e.into()))?;
+
+                if code == PinStatusCode::Ready {
+                    self.network.attached.set(false);
+                    self.network.pdp_context_active.set(false);
+
+                    // TODO: check if context was already activated
+                    // let PDPContextState { status } =
+                    //     self.network.send_internal(&GetPDPContextState, true)?;
+                    if false {
+                        defmt::debug!("Active context found");
+                        self.network.pdp_context_active.set(true);
+                    }
+
+                    // Check if modem is already attached to a network
+                    if let GPRSAttached {
+                        state: GPRSAttachedState::Attached,
+                    } = self
+                        .network
+                        .send_internal(&GetGPRSAttached, true)
+                        .map_err(|e| nb::Error::Other(e.into()))?
+                    {
+                        defmt::debug!("Cellular already attached");
+                        self.network.attached.set(true);
+                    }
+
+                    // FIXME:
+                    // self.network.send_internal(
+                    //     &mobile_control::SetAutomaticTimezoneUpdate {
+                    //         on_off: AutomaticTimezone::EnabledLocal,
+                    //     },
+                    //     true,
+                    // )?;
+
+                    // if packet domain event reporting is not set it's not a
+                    // stopper. We might lack some events when we are dropped
+                    // from the network.
+                    if self
+                        .network
+                        .set_packet_domain_event_reporting(true)
+                        .is_err()
+                    {
+                        defmt::warn!("Packet domain event reporting set failed");
+                    }
+
+                    Ok(State::SignalQuality)
+                } else {
+                    // TODO: Handle SIM Pin here
+                    defmt::error!("PIN status not ready!!");
+                    Err(State::PowerOn)
+                }
+            }
+            State::SignalQuality => {
+                let CCID { ccid } = self
+                    .network
+                    .send_internal(&GetCCID, true)
+                    .map_err(|e| nb::Error::Other(e.into()))?;
+
+                defmt::info!("CCID: {:?}", ccid.to_le_bytes());
+
+                Ok(State::RegisteringNetwork)
+            }
+            State::RegisteringNetwork => match self.network.register(None) {
+                Ok(_) => Ok(State::AttachingNetwork),
+                Err(nb::Error::Other(NetworkError::RegistrationDenied)) => {
+                    self.restart(true)?;
+                    self.delay
+                        .try_delay_ms(crate::module_cfg::constants::BOOT_WAIT_TIME_MS)
+                        .map_err(|_| Error::Busy)?;
+
+                    self.fsm.set_max_retry_attempts(0);
+                    Err(State::PowerOn)
+                }
+                Err(_) => Err(State::PowerOn),
+            },
+            State::AttachingNetwork => match self.network.attach() {
+                Ok(_) => Ok(State::Connected),
+                Err(_) => Err(State::PowerOn),
+            },
+            State::Connected => {
+                // Reset the retry attempts on connected, as this
+                // essentially is a success path.
+                self.fsm.reset();
                 return Ok(());
-            }
-            s => {
-                return Err(Error::NetworkState(s));
-            }
-        }
-
-        // Occasionally poll every open socket, in case a `SocketDataAvailable`
-        // URC was missed somehow. TODO: rewrite this to readable code
-        let data_available: heapless::Vec<(SocketHandle, usize), consts::U4> = {
-            let sockets = self.sockets.try_borrow()?;
-
-            if sockets.len() > 0 && self.poll_cnt(false) >= 500 {
-                self.poll_cnt(true);
-
-                sockets
-                    .iter()
-                    .filter_map(|(h, s)| {
-                        // Figure out if socket is TCP or UDP
-                        match s.get_type() {
-                            SocketType::Tcp => self
-                                .send_internal(
-                                    &ReadSocketData {
-                                        socket: h,
-                                        length: 0,
-                                    },
-                                    false,
-                                )
-                                .map_or(None, |s| {
-                                    if s.length > 0 {
-                                        Some((h, s.length))
-                                    } else {
-                                        None
-                                    }
-                                }),
-                            // SocketType::Udp => self
-                            //     .send_internal(
-                            //         &ReadUDPSocketData {
-                            //             socket: h,
-                            //             length: 0,
-                            //         },
-                            //         false,
-                            //     )
-                            //     .map_or(None, |s| {
-                            //         if s.length > 0 {
-                            //             Some((h, s.length))
-                            //         } else {
-                            //             None
-                            //         }
-                            //     }),
-                            _ => None,
-                        }
-                    })
-                    .collect()
-            } else {
-                heapless::Vec::new()
             }
         };
 
-        data_available
-            .iter()
-            .try_for_each(|(handle, len)| self.socket_ingress(*handle, *len).map(|_| ()))
-            .map_err(|e| {
-                #[cfg(feature = "logging")]
-                log::error!("ERROR: {:?}", e);
-                e
-            })?;
-
-        Ok(())
-    }
-
-    fn handle_urc(&self) -> Result<(), Error> {
-        let urc = self.client.try_borrow_mut()?.check_urc::<Urc>();
-
-        match urc {
-            Some(Urc::MessageWaitingIndication(_)) => {
-                // #[cfg(feature = "logging")]
-                // log::info!("[URC] MessageWaitingIndication");
-                Ok(())
-            }
-            Some(Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket })) => {
-                #[cfg(feature = "logging")]
-                log::info!("[URC] SocketClosed {:?}", socket);
-                let mut sockets = self.sockets.try_borrow_mut()?;
-                match sockets.socket_type(socket) {
-                    Some(SocketType::Tcp) => {
-                        let mut tcp = sockets.get::<TcpSocket<_>>(socket)?;
-                        tcp.close();
-                    }
-                    Some(SocketType::Udp) => {
-                        let mut udp = sockets.get::<UdpSocket<_>>(socket)?;
-                        udp.close();
-                    }
-                    _ => {}
+        match new_state {
+            Ok(new_state) => self.fsm.set_state(new_state),
+            Err(err_state) => {
+                if let nb::Error::Other(Error::StateTimeout) =
+                    self.fsm.retry_or_fail(&mut self.delay)
+                {
+                    self.fsm.set_state(err_state);
                 }
-                sockets.remove(socket)?;
-                Ok(())
-            }
-            Some(Urc::DataConnectionActivated(psn::urc::DataConnectionActivated {
-                result: _result,
-            })) => {
-                #[cfg(feature = "logging")]
-                log::info!("[URC] DataConnectionActivated {:?}", _result);
-                Ok(())
-            }
-            Some(Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
-                profile_id: _profile_id,
-            })) => {
-                #[cfg(feature = "logging")]
-                log::info!("[URC] DataConnectionDeactivated {:?}", _profile_id);
-                self.init(false)?;
-                self.state.set(State::Deregistered);
-                Ok(())
-            }
-            Some(Urc::SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable {
-                socket,
-                length,
-            })) => match self.socket_ingress(socket, length) {
-                Ok(bytes) if bytes > 0 => {
-                    // #[cfg(feature = "logging")]
-                    // log::info!("[URC] Ingressed {:?} bytes", bytes);
-                    Ok(())
-                }
-                Ok(_) => Ok(()),
-                Err(e) => {
-                    #[cfg(feature = "logging")]
-                    log::error!("[URC] Failed ingress! {:?}", e);
-                    Err(e)
-                }
-            },
-            None => Ok(()),
-        }
-    }
-
-    #[inline]
-    pub(crate) fn send_internal<A: atat::AtatCmd>(
-        &self,
-        req: &A,
-        check_urc: bool,
-    ) -> Result<A::Response, Error> {
-        if check_urc {
-            if let Err(_e) = self.handle_urc() {
-                #[cfg(features = "logging")]
-                log::error!("Failed handle URC: {:?}", _e);
             }
         }
 
-        self.client
-            .try_borrow_mut()?
-            .send(req)
-            .map_err(|e| match e {
-                nb::Error::Other(ate) => {
-                    #[cfg(feature = "logging")]
-                    match core::str::from_utf8(&req.as_bytes()) {
-                        Ok(s) => log::error!("{:?}: [{:?}]", ate, s),
-                        Err(_) => log::error!("{:?}: {:02x?}", ate, req.as_bytes()),
-                    };
-                    ate.into()
-                }
-                nb::Error::WouldBlock => Error::_Unknown,
-            })
+        Err(nb::Error::WouldBlock)
     }
 
     pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
-        if !self.initialized.get() {
-            self.init(false)?;
+        // At any point after init state, we should be able to fully send AT
+        // commands.
+        if self.fsm.get_state() == State::Init {
+            return Err(Error::Uninitialized);
         }
 
-        self.send_internal(cmd, true)
+        Ok(self.network.send_internal(cmd, true)?)
     }
 }

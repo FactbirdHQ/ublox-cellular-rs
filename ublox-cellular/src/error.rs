@@ -1,49 +1,75 @@
-// use atat::Error as ATError;
-// use heapless::{consts::U64, String};
+use crate::network::Error as NetworkError;
+use crate::services::data::Error as DataServiceError;
+use core::cell::{BorrowError, BorrowMutError};
 
-use crate::socket;
+#[derive(Debug, defmt::Format)]
+pub enum GenericError {
+    BorrowError,
+    BorrowMutError,
+}
 
-#[derive(Debug)]
+impl From<BorrowMutError> for GenericError {
+    fn from(_: BorrowMutError) -> Self {
+        GenericError::BorrowMutError
+    }
+}
+
+impl From<BorrowError> for GenericError {
+    fn from(_: BorrowError) -> Self {
+        GenericError::BorrowError
+    }
+}
+
+#[derive(Debug, defmt::Format)]
+#[non_exhaustive]
 pub enum Error {
-    SetState,
-    BadLength,
-    Network,
-    Pin,
+    // General device errors
     BaudDetection,
-    SocketClosed,
-    WrongSocketType,
-    SocketNotFound,
-    NetworkState(crate::State),
-    Socket(socket::Error),
-    BorrowError(core::cell::BorrowError),
-    BorrowMutError(core::cell::BorrowMutError),
-    AT(atat::Error),
     Busy,
-    InvalidHex,
-    Dns,
+    Uninitialized,
+    StateTimeout,
+
+    // Network errors
+    Network(NetworkError),
+
+    // Service specific errors
+    DataService(DataServiceError),
+
+    // Generic shared errors, e.g. from `core::`
+    Generic(GenericError),
+
     _Unknown,
 }
 
-impl From<atat::Error> for Error {
-    fn from(e: atat::Error) -> Self {
-        Error::AT(e)
+impl From<DataServiceError> for Error {
+    fn from(e: DataServiceError) -> Self {
+        // Unwrap generic and network errors
+        match e {
+            DataServiceError::Generic(g) => Error::Generic(g),
+            DataServiceError::Network(g) => Error::Network(g),
+            _ => Error::DataService(e),
+        }
     }
 }
 
-impl From<socket::Error> for Error {
-    fn from(e: crate::socket::Error) -> Self {
-        Error::Socket(e)
+impl From<NetworkError> for Error {
+    fn from(e: NetworkError) -> Self {
+        // Unwrap generic errors
+        match e {
+            NetworkError::Generic(g) => Error::Generic(g),
+            _ => Error::Network(e),
+        }
     }
 }
 
-impl From<core::cell::BorrowMutError> for Error {
-    fn from(e: core::cell::BorrowMutError) -> Self {
-        Error::BorrowMutError(e)
+impl From<BorrowMutError> for Error {
+    fn from(e: BorrowMutError) -> Self {
+        Error::Generic(e.into())
     }
 }
 
-impl From<core::cell::BorrowError> for Error {
-    fn from(e: core::cell::BorrowError) -> Self {
-        Error::BorrowError(e)
+impl From<BorrowError> for Error {
+    fn from(e: BorrowError) -> Self {
+        Error::Generic(e.into())
     }
 }

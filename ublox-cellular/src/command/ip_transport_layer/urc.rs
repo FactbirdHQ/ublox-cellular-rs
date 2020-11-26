@@ -1,7 +1,8 @@
 //! Unsolicited responses for Internet protocol transport layer Commands
-use crate::socket::SocketHandle;
+use crate::services::data::socket::SocketHandle;
 use atat::atat_derive::AtatResp;
 
+/// +UUSORD/+UUSORF
 #[derive(Clone, AtatResp)]
 pub struct SocketDataAvailable {
     #[at_arg(position = 0)]
@@ -10,6 +11,7 @@ pub struct SocketDataAvailable {
     pub length: usize,
 }
 
+/// +UUSOCL
 #[derive(Clone, AtatResp)]
 pub struct SocketClosed {
     #[at_arg(position = 0)]

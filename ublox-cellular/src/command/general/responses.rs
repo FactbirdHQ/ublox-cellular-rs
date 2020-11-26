@@ -29,6 +29,16 @@ pub struct IdentificationInformationResponse {
     pub app_ver: String<consts::U32>,
 }
 
+/// 4.11 International mobile subscriber identification +CIM
+///
+/// Request the IMSI (International Mobile Subscriber Identity).
+#[derive(Clone, Debug, AtatResp)]
+pub struct CIMI {
+    /// International Mobile Subscriber Identity
+    #[at_arg(position = 0)]
+    pub imsi: u64,
+}
+
 /// 4.12 Card identification +CCID
 ///
 /// Returns the ICCID (Integrated Circuit Card ID) of the SIM-card. ICCID is a
