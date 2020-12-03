@@ -6,6 +6,7 @@ use crate::{
     command::psn::{responses::EPSNetworkRegistrationStatus, urc::GPRSNetworkRegistration},
     command::psn::{types::EPSNetworkRegistrationStat, urc::EPSNetworkRegistration},
     error::Error,
+    ContextId,
 };
 use embedded_hal::timer::CountDown;
 use heapless::{consts, String, Vec};
@@ -114,7 +115,7 @@ pub struct Registration {
 }
 
 pub enum Event {
-    Disconnected,
+    Disconnected(Option<ContextId>),
     CellularRadioAccessTechnologyChanged(RadioAccessNetwork, RatAct),
     CellularRegistrationStatusChanged(RadioAccessNetwork, RegistrationStatus),
     CellularCellIDChanged(Option<String<consts::U8>>),
@@ -137,6 +138,10 @@ impl Default for RegistrationParams {
 impl Registration {
     pub fn set_params(&mut self, new_params: RegistrationParams) {
         self.params = new_params;
+    }
+
+    pub fn push_event(&mut self, event: Event) {
+        self.events.push(event).ok();
     }
 
     pub fn compare_and_set(&mut self, new_params: RegistrationParams) {
@@ -164,7 +169,7 @@ impl Registration {
                 && prev_status.is_registered().is_some()
                 && new_params.reg_type != RadioAccessNetwork::Geran
             {
-                self.events.push(Event::Disconnected).ok();
+                self.events.push(Event::Disconnected(None)).ok();
             }
         }
         if new_params.cell_id.is_some() && self.params.cell_id != new_params.cell_id {

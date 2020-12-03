@@ -3,6 +3,15 @@ use super::types::*;
 use atat::atat_derive::AtatResp;
 use heapless::{consts, String};
 
+/// 7.3 Signal quality +CSQ
+#[derive(Clone, AtatResp, defmt::Format)]
+pub struct SignalQuality {
+    #[at_arg(position = 0)]
+    pub signal_power: u8,
+    #[at_arg(position = 1)]
+    pub qual: u8,
+}
+
 /// 7.5 Operator selection +COPS
 #[derive(Clone, AtatResp)]
 pub struct OperatorSelection {

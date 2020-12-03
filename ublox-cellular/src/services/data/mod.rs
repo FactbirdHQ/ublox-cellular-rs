@@ -24,6 +24,7 @@ use crate::{
     },
     error::Error as DeviceError,
     network::{ContextId, Network, ProfileId, ProfileState},
+    state::Event,
 };
 use apn::{APNInfo, Apn};
 use atat::{typenum::Unsigned, AtatClient};
@@ -76,8 +77,6 @@ where
         self.spin()?;
 
         if let Some(ref sockets) = self.sockets {
-            // Attempt to ingress data from every open socket, into it's
-            // internal rx buffer
             match DataService::try_new(profile_id, cid, apn_info, &self.network, sockets) {
                 Ok(service) => Ok(service),
                 Err(nb::Error::Other(e)) => Err(nb::Error::Other(e.into())),
@@ -90,6 +89,70 @@ where
         }
     }
 }
+
+// pub trait Tls: TcpStack {
+//     type TlsConnector;
+//
+//     fn connect_tls(&self, connector: Self::TlsConnector, socket: <Self as TcpStack>::TcpSocket);
+// }
+
+// impl Tls for DataService {
+//     type TlsConnector = SecurityProfileId;
+//
+//     fn connect_tls(&self, connector: Self::TlsConnector, socket: <Self as TcpStack>::TcpSocket) {
+//         self.network.send_internal(
+//             &SetSocketSslState {
+//                 socket,
+//                 ssl_tls_status: SslTlsStatus::Enabled(connector),
+//             },
+//             true,
+//         )?;
+//
+//         TcpStack::Connect(self, socket)
+//     }
+// }
+
+// impl core::convert::TryFrom<TlsConnectorBuilder<Device>> for SecurityProfileId {
+//     type Error;
+//
+//     fn try_from(builder: TlsConnectorBuilder<Device>) -> Result<Self, Self::Error> {
+//         if let Some(cert) = builder.cert {
+//             builder.ctx.send_at(SetCertificate { cert })?;
+//         }
+//
+//         let sec_id = 0;
+//
+//         self.network.send_internal(
+//             &SecurityProfileManager {
+//                 profile_id: sec_id,
+//                 operation: Some(SecurityProfileOperation::CertificateValidationLevel(
+//                     CertificateValidationLevel::RootCertValidationWithValidityDate,
+//                 )),
+//             },
+//             true,
+//         )?;
+//
+//         self.network.send_internal(
+//             &SecurityProfileManager {
+//                 profile_id: sec_id,
+//                 operation: Some(SecurityProfileOperation::CipherSuite(0)),
+//             },
+//             true,
+//         )?;
+//
+//         self.network.send_internal(
+//             &SecurityProfileManager {
+//                 profile_id: sec_id,
+//                 operation: Some(SecurityProfileOperation::ExpectedServerHostname(
+//                     builder.host_name,
+//                 )),
+//             },
+//             true,
+//         )?;
+//
+//         Ok(SecurityProfileId::new(sec_id))
+//     }
+// }
 
 pub struct DataService<'a, C, N, L>
 where
@@ -209,6 +272,8 @@ where
                             self.network
                                 .set_profile_state(profile_id, ProfileState::Deactivated)
                                 .map_err(|e| nb::Error::Other(e.into()))?;
+
+                            self.network.push_event(Event::Disconnected(Some(cid))).ok();
 
                             Err(nb::Error::Other(Error::InvalidApn))
                         }
