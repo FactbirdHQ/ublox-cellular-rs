@@ -19,8 +19,8 @@ heapless = { version = "^0.5", features = ["serde"] }
 no-std-net = { version = "0.4.0", features = ["serde"] }
 embedded-hal = { version = "1.0.0-alpha.4" }
 nb = "^1"
-atat = { git = "https://github.com/BlackbirdHQ/atat", features = ["derive"], branch = "factbird-mini-1.0" }
-serde_at = { git = "https://github.com/BlackbirdHQ/atat", branch = "factbird-mini-1.0" }
+atat = { version = "0.6.0", features = ["derive"] }
+serde_at = { version = "0.6.0" }
 serde = { version = "^1", default-features = false, features = ["derive"] }
 embedded-nal = { git = "https://github.com/BlackbirdHQ/embedded-nal", branch = "factbird-mini-1.0" }
 typenum = "^1"
