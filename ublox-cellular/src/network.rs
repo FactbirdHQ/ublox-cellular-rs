@@ -1,4 +1,5 @@
 use crate::{
+    command::ip_transport_layer,
     command::psn::GetEPSNetworkRegistrationStatus,
     command::psn::GetGPRSNetworkRegistrationStatus,
     command::psn::SetPacketSwitchedEventReporting,
@@ -24,6 +25,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, defmt::Format)]
 pub enum Error {
     Generic(GenericError),
+    AT(atat::Error),
     RegistrationDenied,
     UnknownProfile,
     _Unknown,
@@ -122,6 +124,10 @@ where
 
     pub fn get_event(&self) -> Result<Option<Event>, Error> {
         Ok(self.registration.try_borrow_mut()?.events.pop())
+    }
+
+    pub fn push_event(&self, event: Event) -> Result<(), Error> {
+        Ok(self.registration.try_borrow_mut()?.push_event(event))
     }
 
     pub fn clear_events(&self) -> Result<(), Error> {
@@ -291,6 +297,7 @@ where
             match urc {
                 Urc::NetworkDetach => {
                     defmt::warn!("Network Detach URC!");
+                    self.attach().ok();
                 }
                 Urc::MobileStationDetach => {
                     defmt::warn!("ME Detach URC!");
@@ -347,6 +354,13 @@ where
                 Urc::MessageWaitingIndication(_) => {
                     defmt::info!("[URC] MessageWaitingIndication");
                 }
+                Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
+                    defmt::info!(
+                        "[URC] Socket {:?} closed! Should be followed by one more!",
+                        socket
+                    );
+                    return false;
+                }
                 _ => return false,
             };
             true
@@ -373,13 +387,12 @@ where
                     match core::str::from_utf8(&req.as_bytes()) {
                         Ok(s) => defmt::error!("{:?}: [{:str}]", ate, s[..s.len() - 2]),
                         Err(_) => defmt::error!(
-                            "{:?}:",
+                            "{:?}: {:?}",
                             ate,
-                            // core::convert::AsRef::<[u8]>::as_ref(&req.as_bytes())
+                            core::convert::AsRef::<[u8]>::as_ref(&req.as_bytes())
                         ),
                     };
-                    // ate.into()
-                    Error::_Unknown
+                    Error::AT(ate)
                 }
                 nb::Error::WouldBlock => Error::_Unknown,
             })
@@ -432,6 +445,8 @@ mod tests {
         tx.handle_urc(|_| false).unwrap();
         assert_eq!(tx.client.borrow().n_urcs_dequeued, 1);
         tx.handle_urc(|_| false).unwrap();
-        assert_eq!(tx.client.borrow().n_urcs_dequeued, 1);
+        tx.handle_urc(|_| true).unwrap();
+        tx.handle_urc(|_| false).unwrap();
+        assert_eq!(tx.client.borrow().n_urcs_dequeued, 2);
     }
 }

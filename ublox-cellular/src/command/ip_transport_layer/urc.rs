@@ -3,7 +3,7 @@ use crate::services::data::socket::SocketHandle;
 use atat::atat_derive::AtatResp;
 
 /// +UUSORD/+UUSORF
-#[derive(Clone, AtatResp)]
+#[derive(Clone, AtatResp, defmt::Format)]
 pub struct SocketDataAvailable {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,
@@ -12,7 +12,7 @@ pub struct SocketDataAvailable {
 }
 
 /// +UUSOCL
-#[derive(Clone, AtatResp)]
+#[derive(Clone, AtatResp, defmt::Format)]
 pub struct SocketClosed {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,

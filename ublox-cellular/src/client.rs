@@ -10,8 +10,10 @@ use heapless::{ArrayLength, Bucket, Pos};
 use crate::{
     command::device_lock::GetPinStatus,
     command::device_lock::{responses::PinStatus, types::PinStatusCode},
+    command::general::GetCCID,
     command::{
         control::{types::*, *},
+        general::responses::CCID,
         mobile_control::{types::*, *},
         network_service::SetRadioAccessTechnology,
         psn::responses::GPRSAttached,
@@ -29,7 +31,6 @@ use crate::{
     state::StateMachine,
     State,
 };
-use general::{responses::CCID, GetCCID};
 use ip_transport_layer::{types::HexMode, SetHexMode};
 use network_service::{
     types::{NetworkRegistrationUrcConfig, RadioAccessTechnologySelected, RatPreferred},
@@ -78,7 +79,7 @@ where
             fsm: StateMachine::new(),
             config,
             delay,
-            network: Network::new(AtTx::new(client, 20)),
+            network: Network::new(AtTx::new(client, 5)),
             sockets: None,
         }
     }
@@ -110,7 +111,7 @@ where
             _ => false,
         };
 
-        if vint_value || self.is_alive(1).is_ok() {
+        if vint_value || self.is_alive(3).is_ok() {
             defmt::debug!("powering on, module is already on, flushing config...");
         } else {
             defmt::debug!("powering on.");
@@ -128,6 +129,10 @@ where
                 .try_delay_ms(crate::module_cfg::constants::BOOT_WAIT_TIME_MS)
                 .map_err(|_| Error::Busy)?;
             self.is_alive(10)?;
+            // self.network.send_internal(&SetFactoryConfiguration {
+            //     fs_op: FSFactoryRestoreType::AllFiles,
+            //     nvm_op: NVMFactoryRestoreType::NVMFlashSectors,
+            // }, true)?;
         }
         Ok(())
     }
@@ -135,7 +140,7 @@ where
     /// Check that the cellular module is alive.
     ///
     /// See if the cellular module is responding at the AT interface by poking
-    /// it with "AT" up to "attempts" times, waiting 1 second for an "OK"
+    /// it with "AT" up to `attempts` times, waiting 1 second for an "OK"
     /// response each time
     pub(crate) fn is_alive(&self, attempts: u8) -> Result<(), Error> {
         let mut error = Error::BaudDetection;
@@ -177,7 +182,7 @@ where
         // Extended errors on
         self.network.send_internal(
             &SetReportMobileTerminationError {
-                n: TerminationErrorMode::Disabled,
+                n: TerminationErrorMode::Verbose,
             },
             false,
         )?;
@@ -317,8 +322,9 @@ where
             .map_err(|e| nb::Error::Other(e.into()))?
         {
             match event {
-                Event::Disconnected => {
-                    defmt::info!("[EVENT] Disconnected");
+                Event::Disconnected(cid) => {
+                    defmt::info!("[EVENT] Disconnected, {:?}", cid);
+                    // FIXME: Use cid info to only terminate a single cid
                     self.fsm.set_state(State::Init);
                     self.network
                         .clear_events()
@@ -332,14 +338,16 @@ where
                     );
                     if matches!(
                         self.fsm.get_state(),
-                        State::RegisteringNetwork
-                            | State::SignalQuality
+                        State::SignalQuality
+                            | State::RegisteringNetwork
                             | State::AttachingNetwork
                             | State::Connected
-                    ) && reg_type != RadioAccessNetwork::Geran
-                        && status.is_registered().is_some()
+                    ) && matches!(
+                        reg_type,
+                        RadioAccessNetwork::Utran | RadioAccessNetwork::Eutran
+                    ) && status.is_registered().is_some()
                     {
-                        self.fsm.set_state(State::AttachingNetwork);
+                        self.fsm.set_state(State::RegisteringNetwork);
                         self.network
                             .clear_events()
                             .map_err(|e| nb::Error::Other(e.into()))?;
@@ -466,13 +474,9 @@ where
                 }
             }
             State::SignalQuality => {
-                let CCID { ccid } = self
-                    .network
-                    .send_internal(&GetCCID, true)
-                    .map_err(|e| nb::Error::Other(e.into()))?;
-
-                defmt::info!("CCID: {:?}", ccid.to_le_bytes());
-
+                if let Ok(CCID { ccid }) = self.network.send_internal(&GetCCID, true) {
+                    defmt::info!("CCID: {:?}", ccid.to_le_bytes());
+                }
                 Ok(State::RegisteringNetwork)
             }
             State::RegisteringNetwork => match self.network.register(None) {
