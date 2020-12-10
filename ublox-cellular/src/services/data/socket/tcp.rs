@@ -15,8 +15,6 @@ pub enum State {
     ShutdownForRead,
     /// Block all writes
     ShutdownForWrite,
-    /// Block all reads and writes
-    ShutdownForReadWrite,
     /// Block all reads and writes, waiting for far end to complete closure, can
     /// be tidied up.
     Closing,

@@ -7,28 +7,7 @@ use embedded_hal::{
 };
 use heapless::{ArrayLength, Bucket, Pos};
 
-use crate::{
-    command::device_lock::GetPinStatus,
-    command::device_lock::{responses::PinStatus, types::PinStatusCode},
-    command::{
-        control::{types::*, *},
-        mobile_control::{types::*, *},
-        network_service::SetRadioAccessTechnology,
-        psn::responses::GPRSAttached,
-        psn::types::GPRSAttachedState,
-        psn::GetGPRSAttached,
-        system_features::{types::*, *},
-        *,
-    },
-    config::{Config, NoPin},
-    error::Error,
-    network::{AtTx, Error as NetworkError, Network},
-    services::data::socket::{SocketSet, SocketSetItem},
-    state::Event,
-    state::RadioAccessNetwork,
-    state::StateMachine,
-    State,
-};
+use crate::{State, command::device_lock::GetPinStatus, command::device_lock::{responses::PinStatus, types::PinStatusCode}, command::{*, general::responses::CCID, control::{types::*, *}, mobile_control::{types::*, *}, network_service::SetRadioAccessTechnology, psn::GetGPRSAttached, psn::responses::GPRSAttached, psn::types::GPRSAttachedState, system_features::{types::*, *}}, config::{Config, NoPin}, error::Error, network::{AtTx, Error as NetworkError, Network}, services::data::socket::{SocketSet, SocketSetItem}, state::Event, command::general::GetCCID, state::RadioAccessNetwork, state::StateMachine};
 use ip_transport_layer::{types::HexMode, SetHexMode};
 use network_service::{
     types::{NetworkRegistrationUrcConfig, RadioAccessTechnologySelected, RatPreferred},
@@ -472,13 +451,10 @@ where
                 }
             }
             State::SignalQuality => {
-                // if let Ok(CCID { ccid }) = self.network.send_internal(&GetCCID, true) {
-                //     defmt::info!("CCID: {:?}", ccid.to_le_bytes());
-
+                if let Ok(CCID { ccid }) = self.network.send_internal(&GetCCID, true) {
+                    defmt::info!("CCID: {:?}", ccid.to_le_bytes());
+                }
                 Ok(State::RegisteringNetwork)
-                // } else {
-                //     Err(State::PowerOn)
-                // }
             }
             State::RegisteringNetwork => match self.network.register(None) {
                 Ok(_) => Ok(State::AttachingNetwork),
