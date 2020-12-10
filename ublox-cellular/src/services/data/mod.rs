@@ -4,7 +4,7 @@ pub mod error;
 pub mod socket;
 pub mod ssl;
 mod tcp_stack;
-// mod udp_stack;
+mod udp_stack;
 
 mod hex;
 
