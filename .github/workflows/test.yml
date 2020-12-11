@@ -22,11 +22,17 @@ jobs:
           target: thumbv7m-none-eabi
           override: true
 
-      - name: Build
+      - name: Build examples
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --all --all-features --target thumbv7m-none-eabi
+          args: --all --all-features --target x86_64-unknown-linux-gnu
+
+      - name: Build library for ARM
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: -p ublox-cellular-rs --all-features --target thumbv7m-none-eabi
 
       - name: Test
         uses: actions-rs/cargo@v1
