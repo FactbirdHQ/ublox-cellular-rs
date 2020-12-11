@@ -15,19 +15,19 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
+atat = { version = "0.6.0", features = ["derive"] }
 heapless = { version = "^0.5", features = ["serde"] }
 no-std-net = { version = "0.4.0", features = ["serde"] }
-
-embedded-hal = { version = "1.0.0-alpha.4" }
-embedded-nal = "0.2.0"
-nb = "^1"
-atat = { version = "0.6.0", features = ["derive"] }
-serde_at = { version = "0.6.0" }
 serde = { version = "^1", default-features = false, features = ["derive"] }
-typenum = "^1"
-defmt = { version = "^0.1" }
+
+defmt = "^0.1"
+embedded-hal = "1.0.0-alpha.4"
+embedded-nal = "0.2.0"
 hash32 = "^0.1.1"
 hash32-derive = "^0.1.0"
+nb = "^1"
+serde_at = "0.6.0"
+typenum = "^1"
 
 [features]
 default = [
@@ -36,17 +36,17 @@ default = [
     "socket-tcp",
 ]
 
-topy-l4 = []
-mpci-l2 = []
-lisa-u2 = []
-sara-g3 = []
-sara-g4 = []
-sara-u2 = []
-sara-u1 = []
-toby-l2 = []
-toby-r2 = []
 lara-r2 = []
 leon-g1 = []
+lisa-u2 = []
+mpci-l2 = []
+sara-g3 = []
+sara-g4 = []
+sara-u1 = []
+sara-u2 = []
+toby-l2 = []
+toby-r2 = []
+topy-l4 = []
 
 socket-tcp = []
 socket-udp = []
