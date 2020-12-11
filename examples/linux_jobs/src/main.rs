@@ -2,66 +2,29 @@ extern crate alloc;
 
 mod file_handler;
 
-use serialport;
-use std::io;
-use std::thread;
+use embedded_nal::{nb, Ipv4Addr};
+use std::{io, thread, time::Duration};
 
 use file_handler::FileHandler;
 
-use ublox_cellular::gprs::APNInfo;
-use ublox_cellular::prelude::*;
-use ublox_cellular::sockets::Ipv4Addr;
-use ublox_cellular::{error::Error as GSMError, Config, GsmClient};
-
-use atat::AtatClient;
-use embedded_hal::digital::v2::OutputPin;
-use linux_embedded_hal::Pin;
+use atat::{ClientBuilder, ComQueue, Queues, ResQueue, UrcQueue};
 use mqttrust::{MqttClient, MqttEvent, MqttOptions, Notification, Request};
+use ublox_cellular::{sockets::SocketSet, APNInfo, Apn, Config, ContextId, GsmClient, ProfileId};
 
 use rustot::{
-    jobs::{is_job_message, IotJobsData, JobAgent, JobDetails, JobStatus},
+    jobs::{is_job_message, IotJobsData, JobAgent, JobDetails},
     ota::ota::{is_ota_message, OtaAgent, OtaConfig},
 };
 
 use heapless::{consts, spsc::Queue, ArrayLength};
 
-use common::{serial::Serial, timer::SysTimer};
-use std::time::Duration;
+use common::{serial::serialport, serial::Serial, timer::SysTimer};
 
-fn attach_gprs<C, RST, DTR>(gsm: &GsmClient<C, RST, DTR>) -> Result<(), GSMError>
-where
-    C: AtatClient,
-    RST: OutputPin,
-    DTR: OutputPin,
-{
-    gsm.init(true)?;
-
-    // Load certificates
-    gsm.import_root_ca(
-        0,
-        "Verisign",
-        include_bytes!("../secrets_mini_2/Verisign.pem"),
-    )?;
-    gsm.import_certificate(
-        0,
-        "cert",
-        include_bytes!("../secrets_mini_2/certificate.pem.crt"),
-    )?;
-    gsm.import_private_key(
-        0,
-        "key",
-        include_bytes!("../secrets_mini_2/private.pem.key"),
-        None,
-    )?;
-
-    gsm.begin("").unwrap();
-    gsm.attach_gprs(APNInfo::new("em")).unwrap();
-    Ok(())
-}
-
-static mut Q: Queue<Request, consts::U10> = Queue(heapless::i::Queue::new());
+static mut Q: Queue<Request<heapless::Vec<u8, consts::U2048>>, consts::U10, u8> =
+    Queue(heapless::i::Queue::u8());
 
 static mut URC_READY: bool = false;
+static mut SOCKET_SET: Option<SocketSet<consts::U6, consts::U2048>> = None;
 
 struct NvicUrcMatcher {}
 
@@ -85,10 +48,6 @@ impl<BufLen: ArrayLength<u8>> atat::UrcMatcher<BufLen> for NvicUrcMatcher {
 type AtatRxBufLen = consts::U2048;
 
 fn main() {
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
-        .init();
-
     // Serial port settings
     let settings = serialport::SerialPortSettings {
         baud_rate: 115_200,
@@ -104,45 +63,54 @@ fn main() {
         .expect("Could not open serial port");
     let mut serial_rx = serial_tx.try_clone().expect("Failed to clone serial port");
 
-    static mut RES_QUEUE: atat::ResQueue<AtatRxBufLen> = Queue(heapless::i::Queue::u8());
-    static mut URC_QUEUE: atat::UrcQueue<AtatRxBufLen> = Queue(heapless::i::Queue::u8());
-    static mut COM_QUEUE: atat::ComQueue = Queue(heapless::i::Queue::u8());
-    let (res_p, res_c) = unsafe { RES_QUEUE.split() };
-    let (urc_p, urc_c) = unsafe { URC_QUEUE.split() };
-    let (com_p, com_c) = unsafe { COM_QUEUE.split() };
+    static mut RES_QUEUE: ResQueue<consts::U256, consts::U5> = Queue(heapless::i::Queue::u8());
+    static mut URC_QUEUE: UrcQueue<consts::U256, consts::U10> = Queue(heapless::i::Queue::u8());
+    static mut COM_QUEUE: ComQueue<consts::U3> = Queue(heapless::i::Queue::u8());
 
-    let at_config = atat::Config::new(atat::Mode::Timeout);
-    let mut ingress = atat::IngressManager::with_custom_urc_matcher(
-        res_p,
-        urc_p,
-        com_c,
-        at_config,
-        Some(NvicUrcMatcher::new()),
-    );
-    let cell_client = atat::Client::new(
+    let queues = Queues {
+        res_queue: unsafe { RES_QUEUE.split() },
+        urc_queue: unsafe { URC_QUEUE.split() },
+        com_queue: unsafe { COM_QUEUE.split() },
+    };
+
+    let (cell_client, mut ingress) = ClientBuilder::new(
         Serial(serial_tx),
-        res_c,
-        urc_c,
-        com_p,
         SysTimer::new(),
-        at_config,
+        atat::Config::new(atat::Mode::Timeout),
+    )
+    .with_custom_urc_matcher(NvicUrcMatcher::new())
+    .build(queues);
+
+    unsafe {
+        SOCKET_SET = Some(SocketSet::new());
+    }
+
+    let mut gsm = GsmClient::<_, _, consts::U6, consts::U2048>::new(
+        cell_client,
+        SysTimer::new(),
+        Config::new(""),
     );
 
-    let gsm = GsmClient::<_, Pin, Pin>::new(cell_client, Config::new());
+    let socket_set: &'static mut _ = unsafe {
+        SOCKET_SET.as_mut().unwrap_or_else(|| {
+            panic!("Failed to get the static socket_set");
+        })
+    };
+
+    gsm.set_socket_storage(socket_set);
 
     let (p, c) = unsafe { Q.split() };
 
-    let thing_name = heapless::String::<heapless::consts::U32>::from("test_mini_2");
+    let thing_name = "test_mini_2";
 
     // Connect to AWS IoT
-    let mut mqtt_eventloop = MqttEvent::new(
+    let mut mqtt_event = MqttEvent::new(
         c,
         SysTimer::new(),
-        MqttOptions::new(thing_name.as_str(), Ipv4Addr::new(52, 208, 158, 107), 8883)
-            .set_max_packet_size(2048),
+        MqttOptions::new(thing_name, Ipv4Addr::new(52, 208, 158, 107).into(), 8883),
     );
 
-    let mqtt_client = MqttClient::new(p, thing_name);
+    let mut mqtt_client = MqttClient::new(p, thing_name);
 
     let file_handler = FileHandler::new();
     let mut job_agent = JobAgent::new();
@@ -154,7 +122,6 @@ fn main() {
 
     // Launch reading thread
     thread::Builder::new()
-        .name("serial_read".to_string())
         .spawn(move || loop {
             let mut buffer = [0; 32];
             match serial_rx.read(&mut buffer[..]) {
@@ -163,104 +130,92 @@ fn main() {
                     ingress.write(&buffer[0..bytes_read]);
                     ingress.digest();
                     ingress.digest();
-                    // gsm.spin();
                 }
                 Err(e) => match e.kind() {
-                    io::ErrorKind::WouldBlock
-                    | io::ErrorKind::TimedOut
-                    | io::ErrorKind::Interrupted => {
-                        // Ignore
-                    }
+                    io::ErrorKind::Interrupted => {}
                     _ => {
-                        log::error!("Serial reading thread error while reading: {}", e);
+                        // log::error!("Serial reading thread error while reading: {}", e);
                     }
                 },
             }
         })
         .unwrap();
 
-    if attach_gprs(&gsm).is_ok() {
-        loop {
-            match mqtt_eventloop.connect(&gsm) {
-                Ok(_) => {
-                    break;
-                }
-                Err(nb::Error::Other(_e)) => panic!("Failed to connect to MQTT"),
-                Err(nb::Error::WouldBlock) => {}
+    let apn_info = APNInfo {
+        apn: Apn::Given(heapless::String::from("em")),
+        ..APNInfo::default()
+    };
+
+    let mut cnt = 1;
+    loop {
+        match gsm.data_service(ProfileId(0), ContextId(2), &apn_info) {
+            Err(nb::Error::WouldBlock) => {}
+            Err(nb::Error::Other(_e)) => {
+                // defmt::error!("Data Service error! {:?}", e);
             }
-            if unsafe { URC_READY } {
-                gsm.spin().unwrap();
-                unsafe { URC_READY = false };
-            }
-            thread::sleep(Duration::from_millis(100));
-        }
+            Ok(data) => {
+                match mqtt_event.connect(&data) {
+                    Err(e) => {
+                        continue;
+                    }
+                    Ok(new_session) => {
+                        if new_session {
+                            job_agent.subscribe_to_jobs(&mut mqtt_client).unwrap();
 
-        job_agent.subscribe_to_jobs(&mqtt_client).unwrap();
-
-        job_agent
-            .describe_job_execution(&mqtt_client, "$next", None, None)
-            .unwrap();
-
-        loop {
-            if unsafe { URC_READY } {
-                log::info!("Spinning from URC_RDY");
-                gsm.spin().unwrap();
-                unsafe { URC_READY = false };
-            }
-
-            ota_agent.request_timer_irq(&mqtt_client);
-
-            match mqtt_eventloop.yield_event(&gsm) {
-                Ok(Notification::Publish(publish)) => {
-                    if is_job_message(&publish.topic_name) {
-                        match job_agent.handle_message(&mqtt_client, &publish) {
-                            Ok(None) => {}
-                            Ok(Some(job)) => {
-                                log::debug!("Accepted a new JOB! {:?}", job);
-                                match job.details {
-                                    JobDetails::OtaJob(otajob) => {
-                                        ota_agent.process_ota_job(&mqtt_client, otajob).unwrap()
-                                    }
-                                    _ => {}
-                                }
-                            }
-                            Err(e) => {
-                                log::error!(
-                                    "[{}, {:?}]: {:?}",
-                                    publish.topic_name,
-                                    publish.qospid,
-                                    e
-                                );
-                            }
+                            job_agent
+                                .describe_job_execution(&mut mqtt_client, "$next", None, None)
+                                .unwrap();
                         }
-                    } else if is_ota_message(&publish.topic_name) {
-                        match ota_agent.handle_message(&mqtt_client, &publish) {
-                            Ok(progress) => {
-                                log::info!("OTA Progress: {}%", progress);
-                                if progress == 100 {
-                                    job_agent
-                                        .update_job_execution(&mqtt_client, JobStatus::Succeeded)
-                                        .unwrap();
-                                }
-                            }
-                            Err(e) => {
-                                log::error!(
-                                    "[{}, {:?}]: {:?}",
-                                    publish.topic_name,
-                                    publish.qospid,
-                                    e
-                                );
-                            }
-                        }
-                    } else {
-                        log::info!("Got some other incoming message {:?}", publish);
                     }
                 }
-                _ => {
-                    // log::debug!("{:?}", n);
+
+                match mqtt_event.yield_event(&data) {
+                    Ok(Notification::Publish(publish)) => {
+                        if is_job_message(&publish.topic_name) {
+                            match job_agent.handle_message(&mut mqtt_client, &publish) {
+                                Ok(None) => {}
+                                Ok(Some(job)) => {
+                                    // log::debug!("Accepted a new JOB! {:?}", job);
+                                    match job.details {
+                                        JobDetails::OtaJob(otajob) => ota_agent
+                                            .process_ota_job(&mut mqtt_client, otajob)
+                                            .unwrap(),
+                                        _ => {}
+                                    }
+                                }
+                                Err(e) => {
+                                    // log::error!(
+                                    //     "[{}, {:?}]: {:?}",
+                                    //     publish.topic_name,
+                                    //     publish.qospid,
+                                    //     e
+                                    // );
+                                }
+                            }
+                        } else if is_ota_message(&publish.topic_name) {
+                            match ota_agent.handle_message(&mut mqtt_client, &mut job_agent, &mut publish) {
+                                Ok(()) => {
+                                    // log::info!("OTA Finished successfully");
+                                }
+                                Err(e) => {
+                                    // log::error!(
+                                    //     "[{}, {:?}]: {:?}",
+                                    //     publish.topic_name,
+                                    //     publish.qospid,
+                                    //     e
+                                    // );
+                                }
+                            }
+                        } else {
+                            // log::info!("Got some other incoming message {:?}", publish);
+                        }
+                    }
+                    _ => {
+                        // log::debug!("{:?}", n);
+                    }
                 }
+                thread::sleep(Duration::from_millis(100));
             }
-            thread::sleep(Duration::from_millis(100));
         }
     }
 }

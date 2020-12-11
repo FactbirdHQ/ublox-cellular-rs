@@ -1,45 +1,23 @@
 extern crate alloc;
 
-use serialport;
-use std::io;
-use std::thread;
+use embedded_nal::nb;
+use std::{io, thread, time::Duration};
 
-use ublox_cellular::gprs::APNInfo;
-use ublox_cellular::prelude::*;
-use ublox_cellular::{error::Error as GSMError, sockets::SocketSet, Config, GsmClient};
-
-use atat::{self, AtatClient, ClientBuilder, ComQueue, Queues, ResQueue, UrcQueue};
-use embedded_hal::digital::v2::OutputPin;
-use linux_embedded_hal::Pin;
+use atat::{ClientBuilder, ComQueue, Queues, ResQueue, UrcQueue};
 use mqttrust::{
-    MqttEvent, MqttOptions, Notification, PublishRequest, QoS, Request, SubscribeRequest,
-    SubscribeTopic,
+    Mqtt, MqttClient, MqttEvent, MqttOptions, Notification, QoS, Request, SubscribeTopic,
 };
+use ublox_cellular::{sockets::SocketSet, APNInfo, Apn, Config, ContextId, GsmClient, ProfileId};
 
-use heapless::{consts, spsc::Queue, ArrayLength, String, Vec};
+use heapless::{consts, spsc::Queue, ArrayLength};
 
-use common::{serial::Serial, timer::SysTimer};
-use std::time::Duration;
+use common::{serial::serialport, serial::Serial, timer::SysTimer};
 
-fn attach_gprs<C, RST, DTR, N, L>(gsm: &GsmClient<C, RST, DTR, N, L>) -> Result<(), GSMError>
-where
-    C: AtatClient,
-    RST: OutputPin,
-    DTR: OutputPin,
-    N: ArrayLength<Option<ublox_cellular::sockets::SocketSetItem<L>>>,
-    L: ArrayLength<u8>,
-{
-    gsm.init(true)?;
-    gsm.begin().unwrap();
-    gsm.attach_gprs().unwrap();
-    Ok(())
-}
-
-static mut Q: Queue<Request<std::vec::Vec<u8>>, consts::U10, u8> = Queue(heapless::i::Queue::u8());
-
-static mut SOCKET_SET: Option<SocketSet<consts::U6, consts::U2048>> = None;
+static mut Q: Queue<Request<heapless::Vec<u8, consts::U2048>>, consts::U10, u8> =
+    Queue(heapless::i::Queue::u8());
 
 static mut URC_READY: bool = false;
+static mut SOCKET_SET: Option<SocketSet<consts::U6, consts::U2048>> = None;
 
 struct NvicUrcMatcher {}
 
@@ -63,13 +41,9 @@ impl<BufLen: ArrayLength<u8>> atat::UrcMatcher<BufLen> for NvicUrcMatcher {
 type AtatRxBufLen = consts::U2048;
 
 fn main() {
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Debug)
-        .init();
-
     // Serial port settings
     let settings = serialport::SerialPortSettings {
-        baud_rate: 230_400,
+        baud_rate: 115_200,
         data_bits: serialport::DataBits::Eight,
         parity: serialport::Parity::None,
         stop_bits: serialport::StopBits::One,
@@ -82,8 +56,8 @@ fn main() {
         .expect("Could not open serial port");
     let mut serial_rx = serial_tx.try_clone().expect("Failed to clone serial port");
 
-    static mut RES_QUEUE: ResQueue<AtatRxBufLen, consts::U5> = Queue(heapless::i::Queue::u8());
-    static mut URC_QUEUE: UrcQueue<AtatRxBufLen, consts::U10> = Queue(heapless::i::Queue::u8());
+    static mut RES_QUEUE: ResQueue<consts::U256, consts::U5> = Queue(heapless::i::Queue::u8());
+    static mut URC_QUEUE: UrcQueue<consts::U256, consts::U10> = Queue(heapless::i::Queue::u8());
     static mut COM_QUEUE: ComQueue<consts::U3> = Queue(heapless::i::Queue::u8());
 
     let queues = Queues {
@@ -104,26 +78,35 @@ fn main() {
         SOCKET_SET = Some(SocketSet::new());
     }
 
-    let gsm = GsmClient::<_, Pin, Pin, _, _>::new(
+    let mut gsm = GsmClient::<_, _, consts::U6, consts::U2048>::new(
         cell_client,
-        unsafe { SOCKET_SET.as_mut().unwrap() },
-        Config::new(APNInfo::new("em")),
+        SysTimer::new(),
+        Config::new(""),
     );
 
-    let (mut p, c) = unsafe { Q.split() };
+    let socket_set: &'static mut _ = unsafe {
+        SOCKET_SET.as_mut().unwrap_or_else(|| {
+            panic!("Failed to get the static socket_set");
+        })
+    };
 
-    // Connect to broker.hivemq.com:1883
-    let mut mqtt_eventloop = MqttEvent::new(
+    gsm.set_socket_storage(socket_set);
+
+    let (p, c) = unsafe { Q.split() };
+
+    let thing_name = "test_ublox_cellular";
+
+    // Connect to AWS IoT
+    let mut mqtt_event = MqttEvent::new(
         c,
         SysTimer::new(),
-        MqttOptions::new("test_mini_1", "broker.hivemq.com".into(), 1883),
+        MqttOptions::new(thing_name, "broker.hivemq.com".into(), 1883),
     );
 
-    log::info!("{:?}", mqtt_eventloop.options.broker());
+    let mut mqtt_client = MqttClient::new(p, thing_name);
 
     // Launch reading thread
     thread::Builder::new()
-        .name("serial_read".to_string())
         .spawn(move || loop {
             let mut buffer = [0; 32];
             match serial_rx.read(&mut buffer[..]) {
@@ -132,84 +115,93 @@ fn main() {
                     ingress.write(&buffer[0..bytes_read]);
                     ingress.digest();
                     ingress.digest();
-                    // gsm.spin();
                 }
                 Err(e) => match e.kind() {
-                    io::ErrorKind::WouldBlock
-                    | io::ErrorKind::TimedOut
-                    | io::ErrorKind::Interrupted => {
-                        // Ignore
-                    }
+                    io::ErrorKind::Interrupted => {}
                     _ => {
-                        log::error!("Serial reading thread error while reading: {}", e);
+                        // log::error!("Serial reading thread error while reading: {}", e);
                     }
                 },
             }
         })
         .unwrap();
 
-    if attach_gprs(&gsm).is_ok() {
-        nb::block!(mqtt_eventloop.connect(&gsm)).expect("Failed to connect to MQTT");
+    let apn_info = APNInfo {
+        apn: Apn::Given(heapless::String::from("em")),
+        ..APNInfo::default()
+    };
 
-        // Publish @ http://www.hivemq.com/demos/websocket-client/
-        p.enqueue(
-            SubscribeRequest {
-                topics: Vec::from_slice(&[
-                    SubscribeTopic {
-                        topic_path: String::from("mqttrust/tester/subscriber"),
-                        qos: QoS::AtLeastOnce,
-                    },
-                    SubscribeTopic {
-                        topic_path: String::from("mqttrust/tester/subscriber2"),
-                        qos: QoS::AtLeastOnce,
-                    },
-                ])
-                .unwrap(),
-            }
-            .into(),
+    let mut cnt = 1;
+
+    // Subscribe @ http://www.hivemq.com/demos/websocket-client/
+    mqtt_client
+        .subscribe(
+            heapless::Vec::from_slice(&[
+                SubscribeTopic {
+                    topic_path: heapless::String::from("mqttrust/tester/subscriber"),
+                    qos: QoS::AtLeastOnce,
+                },
+                SubscribeTopic {
+                    topic_path: heapless::String::from("mqttrust/tester/subscriber2"),
+                    qos: QoS::AtLeastOnce,
+                },
+            ])
+            .unwrap(),
         )
         .expect("Failed to subscribe!");
 
-        thread::Builder::new()
-            .name("eventloop".to_string())
-            .spawn(move || {
-                let mut cnt = 0;
-                loop {
-                    // Subscribe @ http://www.hivemq.com/demos/websocket-client/
-                    p.enqueue(
-                        PublishRequest::new(
-                            String::from("fbmini/input/test_mini_1"),
-                            format!("{{\"key\": \"Hello World from Factbird Mini - {}!\"}}", cnt)
-                                .as_bytes()
-                                .to_owned(),
+    thread::Builder::new()
+        .name("eventloop".to_string())
+        .spawn(move || {
+            let mut cnt = 0;
+            loop {
+                // Publish @ http://www.hivemq.com/demos/websocket-client/
+                mqtt_client
+                    .publish(
+                        heapless::String::from("mqttrust/tester/publisher"),
+                        heapless::Vec::from_slice(
+                            format!(
+                                "{{\"key\": \"Hello World from Ublox Cellular - {}!\"}}",
+                                cnt
+                            )
+                            .as_bytes(),
                         )
-                        .into(),
+                        .unwrap(),
+                        QoS::AtLeastOnce,
                     )
                     .expect("Failed to publish!");
-                    cnt += 1;
-                    thread::sleep(Duration::from_millis(5000));
-                }
-            })
-            .unwrap();
+                cnt += 1;
+                thread::sleep(Duration::from_millis(5000));
+            }
+        })
+        .unwrap();
 
-        loop {
-            if unsafe { URC_READY } {
-                gsm.spin().unwrap();
+    loop {
+        match gsm.data_service(ProfileId(0), ContextId(2), &apn_info) {
+            Err(nb::Error::WouldBlock) => {}
+            Err(nb::Error::Other(_e)) => {
+                // defmt::error!("Data Service error! {:?}", e);
             }
-            match nb::block!(mqtt_eventloop.yield_event(&gsm)) {
-                Ok(Notification::Publish(_publish)) => {
-                    log::debug!(
-                        "[{}, {:?}]: {:?}",
-                        _publish.topic_name,
-                        _publish.qospid,
-                        String::from_utf8(_publish.payload).unwrap()
-                    );
+            Ok(data) => {
+                if mqtt_event.connect(&data).is_err() {
+                    continue;
                 }
-                _ => {
-                    // log::debug!("{:?}", n);
+
+                match mqtt_event.yield_event(&data) {
+                    Ok(Notification::Publish(_publish)) => {
+                        // log::debug!(
+                        //     "[{}, {:?}]: {:?}",
+                        //     _publish.topic_name,
+                        //     _publish.qospid,
+                        //     String::from_utf8(_publish.payload).unwrap()
+                        // );
+                    }
+                    _ => {
+                        // log::debug!("{:?}", n);
+                    }
                 }
+                thread::sleep(Duration::from_millis(500));
             }
-            thread::sleep(Duration::from_millis(500));
         }
     }
 }

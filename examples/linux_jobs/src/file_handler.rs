@@ -47,7 +47,7 @@ impl OtaPal for FileHandler {
         if let Some(ref mut buf) = &mut self.filebuf {
             let mut hasher = Sha1::new();
             hasher.input(buf.get_ref());
-            log::info!("Sha1 is {:}!", hasher.result_str());
+            // log::info!("Sha1 is {:}!", hasher.result_str());
             Ok(())
         } else {
             Err(OtaPalError::BadFileHandle)

@@ -11,12 +11,10 @@ repository = "https://github.com/BlackbirdHQ/ublox-cellular-rs"
 edition = "2018"
 
 [dependencies]
-embedded-hal = "0.2.3"
-atat = { version = "^0.4.1", features = ["derive", "logging"] }
-log = { version = "0.4", default-features = false }
-env_logger = "0.7.1"
-linux-embedded-hal = "0.3.0"
-serialport = "3.3.0"
+embedded-hal = "1.0.0-alpha.4"
+embedded-nal = "0.2.0"
+
+atat = { version = "^0.6.0", features = ["derive"] }
 heapless = "0.5.5"
 
 common_lib = { path = "../common_lib" }
