@@ -1,6 +1,9 @@
-use embedded_hal::{timer::{CountDown, Periodic}, blocking::delay::DelayMs};
-use std::time::{Duration, Instant};
 use core::convert::Infallible;
+use embedded_hal::{
+    blocking::delay::DelayMs,
+    timer::{CountDown, Periodic},
+};
+use std::time::{Duration, Instant};
 
 pub struct SysTimer {
     start: Instant,

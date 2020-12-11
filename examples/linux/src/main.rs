@@ -1,5 +1,5 @@
 use atat::{ClientBuilder, ComQueue, Queues, ResQueue, UrcQueue};
-use std::{thread, io};
+use std::{io, thread};
 use ublox_cellular::{
     sockets::{
         udp::{Ipv4Addr, SocketAddrV4},
@@ -8,7 +8,10 @@ use ublox_cellular::{
     APNInfo, Apn, Config, ContextId, GsmClient, ProfileId,
 };
 
-use common::{timer::SysTimer, serial::{Serial, serialport}};
+use common::{
+    serial::{serialport, Serial},
+    timer::SysTimer,
+};
 use embedded_nal::nb;
 use embedded_nal::TcpClient;
 use heapless::{self, consts, spsc::Queue};

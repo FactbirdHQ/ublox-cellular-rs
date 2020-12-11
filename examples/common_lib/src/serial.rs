@@ -1,6 +1,6 @@
 use embedded_hal::serial::{Read, Write};
 pub use serialport;
-use std::io::{ErrorKind as IoErrorKind};
+use std::io::ErrorKind as IoErrorKind;
 
 pub struct Serial(pub Box<dyn serialport::SerialPort>);
 
