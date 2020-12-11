@@ -5,17 +5,25 @@ use embedded_hal::{
 };
 use std::time::{Duration, Instant};
 
+#[allow(clippy::module_name_repetitions)]
 pub struct SysTimer {
     start: Instant,
     count: u32,
 }
 
 impl SysTimer {
-    pub fn new() -> SysTimer {
-        SysTimer {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
             start: Instant::now(),
             count: 0,
         }
+    }
+}
+
+impl Default for SysTimer {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -42,7 +50,7 @@ impl CountDown for SysTimer {
     }
 
     fn try_wait(&mut self) -> nb::Result<(), Self::Error> {
-        if Instant::now() - self.start > Duration::from_millis(self.count as u64) {
+        if Instant::now() - self.start > Duration::from_millis(u64::from(self.count)) {
             Ok(())
         } else {
             Err(nb::Error::WouldBlock)

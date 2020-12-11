@@ -45,6 +45,7 @@ pub struct SetCircuit108Behaviour {
 /// - SW flow control also referred with XON / XOFF flow control
 #[derive(Clone, AtatCmd)]
 #[at_cmd("&K", NoResponse, value_sep = false)]
+#[allow(clippy::module_name_repetitions)]
 pub struct SetFlowControl {
     #[at_arg(position = 0)]
     pub value: FlowControl,
@@ -65,6 +66,7 @@ pub struct SetFlowControl {
 /// forced to stay awake until a subsequent DC1 character (XON) is received.
 #[derive(Clone, AtatCmd)]
 #[at_cmd("\\Q", NoResponse, value_sep = false)]
+#[allow(clippy::module_name_repetitions)]
 pub struct SetSoftwareFlowControl {
     #[at_arg(position = 0)]
     pub value: SoftwareFlowControl,

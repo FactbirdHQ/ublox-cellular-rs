@@ -4,8 +4,8 @@ use std::io::ErrorKind as IoErrorKind;
 
 pub struct Serial(pub Box<dyn serialport::SerialPort>);
 
-/// Helper to convert std::io::Error to the nb::Error
-fn translate_io_errors(err: std::io::Error) -> nb::Error<IoErrorKind> {
+/// Helper to convert `std::io::Error` to the `nb::Error`
+fn translate_io_errors(err: &std::io::Error) -> nb::Error<IoErrorKind> {
     match err.kind() {
         IoErrorKind::WouldBlock | IoErrorKind::TimedOut | IoErrorKind::Interrupted => {
             nb::Error::WouldBlock

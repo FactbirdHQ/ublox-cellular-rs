@@ -51,6 +51,7 @@ pub struct ProfileId(pub u8);
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, AtatLen, defmt::Format)]
 pub struct ContextId(pub u8);
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone)]
 pub enum ProfileState {
     Unknown,
