@@ -127,7 +127,8 @@ where
     }
 
     pub fn push_event(&self, event: Event) -> Result<(), Error> {
-        Ok(self.registration.try_borrow_mut()?.push_event(event))
+        self.registration.try_borrow_mut()?.push_event(event);
+        Ok(())
     }
 
     pub fn clear_events(&self) -> Result<(), Error> {

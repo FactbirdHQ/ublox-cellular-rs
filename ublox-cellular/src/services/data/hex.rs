@@ -10,7 +10,7 @@ pub enum FromHexError {
 }
 
 /// Decode a single hex char to decimal.
-fn val(c: u8) -> Result<u8, FromHexError> {
+const fn val(c: u8) -> Result<u8, FromHexError> {
     match c {
         b'A'..=b'F' => Ok(c - b'A' + 10),
         b'a'..=b'f' => Ok(c - b'a' + 10),
