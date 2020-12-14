@@ -53,23 +53,27 @@ where
             .get::<TcpSocket<_>>(*socket)
             .map_err(Self::Error::from)?;
 
-        if tcp.state() == TcpState::Created {
-            self.network
-                .send_internal(
-                    &ConnectSocket {
-                        socket: *socket,
-                        remote_addr: remote.ip(),
-                        remote_port: remote.port(),
-                    },
-                    false,
-                )
-                .map_err(Self::Error::from)?;
+        match tcp.state() {
+            TcpState::Created => {
+                self.network
+                    .send_internal(
+                        &ConnectSocket {
+                            socket: *socket,
+                            remote_addr: remote.ip(),
+                            remote_port: remote.port(),
+                        },
+                        false,
+                    )
+                    .map_err(Self::Error::from)?;
 
-            tcp.set_state(TcpState::Connected);
-            Ok(())
-        } else {
-            defmt::error!("Cannot connect socket! Socket state: {:?}", tcp.state());
-            Err(Error::Socket(SocketError::Illegal).into())
+                tcp.set_state(TcpState::Connected);
+                Ok(())
+            }
+            TcpState::Connected => Ok(()),
+            _ => {
+                defmt::error!("Cannot connect socket! Socket state: {:?}", tcp.state());
+                Err(Error::Socket(SocketError::Illegal).into())
+            }
         }
     }
 
