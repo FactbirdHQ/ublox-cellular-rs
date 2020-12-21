@@ -8,10 +8,10 @@ use crate::command::ip_transport_layer::{
     UDPSendToDataBinary,
 };
 use atat::typenum::Unsigned;
-use embedded_nal::{SocketAddr, UdpClient};
+use embedded_nal::{HostSocketAddr, UdpClientStack};
 use heapless::{ArrayLength, Bucket, Pos};
 
-impl<'a, C, N, L> UdpClient for DataService<'a, C, N, L>
+impl<'a, C, N, L> UdpClientStack for DataService<'a, C, N, L>
 where
     C: atat::AtatClient,
     N: 'static
@@ -42,13 +42,18 @@ where
         Ok(self.sockets.try_borrow_mut()?.add(socket)?)
     }
 
-    fn connect(&self, socket: &mut Self::UdpSocket, remote: SocketAddr) -> Result<(), Self::Error> {
+    fn connect(
+        &self,
+        socket: &mut Self::UdpSocket,
+        remote: HostSocketAddr,
+    ) -> Result<(), Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let mut udp = sockets
             .get::<UdpSocket<_>>(*socket)
             .map_err(Self::Error::from)?;
-        udp.bind(remote).map_err(Self::Error::from)?;
+        udp.bind(remote.as_socket_addr())
+            .map_err(Self::Error::from)?;
         Ok(())
     }
 
@@ -106,7 +111,7 @@ where
         &self,
         socket: &mut Self::UdpSocket,
         buffer: &mut [u8],
-    ) -> nb::Result<(usize, SocketAddr), Self::Error> {
+    ) -> nb::Result<(usize, HostSocketAddr), Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let mut udp = sockets
@@ -115,7 +120,7 @@ where
 
         let response = udp
             .recv_slice(buffer)
-            .map(|n| (n, udp.endpoint()))
+            .map(|n| (n, udp.endpoint().into()))
             .map_err(Self::Error::from)?;
         Ok(response)
     }

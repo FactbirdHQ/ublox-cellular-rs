@@ -1,6 +1,6 @@
 use atat::AtatClient;
 use core::fmt::Write;
-use embedded_nal::{AddrType, Dns};
+use embedded_nal::{AddrType, Dns, HostAddr};
 use heapless::{consts, ArrayLength, Bucket, Pos, String};
 use no_std_net::IpAddr;
 
@@ -17,7 +17,7 @@ where
 {
     type Error = Error;
 
-    fn gethostbyaddr(&self, ip_addr: IpAddr) -> Result<String<consts::U256>, Self::Error> {
+    fn get_host_by_address(&self, ip_addr: IpAddr) -> Result<HostAddr, Self::Error> {
         let mut ip_str = String::<consts::U256>::new();
         write!(&mut ip_str, "{}", ip_addr).map_err(|_| Error::BadLength)?;
 
@@ -29,10 +29,17 @@ where
             true,
         )?;
 
-        Ok(String::from(resp.ip_domain_string.as_str()))
+        resp.ip_domain_string
+            .as_str()
+            .parse::<HostAddr>()
+            .map_err(|_| unreachable!())
     }
 
-    fn gethostbyname(&self, hostname: &str, addr_type: AddrType) -> Result<IpAddr, Self::Error> {
+    fn get_host_by_name(
+        &self,
+        hostname: &str,
+        addr_type: AddrType,
+    ) -> Result<HostAddr, Self::Error> {
         if addr_type == AddrType::IPv6 {
             return Err(Error::Dns);
         }

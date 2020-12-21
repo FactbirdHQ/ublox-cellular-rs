@@ -9,10 +9,10 @@ use crate::command::ip_transport_layer::{
     WriteSocketDataBinary,
 };
 use atat::typenum::Unsigned;
-use embedded_nal::{SocketAddr, TcpClient};
+use embedded_nal::{HostSocketAddr, TcpClientStack};
 use heapless::{ArrayLength, Bucket, Pos};
 
-impl<'a, C, N, L> TcpClient for DataService<'a, C, N, L>
+impl<'a, C, N, L> TcpClientStack for DataService<'a, C, N, L>
 where
     C: atat::AtatClient,
     N: 'static
@@ -47,7 +47,7 @@ where
     fn connect(
         &self,
         socket: &mut Self::TcpSocket,
-        remote: SocketAddr,
+        remote: HostSocketAddr,
     ) -> nb::Result<(), Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
         let mut tcp = sockets
@@ -62,7 +62,7 @@ where
                 .send_internal(
                     &ConnectSocket {
                         socket: *socket,
-                        remote_addr: remote.ip(),
+                        remote_addr: remote.addr().ip(),
                         remote_port: remote.port(),
                     },
                     false,
