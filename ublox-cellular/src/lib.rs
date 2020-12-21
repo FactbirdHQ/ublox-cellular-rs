@@ -12,7 +12,7 @@ pub use client::Device as GsmClient;
 pub use config::Config;
 pub use network::{ContextId, ProfileId};
 pub use services::data::apn::{APNInfo, Apn};
-pub use services::data::ssl::SecurityProfileId;
+pub use services::data::tls::SecurityProfileId;
 pub use state::State;
 
 // Re-export atat version in use
@@ -26,7 +26,5 @@ pub mod sockets {
 /// Prelude - Include traits
 pub mod prelude {
     #[cfg(any(feature = "socket-udp", feature = "socket-tcp"))]
-    pub use super::services::data::ssl::SSL;
-    #[cfg(any(feature = "socket-udp", feature = "socket-tcp"))]
-    pub use embedded_nal::{TcpClientStack, UdpClientStack};
+    pub use embedded_nal::{tls::TlsConnect, TcpClientStack, UdpClientStack};
 }

@@ -47,7 +47,7 @@ use responses::*;
 use types::*;
 
 use super::NoResponse;
-use crate::services::data::ssl::SecurityProfileId;
+use crate::services::data::tls::SecurityProfileId;
 
 /// 26.1.2 SSL/TLS certificates and private keys manager +USECMNG
 ///

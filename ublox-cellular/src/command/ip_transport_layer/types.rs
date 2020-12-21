@@ -1,5 +1,5 @@
 //! Argument and parameter types used by Internet protocol transport layer Commands and Responses
-use crate::services::data::ssl::SecurityProfileId;
+use crate::services::data::tls::SecurityProfileId;
 use atat::atat_derive::AtatEnum;
 
 #[derive(Clone, PartialEq, AtatEnum)]

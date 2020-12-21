@@ -22,7 +22,7 @@ serde = { version = "^1", default-features = false, features = ["derive"] }
 
 defmt = "^0.1"
 embedded-hal = "1.0.0-alpha.4"
-embedded-nal = { git = "https://github.com/BlackbirdHQ/embedded-nal.git", branch = "feature/tls-options" }
+embedded-nal = { git = "https://github.com/BlackbirdHQ/embedded-nal.git", branch = "feature/tls-options-mutable" }
 hash32 = "^0.1.1"
 hash32-derive = "^0.1.0"
 nb = "^1"

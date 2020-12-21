@@ -2,8 +2,8 @@ pub mod apn;
 pub mod dns;
 pub mod error;
 pub mod socket;
-pub mod ssl;
 mod tcp_stack;
+pub mod tls;
 mod udp_stack;
 
 mod hex;
@@ -89,70 +89,6 @@ where
         }
     }
 }
-
-// pub trait Tls: TcpStack {
-//     type TlsConnector;
-//
-//     fn connect_tls(&self, connector: Self::TlsConnector, socket: <Self as TcpStack>::TcpSocket);
-// }
-
-// impl Tls for DataService {
-//     type TlsConnector = SecurityProfileId;
-//
-//     fn connect_tls(&self, connector: Self::TlsConnector, socket: <Self as TcpStack>::TcpSocket) {
-//         self.network.send_internal(
-//             &SetSocketSslState {
-//                 socket,
-//                 ssl_tls_status: SslTlsStatus::Enabled(connector),
-//             },
-//             true,
-//         )?;
-//
-//         TcpStack::Connect(self, socket)
-//     }
-// }
-
-// impl core::convert::TryFrom<TlsConnectorBuilder<Device>> for SecurityProfileId {
-//     type Error;
-//
-//     fn try_from(builder: TlsConnectorBuilder<Device>) -> Result<Self, Self::Error> {
-//         if let Some(cert) = builder.cert {
-//             builder.ctx.send_at(SetCertificate { cert })?;
-//         }
-//
-//         let sec_id = 0;
-//
-//         self.network.send_internal(
-//             &SecurityProfileManager {
-//                 profile_id: sec_id,
-//                 operation: Some(SecurityProfileOperation::CertificateValidationLevel(
-//                     CertificateValidationLevel::RootCertValidationWithValidityDate,
-//                 )),
-//             },
-//             true,
-//         )?;
-//
-//         self.network.send_internal(
-//             &SecurityProfileManager {
-//                 profile_id: sec_id,
-//                 operation: Some(SecurityProfileOperation::CipherSuite(0)),
-//             },
-//             true,
-//         )?;
-//
-//         self.network.send_internal(
-//             &SecurityProfileManager {
-//                 profile_id: sec_id,
-//                 operation: Some(SecurityProfileOperation::ExpectedServerHostname(
-//                     builder.host_name,
-//                 )),
-//             },
-//             true,
-//         )?;
-//
-//         Ok(SecurityProfileId::new(sec_id))
-//     }
-// }
 
 pub struct DataService<'a, C, N, L>
 where

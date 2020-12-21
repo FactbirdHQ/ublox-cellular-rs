@@ -6,3 +6,6 @@ members = [
     # "examples/linux_mqtt",
     # "examples/linux_jobs",
 ]
+
+[patch."https://github.com/BlackbirdHQ/embedded-nal"]
+embedded-nal = { path = "/home/kei/Blackbird/GitHub/embedded-nal" }
