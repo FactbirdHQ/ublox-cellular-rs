@@ -1,5 +1,5 @@
 use atat::AtatClient;
-use core::cell::RefCell;
+use core::{cell::RefCell, convert::TryInto};
 use embedded_hal::{
     blocking::delay::DelayMs,
     digital::{InputPin, OutputPin},
@@ -10,32 +10,29 @@ use heapless::{ArrayLength, Bucket, Pos};
 use crate::{
     command::device_lock::GetPinStatus,
     command::device_lock::{responses::PinStatus, types::PinStatusCode},
-    command::general::GetCCID,
     command::{
         control::{types::*, *},
-        general::responses::CCID,
         mobile_control::{types::*, *},
-        network_service::SetRadioAccessTechnology,
-        psn::responses::GPRSAttached,
-        psn::types::GPRSAttachedState,
-        psn::GetGPRSAttached,
         system_features::{types::*, *},
         *,
     },
+    command::{
+        network_service::{
+            responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
+            SetOperatorSelection,
+        },
+        psn::{types::GPRSAttachedState, SetGPRSAttached},
+    },
     config::{Config, NoPin},
     error::Error,
-    network::{AtTx, Error as NetworkError, Network},
+    network::{AtTx, Network},
     services::data::socket::{SocketSet, SocketSetItem},
     state::Event,
-    state::RadioAccessNetwork,
     state::StateMachine,
     State,
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
-use network_service::{
-    types::{NetworkRegistrationUrcConfig, RadioAccessTechnologySelected, RatPreferred},
-    SetNetworkRegistrationStatus,
-};
+use network_service::{types::NetworkRegistrationUrcConfig, SetNetworkRegistrationStatus};
 use psn::{
     types::{EPSNetworkRegistrationUrcConfig, GPRSNetworkRegistrationUrcConfig},
     SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
@@ -90,50 +87,52 @@ where
 
     pub(crate) fn initialize(&mut self, leave_pwr_alone: bool) -> Result<(), Error> {
         defmt::info!(
-            "Initialising with PWR_ON pin: {:bool} and VInt pin: {:bool}",
+            "Initialising with PWR_ON pin: {:bool} and VInt pin: {:bool}. Using PWR_ON pin: {:bool}",
             self.config.pwr_pin.is_some(),
-            self.config.vint_pin.is_some()
+            self.config.vint_pin.is_some(),
+            !leave_pwr_alone
         );
 
-        match self.config.pwr_pin {
-            Some(ref mut pwr) if !leave_pwr_alone => {
-                pwr.try_set_high().ok();
-            }
-            _ => {}
-        }
-
-        Ok(())
-    }
-
-    pub(crate) fn power_on(&mut self) -> Result<(), Error> {
         let vint_value = match self.config.vint_pin {
             Some(ref _vint) => false,
             _ => false,
         };
 
-        if vint_value || self.is_alive(3).is_ok() {
+        self.is_alive(3).ok();
+
+        if vint_value {
             defmt::debug!("powering on, module is already on, flushing config...");
         } else {
             defmt::debug!("powering on.");
-            if let Some(ref mut pwr) = self.config.pwr_pin {
-                pwr.try_set_low().ok();
-                self.delay
-                    .try_delay_ms(crate::module_cfg::constants::PWR_ON_PULL_TIME_MS)
-                    .map_err(|_| Error::Busy)?;
-                pwr.try_set_high().ok();
-            } else {
-                // Software restart
-                self.restart(false)?;
+            match self.config.pwr_pin {
+                Some(ref mut pwr) if !leave_pwr_alone => {
+                    pwr.try_set_high().ok();
+                    self.delay
+                        .try_delay_ms(crate::module_cfg::constants::PWR_ON_PULL_TIME_MS)
+                        .map_err(|_| Error::Busy)?;
+                    pwr.try_set_low().ok();
+                    self.delay
+                        .try_delay_ms(crate::module_cfg::constants::PWR_ON_PULL_TIME_MS)
+                        .map_err(|_| Error::Busy)?;
+                    pwr.try_set_high().ok();
+                }
+                _ => {
+                    // Software restart
+                    self.restart(false)?;
+                }
             }
             self.delay
                 .try_delay_ms(crate::module_cfg::constants::BOOT_WAIT_TIME_MS)
                 .map_err(|_| Error::Busy)?;
             self.is_alive(10)?;
-            // self.network.send_internal(&SetFactoryConfiguration {
-            //     fs_op: FSFactoryRestoreType::AllFiles,
-            //     nvm_op: NVMFactoryRestoreType::NVMFlashSectors,
-            // }, true)?;
         }
+
+        self.network.clear_events()?;
+
+        self.configure()?;
+
+        self.network.push_event(Event::PwrOn)?;
+
         Ok(())
     }
 
@@ -182,7 +181,7 @@ where
         // Extended errors on
         self.network.send_internal(
             &SetReportMobileTerminationError {
-                n: TerminationErrorMode::Verbose,
+                n: TerminationErrorMode::Disabled,
             },
             false,
         )?;
@@ -230,16 +229,8 @@ where
 
         // self.network.send_internal(&general::IdentificationInformation { n: 9 }, true)?;
 
-        // Stay in airplane mode until commanded to register
-        self.network.send_internal(
-            &SetModuleFunctionality {
-                fun: Functionality::AirplaneMode,
-                rst: None,
-            },
-            false,
-        )?;
-
         // Tell module whether we support flow control
+        // FIXME: Use AT+IFC=2,2 instead of AT&K here
         if self.config.flow_control {
             self.network.send_internal(
                 &SetFlowControl {
@@ -256,6 +247,14 @@ where
             )?;
         }
 
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun: Functionality::Full,
+                rst: None,
+            },
+            true,
+        )?;
+
         // Disable Message Waiting URCs (UMWI)
         self.network.send_internal(
             &SetMessageWaitingIndication {
@@ -263,6 +262,28 @@ where
             },
             false,
         )?;
+
+        let PinStatus { code } = self.network.send_internal(&GetPinStatus, true)?;
+
+        if code != PinStatusCode::Ready {
+            // FIXME: Handle SIM Pin here
+            defmt::error!("PIN status not ready!!");
+            return Err(Error::Busy);
+        }
+
+        let OperatorSelection { mode, .. } =
+            self.network.send_internal(&GetOperatorSelection, true)?;
+
+        if mode != OperatorSelectionMode::Automatic {
+            self.network.send_internal(
+                &SetOperatorSelection {
+                    mode: OperatorSelectionMode::Automatic,
+                },
+                true,
+            )?;
+        }
+
+        self.enable_registration_urcs()?;
 
         Ok(())
     }
@@ -286,17 +307,31 @@ where
                 false,
             )?;
         }
+
+        self.network.push_event(Event::PwrOff)?;
         Ok(())
     }
 
     pub(crate) fn enable_registration_urcs(&self) -> Result<(), Error> {
+        // if packet domain event reporting is not set it's not a stopper. We
+        // might lack some events when we are dropped from the network.
+        if self
+            .network
+            .set_packet_domain_event_reporting(true)
+            .is_err()
+        {
+            defmt::warn!("Packet domain event reporting set failed");
+        }
+
+        // CREG URC
         self.network.send_internal(
             &SetNetworkRegistrationStatus {
-                n: NetworkRegistrationUrcConfig::UrcDisabled,
+                n: NetworkRegistrationUrcConfig::UrcVerbose,
             },
             true,
         )?;
 
+        // CGREG URC
         self.network.send_internal(
             &SetGPRSNetworkRegistrationStatus {
                 n: GPRSNetworkRegistrationUrcConfig::UrcVerbose,
@@ -304,6 +339,7 @@ where
             true,
         )?;
 
+        // CEREG URC
         self.network.send_internal(
             &SetEPSNetworkRegistrationStatus {
                 n: EPSNetworkRegistrationUrcConfig::UrcVerbose,
@@ -313,7 +349,18 @@ where
         Ok(())
     }
 
-    pub fn spin(&mut self) -> nb::Result<(), Error> {
+    pub fn attach(&self) -> Result<(), Error> {
+        self.network.send_internal(
+            &SetGPRSAttached {
+                state: GPRSAttachedState::Attached,
+            },
+            true,
+        )?;
+
+        Ok(())
+    }
+
+    pub fn spin(&mut self) -> nb::Result<bool, Error> {
         self.network.handle_urc().ok();
 
         while let Some(event) = self
@@ -321,52 +368,8 @@ where
             .get_event()
             .map_err(|e| nb::Error::Other(e.into()))?
         {
-            match event {
-                Event::Disconnected(cid) => {
-                    defmt::info!("[EVENT] Disconnected, {:?}", cid);
-                    // FIXME: Use cid info to only terminate a single cid
-                    self.fsm.set_state(State::Init);
-                    self.network
-                        .clear_events()
-                        .map_err(|e| nb::Error::Other(e.into()))?;
-                }
-                Event::CellularRegistrationStatusChanged(reg_type, status) => {
-                    defmt::info!(
-                        "[EVENT] CellularRegistrationStatusChanged {:?} {:?}",
-                        reg_type,
-                        status
-                    );
-                    if matches!(
-                        self.fsm.get_state(),
-                        State::SignalQuality
-                            | State::RegisteringNetwork
-                            | State::AttachingNetwork
-                            | State::Connected
-                    ) && matches!(
-                        reg_type,
-                        RadioAccessNetwork::Utran | RadioAccessNetwork::Eutran
-                    ) && status.is_registered().is_some()
-                    {
-                        self.fsm.set_state(State::RegisteringNetwork);
-                        self.network
-                            .clear_events()
-                            .map_err(|e| nb::Error::Other(e.into()))?;
-                    }
-                }
-                Event::CellularRadioAccessTechnologyChanged(reg_type, rat) => {
-                    defmt::info!(
-                        "[EVENT] CellularRadioAccessTechnologyChanged {:?} {:?}",
-                        reg_type,
-                        rat
-                    );
-                    // TODO: What to do here??
-                }
-                Event::CellularCellIDChanged(cell_id) => {
-                    defmt::info!(
-                        "[EVENT] CellularCellIDChanged {:str}",
-                        cell_id.unwrap_or_default().as_str()
-                    );
-                }
+            if let Ok(cell_event) = event.try_into() {
+                self.fsm.handle_event(cell_event);
             }
         }
 
@@ -376,152 +379,35 @@ where
             }
         }
 
-        let new_state = match self.fsm.get_state() {
-            State::Init => match self.initialize(true) {
-                Ok(()) => Ok(State::PowerOn),
-                Err(_) => Err(State::Init),
-            },
-            State::PowerOn => match self.power_on() {
-                Ok(()) => Ok(State::Configure),
-                Err(_) => Err(State::PowerOn),
-            },
-            State::Configure => match self.configure() {
-                Ok(()) => Ok(State::DeviceReady),
-                Err(_) => Err(State::PowerOn),
-            },
-            State::DeviceReady => {
-                self.network
-                    .send_internal(
-                        &SetRadioAccessTechnology {
-                            selected_act: RadioAccessTechnologySelected::GsmUmtsLte(
-                                RatPreferred::Lte,
-                                RatPreferred::Utran,
-                            ),
-                        },
-                        true,
-                    )
-                    .map_err(|e| nb::Error::Other(e.into()))?;
+        let state = self.fsm.get_state();
 
-                // Now come out of airplane mode
-                self.network
-                    .send_internal(
-                        &SetModuleFunctionality {
-                            fun: Functionality::Full,
-                            rst: None,
-                        },
-                        true,
-                    )
-                    .map_err(|e| nb::Error::Other(e.into()))?;
-
-                Ok(State::SimPin)
-            }
-            State::SimPin => {
-                self.enable_registration_urcs()?;
-
-                let PinStatus { code } = self
-                    .network
-                    .send_internal(&GetPinStatus, true)
-                    .map_err(|e| nb::Error::Other(e.into()))?;
-
-                if code == PinStatusCode::Ready {
-                    self.network.attached.set(false);
-                    self.network.pdp_context_active.set(false);
-
-                    // TODO: check if context was already activated
-                    // let PDPContextState { status } =
-                    //     self.network.send_internal(&GetPDPContextState, true)?;
-                    if false {
-                        defmt::debug!("Active context found");
-                        self.network.pdp_context_active.set(true);
-                    }
-
-                    // Check if modem is already attached to a network
-                    if let GPRSAttached {
-                        state: GPRSAttachedState::Attached,
-                    } = self
-                        .network
-                        .send_internal(&GetGPRSAttached, true)
-                        .map_err(|e| nb::Error::Other(e.into()))?
-                    {
-                        defmt::debug!("Cellular already attached");
-                        self.network.attached.set(true);
-                    }
-
-                    // FIXME:
-                    // self.network.send_internal(
-                    //     &mobile_control::SetAutomaticTimezoneUpdate {
-                    //         on_off: AutomaticTimezone::EnabledLocal,
-                    //     },
-                    //     true,
-                    // )?;
-
-                    // if packet domain event reporting is not set it's not a
-                    // stopper. We might lack some events when we are dropped
-                    // from the network.
-                    if self
-                        .network
-                        .set_packet_domain_event_reporting(true)
-                        .is_err()
-                    {
-                        defmt::warn!("Packet domain event reporting set failed");
-                    }
-
-                    Ok(State::SignalQuality)
-                } else {
-                    // TODO: Handle SIM Pin here
-                    defmt::error!("PIN status not ready!!");
-                    Err(State::PowerOn)
-                }
-            }
-            State::SignalQuality => {
-                if let Ok(CCID { ccid }) = self.network.send_internal(&GetCCID, true) {
-                    defmt::info!("CCID: {:?}", ccid.to_le_bytes());
-                }
-                Ok(State::RegisteringNetwork)
-            }
-            State::RegisteringNetwork => match self.network.register(None) {
-                Ok(_) => Ok(State::AttachingNetwork),
-                Err(nb::Error::Other(NetworkError::RegistrationDenied)) => {
-                    self.restart(true)?;
-                    self.delay
-                        .try_delay_ms(crate::module_cfg::constants::BOOT_WAIT_TIME_MS)
-                        .map_err(|_| Error::Busy)?;
-
-                    self.fsm.set_max_retry_attempts(0);
-                    Err(State::PowerOn)
-                }
-                Err(_) => Err(State::PowerOn),
-            },
-            State::AttachingNetwork => match self.network.attach() {
-                Ok(_) => Ok(State::Connected),
-                Err(_) => Err(State::PowerOn),
-            },
-            State::Connected => {
-                // Reset the retry attempts on connected, as this
-                // essentially is a success path.
-                self.fsm.reset();
-                return Ok(());
-            }
-        };
-
-        match new_state {
-            Ok(new_state) => self.fsm.set_state(new_state),
-            Err(err_state) => {
-                if let nb::Error::Other(Error::StateTimeout) =
-                    self.fsm.retry_or_fail(&mut self.delay)
-                {
-                    self.fsm.set_state(err_state);
+        if let Err(_) = match state {
+            State::Unknown => self.restart(true),
+            State::Off => self.initialize(true),
+            _ => Ok(()),
+        } {
+            match self.fsm.retry_or_fail(&mut self.delay) {
+                nb::Error::WouldBlock => return Err(nb::Error::WouldBlock),
+                nb::Error::Other(_) => {
+                    self.network.clear_events().ok();
+                    self.fsm.set_state(State::Unknown);
                 }
             }
         }
 
-        Err(nb::Error::WouldBlock)
+        if matches!(state, State::On | State::Registered) {
+            Ok(false)
+        } else if matches!(state, State::Connected) {
+            Ok(true)
+        } else {
+            Err(nb::Error::WouldBlock)
+        }
     }
 
     pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
         // At any point after init state, we should be able to fully send AT
         // commands.
-        if self.fsm.get_state() == State::Init {
+        if matches!(self.fsm.get_state(), State::Unknown | State::Off) {
             return Err(Error::Uninitialized);
         }
 

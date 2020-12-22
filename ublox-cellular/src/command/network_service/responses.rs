@@ -1,7 +1,7 @@
 //! Responses for Network service Commands
 use super::types::*;
 use atat::atat_derive::AtatResp;
-use heapless::{consts, String};
+use heapless::{String, consts};
 
 /// 7.3 Signal quality +CSQ
 #[derive(Clone, AtatResp, defmt::Format)]
@@ -18,10 +18,8 @@ pub struct OperatorSelection {
     #[at_arg(position = 0)]
     pub mode: OperatorSelectionMode,
     #[at_arg(position = 1)]
-    pub format: Option<u8>,
+    pub oper: Option<OperatorNameFormat>,
     #[at_arg(position = 2)]
-    pub oper: Option<String<consts::U24>>,
-    #[at_arg(position = 3)]
     pub act: Option<RatAct>,
 }
 
@@ -39,10 +37,10 @@ pub struct NetworkRegistrationStatus {
     pub n: NetworkRegistrationUrcConfig,
     #[at_arg(position = 1)]
     pub stat: NetworkRegistrationStat,
-    // #[at_arg(position = 2)]
-    // pub lac: Option<String<consts::U32>>,
-    // #[at_arg(position = 3)]
-    // pub ci: Option<String<consts::U32>>,
-    // #[at_arg(position = 4)]
-    // pub act_status: Option<u8>,
+    #[at_arg(position = 2)]
+    pub lac: Option<String<consts::U4>>,
+    #[at_arg(position = 3)]
+    pub ci: Option<String<consts::U8>>,
+    #[at_arg(position = 4)]
+    pub act_status: Option<u8>,
 }

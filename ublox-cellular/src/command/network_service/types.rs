@@ -1,10 +1,11 @@
 //! Argument and parameter types used by Network service Commands and Responses
 use atat::atat_derive::AtatEnum;
+use heapless::{String, consts};
 
 /// Is used to chose whether the network selection is automatically done by the
 /// MT or is forced by this command to the operator <oper> given in the format
 /// <format>
-#[derive(Clone, PartialEq, AtatEnum, defmt::Format)]
+#[derive(Debug, Clone, PartialEq, AtatEnum, defmt::Format)]
 pub enum OperatorSelectionMode {
     /// • 0 (default value and factory-programmed value): automatic (<oper> field is ignored)
     Automatic = 0,
@@ -23,9 +24,12 @@ pub enum OperatorSelectionMode {
     ExtendedNetworkSearchWithoutTags = 6,
     /// • 8: network timing advance search
     NetworkTimingAdvanceSearch = 8,
+
+    #[at_arg(default)]
+    Unknown
 }
 /// Indicates the radio access technology
-#[derive(Clone, Copy, PartialEq, AtatEnum, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, AtatEnum, defmt::Format)]
 pub enum RatAct {
     /// • 0: GSM
     Gsm = 0,
@@ -47,6 +51,7 @@ pub enum RatAct {
     EcGsmIot = 8,
     /// • 9: E-UTRAN (NB-S1 mode)
     Eutran = 9,
+    #[at_arg(default)]
     Unknown = 10,
 }
 
@@ -124,4 +129,15 @@ pub enum RadioAccessTechnologySelected {
     /// • 6: UMTS / LTE (dual mode)
     #[at_arg(value = 6)]
     UmtsLte(RatPreferred),
+}
+
+
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
+pub enum OperatorNameFormat {
+    #[at_arg(value = 0)]
+    Long(String<consts::U24>),
+    #[at_arg(value = 1)]
+    Short(String<consts::U10>),
+    #[at_arg(value = 2)]
+    Numeric(String<consts::U6>),
 }

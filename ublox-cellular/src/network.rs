@@ -1,25 +1,18 @@
-use crate::{
-    command::ip_transport_layer,
-    command::psn::GetEPSNetworkRegistrationStatus,
-    command::psn::GetGPRSNetworkRegistrationStatus,
-    command::psn::SetPacketSwitchedEventReporting,
-    command::{network_service, psn, Urc},
-    error::GenericError,
-    state::Event,
-    state::Registration,
-    state::RegistrationStatus,
-    APNInfo,
-};
+use crate::{services::data::ContextState, command::network_service::GetOperatorSelection, command::network_service::responses::OperatorSelection, command::{
+        ip_transport_layer,
+        network_service::GetNetworkRegistrationStatus,
+        psn::{
+            self, types::PSEventReportingMode, GetEPSNetworkRegistrationStatus,
+            GetGPRSNetworkRegistrationStatus, SetPacketSwitchedEventReporting,
+        },
+        Urc,
+    }, error::GenericError, state::{Event, NetworkStatus, ServiceStatus}};
 use atat::{atat_derive::AtatLen, AtatClient};
-use core::cell::{BorrowError, BorrowMutError, Cell, RefCell};
-use embedded_nal::IpAddr;
-use hash32_derive::Hash32;
-use heapless::{consts, FnvIndexMap, IndexMap};
-use network_service::{types::OperatorSelectionMode, GetOperatorSelection, SetOperatorSelection};
-use psn::{
-    responses::GPRSAttached, types::GPRSAttachedState, types::PSEventReportingMode,
-    GetGPRSAttached, SetGPRSAttached,
+use core::{
+    cell::{BorrowError, BorrowMutError, Cell, RefCell},
+    ops::DerefMut,
 };
+use hash32_derive::Hash32;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, defmt::Format)]
@@ -28,6 +21,7 @@ pub enum Error {
     AT(atat::Error),
     RegistrationDenied,
     UnknownProfile,
+    ActivationFailed,
     _Unknown,
 }
 
@@ -50,14 +44,6 @@ pub struct ProfileId(pub u8);
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, AtatLen, defmt::Format)]
 pub struct ContextId(pub u8);
-
-#[derive(Debug, Clone)]
-pub enum ProfileState {
-    Unknown,
-    Deactivated,
-    Activating(ContextId, APNInfo),
-    Active(ContextId, Option<IpAddr>),
-}
 
 pub struct AtTx<C> {
     urc_attempts: Cell<u8>,
@@ -83,6 +69,8 @@ impl<C: AtatClient> AtTx<C> {
                     if a < self.max_urc_attempts {
                         self.urc_attempts.set(a + 1);
                         return false;
+                    } else {
+                        defmt::warn!("Dropping stale URC!");
                     }
                 }
                 self.urc_attempts.set(0);
@@ -94,11 +82,8 @@ impl<C: AtatClient> AtTx<C> {
 }
 
 pub struct Network<C> {
-    pub(crate) registration: RefCell<Registration>,
-    pub(crate) pdp_context_active: Cell<bool>,
-    pub(crate) attached: Cell<bool>,
-    // NOTE: Currently only a single profile is supported at a time!
-    pub(crate) profile_status: RefCell<FnvIndexMap<ProfileId, ProfileState, consts::U1>>,
+    pub(crate) network_status: RefCell<NetworkStatus>,
+    pub(crate) context_state: Cell<ContextState>,
     pub(crate) at_tx: AtTx<C>,
 }
 
@@ -107,177 +92,62 @@ where
     C: AtatClient,
 {
     pub(crate) fn new(at_tx: AtTx<C>) -> Self {
-        let mut profile_status = IndexMap::new();
-        for i in 0..profile_status.capacity() as u8 {
-            profile_status
-                .insert(ProfileId(i), ProfileState::Unknown)
-                .ok();
-        }
         Network {
-            registration: RefCell::new(Registration::default()),
-            profile_status: RefCell::new(profile_status),
-            attached: Cell::new(false),
-            pdp_context_active: Cell::new(false),
+            network_status: RefCell::new(NetworkStatus::new()),
+            context_state: Cell::new(ContextState::Setup),
             at_tx,
         }
     }
 
     pub fn get_event(&self) -> Result<Option<Event>, Error> {
-        Ok(self.registration.try_borrow_mut()?.events.pop())
+        Ok(self.network_status.try_borrow_mut()?.events.dequeue())
     }
 
     pub fn push_event(&self, event: Event) -> Result<(), Error> {
-        Ok(self.registration.try_borrow_mut()?.push_event(event))
+        Ok(self.network_status.try_borrow_mut()?.push_event(event))
     }
 
     pub fn clear_events(&self) -> Result<(), Error> {
-        self.registration.try_borrow_mut()?.events.clear();
+        let mut status = self.network_status.try_borrow_mut()?;
+        while !status.events.is_empty() {
+            status.events.dequeue();
+        }
         Ok(())
     }
 
-    pub fn context_active(&self, profile_id: ProfileId, cid: ContextId) -> Result<bool, Error> {
-        Ok(
-            matches!(self.get_profile_state(profile_id)?, ProfileState::Active(active_cid, _) if active_cid == cid),
-        )
-    }
+    pub fn is_registered(&self) -> Result<ServiceStatus, Error> {
+        let mut status = self.network_status.try_borrow_mut()?;
 
-    pub fn finish_activating_profile_state(&self, ip_addr: Option<IpAddr>) -> Result<(), Error> {
-        let (profile_id, cid) = self
-            .profile_status
-            .try_borrow_mut()?
-            .iter()
-            .find_map(|(profile_id, prev_state)| {
-                if let ProfileState::Activating(cid, _) = prev_state {
-                    Some((*profile_id, *cid))
-                } else {
-                    None
-                }
-            })
-            .ok_or(Error::UnknownProfile)?;
-
-        self.set_profile_state(profile_id, ProfileState::Active(cid, ip_addr))
-    }
-
-    pub fn get_profile_state(&self, profile_id: ProfileId) -> Result<ProfileState, Error> {
-        match self.profile_status.try_borrow()?.get(&profile_id) {
-            Some(state) => Ok(state.clone()),
-            None => Err(Error::UnknownProfile),
-        }
-    }
-
-    pub fn set_profile_state(
-        &self,
-        profile_id: ProfileId,
-        state: ProfileState,
-    ) -> Result<(), Error> {
-        if let Some(v) = self.profile_status.try_borrow_mut()?.get_mut(&profile_id) {
-            *v = state;
-            Ok(())
-        } else {
-            Err(Error::UnknownProfile)
-        }
-    }
-
-    pub fn is_registered(&self) -> Result<Option<RegistrationStatus>, Error> {
-        // accept only CGREG/CEREG. CREG is for circuit switch network changed. If we accept CREG attach will fail if also
-        // CGREG/CEREG is not registered.
-        let mut status = self.registration.try_borrow_mut()?;
-        status.set_params(
-            self.send_internal(&GetEPSNetworkRegistrationStatus, true)?
+        status.compare_and_set(
+            self.send_internal(&GetNetworkRegistrationStatus, true)?
                 .into(),
         );
 
-        if status.is_registered().is_none() {
-            status.set_params(
-                self.send_internal(&GetGPRSNetworkRegistrationStatus, true)?
+        status.compare_and_set(
+            self.send_internal(&GetGPRSNetworkRegistrationStatus, true)?
+                .into(),
+        );
+
+        if !status.ps_reg_status.is_registered() {
+            status.compare_and_set(
+                self.send_internal(&GetEPSNetworkRegistrationStatus, true)?
                     .into(),
             );
         }
 
-        // TODO:
-        // in manual registering we are forcing registration to certain network so we don't accept active context or attached
-        // as indication that device is registered to correct network.
-        // if plmn.is_some() {
-        //     return self.is_registered();
-        // }
+        let mut service_status: ServiceStatus = status.deref_mut().into();
 
-        if let Some(registration_status) = status.is_registered() {
-            Ok(Some(registration_status))
-        } else if self.attached.get() || self.pdp_context_active.get() {
-            Ok(Some(RegistrationStatus::AlreadyRegistered))
-        } else {
-            Ok(None)
-        }
-    }
+        let OperatorSelection { mode, oper, act } =
+            self.send_internal(&GetOperatorSelection, true)?;
 
-    pub fn set_registration(&self, plmn: Option<&str>) -> nb::Result<(), Error> {
-        match plmn {
-            Some(p) => {
-                defmt::debug!("Manual network registration to {:str}", p);
-                // FIXME:
-                // https://github.com/ARMmbed/mbed-os/blob/master/connectivity/cellular/source/framework/AT/AT_CellularNetwork.cpp#L227
-                //
-                // self.send_internal(&SetOperatorSelection {mode:
-                //     OperatorSelectionMode::Manual,
-                //     },
-                //     true,
-                // )?;
-                unimplemented!();
-            }
-            None => {
-                match self.send_internal(&GetOperatorSelection, true)?.mode {
-                    OperatorSelectionMode::Automatic => {}
-                    _ => {
-                        self.send_internal(
-                            &SetOperatorSelection {
-                                mode: OperatorSelectionMode::Automatic,
-                            },
-                            true,
-                        )?;
-                    }
-                }
-                Ok(())
-            }
-        }
-    }
+        service_status.network_registration_mode = mode;
+        service_status.operator = oper;
 
-    pub fn register(&self, plmn: Option<&str>) -> nb::Result<(), Error> {
-        if let Some(registration_status) = self.is_registered()? {
-            if registration_status == RegistrationStatus::AlreadyRegistered {
-                defmt::info!("Already registered!");
-            }
-            return Ok(());
+        if let Some(act) = act {
+            service_status.rat = act;
         }
 
-        if self
-            .registration
-            .try_borrow_mut()
-            .map_err(|e| nb::Error::Other(e.into()))?
-            .is_denied()
-        {
-            return Err(nb::Error::Other(Error::RegistrationDenied));
-        }
-
-        self.set_registration(plmn)?;
-
-        Err(nb::Error::WouldBlock)
-    }
-
-    pub fn attach(&self) -> Result<(), Error> {
-        if !self.attached.get() {
-            let GPRSAttached { state } = self.send_internal(&GetGPRSAttached, true)?;
-
-            if state != GPRSAttachedState::Attached {
-                defmt::debug!("Network attach");
-                self.send_internal(
-                    &SetGPRSAttached {
-                        state: GPRSAttachedState::Attached,
-                    },
-                    true,
-                )?;
-            }
-        }
-        Ok(())
+        Ok(service_status)
     }
 
     pub fn set_packet_domain_event_reporting(&self, enable: bool) -> Result<(), Error> {
@@ -297,7 +167,6 @@ where
             match urc {
                 Urc::NetworkDetach => {
                     defmt::warn!("Network Detach URC!");
-                    self.attach().ok();
                 }
                 Urc::MobileStationDetach => {
                     defmt::warn!("ME Detach URC!");
@@ -320,36 +189,36 @@ where
                     defmt::info!("[URC] ExtendedPSNetworkRegistration {:?}", state);
                 }
                 Urc::GPRSNetworkRegistration(reg_params) => {
-                    if let Ok(mut params) = self.registration.try_borrow_mut() {
+                    if let Ok(mut params) = self.network_status.try_borrow_mut() {
                         params.compare_and_set(reg_params.into())
                     }
                 }
                 Urc::EPSNetworkRegistration(reg_params) => {
-                    if let Ok(mut params) = self.registration.try_borrow_mut() {
+                    if let Ok(mut params) = self.network_status.try_borrow_mut() {
                         params.compare_and_set(reg_params.into())
                     }
                 }
                 Urc::NetworkRegistration(reg_params) => {
-                    if let Ok(mut params) = self.registration.try_borrow_mut() {
+                    if let Ok(mut params) = self.network_status.try_borrow_mut() {
                         params.compare_and_set(reg_params.into())
                     }
                 }
                 Urc::DataConnectionActivated(psn::urc::DataConnectionActivated {
                     result,
-                    ip_addr,
+                    ip_addr: _,
                 }) => {
                     defmt::info!("[URC] DataConnectionActivated {:u8}", result);
-                    if result == 0 {
-                        self.finish_activating_profile_state(ip_addr).ok();
+                    if let Ok(mut params) = self.network_status.try_borrow_mut() {
+                        params.push_event(Event::DataActive);
                     }
                 }
                 Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
                     profile_id,
                 }) => {
                     defmt::info!("[URC] DataConnectionDeactivated {:?}", profile_id);
-                    // Set the state of `profile_id`!
-                    self.set_profile_state(profile_id, ProfileState::Deactivated)
-                        .ok();
+                    if let Ok(mut params) = self.network_status.try_borrow_mut() {
+                        params.push_event(Event::DataInactive);
+                    }
                 }
                 Urc::MessageWaitingIndication(_) => {
                     defmt::info!("[URC] MessageWaitingIndication");
