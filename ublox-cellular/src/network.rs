@@ -318,4 +318,21 @@ mod tests {
         tx.handle_urc(|_| false).unwrap();
         assert_eq!(tx.client.borrow().n_urcs_dequeued, 2);
     }
+
+    #[test]
+    fn clearing_events() {
+        let tx = AtTx::new(AtClient { n_urcs_dequeued: 0 }, 5);
+
+        let network = Network::new(tx);
+
+        network.push_event(Event::Attached).unwrap();
+        network.push_event(Event::DataActive).unwrap();
+        network.push_event(Event::DataInactive).unwrap();
+        network.push_event(Event::Detached).unwrap();
+        network.push_event(Event::Attached).unwrap();
+
+        assert!(network.get_event().unwrap().is_some());
+        assert!(network.clear_events().is_ok());
+        assert!(network.get_event().unwrap().is_none());
+    }
 }

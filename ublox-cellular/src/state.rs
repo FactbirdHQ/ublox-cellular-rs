@@ -135,11 +135,13 @@ impl StateMachine {
             State::On if matches!(event, CellularEvent::RfOff) => State::Rfoff,
             State::On if matches!(event, CellularEvent::Attached) => State::Registered,
             State::On if matches!(event, CellularEvent::Detached) => State::On,
+            State::On if matches!(event, CellularEvent::DataActive) => State::Connected,
             State::Registered if matches!(event, CellularEvent::PwrOff) => State::Off,
             State::Registered if matches!(event, CellularEvent::RfOff) => State::Rfoff,
             State::Registered if matches!(event, CellularEvent::Detached) => State::On,
             State::Registered if matches!(event, CellularEvent::Attached) => State::Registered,
             State::Registered if matches!(event, CellularEvent::DataActive) => State::Connected,
+            State::Registered if matches!(event, CellularEvent::DataInactive) => State::Registered,
             State::Connected if matches!(event, CellularEvent::PwrOff) => State::Off,
             State::Connected if matches!(event, CellularEvent::RfOff) => State::Rfoff,
             State::Connected if matches!(event, CellularEvent::Detached) => State::On,
@@ -670,7 +672,7 @@ mod test {
     #[test]
     fn retry_or_fail() {
         let mut fsm = StateMachine::new();
-        assert_eq!(fsm.get_state(), State::Init);
+        assert_eq!(fsm.get_state(), State::Off);
         assert!(!fsm.is_retry());
 
         let mut timer = MockTimer::new();

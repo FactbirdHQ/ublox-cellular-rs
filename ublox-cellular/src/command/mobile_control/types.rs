@@ -3,7 +3,7 @@ use atat::atat_derive::AtatEnum;
 
 #[derive(Clone, PartialEq, AtatEnum)]
 pub enum Functionality {
-    /// Sets the MT to minimum functionality (disable both transmit and receive RF
+    /// 0: Sets the MT to minimum functionality (disable both transmit and receive RF
     /// circuits by deactivating both CS and PS services)
     #[cfg(any(
         feature = "toby-l2",
@@ -20,7 +20,7 @@ pub enum Functionality {
     ))]
     Minimum = 0,
 
-    /// (factory-programmed value): sets the MT to full functionality, e.g. from airplane
+    /// 1 (factory-programmed value): sets the MT to full functionality, e.g. from airplane
     /// mode or minimum functionality
     #[cfg(any(
         feature = "toby-l2",
@@ -37,7 +37,7 @@ pub enum Functionality {
     ))]
     Full = 1,
 
-    /// Disables both transmit and receive RF circuits by deactivating both CS and PS
+    /// 4: Disables both transmit and receive RF circuits by deactivating both CS and PS
     /// services and sets the MT into airplane mode. Airplane mode is persistent between
     /// power cycles triggered by +CFUN=16 or +CPWROFF (where supported)
     #[cfg(any(
@@ -52,7 +52,7 @@ pub enum Functionality {
     ))]
     AirplaneMode = 4,
 
-    /// Enables the SIM toolkit interface in dedicated mode and fetching of proactive
+    /// 6: Enables the SIM toolkit interface in dedicated mode and fetching of proactive
     /// commands by SIM Application Toolkit from the SIM card
     #[cfg(any(
         feature = "toby-l2",
@@ -69,7 +69,7 @@ pub enum Functionality {
     ))]
     DedicatedMode = 6,
 
-    /// Disables the SIM toolkit interface and fetching of proactive commands by
+    /// 7: Disables the SIM toolkit interface and fetching of proactive commands by
     /// SIM Application Toolkit from the SIM card
     #[cfg(any(
         feature = "lisa-u1",
@@ -96,7 +96,7 @@ pub enum Functionality {
     ))]
     DisableSimToolkit_ = 8,
 
-    /// Enables the SIM toolkit interface in raw mode and fetching of proactive
+    /// 9: Enables the SIM toolkit interface in raw mode and fetching of proactive
     /// commands by SIM Application Toolkit from the SIM card
     #[cfg(any(
         feature = "lisa-u1",
@@ -107,7 +107,7 @@ pub enum Functionality {
     ))]
     RawMode = 9,
 
-    /// MT silent reset (with detach from network and saving of NVM parameters),
+    /// 15: MT silent reset (with detach from network and saving of NVM parameters),
     /// without reset of the SIM card
     #[cfg(any(
         feature = "toby-l2",
@@ -124,7 +124,7 @@ pub enum Functionality {
     ))]
     SilentReset = 15,
 
-    /// MT silent reset (with detach from network and saving of NVM parameters), with
+    /// 16: MT silent reset (with detach from network and saving of NVM parameters), with
     /// reset of the SIM card
     #[cfg(any(
         feature = "lisa-u1",
@@ -139,12 +139,12 @@ pub enum Functionality {
     ))]
     SilentResetWithSimReset = 16,
 
-    /// Sets the MT to minimum functionality by deactivating CS and PS services and
+    /// 19: Sets the MT to minimum functionality by deactivating CS and PS services and
     /// the SIM card
     #[cfg(any(feature = "toby-l2", feature = "mpci-l2", feature = "toby-l4"))]
     MinimumWithoutSim = 19,
 
-    /// Sets the MT in a deep low power state "HALT" (with detach from the network
+    /// 127: Sets the MT in a deep low power state "HALT" (with detach from the network
     /// and saving of the NVM parameters); the only way to wake up the module is a power
     /// cycle or a module reset
     #[cfg(any(feature = "toby-l2", feature = "mpci-l2"))]

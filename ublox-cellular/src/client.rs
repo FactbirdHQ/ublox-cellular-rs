@@ -361,12 +361,15 @@ where
     }
 
     pub fn spin(&mut self) -> nb::Result<bool, Error> {
-        self.network.handle_urc().ok();
+        self.network.handle_urc()
+        .map_err(Error::from)?;
 
+
+        // Always let events propagate the state of the FSM.
         while let Some(event) = self
             .network
             .get_event()
-            .map_err(|e| nb::Error::Other(e.into()))?
+            .map_err(Error::from)?
         {
             if let Ok(cell_event) = event.try_into() {
                 self.fsm.handle_event(cell_event);
@@ -389,7 +392,9 @@ where
             match self.fsm.retry_or_fail(&mut self.delay) {
                 nb::Error::WouldBlock => return Err(nb::Error::WouldBlock),
                 nb::Error::Other(_) => {
-                    self.network.clear_events().ok();
+                    if self.network.clear_events().is_err() {
+                        defmt::error!("Failed to clear events after failed state transition!");
+                    }
                     self.fsm.set_state(State::Unknown);
                 }
             }
