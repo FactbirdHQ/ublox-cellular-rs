@@ -1,4 +1,4 @@
-use crate::{services::data::ContextState, command::network_service::GetOperatorSelection, command::network_service::responses::OperatorSelection, command::{
+use crate::{command::network_service::GetOperatorSelection, command::network_service::responses::OperatorSelection, command::{
         ip_transport_layer,
         network_service::GetNetworkRegistrationStatus,
         psn::{
@@ -6,7 +6,7 @@ use crate::{services::data::ContextState, command::network_service::GetOperatorS
             GetGPRSNetworkRegistrationStatus, SetPacketSwitchedEventReporting,
         },
         Urc,
-    }, error::GenericError, state::{Event, NetworkStatus, ServiceStatus}};
+    }, error::GenericError, services::data::ContextState, command::error::UbloxError, state::{Event, NetworkStatus, ServiceStatus}};
 use atat::{atat_derive::AtatLen, AtatClient};
 use core::{
     cell::{BorrowError, BorrowMutError, Cell, RefCell},
@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, defmt::Format)]
 pub enum Error {
     Generic(GenericError),
-    AT(atat::Error),
+    AT(atat::Error<UbloxError>),
     RegistrationDenied,
     UnknownProfile,
     ActivationFailed,
@@ -236,11 +236,15 @@ where
         })
     }
 
-    pub(crate) fn send_internal<A: atat::AtatCmd>(
+    pub(crate) fn send_internal<A>(
         &self,
         req: &A,
         check_urc: bool,
-    ) -> Result<A::Response, Error> {
+    ) -> Result<A::Response, Error>
+    where
+        A: atat::AtatCmd,
+        // A::Error: Into<UbloxError>
+    {
         if check_urc {
             if let Err(e) = self.handle_urc() {
                 defmt::error!("Failed handle URC: {:?}", e);
@@ -261,7 +265,8 @@ where
                             core::convert::AsRef::<[u8]>::as_ref(&req.as_bytes())
                         ),
                     };
-                    Error::AT(ate)
+                    // Error::AT(ate.into())
+                    Error::_Unknown
                 }
                 nb::Error::WouldBlock => Error::_Unknown,
             })
@@ -277,12 +282,12 @@ mod tests {
     }
 
     impl AtatClient for AtClient {
-        fn send<A: atat::AtatCmd>(&mut self, _cmd: &A) -> nb::Result<A::Response, atat::Error> {
+        fn send<A: atat::AtatCmd>(&mut self, _cmd: &A) -> nb::Result<A::Response, atat::Error<A::Error>> {
             unreachable!()
         }
 
         fn peek_urc_with<URC: atat::AtatUrc, F: FnOnce(URC::Response) -> bool>(&mut self, f: F) {
-            if let Ok(urc) = URC::parse(b"+UREG:0") {
+            if let Some(urc) = URC::parse(b"+UREG:0") {
                 if f(urc) {
                     self.n_urcs_dequeued += 1;
                 }
@@ -292,7 +297,7 @@ mod tests {
         fn check_response<A: atat::AtatCmd>(
             &mut self,
             _cmd: &A,
-        ) -> nb::Result<A::Response, atat::Error> {
+        ) -> nb::Result<A::Response, atat::Error<A::Error>> {
             unreachable!()
         }
 

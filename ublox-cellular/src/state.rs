@@ -670,7 +670,7 @@ mod test {
     #[test]
     fn retry_or_fail() {
         let mut fsm = StateMachine::new();
-        assert_eq!(fsm.get_state(), State::Init);
+        assert_eq!(fsm.get_state(), State::Off);
         assert!(!fsm.is_retry());
 
         let mut timer = MockTimer::new();
