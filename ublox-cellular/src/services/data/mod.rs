@@ -8,14 +8,34 @@ mod udp_stack;
 
 mod hex;
 
-use crate::{ProfileId, client::Device, command::mobile_control::SetModuleFunctionality, command::mobile_control::types::Functionality, command::network_service::types::RatAct, command::psn::GetGPRSAttached, command::psn::GetPDPContextState, command::psn::SetGPRSAttached, command::psn::SetPDPContextDefinition, command::psn::SetPDPContextState, command::psn::SetPacketSwitchedAction, command::psn::SetPacketSwitchedConfig, command::psn::types::GPRSAttachedState, command::psn::types::PDPContextStatus, command::psn::types::PacketSwitchedParam, command::{
+use crate::{
+    client::Device,
+    command::mobile_control::types::Functionality,
+    command::mobile_control::SetModuleFunctionality,
+    command::network_service::types::RatAct,
+    command::psn::types::GPRSAttachedState,
+    command::psn::types::PDPContextStatus,
+    command::psn::types::PacketSwitchedParam,
+    command::psn::GetGPRSAttached,
+    command::psn::GetPDPContextState,
+    command::psn::SetGPRSAttached,
+    command::psn::SetPDPContextDefinition,
+    command::psn::SetPDPContextState,
+    command::psn::SetPacketSwitchedAction,
+    command::psn::SetPacketSwitchedConfig,
+    command::{
         ip_transport_layer::{
             self,
             responses::{SocketData, UDPSocketData},
             ReadSocketData, ReadUDPSocketData,
         },
         psn, Urc,
-    }, command::network_service::SetOperatorSelection, error::Error as DeviceError, command::network_service::types::OperatorSelectionMode, network::{ContextId, Error as NetworkError, Network}, state::Event};
+    },
+    error::Error as DeviceError,
+    network::{ContextId, Error as NetworkError, Network},
+    state::Event,
+    ProfileId,
+};
 use apn::{APNInfo, Apn};
 use atat::{typenum::Unsigned, AtatClient};
 use core::cell::RefCell;
@@ -154,8 +174,9 @@ where
 
     fn set_pdn_config(&self, cid: ContextId, apn_info: &APNInfo) -> Result<(), Error> {
         self.network.send_internal(
-            &SetOperatorSelection {
-                mode: OperatorSelectionMode::Deregister,
+            &SetModuleFunctionality {
+                fun: Functionality::AirplaneMode,
+                rst: None,
             },
             true,
         )?;
@@ -182,8 +203,9 @@ where
         )?;
 
         self.network.send_internal(
-            &SetOperatorSelection {
-                mode: OperatorSelectionMode::Automatic,
+            &SetModuleFunctionality {
+                fun: Functionality::Full,
+                rst: None,
             },
             true,
         )?;
@@ -212,6 +234,7 @@ where
             )?;
         }
 
+        // TODO: Sometimes we get InvalidResponse on this?!
         self.network.send_internal(
             &SetPacketSwitchedConfig {
                 profile_id: ProfileId(0),
@@ -284,24 +307,24 @@ where
                 self.set_pdn_config(cid, apn_info).map_err(Error::from)?;
 
                 /* Rescan network. */
-                self.network
-                    .send_internal(
-                        &SetModuleFunctionality {
-                            fun: Functionality::AirplaneMode,
-                            rst: None,
-                        },
-                        true,
-                    ).map_err(Error::from)?;
+                // self.network
+                //     .send_internal(
+                //         &SetModuleFunctionality {
+                //             fun: Functionality::AirplaneMode,
+                //             rst: None,
+                //         },
+                //         true,
+                //     ).map_err(Error::from)?;
 
-                self.network
-                    .send_internal(
-                        &SetModuleFunctionality {
-                            fun: Functionality::Full,
-                            rst: None,
-                        },
-                        true,
-                    )
-                    .map_err(Error::from)?;
+                // self.network
+                //     .send_internal(
+                //         &SetModuleFunctionality {
+                //             fun: Functionality::Full,
+                //             rst: None,
+                //         },
+                //         true,
+                //     )
+                //     .map_err(Error::from)?;
 
                 Ok(ContextState::Registering)
             }
@@ -333,9 +356,7 @@ where
 
                 Ok(ContextState::Active)
             }
-            ContextState::Active => {
-                Ok(ContextState::Active)
-            }
+            ContextState::Active => Ok(ContextState::Active),
         }
     }
 

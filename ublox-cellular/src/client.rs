@@ -81,6 +81,28 @@ where
         }
     }
 
+    pub fn factory_reset(&mut self) -> Result<(), Error> {
+        self.network.send_internal(
+            &SetFactoryConfiguration {
+                fs_op: FSFactoryRestoreType::AllFiles,
+                nvm_op: NVMFactoryRestoreType::NVMFlashSectors,
+            },
+            true,
+        )?;
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun: Functionality::SilentResetWithSimReset,
+                rst: None,
+            },
+            true,
+        )?;
+
+        defmt::info!("Succefully factory reset modem! ");
+        self.network.push_event(Event::FactoryReset)?;
+
+        Ok(())
+    }
+
     pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<N, L>) {
         self.sockets = Some(RefCell::new(socket_set));
     }
@@ -181,7 +203,7 @@ where
         // Extended errors on
         self.network.send_internal(
             &SetReportMobileTerminationError {
-                n: TerminationErrorMode::Disabled,
+                n: TerminationErrorMode::Verbose,
             },
             false,
         )?;
@@ -361,16 +383,10 @@ where
     }
 
     pub fn spin(&mut self) -> nb::Result<bool, Error> {
-        self.network.handle_urc()
-        .map_err(Error::from)?;
-
+        self.network.handle_urc().map_err(Error::from)?;
 
         // Always let events propagate the state of the FSM.
-        while let Some(event) = self
-            .network
-            .get_event()
-            .map_err(Error::from)?
-        {
+        while let Some(event) = self.network.get_event().map_err(Error::from)? {
             if let Ok(cell_event) = event.try_into() {
                 self.fsm.handle_event(cell_event);
             }

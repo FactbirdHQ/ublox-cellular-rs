@@ -41,7 +41,7 @@ pub struct SetOperatorSelection {
 }
 
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+COPS?", OperatorSelection)]
+#[at_cmd("+COPS?", OperatorSelection, timeout_ms = 180000)]
 pub struct GetOperatorSelection;
 
 /// 7.8 Radio Access Technology (RAT) selection +URAT Forces the selection of

@@ -64,6 +64,8 @@ pub enum CellularEvent {
     Ota,
     /// trigger: OTA finishes
     OtaDone,
+
+    FactoryReset,
 }
 
 impl TryFrom<Event> for CellularEvent {
@@ -78,11 +80,11 @@ impl TryFrom<Event> for CellularEvent {
                 RegType::Cgreg | RegType::Cereg if !status.ps_reg_status.is_registered() => {
                     Self::Detached
                 }
-                RegType::Creg if status.ps_reg_status.is_registered() => {
+                RegType::Creg if status.cs_reg_status.is_registered() => {
                     /* CS attach won't count as CELLULAR_EVENT_ATTACHED. */
                     return Err(());
                 }
-                RegType::Creg if !status.ps_reg_status.is_registered() => Self::Detached,
+                RegType::Creg if !status.cs_reg_status.is_registered() => Self::Detached,
                 _ => {
                     return Err(());
                 }
@@ -112,6 +114,7 @@ impl TryFrom<Event> for CellularEvent {
             Event::DataInactive => Self::DataInactive,
             Event::Ota => Self::Ota,
             Event::OtaDone => Self::OtaDone,
+            Event::FactoryReset => Self::FactoryReset,
         })
     }
 }
@@ -126,9 +129,19 @@ impl StateMachine {
     }
 
     pub(crate) fn handle_event(&mut self, event: CellularEvent) {
-        defmt::debug!("Handling cellular event: {:?}, from {:?}", event, self.get_state());
+        defmt::debug!(
+            "Handling cellular event: {:?}, from {:?}",
+            event,
+            self.get_state()
+        );
+
+        if matches!(event, CellularEvent::FactoryReset) {
+            self.set_state(State::Unknown);
+            return;
+        }
 
         let new_state = match self.get_state() {
+            State::Unknown if matches!(event, CellularEvent::PwrOff) => State::Off,
             State::Off if matches!(event, CellularEvent::PwrOn) => State::On,
             State::Off if matches!(event, CellularEvent::Attached) => State::Registered,
             State::On if matches!(event, CellularEvent::PwrOff) => State::Off,
@@ -360,6 +373,8 @@ pub enum Event {
     Ota,
     /// trigger: OTA finishes
     OtaDone,
+
+    FactoryReset,
 }
 
 impl Default for RegistrationParams {

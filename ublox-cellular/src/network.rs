@@ -1,4 +1,7 @@
-use crate::{services::data::ContextState, command::network_service::GetOperatorSelection, command::network_service::responses::OperatorSelection, command::{
+use crate::{
+    command::network_service::responses::OperatorSelection,
+    command::network_service::GetOperatorSelection,
+    command::{
         ip_transport_layer,
         network_service::GetNetworkRegistrationStatus,
         psn::{
@@ -6,7 +9,11 @@ use crate::{services::data::ContextState, command::network_service::GetOperatorS
             GetGPRSNetworkRegistrationStatus, SetPacketSwitchedEventReporting,
         },
         Urc,
-    }, error::GenericError, state::{Event, NetworkStatus, ServiceStatus}};
+    },
+    error::GenericError,
+    services::data::ContextState,
+    state::{Event, NetworkStatus, ServiceStatus},
+};
 use atat::{atat_derive::AtatLen, AtatClient};
 use core::{
     cell::{BorrowError, BorrowMutError, Cell, RefCell},

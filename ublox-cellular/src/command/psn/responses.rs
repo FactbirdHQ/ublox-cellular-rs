@@ -1,6 +1,6 @@
 //! Responses for Packet Switched Data Services Commands
 use super::types::*;
-use crate::{ContextId, command::network_service::types::RatAct, network::ProfileId};
+use crate::{command::network_service::types::RatAct, network::ProfileId, ContextId};
 use atat::atat_derive::AtatResp;
 use heapless::{consts, String};
 
