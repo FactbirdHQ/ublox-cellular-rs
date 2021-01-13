@@ -8,10 +8,10 @@ use crate::command::ip_transport_layer::{
     UDPSendToDataBinary,
 };
 use atat::typenum::Unsigned;
-use embedded_nal::{Mode, SocketAddr, UdpStack};
+use embedded_nal::{SocketAddr, UdpClient};
 use heapless::{ArrayLength, Bucket, Pos};
 
-impl<'a, C, N, L> UdpStack for DataService<'a, C, N, L>
+impl<'a, C, N, L> UdpClient for DataService<'a, C, N, L>
 where
     C: atat::AtatClient,
     N: 'static
@@ -28,7 +28,7 @@ where
 
     /// Open a new UDP socket to the given address and port. UDP is connectionless,
     /// so unlike `TcpStack` no `connect()` is required.
-    fn open(&self, remote: SocketAddr, _mode: Mode) -> Result<Self::UdpSocket, Self::Error> {
+    fn socket(&self) -> Result<Self::UdpSocket, Self::Error> {
         let socket_resp = self.network.send_internal(
             &CreateSocket {
                 protocol: SocketProtocol::UDP,
@@ -37,25 +37,31 @@ where
             false,
         )?;
 
-        let mut socket = UdpSocket::new(socket_resp.socket.0);
-        socket.bind(remote)?;
+        let socket = UdpSocket::new(socket_resp.socket.0);
 
         Ok(self.sockets.try_borrow_mut()?.add(socket)?)
     }
 
+    fn connect(&self, socket: &mut Self::UdpSocket, remote: SocketAddr) -> Result<(), Self::Error> {
+        let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
+
+        let mut udp = sockets
+            .get::<UdpSocket<_>>(*socket)
+            .map_err(Self::Error::from)?;
+        udp.bind(remote).map_err(Self::Error::from)?;
+        Ok(())
+    }
+
     /// Send a datagram to the remote host.
-    fn write(&self, socket: &mut Self::UdpSocket, buffer: &[u8]) -> nb::Result<(), Self::Error> {
-        let mut sockets = self
-            .sockets
-            .try_borrow_mut()
-            .map_err(|e| nb::Error::Other(e.into()))?;
+    fn send(&self, socket: &mut Self::UdpSocket, buffer: &[u8]) -> nb::Result<(), Self::Error> {
+        let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let udp = sockets
             .get::<UdpSocket<_>>(*socket)
-            .map_err(|e| nb::Error::Other(Error::Socket(e)))?;
+            .map_err(Self::Error::from)?;
 
         if !udp.is_open() {
-            return Err(nb::Error::Other(Error::SocketClosed));
+            return Err(Error::SocketClosed.into());
         }
 
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
@@ -70,13 +76,7 @@ where
                     },
                     false,
                 )
-                .map_err(|e| nb::Error::Other(e.into()))?;
-
-            // self.delay
-            //     .try_borrow_mut()
-            //     .map_err(|_| Error::BorrowMutError)?
-            //     .try_delay_ms(50)
-            //     .map_err(|_| Error::Busy)?;
+                .map_err(Self::Error::from)?;
 
             let response = self
                 .network
@@ -86,13 +86,13 @@ where
                     },
                     false,
                 )
-                .map_err(|e| nb::Error::Other(e.into()))?;
+                .map_err(Self::Error::from)?;
 
             if response.length != chunk.len() {
-                return Err(nb::Error::Other(Error::BadLength));
+                return Err(Error::BadLength.into());
             }
             if &response.socket != socket {
-                return Err(nb::Error::Other(Error::WrongSocketType));
+                return Err(Error::WrongSocketType.into());
             }
         }
 
@@ -102,22 +102,22 @@ where
     /// Read a datagram the remote host has sent to us. Returns `Ok(n)`, which
     /// means a datagram of size `n` has been received and it has been placed
     /// in `&buffer[0..n]`, or an error.
-    fn read(
+    fn receive(
         &self,
         socket: &mut Self::UdpSocket,
         buffer: &mut [u8],
-    ) -> nb::Result<usize, Self::Error> {
-        let mut sockets = self
-            .sockets
-            .try_borrow_mut()
-            .map_err(|e| nb::Error::Other(e.into()))?;
+    ) -> nb::Result<(usize, SocketAddr), Self::Error> {
+        let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let mut udp = sockets
             .get::<UdpSocket<_>>(*socket)
-            .map_err(|e| nb::Error::Other(Error::Socket(e)))?;
+            .map_err(Self::Error::from)?;
 
-        udp.recv_slice(buffer)
-            .map_err(|e| nb::Error::Other(e.into()))
+        let response = udp
+            .recv_slice(buffer)
+            .map(|n| (n, udp.endpoint()))
+            .map_err(Self::Error::from)?;
+        Ok(response)
     }
 
     /// Close an existing UDP socket.

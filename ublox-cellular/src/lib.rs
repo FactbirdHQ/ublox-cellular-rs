@@ -28,5 +28,5 @@ pub mod prelude {
     #[cfg(any(feature = "socket-udp", feature = "socket-tcp"))]
     pub use super::services::data::ssl::SSL;
     #[cfg(any(feature = "socket-udp", feature = "socket-tcp"))]
-    pub use embedded_nal::{TcpStack, UdpStack};
+    pub use embedded_nal::{TcpClient, UdpClient};
 }
