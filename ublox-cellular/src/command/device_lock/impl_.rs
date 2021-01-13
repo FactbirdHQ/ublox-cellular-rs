@@ -63,8 +63,8 @@ impl<'de> Deserialize<'de> for PinStatusCode {
                     b"PH-CORP PIN" => Ok(Field::PhCorpPin),
                     b"PH-SIM PIN" => Ok(Field::PhSimPin),
                     _ => {
-                        let value = core::str::from_utf8(value)
-                            .unwrap_or("\u{fffd}\u{fffd}\u{fffd}");
+                        let value =
+                            core::str::from_utf8(value).unwrap_or("\u{fffd}\u{fffd}\u{fffd}");
                         Err(de::Error::unknown_variant(value, VARIANTS))
                     }
                 }
