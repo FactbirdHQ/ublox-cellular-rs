@@ -1,69 +1,202 @@
+use core::convert::TryFrom;
+
 use crate::{
     command::network_service,
+    command::network_service::responses::NetworkRegistrationStatus,
+    command::network_service::types::OperatorNameFormat,
+    command::network_service::types::OperatorSelectionMode,
     command::network_service::types::RatAct,
+    command::network_service::urc::NetworkRegistration,
     command::psn::responses::GPRSNetworkRegistrationStatus,
     command::psn::types::GPRSNetworkRegistrationStat,
     command::psn::{responses::EPSNetworkRegistrationStatus, urc::GPRSNetworkRegistration},
     command::psn::{types::EPSNetworkRegistrationStat, urc::EPSNetworkRegistration},
     error::Error,
-    ContextId,
 };
 use embedded_hal::timer::CountDown;
-use heapless::{consts, String, Vec};
+use heapless::{consts, spsc::Queue, String};
 use network_service::types::NetworkRegistrationStat;
 
 #[derive(Debug, Clone, Copy, PartialEq, defmt::Format)]
 pub enum State {
-    Init,
-    PowerOn,
-    Configure,
-    DeviceReady,
-    SimPin,
-    SignalQuality,
-    RegisteringNetwork,
-    AttachingNetwork,
+    /// StateMachine: CELLULAR module is off
+    Off,
+    /// StateMachine: CELLULAR module is on
+    On,
+    /// StateMachine: CELLULAR module is connected
     Connected,
+    /// StateMachine: CELLULAR module is registered
+    Registered,
+    /// StateMachine: CELLULAR module is rfoff
+    Rfoff,
+    /// StateMachine: CELLULAR module is OTA mode
+    Ota,
+    /// StateMachine: Unknown state
+    Unknown,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, defmt::Format)]
 pub struct StateMachine {
     max_retry_attempts: u8,
-    retry_count: u8,
+    retry_count: Option<u8>,
     inner: State,
+}
+
+#[derive(defmt::Format)]
+pub enum CellularEvent {
+    /// trigger: an module is powered on
+    PwrOn,
+    /// trigger: cellular module is powered off
+    PwrOff,
+    /// trigger: airplane mode off
+    RfOn,
+    /// trigger: airplane mode on
+    RfOff,
+    /// trigger: attached to a network
+    Attached,
+    /// trigger: detached from a network
+    Detached,
+    /// trigger: data connect is active
+    DataActive,
+    /// trigger: data connection is inactive
+    DataInactive,
+    /// trigger: OTA starts
+    Ota,
+    /// trigger: OTA finishes
+    OtaDone,
+
+    FactoryReset,
+}
+
+impl TryFrom<Event> for CellularEvent {
+    type Error = ();
+
+    fn try_from(e: Event) -> Result<Self, Self::Error> {
+        Ok(match e {
+            Event::RegistrationStatusChanged(reg_type, status) => match reg_type {
+                RegType::Cgreg | RegType::Cereg if status.ps_reg_status.is_registered() => {
+                    Self::Attached
+                }
+                RegType::Cgreg | RegType::Cereg if !status.ps_reg_status.is_registered() => {
+                    Self::Detached
+                }
+                RegType::Creg if status.cs_reg_status.is_registered() => {
+                    /* CS attach won't count as CELLULAR_EVENT_ATTACHED. */
+                    return Err(());
+                }
+                RegType::Creg if !status.cs_reg_status.is_registered() => Self::Detached,
+                _ => {
+                    return Err(());
+                }
+            },
+            Event::RadioAccessTechnologyChanged(reg_type, rat) => {
+                defmt::info!(
+                    "[EVENT] CellularRadioAccessTechnologyChanged {:?} {:?}",
+                    reg_type,
+                    rat
+                );
+                return Err(());
+            }
+            Event::CellIDChanged(cell_id) => {
+                defmt::info!(
+                    "[EVENT] CellularCellIDChanged {:str}",
+                    cell_id.unwrap_or_default().as_str()
+                );
+                return Err(());
+            }
+            Event::PwrOn => Self::PwrOn,
+            Event::PwrOff => Self::PwrOff,
+            Event::RfOn => Self::RfOn,
+            Event::RfOff => Self::RfOff,
+            Event::Attached => Self::Attached,
+            Event::Detached => Self::Detached,
+            Event::DataActive => Self::DataActive,
+            Event::DataInactive => Self::DataInactive,
+            Event::Ota => Self::Ota,
+            Event::OtaDone => Self::OtaDone,
+            Event::FactoryReset => Self::FactoryReset,
+        })
+    }
 }
 
 impl StateMachine {
     pub(crate) const fn new() -> Self {
         Self {
             max_retry_attempts: 10,
-            retry_count: 0,
-            inner: State::Init,
+            retry_count: None,
+            inner: State::Off,
         }
     }
 
+    pub(crate) fn handle_event(&mut self, event: CellularEvent) {
+        defmt::debug!(
+            "Handling cellular event: {:?}, from {:?}",
+            event,
+            self.get_state()
+        );
+
+        if matches!(event, CellularEvent::FactoryReset) {
+            self.set_state(State::Unknown);
+            return;
+        }
+
+        let new_state = match self.get_state() {
+            State::Unknown if matches!(event, CellularEvent::PwrOff) => State::Off,
+            State::Off if matches!(event, CellularEvent::PwrOn) => State::On,
+            State::Off if matches!(event, CellularEvent::Attached) => State::Registered,
+            State::On if matches!(event, CellularEvent::PwrOff) => State::Off,
+            State::On if matches!(event, CellularEvent::RfOff) => State::Rfoff,
+            State::On if matches!(event, CellularEvent::Attached) => State::Registered,
+            State::On if matches!(event, CellularEvent::Detached) => State::On,
+            State::On if matches!(event, CellularEvent::DataActive) => State::Connected,
+            State::Registered if matches!(event, CellularEvent::PwrOff) => State::Off,
+            State::Registered if matches!(event, CellularEvent::RfOff) => State::Rfoff,
+            State::Registered if matches!(event, CellularEvent::Detached) => State::On,
+            State::Registered if matches!(event, CellularEvent::Attached) => State::Registered,
+            State::Registered if matches!(event, CellularEvent::DataActive) => State::Connected,
+            State::Registered if matches!(event, CellularEvent::DataInactive) => State::Registered,
+            State::Connected if matches!(event, CellularEvent::PwrOff) => State::Off,
+            State::Connected if matches!(event, CellularEvent::RfOff) => State::Rfoff,
+            State::Connected if matches!(event, CellularEvent::Detached) => State::On,
+            State::Connected if matches!(event, CellularEvent::Ota) => State::Ota,
+            State::Connected if matches!(event, CellularEvent::DataInactive) => State::Registered,
+            State::Rfoff if matches!(event, CellularEvent::PwrOn) => State::Rfoff,
+            State::Rfoff if matches!(event, CellularEvent::PwrOff) => State::Off,
+            State::Rfoff if matches!(event, CellularEvent::RfOn) => State::On,
+            State::Ota if matches!(event, CellularEvent::OtaDone) => State::Off,
+            State::Ota if matches!(event, CellularEvent::PwrOff) => State::Off,
+            _ => {
+                defmt::error!("Wrong event received {:?}", event);
+                return;
+            }
+        };
+
+        self.set_state(new_state);
+    }
+
+    #[allow(dead_code)]
     pub(crate) fn set_max_retry_attempts(&mut self, max_retry_attempts: u8) {
         self.max_retry_attempts = max_retry_attempts;
     }
 
     pub(crate) fn reset(&mut self) {
         self.max_retry_attempts = 10;
-        self.retry_count = 0;
+        self.retry_count = None;
     }
 
     pub(crate) const fn get_state(self) -> State {
         self.inner
     }
 
-    pub(crate) fn set_state(&mut self, new_state: State) {
-        defmt::debug!("State transition: {:?} -> {:?}", self.inner, new_state);
-
+    pub(crate) fn set_state(&mut self, state: State) {
+        defmt::debug!("State transition: {:?} -> {:?}", self.inner, state);
         // Reset the max attempts on any state transition
         self.reset();
-        self.inner = new_state;
+        self.inner = state;
     }
 
     pub(crate) const fn is_retry(self) -> bool {
-        self.retry_count > 0
+        self.retry_count.is_some()
     }
 
     pub(crate) fn retry_or_fail<CNT>(&mut self, timer: &mut CNT) -> nb::Error<Error>
@@ -72,13 +205,18 @@ impl StateMachine {
         CNT::Time: From<u32>,
     {
         // Handle retry based on exponential backoff here
-        if self.is_retry() && self.retry_count >= self.max_retry_attempts {
-            // Max attempts reached! Bail with a timeout error
-            return nb::Error::Other(Error::StateTimeout);
+        match self.retry_count {
+            Some(cnt) if cnt >= self.max_retry_attempts => {
+                // Max attempts reached! Bail with a timeout error
+                return nb::Error::Other(Error::StateTimeout);
+            }
+            _ => {}
         }
 
-        // TODO: Change to a poor-mans exponential
-        let backoff_time = (u32::from(self.retry_count) + 1) * 1000;
+        let cnt = self.retry_count.unwrap_or_default();
+
+        // FIXME: Change to a poor-mans exponential
+        let backoff_time = (u32::from(cnt) + 1) * 1000;
 
         if timer.try_start(backoff_time).is_err() {
             defmt::error!("Failed to start retry_timer!!");
@@ -87,19 +225,19 @@ impl StateMachine {
 
         defmt::warn!(
             "[RETRY] current attempt: {:u8}, retrying state({:?}) in {:u32} ms...",
-            self.retry_count,
+            cnt,
             self.inner,
             backoff_time
         );
 
-        self.retry_count += 1;
+        self.retry_count = Some(cnt + 1);
         nb::Error::WouldBlock
     }
 }
 
 pub struct RegistrationParams {
-    reg_type: RadioAccessNetwork,
-    status: RegistrationStatus,
+    reg_type: RegType,
+    pub(crate) status: RegistrationStatus,
     act: RatAct,
 
     cell_id: Option<String<consts::U8>>,
@@ -108,25 +246,143 @@ pub struct RegistrationParams {
     // periodic_tau: Option<u16>,
 }
 
-#[derive(Default)]
-pub struct Registration {
-    params: RegistrationParams,
-    pub events: Vec<Event, consts::U10>,
+#[derive(Debug, Clone, Copy, defmt::Format)]
+pub enum RegType {
+    Creg,
+    Cgreg,
+    Cereg,
+    Unknown,
 }
 
+impl From<RadioAccessNetwork> for RegType {
+    fn from(ran: RadioAccessNetwork) -> Self {
+        match ran {
+            RadioAccessNetwork::UnknownUnused => RegType::Unknown,
+            RadioAccessNetwork::Geran => RegType::Creg,
+            RadioAccessNetwork::Utran => RegType::Cgreg,
+            RadioAccessNetwork::Eutran => RegType::Cereg,
+        }
+    }
+}
+
+impl From<RegType> for RadioAccessNetwork {
+    fn from(regtype: RegType) -> Self {
+        match regtype {
+            RegType::Unknown => RadioAccessNetwork::UnknownUnused,
+            RegType::Creg => RadioAccessNetwork::Geran,
+            RegType::Cgreg => RadioAccessNetwork::Utran,
+            RegType::Cereg => RadioAccessNetwork::Eutran,
+        }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct ServiceStatus {
+    /// Radio Access Technology (RAT)
+    pub rat: RatAct,
+
+    /// Network registration mode (auto/manual etc.) currently selected.
+    pub network_registration_mode: OperatorSelectionMode,
+
+    /// CS (Circuit Switched) registration status (registered/searching/roaming etc.).
+    pub cs_reg_status: RegistrationStatus,
+    /// PS (Packet Switched) registration status (registered/searching/roaming etc.).
+    pub ps_reg_status: RegistrationStatus,
+
+    /// Registered network operator name.
+    pub operator: Option<OperatorNameFormat>,
+
+    /// CS Reject Type. 0 - 3GPP specific Reject Cause. 1 - Manufacture specific
+    pub cs_reject_type: Option<u8>,
+    /// Reason why the CS (Circuit Switched) registration attempt was rejected
+    pub cs_reject_cause: Option<u8>,
+    /// PS Reject Type. 0 - 3GPP specific Reject Cause. 1 - Manufacture specific
+    pub ps_reject_type: Option<u8>,
+    /// Reason why the PS (Packet Switched) registration attempt was rejected
+    pub ps_reject_cause: Option<u8>,
+}
+
+pub struct NetworkStatus {
+    /// Radio Access Technology (RAT)
+    rat: RatAct,
+
+    /// CS (Circuit Switched) registration status (registered/searching/roaming etc.).
+    pub(crate) cs_reg_status: RegistrationStatus,
+    /// PS (Packet Switched) registration status (registered/searching/roaming etc.).
+    pub(crate) ps_reg_status: RegistrationStatus,
+
+    /// CS Reject Type. 0 - 3GPP specific Reject Cause. 1 - Manufacture specific
+    _cs_reject_type: u8,
+    /// Reason why the CS (Circuit Switched) registration attempt was rejected
+    _cs_reject_cause: u8,
+    /// PS Reject Type. 0 - 3GPP specific Reject Cause. 1 - Manufacture specific
+    _ps_reject_type: u8,
+    /// Reason why the PS (Packet Switched) registration attempt was rejected
+    _ps_reject_cause: u8,
+
+    /// Registered network operator cell Id.
+    cell_id: Option<String<consts::U8>>,
+    /// Registered network operator Location Area Code.
+    lac: Option<String<consts::U4>>,
+    /// Registered network operator Routing Area Code.
+    // rac: u8,
+    /// Registered network operator Tracking Area Code.
+    // tac: u8,
+    pub events: Queue<Event, consts::U20, u8>,
+}
+
+impl From<&mut NetworkStatus> for ServiceStatus {
+    fn from(ns: &mut NetworkStatus) -> Self {
+        ServiceStatus {
+            rat: ns.rat,
+            network_registration_mode: OperatorSelectionMode::Unknown,
+            cs_reg_status: ns.cs_reg_status,
+            ps_reg_status: ns.ps_reg_status,
+            operator: None,
+            cs_reject_type: None,
+            cs_reject_cause: None,
+            ps_reject_type: None,
+            ps_reject_cause: None,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum Event {
-    Disconnected(Option<ContextId>),
-    CellularRadioAccessTechnologyChanged(RadioAccessNetwork, RatAct),
-    CellularRegistrationStatusChanged(RadioAccessNetwork, RegistrationStatus),
-    CellularCellIDChanged(Option<String<consts::U8>>),
+    RadioAccessTechnologyChanged(RadioAccessNetwork, RatAct),
+    RegistrationStatusChanged(RegType, ServiceStatus),
+    CellIDChanged(Option<String<consts::U8>>),
+
+    /// trigger: an module is powered on
+    PwrOn,
+    /// trigger: cellular module is powered off
+    PwrOff,
+    /// trigger: airplane mode off
+    RfOn,
+    /// trigger: airplane mode on
+    RfOff,
+    /// trigger: attached to a network
+    Attached,
+    /// trigger: detached from a network
+    Detached,
+    /// trigger: data connect is active
+    DataActive,
+    /// trigger: data connection is inactive
+    DataInactive,
+    /// trigger: OTA starts
+    Ota,
+    /// trigger: OTA finishes
+    OtaDone,
+
+    FactoryReset,
 }
 
 impl Default for RegistrationParams {
     fn default() -> Self {
         Self {
-            reg_type: RadioAccessNetwork::UnknownUnused,
-            status: RegistrationStatus::StatusNotAvailable,
             act: RatAct::Unknown,
+            reg_type: RegType::Unknown,
+            status: RegistrationStatus::StatusNotAvailable,
             cell_id: None,
             lac: None,
             // active_time: None,
@@ -135,71 +391,86 @@ impl Default for RegistrationParams {
     }
 }
 
-impl Registration {
-    pub fn set_params(&mut self, new_params: RegistrationParams) {
-        self.params = new_params;
+impl NetworkStatus {
+    pub fn new() -> Self {
+        Self {
+            events: Queue::u8(),
+            rat: RatAct::default(),
+            cs_reg_status: RegistrationStatus::default(),
+            ps_reg_status: RegistrationStatus::default(),
+            _cs_reject_type: 0,
+            _cs_reject_cause: 0,
+            _ps_reject_type: 0,
+            _ps_reject_cause: 0,
+            cell_id: None,
+            lac: None,
+        }
     }
-
     pub fn push_event(&mut self, event: Event) {
-        self.events.push(event).ok();
+        self.events.enqueue(event).ok();
     }
 
     pub fn compare_and_set(&mut self, new_params: RegistrationParams) {
-        if self.params.act != new_params.act {
-            self.params.act = new_params.act;
-            self.events
-                .push(Event::CellularRadioAccessTechnologyChanged(
+        match new_params.reg_type {
+            RegType::Creg if self.cs_reg_status != new_params.status => {
+                self.cs_reg_status = new_params.status;
+                let status = self.into();
+                self.push_event(Event::RegistrationStatusChanged(
                     new_params.reg_type,
-                    self.params.act,
-                ))
-                .ok();
-        }
-        if self.params.status != new_params.status || self.params.reg_type != new_params.reg_type {
-            let prev_status = self.params.status;
-
-            self.params.status = new_params.status;
-            self.events
-                .push(Event::CellularRegistrationStatusChanged(
+                    status,
+                ));
+            }
+            RegType::Cgreg | RegType::Cereg if self.ps_reg_status != new_params.status => {
+                self.ps_reg_status = new_params.status;
+                let status = self.into();
+                self.push_event(Event::RegistrationStatusChanged(
                     new_params.reg_type,
-                    self.params.status,
-                ))
-                .ok();
-
-            if new_params.status == RegistrationStatus::NotRegistered
-                && prev_status.is_registered().is_some()
-                && new_params.reg_type != RadioAccessNetwork::Geran
-            {
-                self.events.push(Event::Disconnected(None)).ok();
+                    status,
+                ));
+            }
+            RegType::Unknown => {
+                defmt::error!("unknown reg type");
+                return;
+            }
+            _ => {
+                return;
             }
         }
-        if new_params.cell_id.is_some() && self.params.cell_id != new_params.cell_id {
-            self.params.cell_id = new_params.cell_id.clone();
-            self.params.lac = new_params.lac;
-            self.events
-                .push(Event::CellularCellIDChanged(new_params.cell_id))
-                .ok();
+
+        if self.rat != new_params.act {
+            self.push_event(Event::RadioAccessTechnologyChanged(
+                new_params.reg_type.into(),
+                self.rat,
+            ));
         }
-
-        self.params.reg_type = new_params.reg_type;
-    }
-
-    /// Check if any Radio Access Network is registered
-    pub const fn is_registered(&self) -> Option<RegistrationStatus> {
-        self.params.status.is_registered()
-    }
-
-    /// Check if any Radio Access Network is registered
-    pub const fn is_denied(&self) -> bool {
-        self.params.status.is_denied()
+        if new_params.cell_id.is_some() && self.cell_id != new_params.cell_id {
+            self.cell_id = new_params.cell_id.clone();
+            self.lac = new_params.lac;
+            self.push_event(Event::CellIDChanged(new_params.cell_id));
+        }
     }
 }
 
-impl From<network_service::urc::NetworkRegistration> for RegistrationParams {
-    fn from(v: network_service::urc::NetworkRegistration) -> Self {
+impl From<NetworkRegistration> for RegistrationParams {
+    fn from(v: NetworkRegistration) -> Self {
         Self {
-            reg_type: RadioAccessNetwork::Geran,
-            status: v.stat.into(),
             act: RatAct::Gsm,
+            reg_type: RegType::Creg,
+            status: v.stat.into(),
+            cell_id: None,
+            lac: None,
+            // active_time: None,
+            // periodic_tau: None,
+        }
+    }
+}
+
+impl From<NetworkRegistrationStatus> for RegistrationParams {
+    fn from(v: NetworkRegistrationStatus) -> Self {
+        Self {
+            act: RatAct::Gsm,
+            reg_type: RegType::Creg,
+            status: v.stat.into(),
             cell_id: None,
             lac: None,
             // active_time: None,
@@ -211,9 +482,9 @@ impl From<network_service::urc::NetworkRegistration> for RegistrationParams {
 impl From<GPRSNetworkRegistration> for RegistrationParams {
     fn from(v: GPRSNetworkRegistration) -> Self {
         Self {
-            reg_type: RadioAccessNetwork::Utran,
-            status: v.stat.into(),
             act: v.act.unwrap_or(RatAct::Unknown),
+            reg_type: RegType::Cgreg,
+            status: v.stat.into(),
             cell_id: v.ci,
             lac: v.lac,
             // active_time: None,
@@ -225,11 +496,11 @@ impl From<GPRSNetworkRegistration> for RegistrationParams {
 impl From<GPRSNetworkRegistrationStatus> for RegistrationParams {
     fn from(v: GPRSNetworkRegistrationStatus) -> Self {
         Self {
-            reg_type: RadioAccessNetwork::Utran,
+            reg_type: RegType::Cgreg,
             status: v.stat.into(),
-            act: v.act.unwrap_or(RatAct::Unknown),
             cell_id: v.ci,
             lac: v.lac,
+            act: v.act.unwrap_or(RatAct::Unknown),
             // active_time: None,
             // periodic_tau: None,
         }
@@ -239,11 +510,11 @@ impl From<GPRSNetworkRegistrationStatus> for RegistrationParams {
 impl From<EPSNetworkRegistration> for RegistrationParams {
     fn from(v: EPSNetworkRegistration) -> Self {
         Self {
-            reg_type: RadioAccessNetwork::Eutran,
+            reg_type: RegType::Cereg,
             status: v.stat.into(),
-            act: v.act.unwrap_or(RatAct::Unknown),
             cell_id: v.ci,
             lac: v.tac,
+            act: v.act.unwrap_or(RatAct::Unknown),
             // active_time: None,
             // periodic_tau: None,
         }
@@ -253,11 +524,11 @@ impl From<EPSNetworkRegistration> for RegistrationParams {
 impl From<EPSNetworkRegistrationStatus> for RegistrationParams {
     fn from(v: EPSNetworkRegistrationStatus) -> Self {
         Self {
-            reg_type: RadioAccessNetwork::Eutran,
+            reg_type: RegType::Cereg,
             status: v.stat.into(),
-            act: v.act.unwrap_or(RatAct::Unknown),
             cell_id: v.ci,
             lac: v.tac,
+            act: v.act.unwrap_or(RatAct::Unknown),
             // active_time: None,
             // periodic_tau: None,
         }
@@ -283,12 +554,15 @@ pub enum RegistrationStatus {
     AlreadyRegistered,
 }
 
+impl Default for RegistrationStatus {
+    fn default() -> Self {
+        Self::StatusNotAvailable
+    }
+}
+
 impl RegistrationStatus {
-    pub const fn is_registered(self) -> Option<Self> {
-        match self {
-            Self::RegisteredHomeNetwork | Self::RegisteredRoaming => Some(self),
-            _ => None,
-        }
+    pub const fn is_registered(self) -> bool {
+        matches!(self, Self::RegisteredHomeNetwork | Self::RegisteredRoaming)
     }
 
     pub const fn is_roaming(self) -> bool {
@@ -413,7 +687,7 @@ mod test {
     #[test]
     fn retry_or_fail() {
         let mut fsm = StateMachine::new();
-        assert_eq!(fsm.get_state(), State::Init);
+        assert_eq!(fsm.get_state(), State::Off);
         assert!(!fsm.is_retry());
 
         let mut timer = MockTimer::new();

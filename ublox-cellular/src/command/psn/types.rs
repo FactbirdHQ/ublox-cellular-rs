@@ -460,17 +460,17 @@ pub enum QoSReliability {
 
 #[derive(Clone, PartialEq, AtatEnum)]
 pub enum PacketSwitchedAction {
-    /// It clears the specified profile resetting all the parameters to their
+    /// • 0: It clears the specified profile resetting all the parameters to their
     /// factory programmed values
     Reset = 0,
-    /// It saves all the parameters in NVM
+    /// • 1: It saves all the parameters in NVM
     Store = 1,
-    /// It reads all the parameters from NVM
+    /// • 2: It reads all the parameters from NVM
     Load = 2,
-    /// It activates a PDP context with the specified profile, using the current
+    /// • 3: It activates a PDP context with the specified profile, using the current
     /// parameters
     Activate = 3,
-    /// It deactivates the PDP context associated with the specified profile
+    /// • 4: It deactivates the PDP context associated with the specified profile
     Deactivate = 4,
 }
 
@@ -511,7 +511,9 @@ pub enum PacketSwitchedNetworkDataParam {
 
 #[derive(Debug, Clone, PartialEq, AtatEnum, defmt::Format)]
 pub enum GPRSAttachedState {
+    /// • 0: Detached
     Detached = 0,
+    /// • 1: Attached
     Attached = 1,
 }
 

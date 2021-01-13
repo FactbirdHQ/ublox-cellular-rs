@@ -1,6 +1,6 @@
 //! Responses for Packet Switched Data Services Commands
 use super::types::*;
-use crate::{command::network_service::types::RatAct, network::ProfileId};
+use crate::{command::network_service::types::RatAct, network::ProfileId, ContextId};
 use atat::atat_derive::AtatResp;
 use heapless::{consts, String};
 
@@ -50,6 +50,8 @@ pub struct GPRSAttached {
 #[derive(Clone, AtatResp)]
 pub struct PDPContextState {
     #[at_arg(position = 0)]
+    pub cid: ContextId,
+    #[at_arg(position = 1)]
     pub status: PDPContextStatus,
 }
 

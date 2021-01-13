@@ -1,8 +1,8 @@
 use super::types::*;
-use serde::{de, export, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 impl Serialize for PinStatusCode {
-    fn serialize<S>(&self, serializer: S) -> export::Result<S::Ok, S::Error>
+    fn serialize<S>(&self, serializer: S) -> core::result::Result<S::Ok, S::Error>
     where
         S: Serializer,
     {
@@ -22,7 +22,7 @@ impl Serialize for PinStatusCode {
 }
 
 impl<'de> Deserialize<'de> for PinStatusCode {
-    fn deserialize<D>(deserializer: D) -> export::Result<Self, D::Error>
+    fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
     where
         D: Deserializer<'de>,
     {
@@ -43,28 +43,29 @@ impl<'de> Deserialize<'de> for PinStatusCode {
 
         impl<'de> de::Visitor<'de> for FieldVisitor {
             type Value = Field;
-            fn expecting(&self, formatter: &mut export::Formatter) -> export::fmt::Result {
-                export::Formatter::write_str(formatter, "variant identifier")
+            fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+                core::fmt::Formatter::write_str(formatter, "variant identifier")
             }
 
-            fn visit_bytes<E>(self, value: &[u8]) -> export::Result<Self::Value, E>
+            fn visit_bytes<E>(self, value: &[u8]) -> core::result::Result<Self::Value, E>
             where
                 E: de::Error,
             {
                 match value {
-                    b"READY" => export::Ok(Field::Ready),
-                    b"SIM PIN" => export::Ok(Field::SimPin),
-                    b"SIM PUK" => export::Ok(Field::SimPuk),
-                    b"SIM PIN2" => export::Ok(Field::SimPin2),
-                    b"SIM PUK2" => export::Ok(Field::SimPuk2),
-                    b"PH-NET PIN" => export::Ok(Field::PhNetPin),
-                    b"PH-NETSUB PIN" => export::Ok(Field::PhNetSubPin),
-                    b"PH-SP PIN" => export::Ok(Field::PhSpPin),
-                    b"PH-CORP PIN" => export::Ok(Field::PhCorpPin),
-                    b"PH-SIM PIN" => export::Ok(Field::PhSimPin),
+                    b"READY" => Ok(Field::Ready),
+                    b"SIM PIN" => Ok(Field::SimPin),
+                    b"SIM PUK" => Ok(Field::SimPuk),
+                    b"SIM PIN2" => Ok(Field::SimPin2),
+                    b"SIM PUK2" => Ok(Field::SimPuk2),
+                    b"PH-NET PIN" => Ok(Field::PhNetPin),
+                    b"PH-NETSUB PIN" => Ok(Field::PhNetSubPin),
+                    b"PH-SP PIN" => Ok(Field::PhSpPin),
+                    b"PH-CORP PIN" => Ok(Field::PhCorpPin),
+                    b"PH-SIM PIN" => Ok(Field::PhSimPin),
                     _ => {
-                        let value = &export::from_utf8_lossy(value);
-                        export::Err(de::Error::unknown_variant(value, VARIANTS))
+                        let value =
+                            core::str::from_utf8(value).unwrap_or("\u{fffd}\u{fffd}\u{fffd}");
+                        Err(de::Error::unknown_variant(value, VARIANTS))
                     }
                 }
             }
@@ -72,7 +73,7 @@ impl<'de> Deserialize<'de> for PinStatusCode {
 
         impl<'de> Deserialize<'de> for Field {
             #[inline]
-            fn deserialize<D>(deserializer: D) -> export::Result<Self, D::Error>
+            fn deserialize<D>(deserializer: D) -> core::result::Result<Self, D::Error>
             where
                 D: Deserializer<'de>,
             {
@@ -80,36 +81,31 @@ impl<'de> Deserialize<'de> for PinStatusCode {
             }
         }
         struct Visitor<'de> {
-            marker: export::PhantomData<PinStatusCode>,
-            lifetime: export::PhantomData<&'de ()>,
+            marker: core::marker::PhantomData<PinStatusCode>,
+            lifetime: core::marker::PhantomData<&'de ()>,
         }
         impl<'de> de::Visitor<'de> for Visitor<'de> {
             type Value = PinStatusCode;
-            fn expecting(&self, formatter: &mut export::Formatter) -> export::fmt::Result {
-                export::Formatter::write_str(formatter, "enum PinStatusCode")
+            fn expecting(&self, formatter: &mut core::fmt::Formatter) -> core::fmt::Result {
+                core::fmt::Formatter::write_str(formatter, "enum PinStatusCode")
             }
 
-            fn visit_enum<A>(self, data: A) -> export::Result<Self::Value, A::Error>
+            fn visit_enum<A>(self, data: A) -> core::result::Result<Self::Value, A::Error>
             where
                 A: de::EnumAccess<'de>,
             {
-                match match de::EnumAccess::variant(data) {
-                    export::Ok(val) => val,
-                    export::Err(err) => {
-                        return export::Err(err);
-                    }
-                } {
-                    (Field::Ready, _) => export::Ok(PinStatusCode::Ready),
-                    (Field::SimPin, _) => export::Ok(PinStatusCode::SimPin),
-                    (Field::SimPuk, _) => export::Ok(PinStatusCode::SimPuk),
-                    (Field::SimPin2, _) => export::Ok(PinStatusCode::SimPin2),
-                    (Field::SimPuk2, _) => export::Ok(PinStatusCode::SimPuk2),
-                    (Field::PhNetPin, _) => export::Ok(PinStatusCode::PhNetPin),
-                    (Field::PhNetSubPin, _) => export::Ok(PinStatusCode::PhNetSubPin),
-                    (Field::PhSpPin, _) => export::Ok(PinStatusCode::PhSpPin),
-                    (Field::PhCorpPin, _) => export::Ok(PinStatusCode::PhCorpPin),
-                    (Field::PhSimPin, _) => export::Ok(PinStatusCode::PhSimPin),
-                }
+                Ok(match de::EnumAccess::variant(data)? {
+                    (Field::Ready, _) => PinStatusCode::Ready,
+                    (Field::SimPin, _) => PinStatusCode::SimPin,
+                    (Field::SimPuk, _) => PinStatusCode::SimPuk,
+                    (Field::SimPin2, _) => PinStatusCode::SimPin2,
+                    (Field::SimPuk2, _) => PinStatusCode::SimPuk2,
+                    (Field::PhNetPin, _) => PinStatusCode::PhNetPin,
+                    (Field::PhNetSubPin, _) => PinStatusCode::PhNetSubPin,
+                    (Field::PhSpPin, _) => PinStatusCode::PhSpPin,
+                    (Field::PhCorpPin, _) => PinStatusCode::PhCorpPin,
+                    (Field::PhSimPin, _) => PinStatusCode::PhSimPin,
+                })
             }
         }
         const VARIANTS: &[&str] = &[
@@ -129,8 +125,8 @@ impl<'de> Deserialize<'de> for PinStatusCode {
             "PinStatusCode",
             VARIANTS,
             Visitor {
-                marker: export::PhantomData::<PinStatusCode>,
-                lifetime: export::PhantomData,
+                marker: core::marker::PhantomData::<PinStatusCode>,
+                lifetime: core::marker::PhantomData,
             },
         )
     }

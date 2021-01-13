@@ -10,11 +10,20 @@ mod hex;
 
 use crate::{
     client::Device,
+    command::mobile_control::types::Functionality,
+    command::mobile_control::SetModuleFunctionality,
+    command::network_service::types::RatAct,
+    command::psn::types::GPRSAttachedState,
     command::psn::types::PDPContextStatus,
+    command::psn::types::PacketSwitchedParam,
+    command::psn::GetGPRSAttached,
+    command::psn::GetPDPContextState,
+    command::psn::SetGPRSAttached,
     command::psn::SetPDPContextDefinition,
     command::psn::SetPDPContextState,
+    command::psn::SetPacketSwitchedAction,
+    command::psn::SetPacketSwitchedConfig,
     command::{
-        general::{responses::CIMI, GetCIMI},
         ip_transport_layer::{
             self,
             responses::{SocketData, UDPSocketData},
@@ -23,8 +32,9 @@ use crate::{
         psn, Urc,
     },
     error::Error as DeviceError,
-    network::{ContextId, Network, ProfileId, ProfileState},
+    network::{ContextId, Error as NetworkError, Network},
     state::Event,
+    ProfileId,
 };
 use apn::{APNInfo, Apn};
 use atat::{typenum::Unsigned, AtatClient};
@@ -34,17 +44,11 @@ use embedded_hal::{
     digital::{InputPin, OutputPin},
     timer::CountDown,
 };
-use embedded_nal::{IpAddr, Ipv4Addr};
 pub use error::Error;
-use heapless::{ArrayLength, Bucket, Pos, String};
+use heapless::{ArrayLength, Bucket, Pos};
 use psn::{
-    responses::PacketSwitchedNetworkData,
-    types::{
-        AuthenticationType, PacketSwitchedAction, PacketSwitchedNetworkDataParam,
-        PacketSwitchedParam,
-    },
-    GetPacketSwitchedNetworkData, SetAuthParameters, SetPacketSwitchedAction,
-    SetPacketSwitchedConfig,
+    types::{AuthenticationType, PacketSwitchedAction},
+    SetAuthParameters,
 };
 use socket::{Error as SocketError, Socket, SocketRef, SocketSet, SocketSetItem, SocketType};
 
@@ -69,15 +73,14 @@ where
 {
     pub fn data_service<'a>(
         &'a mut self,
-        profile_id: ProfileId,
         cid: ContextId,
         apn_info: &APNInfo,
     ) -> nb::Result<DataService<'a, C, N, L>, DeviceError> {
         // Spin [`Device`], handling [`Network`] related URC changes and propagting the FSM
-        self.spin()?;
+        let connected = self.spin()?;
 
         if let Some(ref sockets) = self.sockets {
-            match DataService::try_new(profile_id, cid, apn_info, &self.network, sockets) {
+            match DataService::try_new(cid, apn_info, &self.network, sockets, connected) {
                 Ok(service) => Ok(service),
                 Err(nb::Error::Other(e)) => Err(nb::Error::Other(e.into())),
                 Err(nb::Error::WouldBlock) => Err(nb::Error::WouldBlock),
@@ -90,69 +93,12 @@ where
     }
 }
 
-// pub trait Tls: TcpStack {
-//     type TlsConnector;
-//
-//     fn connect_tls(&self, connector: Self::TlsConnector, socket: <Self as TcpStack>::TcpSocket);
-// }
-
-// impl Tls for DataService {
-//     type TlsConnector = SecurityProfileId;
-//
-//     fn connect_tls(&self, connector: Self::TlsConnector, socket: <Self as TcpStack>::TcpSocket) {
-//         self.network.send_internal(
-//             &SetSocketSslState {
-//                 socket,
-//                 ssl_tls_status: SslTlsStatus::Enabled(connector),
-//             },
-//             true,
-//         )?;
-//
-//         TcpStack::Connect(self, socket)
-//     }
-// }
-
-// impl core::convert::TryFrom<TlsConnectorBuilder<Device>> for SecurityProfileId {
-//     type Error;
-//
-//     fn try_from(builder: TlsConnectorBuilder<Device>) -> Result<Self, Self::Error> {
-//         if let Some(cert) = builder.cert {
-//             builder.ctx.send_at(SetCertificate { cert })?;
-//         }
-//
-//         let sec_id = 0;
-//
-//         self.network.send_internal(
-//             &SecurityProfileManager {
-//                 profile_id: sec_id,
-//                 operation: Some(SecurityProfileOperation::CertificateValidationLevel(
-//                     CertificateValidationLevel::RootCertValidationWithValidityDate,
-//                 )),
-//             },
-//             true,
-//         )?;
-//
-//         self.network.send_internal(
-//             &SecurityProfileManager {
-//                 profile_id: sec_id,
-//                 operation: Some(SecurityProfileOperation::CipherSuite(0)),
-//             },
-//             true,
-//         )?;
-//
-//         self.network.send_internal(
-//             &SecurityProfileManager {
-//                 profile_id: sec_id,
-//                 operation: Some(SecurityProfileOperation::ExpectedServerHostname(
-//                     builder.host_name,
-//                 )),
-//             },
-//             true,
-//         )?;
-//
-//         Ok(SecurityProfileId::new(sec_id))
-//     }
-// }
+#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
+pub enum ContextState {
+    Setup,
+    Registering,
+    Active,
+}
 
 pub struct DataService<'a, C, N, L>
 where
@@ -177,19 +123,40 @@ where
     L: 'static + ArrayLength<u8>,
 {
     pub fn try_new(
-        profile_id: ProfileId,
         cid: ContextId,
         apn_info: &APNInfo,
         network: &'a Network<C>,
         sockets: &'a RefCell<&'static mut SocketSet<N, L>>,
+        connected: bool,
     ) -> nb::Result<Self, Error> {
-        let data_service = Self { network, sockets };
+        let mut data_service = Self { network, sockets };
 
         // Handle [`DataService`] related URCs
         data_service.handle_urc()?;
 
-        // Check if context is active, and create if not
-        data_service.define_context(profile_id, cid, apn_info)?;
+        // Reset context state if data connection is lost
+        if matches!(network.context_state.get(), ContextState::Active) && !connected {
+            network.context_state.set(ContextState::Registering);
+        }
+
+        let state = network.context_state.get();
+        if !connected || state != ContextState::Active {
+            // Check if context is active, and create if not
+            match data_service.define_context(state, cid, apn_info) {
+                Ok(state) => {
+                    network.context_state.set(state);
+                    if state != ContextState::Active {
+                        return Err(nb::Error::WouldBlock);
+                    }
+                }
+                Err(e) => {
+                    if let nb::Error::Other(Error::Network(NetworkError::ActivationFailed)) = e {
+                        network.context_state.set(ContextState::Setup);
+                    }
+                    return Err(nb::Error::WouldBlock);
+                }
+            };
+        }
 
         // At this point [`data_service`] will always have a valid and active data context!
 
@@ -205,248 +172,191 @@ where
         Ok(data_service)
     }
 
-    fn define_context(
-        &self,
-        profile_id: ProfileId,
-        cid: ContextId,
-        apn_info: &APNInfo,
-    ) -> nb::Result<(), Error> {
-        // Check if profile is inactive
-        if !self.is_profile_active(profile_id)? {
-            match self
-                .network
-                .get_profile_state(profile_id)
-                .map_err(|e| nb::Error::Other(e.into()))?
-            {
-                ProfileState::Deactivated | ProfileState::Unknown => {
-                    defmt::debug!("[ProfileState] Deactivated | Unknown");
-
-                    // Prune all sockets upon a clean network connection
-                    self.sockets
-                        .try_borrow_mut()
-                        .map_err(|e| nb::Error::Other(e.into()))?
-                        .prune();
-
-                    match &apn_info.apn {
-                        Apn::Given(_) => {
-                            self.network
-                                .set_profile_state(
-                                    profile_id,
-                                    ProfileState::Activating(cid, apn_info.clone()),
-                                )
-                                .map_err(|e| nb::Error::Other(e.into()))?;
-                        }
-                        Apn::Automatic => {
-                            let CIMI { imsi: _ } = self
-                                .network
-                                .send_internal(&GetCIMI, true)
-                                .map_err(|e| nb::Error::Other(e.into()))?;
-                            // Lookup APN in DB for `imsi`
-                            let apn_info_from_db = APNInfo {
-                                apn: Apn::Given(String::new()),
-                                ..apn_info.clone()
-                            };
-                            self.network
-                                .set_profile_state(
-                                    profile_id,
-                                    ProfileState::Activating(cid, apn_info_from_db),
-                                )
-                                .map_err(|e| nb::Error::Other(e.into()))?;
-                        }
-                    }
-                    defmt::debug!("[ProfileState] Attempting activation!");
-
-                    match self.activate_profile(profile_id) {
-                        Err(nb::Error::Other(_e)) => {
-                            // Find next APN to try!
-                            // Lookup APN in DB for `imsi`
-                            // let apn_info_from_db = APNInfo {
-                            //     apn: Apn::Given(String::new()),
-                            //     ..APNInfo::default()
-                            // };
-                            // self.network.set_profile_state(
-                            //     profile_id,
-                            //     ProfileState::Activating(apn_info_from_db),
-                            // )?;
-                            // Err(nb::Error::WouldBlock)
-                            self.network
-                                .set_profile_state(profile_id, ProfileState::Deactivated)
-                                .map_err(|e| nb::Error::Other(e.into()))?;
-
-                            self.network.push_event(Event::Disconnected(Some(cid))).ok();
-
-                            Err(nb::Error::Other(Error::InvalidApn))
-                        }
-                        Ok(()) => {
-                            // Ok(()) indicates that an LTE context is already active
-                            defmt::debug!("[ProfileState] Shortcut LTE context!");
-
-                            self.network
-                                .finish_activating_profile_state(None)
-                                .map_err(|e| nb::Error::Other(e.into()))?;
-                            Ok(())
-                        }
-                        Err(nb::Error::WouldBlock) => Err(nb::Error::WouldBlock),
-                    }
-                }
-                ProfileState::Activating(_, _) => Err(nb::Error::WouldBlock),
-                ProfileState::Active(c, _ip_addr) if c != cid => {
-                    defmt::debug!("[ProfileState] Active(c != cid)");
-
-                    // Profile is already active, with a different ContextId. Return Error
-                    Err(nb::Error::Other(Error::_Unknown))
-                }
-                ProfileState::Active(_, _) => {
-                    defmt::error!("[ProfileState] Active(c == cid). SHOULD NEVER HAPPEN!");
-                    Ok(())
-                }
-            }
-        } else {
-            // If the profile is already active, we're good
-            Ok(())
-        }
-    }
-
-    fn is_profile_active(&self, profile_id: ProfileId) -> Result<bool, Error> {
-        if let ProfileState::Active(_, _) = self.network.get_profile_state(profile_id)? {
-            return Ok(true);
-        }
-
-        if let Ok(PacketSwitchedNetworkData { param_tag, .. }) = self.network.send_internal(
-            &GetPacketSwitchedNetworkData {
-                profile_id,
-                param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+    fn set_pdn_config(&self, cid: ContextId, apn_info: &APNInfo) -> Result<(), Error> {
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun: Functionality::AirplaneMode,
+                rst: None,
             },
             true,
-        ) {
-            Ok(param_tag == 1)
-        } else {
-            // Just return false in case of errors or timeouts
-            Ok(false)
+        )?;
+
+        if let Apn::Given(apn) = apn_info.clone().apn {
+            self.network.send_internal(
+                &SetPDPContextDefinition {
+                    cid,
+                    pdp_type: "IP",
+                    apn: apn.as_str(),
+                },
+                true,
+            )?;
         }
+
+        self.network.send_internal(
+            &SetAuthParameters {
+                cid,
+                auth_type: AuthenticationType::Auto,
+                username: &apn_info.clone().user_name.unwrap_or_default(),
+                password: &apn_info.clone().password.unwrap_or_default(),
+            },
+            true,
+        )?;
+
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun: Functionality::Full,
+                rst: None,
+            },
+            true,
+        )?;
+
+        Ok(())
     }
 
-    fn activate_profile(&self, profile_id: ProfileId) -> nb::Result<(), Error> {
-        if let ProfileState::Activating(cid, apn) = self
-            .network
-            .get_profile_state(profile_id)
-            .map_err(|e| nb::Error::Other(e.into()))?
-        {
-            // FIXME: Figure out which of these two approaches to use when, and why?
-            if false {
-                if let Apn::Given(apn) = apn.apn {
-                    self.network
-                        .send_internal(
-                            &SetPacketSwitchedConfig {
-                                profile_id,
-                                param: PacketSwitchedParam::APN(apn),
-                            },
-                            true,
-                        )
-                        .map_err(|e| nb::Error::Other(e.into()))?;
-                }
-                if let Some(user_name) = apn.user_name {
-                    self.network
-                        .send_internal(
-                            &SetPacketSwitchedConfig {
-                                profile_id,
-                                param: PacketSwitchedParam::Username(user_name),
-                            },
-                            true,
-                        )
-                        .map_err(|e| nb::Error::Other(e.into()))?;
-                }
-
-                if let Some(password) = apn.password {
-                    self.network
-                        .send_internal(
-                            &SetPacketSwitchedConfig {
-                                profile_id,
-                                param: PacketSwitchedParam::Password(password),
-                            },
-                            true,
-                        )
-                        .map_err(|e| nb::Error::Other(e.into()))?;
-                }
-
-                self.network
-                    .send_internal(
-                        &SetPacketSwitchedConfig {
-                            profile_id,
-                            param: PacketSwitchedParam::IPAddress(IpAddr::V4(
-                                Ipv4Addr::unspecified(),
-                            )),
-                        },
-                        true,
-                    )
-                    .map_err(|e| nb::Error::Other(e.into()))?;
-            } else {
-                if let Apn::Given(apn) = apn.apn {
-                    self.network
-                        .send_internal(
-                            &SetPDPContextDefinition {
-                                cid,
-                                pdp_type: "IP",
-                                apn: apn.as_str(),
-                            },
-                            true,
-                        )
-                        .map_err(|e| nb::Error::Other(e.into()))?;
-                }
-
-                self.network
-                    .send_internal(
-                        &SetAuthParameters {
-                            cid,
-                            auth_type: AuthenticationType::Auto,
-                            username: &apn.user_name.unwrap_or_default(),
-                            password: &apn.password.unwrap_or_default(),
-                        },
-                        true,
-                    )
-                    .map_err(|e| nb::Error::Other(e.into()))?;
-                self.network
-                    .send_internal(
-                        &SetPacketSwitchedConfig {
-                            profile_id,
-                            param: PacketSwitchedParam::MapProfile(cid),
-                        },
-                        true,
-                    )
-                    .map_err(|e| nb::Error::Other(e.into()))?;
-
-                // FIXME: https://github.com/BlackbirdHQ/atat/issues/63
-                // let PDPContextState { status } =
-                //     self.network.send_internal(&GetPDPContextState, true)?;
-
-                // if status == PDPContextStatus::Deactivated {
-                // If not active, help it on its way.
-                self.network
-                    .send_internal(
-                        &SetPDPContextState {
-                            status: PDPContextStatus::Activated,
-                            cid: Some(cid),
-                        },
-                        true,
-                    )
-                    .map_err(|e| nb::Error::Other(e.into()))?;
-                // }
-            }
-
-            self.network
-                .send_internal(
-                    &SetPacketSwitchedAction {
-                        profile_id,
-                        action: PacketSwitchedAction::Activate,
+    fn activate_pdn(&self, cid: ContextId) -> Result<(), Error> {
+        if let Ok(state) = self.network.send_internal(&GetPDPContextState, true) {
+            if state.cid == cid && state.status != PDPContextStatus::Activated {
+                self.network.send_internal(
+                    &SetPDPContextState {
+                        status: PDPContextStatus::Activated,
+                        cid: Some(cid),
                     },
                     true,
-                )
-                .map_err(|e| nb::Error::Other(e.into()))?;
-
-            Err(nb::Error::WouldBlock)
+                )?;
+            }
         } else {
-            defmt::error!("ProfileState ERROR");
-            Err(nb::Error::Other(Error::_Unknown))
+            self.network.send_internal(
+                &SetPDPContextState {
+                    status: PDPContextStatus::Activated,
+                    cid: Some(cid),
+                },
+                true,
+            )?;
+        }
+
+        // TODO: Sometimes we get InvalidResponse on this?!
+        self.network.send_internal(
+            &SetPacketSwitchedConfig {
+                profile_id: ProfileId(0),
+                param: PacketSwitchedParam::MapProfile(cid),
+            },
+            true,
+        )?;
+
+        self.network.send_internal(
+            &SetPacketSwitchedAction {
+                profile_id: ProfileId(0),
+                action: PacketSwitchedAction::Activate,
+            },
+            true,
+        )?;
+
+        Ok(())
+    }
+
+    fn deactivate_pdn(&self, cid: ContextId) -> Result<(), Error> {
+        let status = self.network.is_registered().map_err(Error::from)?;
+        if let Ok(state) = self.network.send_internal(&GetPDPContextState, true) {
+            if state.cid == cid && state.status == PDPContextStatus::Activated {
+                if state.cid != ContextId(1) && matches!(status.rat, RatAct::Lte) {
+                    defmt::info!(
+                        "Default Bearer context {:?} Active. Not allowed to deactivate",
+                        1
+                    );
+                } else {
+                    if self
+                        .network
+                        .send_internal(
+                            &SetPDPContextState {
+                                status: PDPContextStatus::Deactivated,
+                                cid: Some(cid),
+                            },
+                            true,
+                        )
+                        .is_err()
+                    {
+                        defmt::error!("can't deactivate PDN!");
+                        if matches!(status.rat, RatAct::Gsm | RatAct::GsmGprsEdge)
+                            && self.network.send_internal(&GetGPRSAttached, true)?.state
+                                == GPRSAttachedState::Attached
+                        {
+                            defmt::error!("Deactivate Packet switch");
+                            self.network.send_internal(
+                                &SetGPRSAttached {
+                                    state: GPRSAttachedState::Detached,
+                                },
+                                true,
+                            )?;
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn define_context(
+        &mut self,
+        state: ContextState,
+        cid: ContextId,
+        apn_info: &APNInfo,
+    ) -> nb::Result<ContextState, Error> {
+        match state {
+            ContextState::Setup => {
+                /* Setup PDN. */
+                self.set_pdn_config(cid, apn_info).map_err(Error::from)?;
+
+                /* Rescan network. */
+                // self.network
+                //     .send_internal(
+                //         &SetModuleFunctionality {
+                //             fun: Functionality::AirplaneMode,
+                //             rst: None,
+                //         },
+                //         true,
+                //     ).map_err(Error::from)?;
+
+                // self.network
+                //     .send_internal(
+                //         &SetModuleFunctionality {
+                //             fun: Functionality::Full,
+                //             rst: None,
+                //         },
+                //         true,
+                //     )
+                //     .map_err(Error::from)?;
+
+                Ok(ContextState::Registering)
+            }
+            ContextState::Registering => {
+                /* check registration status. */
+                let service_status = self.network.is_registered().map_err(Error::from)?;
+                if service_status.ps_reg_status.is_registered() {
+                    // Emit Event::Attached
+                    self.network
+                        .push_event(Event::Attached)
+                        .map_err(Error::from)?;
+                } else {
+                    // FIXME: Try count here with some failure break?!
+                    return Err(nb::Error::WouldBlock);
+                }
+
+                /* Activate PDN. */
+                if self.activate_pdn(cid).is_err() {
+                    defmt::warn!("Activate PDN failed. Deactivate the PDN and retry");
+                    // Ignore any error here!
+                    self.deactivate_pdn(cid).ok();
+                    if self.activate_pdn(cid).is_err() {
+                        defmt::error!("Activate PDN failed after retry");
+                        return Err(nb::Error::Other(Error::Network(
+                            NetworkError::ActivationFailed,
+                        )));
+                    }
+                }
+
+                Ok(ContextState::Active)
+            }
+            ContextState::Active => Ok(ContextState::Active),
         }
     }
 

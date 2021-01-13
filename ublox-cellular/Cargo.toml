@@ -15,7 +15,7 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.6.0", features = ["derive"] }
+atat = { version = "0.7.1", features = ["derive"] }
 heapless = { version = "^0.5", features = ["serde"] }
 no-std-net = { version = "0.4.0", features = ["serde"] }
 serde = { version = "^1", default-features = false, features = ["derive"] }
@@ -26,15 +26,11 @@ embedded-nal = "0.2.0"
 hash32 = "^0.1.1"
 hash32-derive = "^0.1.0"
 nb = "^1"
-serde_at = "0.6.0"
+serde_at = { version = "0.7.1" }
 typenum = "^1"
 
 [features]
-default = [
-    "toby-r2",
-    "socket-udp",
-    "socket-tcp",
-]
+default = ["toby-r2", "socket-udp", "socket-tcp"]
 
 lara-r2 = []
 leon-g1 = []
