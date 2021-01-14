@@ -402,7 +402,7 @@ where
 
         if let Err(_) = match state {
             State::Unknown => self.restart(true),
-            State::Off => self.initialize(true),
+            State::Off => self.initialize(false),
             _ => Ok(()),
         } {
             match self.fsm.retry_or_fail(&mut self.delay) {
