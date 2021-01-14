@@ -178,7 +178,8 @@ where
             &SecurityProfileManager {
                 profile_id,
                 operation: Some(SecurityProfileOperation::ExpectedServerHostname(
-                    "a3f8k0ccx04zas.iot.eu-west-1.amazonaws.com",
+                    "ec2-18-198-17-154.eu-central-1.compute.amazonaws.com",
+                    //"a3f8k0ccx04zas.iot.eu-west-1.amazonaws.com",
                 )),
             },
             true,
