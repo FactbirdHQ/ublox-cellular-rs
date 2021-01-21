@@ -152,9 +152,12 @@ impl StateMachine {
             State::Registered if matches!(event, CellularEvent::PwrOff) => State::Off,
             State::Registered if matches!(event, CellularEvent::RfOff) => State::Rfoff,
             State::Registered if matches!(event, CellularEvent::Detached) => State::On,
-            State::Registered if matches!(event, CellularEvent::Attached) => State::Registered,
             State::Registered if matches!(event, CellularEvent::DataActive) => State::Connected,
-            State::Registered if matches!(event, CellularEvent::DataInactive) => State::Registered,
+            State::Registered
+                if matches!(event, CellularEvent::Attached | CellularEvent::DataInactive) =>
+            {
+                State::Registered
+            }
             State::Connected if matches!(event, CellularEvent::PwrOff) => State::Off,
             State::Connected if matches!(event, CellularEvent::RfOff) => State::Rfoff,
             State::Connected if matches!(event, CellularEvent::Detached) => State::On,

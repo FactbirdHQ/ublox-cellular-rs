@@ -233,7 +233,7 @@ where
                 }
                 Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
                     defmt::info!(
-                        "[URC] Socket {:?} closed! Should be followed by one more!",
+                        "[URC] Socket {:?} closed! Should be followed by one from data layer!",
                         socket
                     );
                     return false;
