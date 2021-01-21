@@ -150,6 +150,9 @@ where
         }
 
         self.network.clear_events()?;
+        if let Some(ref sockets) = self.sockets {
+            sockets.try_borrow_mut()?.prune();
+        }
 
         self.configure()?;
 
