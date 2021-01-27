@@ -71,20 +71,12 @@ where
     ///
     /// Returned as a [`SocketType`]
     pub fn socket_type(&self, handle: Handle) -> Option<SocketType> {
-        match self.sockets.iter().find_map(|i| {
-            if let Some(ref s) = i {
-                if s.socket.handle().0 == handle.0 {
-                    Some(s)
-                } else {
-                    None
-                }
-            } else {
-                None
+        if let Ok(index) = self.index_of(handle) {
+            if let Some(Some(item)) = self.sockets.get(index) {
+                return Some(item.socket.get_type());
             }
-        }) {
-            Some(item) => Some(item.socket.get_type()),
-            None => None,
         }
+        None
     }
 
     /// Add a socket to the set with the reference count 1, and return its handle.
@@ -93,48 +85,47 @@ where
         T: Into<Socket<L>>,
     {
         let socket = socket.into();
-        for slot in self.sockets.iter_mut() {
-            if slot.is_none() {
-                let handle = socket.handle();
-                *slot = Some(Item { socket, refs: 1 });
-                return Ok(handle);
-            }
+        let handle = socket.handle();
+
+        if self.index_of(handle).is_ok() {
+            return Err(Error::DuplicateSocket);
         }
-        Err(Error::SocketSetFull)
+
+        let slot = self
+            .sockets
+            .iter_mut()
+            .find(|s| s.is_none())
+            .ok_or(Error::SocketSetFull)?;
+
+        *slot = Some(Item { socket, refs: 1 });
+        Ok(handle)
     }
 
     /// Get a socket from the set by its handle, as mutable.
     pub fn get<T: AnySocket<L>>(&mut self, handle: Handle) -> Result<SocketRef<T>> {
-        match self.sockets.iter_mut().find_map(|i| {
-            if let Some(ref mut s) = i {
-                if s.socket.handle().0 == handle.0 {
-                    Some(s)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }) {
+        let index = self.index_of(handle)?;
+
+        match self.sockets.get_mut(index).ok_or(Error::InvalidSocket)? {
             Some(item) => Ok(T::downcast(SocketRef::new(&mut item.socket))?),
             None => Err(Error::InvalidSocket),
         }
     }
 
+    pub fn index_of(&self, handle: Handle) -> Result<usize> {
+        self.sockets
+            .iter()
+            .position(|i| {
+                i.as_ref()
+                    .map(|s| s.socket.handle().0 == handle.0)
+                    .unwrap_or(false)
+            })
+            .ok_or(Error::InvalidSocket)
+    }
+
     /// Remove a socket from the set, without changing its state.
     pub fn remove(&mut self, handle: Handle) -> Result<Socket<L>> {
-        let index = self
-            .sockets
-            .iter_mut()
-            .position(|i| {
-                if let Some(s) = i {
-                    return s.socket.handle().0 == handle.0;
-                }
-                false
-            })
-            .ok_or(Error::InvalidSocket)?;
-
-        let item: &mut Option<Item<L>> = unsafe { self.sockets.get_unchecked_mut(index) };
+        let index = self.index_of(handle)?;
+        let item: &mut Option<Item<L>> = self.sockets.get_mut(index).ok_or(Error::InvalidSocket)?;
 
         item.take()
             .ok_or(Error::InvalidSocket)
@@ -143,41 +134,22 @@ where
 
     /// Increase reference count by 1.
     pub fn retain(&mut self, handle: Handle) -> Result<()> {
-        match self.sockets.iter_mut().find_map(|i| {
-            if let Some(ref mut s) = i {
-                if s.socket.handle().0 == handle.0 {
-                    Some(s)
-                } else {
-                    None
-                }
-            } else {
-                None
+        let index = self.index_of(handle)?;
+        match self.sockets.get_mut(index).ok_or(Error::InvalidSocket)? {
+            Some(item) => {
+                item.refs += 1;
+                Ok(())
             }
-        }) {
-            Some(v) => v.refs += 1,
-            None => return Err(Error::InvalidSocket),
-        };
-        Ok(())
+            None => Err(Error::InvalidSocket),
+        }
     }
 
     /// Decrease reference count by 1.
     pub fn release(&mut self, handle: Handle) -> Result<()> {
-        match self.sockets.iter_mut().find_map(|i| {
-            if let Some(ref mut s) = i {
-                if s.socket.handle().0 == handle.0 {
-                    Some(s)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }) {
+        let index = self.index_of(handle)?;
+        match self.sockets.get_mut(index).ok_or(Error::InvalidSocket)? {
             Some(v) => {
-                if v.refs == 0 {
-                    return Err(Error::Illegal);
-                }
-                v.refs -= 1;
+                v.refs = v.refs.checked_sub(1).ok_or(Error::Illegal)?;
                 Ok(())
             }
             None => Err(Error::InvalidSocket),

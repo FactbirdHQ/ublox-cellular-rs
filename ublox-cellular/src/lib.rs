@@ -8,6 +8,9 @@ mod network;
 mod services;
 mod state;
 
+#[cfg(test)]
+mod test_helpers;
+
 pub use client::Device as GsmClient;
 pub use config::Config;
 pub use network::{ContextId, ProfileId};

@@ -454,6 +454,12 @@ impl NetworkStatus {
     }
 }
 
+impl Default for NetworkStatus {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl From<NetworkRegistration> for RegistrationParams {
     fn from(v: NetworkRegistration) -> Self {
         Self {
@@ -660,32 +666,7 @@ impl From<usize> for RadioAccessNetwork {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    struct MockTimer {
-        time: Option<u32>,
-    }
-
-    impl MockTimer {
-        pub fn new() -> Self {
-            MockTimer { time: None }
-        }
-    }
-
-    impl CountDown for MockTimer {
-        type Error = core::convert::Infallible;
-        type Time = u32;
-        fn try_start<T>(&mut self, count: T) -> Result<(), Self::Error>
-        where
-            T: Into<Self::Time>,
-        {
-            self.time = Some(count.into());
-            Ok(())
-        }
-        fn try_wait(&mut self) -> nb::Result<(), Self::Error> {
-            self.time = None;
-            Ok(())
-        }
-    }
+    use crate::test_helpers::MockTimer;
 
     #[test]
     fn retry_or_fail() {

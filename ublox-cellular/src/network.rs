@@ -22,7 +22,7 @@ use core::{
 use hash32_derive::Hash32;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, defmt::Format)]
+#[derive(Debug, PartialEq, defmt::Format)]
 pub enum Error {
     Generic(GenericError),
     AT(atat::Error),

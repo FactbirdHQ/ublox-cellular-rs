@@ -110,7 +110,7 @@ where
     L: 'static + ArrayLength<u8>,
 {
     network: &'a Network<C>,
-    sockets: &'a RefCell<&'static mut SocketSet<N, L>>,
+    pub(crate) sockets: &'a RefCell<&'static mut SocketSet<N, L>>,
 }
 
 impl<'a, C, N, L> DataService<'a, C, N, L>
@@ -263,31 +263,29 @@ where
                         "Default Bearer context {:?} Active. Not allowed to deactivate",
                         1
                     );
-                } else {
-                    if self
-                        .network
-                        .send_internal(
-                            &SetPDPContextState {
-                                status: PDPContextStatus::Deactivated,
-                                cid: Some(cid),
+                } else if self
+                    .network
+                    .send_internal(
+                        &SetPDPContextState {
+                            status: PDPContextStatus::Deactivated,
+                            cid: Some(cid),
+                        },
+                        true,
+                    )
+                    .is_err()
+                {
+                    defmt::error!("can't deactivate PDN!");
+                    if matches!(status.rat, RatAct::Gsm | RatAct::GsmGprsEdge)
+                        && self.network.send_internal(&GetGPRSAttached, true)?.state
+                            == GPRSAttachedState::Attached
+                    {
+                        defmt::error!("Deactivate Packet switch");
+                        self.network.send_internal(
+                            &SetGPRSAttached {
+                                state: GPRSAttachedState::Detached,
                             },
                             true,
-                        )
-                        .is_err()
-                    {
-                        defmt::error!("can't deactivate PDN!");
-                        if matches!(status.rat, RatAct::Gsm | RatAct::GsmGprsEdge)
-                            && self.network.send_internal(&GetGPRSAttached, true)?.state
-                                == GPRSAttachedState::Attached
-                        {
-                            defmt::error!("Deactivate Packet switch");
-                            self.network.send_internal(
-                                &SetGPRSAttached {
-                                    state: GPRSAttachedState::Detached,
-                                },
-                                true,
-                            )?;
-                        }
+                        )?;
                     }
                 }
             }

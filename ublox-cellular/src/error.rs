@@ -2,7 +2,7 @@ use crate::network::Error as NetworkError;
 use crate::services::data::Error as DataServiceError;
 use core::cell::{BorrowError, BorrowMutError};
 
-#[derive(Debug, defmt::Format)]
+#[derive(Debug, PartialEq, defmt::Format)]
 pub enum GenericError {
     BorrowError,
     BorrowMutError,
@@ -20,7 +20,7 @@ impl From<BorrowError> for GenericError {
     }
 }
 
-#[derive(Debug, defmt::Format)]
+#[derive(Debug, PartialEq, defmt::Format)]
 #[non_exhaustive]
 pub enum Error {
     // General device errors
