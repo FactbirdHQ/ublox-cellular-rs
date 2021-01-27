@@ -4,15 +4,13 @@ use embedded_nal::{AddrType, Dns};
 use heapless::{consts, ArrayLength, Bucket, Pos, String};
 use no_std_net::IpAddr;
 
-use super::{socket::SocketSetItem, DataService, Error};
+use super::{socket::Socket, DataService, Error};
 use crate::command::dns::{self, types::ResolutionType};
 
 impl<'a, C, N, L> Dns for DataService<'a, C, N, L>
 where
     C: AtatClient,
-    N: ArrayLength<Option<SocketSetItem<L>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
+    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     type Error = Error;

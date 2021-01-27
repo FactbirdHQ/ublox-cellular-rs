@@ -26,7 +26,7 @@ use crate::{
     config::{Config, NoPin},
     error::Error,
     network::{AtTx, Network},
-    services::data::socket::{SocketSet, SocketSetItem},
+    services::data::socket::{Socket, SocketSet},
     state::Event,
     state::StateMachine,
     State,
@@ -44,7 +44,7 @@ where
     C: AtatClient,
     DLY: DelayMs<u32> + CountDown,
     N: 'static
-        + ArrayLength<Option<SocketSetItem<L>>>
+        + ArrayLength<Option<Socket<L>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
@@ -66,9 +66,7 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<SocketSetItem<L>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
+    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     pub fn new(client: C, delay: DLY, config: Config<RST, DTR, PWR, VINT>) -> Self {

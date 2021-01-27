@@ -1,6 +1,6 @@
 use super::DataService;
 use super::{
-    socket::{SocketHandle, SocketSetItem, UdpSocket},
+    socket::{Socket, SocketHandle, UdpSocket},
     EgressChunkSize, Error,
 };
 use crate::command::ip_transport_layer::{
@@ -15,7 +15,7 @@ impl<'a, C, N, L> UdpClient for DataService<'a, C, N, L>
 where
     C: atat::AtatClient,
     N: 'static
-        + ArrayLength<Option<SocketSetItem<L>>>
+        + ArrayLength<Option<Socket<L>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,

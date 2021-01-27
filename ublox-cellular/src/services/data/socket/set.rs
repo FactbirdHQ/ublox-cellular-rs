@@ -3,14 +3,6 @@ use super::{AnySocket, Error, Result, Socket, SocketRef, SocketType};
 use heapless::{ArrayLength, Vec};
 use serde::{Deserialize, Serialize};
 
-/// An item of a socket set.
-///
-/// The only reason this struct is public is to allow the socket set storage
-/// to be allocated externally.
-pub struct Item<L: ArrayLength<u8>> {
-    socket: Socket<L>,
-}
-
 /// A handle, identifying a socket in a set.
 #[derive(
     Debug,
@@ -31,15 +23,15 @@ pub struct Handle(pub u8);
 #[derive(Default)]
 pub struct Set<N, L>
 where
-    N: ArrayLength<Option<Item<L>>>,
+    N: ArrayLength<Option<Socket<L>>>,
     L: ArrayLength<u8>,
 {
-    pub sockets: Vec<Option<Item<L>>, N>,
+    pub sockets: Vec<Option<Socket<L>>, N>,
 }
 
 impl<N, L> Set<N, L>
 where
-    N: ArrayLength<Option<Item<L>>>,
+    N: ArrayLength<Option<Socket<L>>>,
     L: ArrayLength<u8>,
 {
     /// Create a socket set using the provided storage.
@@ -71,8 +63,8 @@ where
     /// Returned as a [`SocketType`]
     pub fn socket_type(&self, handle: Handle) -> Option<SocketType> {
         if let Ok(index) = self.index_of(handle) {
-            if let Some(Some(item)) = self.sockets.get(index) {
-                return Some(item.socket.get_type());
+            if let Some(Some(socket)) = self.sockets.get(index) {
+                return Some(socket.get_type());
             }
         }
         None
@@ -94,7 +86,7 @@ where
             .iter_mut()
             .find(|s| s.is_none())
             .ok_or(Error::SocketSetFull)?
-            .replace(Item { socket });
+            .replace(socket);
 
         Ok(handle)
     }
@@ -104,7 +96,7 @@ where
         let index = self.index_of(handle)?;
 
         match self.sockets.get_mut(index).ok_or(Error::InvalidSocket)? {
-            Some(item) => Ok(T::downcast(SocketRef::new(&mut item.socket))?),
+            Some(socket) => Ok(T::downcast(SocketRef::new(socket))?),
             None => Err(Error::InvalidSocket),
         }
     }
@@ -114,16 +106,16 @@ where
             .iter()
             .position(|i| {
                 i.as_ref()
-                    .map(|s| s.socket.handle().0 == handle.0)
+                    .map(|s| s.handle().0 == handle.0)
                     .unwrap_or(false)
             })
             .ok_or(Error::InvalidSocket)
     }
 
     /// Remove a socket from the set, without changing its state.
-    pub fn remove(&mut self, handle: Handle) -> Result<Item<L>> {
+    pub fn remove(&mut self, handle: Handle) -> Result<Socket<L>> {
         let index = self.index_of(handle)?;
-        let item: &mut Option<Item<L>> =
+        let item: &mut Option<Socket<L>> =
             self.sockets.get_mut(index).ok_or(Error::InvalidSocket)?;
 
         item.take().ok_or(Error::InvalidSocket)
@@ -131,8 +123,7 @@ where
 
     /// Prune the sockets in this set.
     ///
-    /// Pruning affects sockets with reference count 0. Open sockets are closed.
-    /// Closed sockets are removed and dropped.
+    /// All sockets are removed and dropped.
     pub fn prune(&mut self) {
         self.sockets.iter_mut().for_each(|slot| {
             slot.take();
@@ -142,7 +133,7 @@ where
     /// Iterate every socket in this set.
     pub fn iter(&self) -> impl Iterator<Item = (Handle, &Socket<L>)> {
         self.sockets.iter().filter_map(|slot| {
-            if let Some(Item { ref socket }) = slot {
+            if let Some(socket) = slot {
                 Some((Handle(socket.handle().0), socket))
             } else {
                 None
@@ -153,7 +144,7 @@ where
     /// Iterate every socket in this set, as SocketRef.
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Handle, SocketRef<Socket<L>>)> {
         self.sockets.iter_mut().filter_map(|slot| {
-            if let Some(Item { ref mut socket }) = slot {
+            if let Some(socket) = slot {
                 Some((Handle(socket.handle().0), SocketRef::new(socket)))
             } else {
                 None

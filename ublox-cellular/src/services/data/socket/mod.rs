@@ -14,10 +14,9 @@ pub use tcp::{State as TcpState, TcpSocket};
 #[cfg(feature = "socket-udp")]
 pub use udp::UdpSocket;
 
-pub use self::set::{Handle as SocketHandle, Item as SocketSetItem, Set as SocketSet};
+pub use self::set::{Handle as SocketHandle, Set as SocketSet};
 
 pub use self::ref_::Ref as SocketRef;
-pub(crate) use self::ref_::Session as SocketSession;
 
 /// The error type for the networking stack.
 #[non_exhaustive]
@@ -136,23 +135,8 @@ impl<L: ArrayLength<u8>> Socket<L> {
     }
 }
 
-impl<L: ArrayLength<u8>> SocketSession for Socket<L> {
-    fn finish(&mut self) {
-        match self {
-            // #[cfg(feature = "socket-raw")]
-            // Socket::Raw(ref $( $mut_ )* $socket) => $code,
-            // #[cfg(all(feature = "socket-icmp", any(feature = "proto-ipv4", feature = "proto-ipv6")))]
-            // Socket::Icmp(ref $( $mut_ )* $socket) => $code,
-            #[cfg(feature = "socket-udp")]
-            Socket::Udp(ref mut socket) => socket.finish(),
-            #[cfg(feature = "socket-tcp")]
-            Socket::Tcp(ref mut socket) => socket.finish(),
-        }
-    }
-}
-
 /// A conversion trait for network sockets.
-pub trait AnySocket<L: ArrayLength<u8>>: SocketSession + Sized {
+pub trait AnySocket<L: ArrayLength<u8>>: Sized {
     fn downcast(socket_ref: SocketRef<'_, Socket<L>>) -> Result<SocketRef<'_, Self>>;
 }
 

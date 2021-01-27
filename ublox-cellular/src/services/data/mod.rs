@@ -50,7 +50,7 @@ use psn::{
     types::{AuthenticationType, PacketSwitchedAction},
     SetAuthParameters,
 };
-use socket::{Error as SocketError, Socket, SocketRef, SocketSet, SocketSetItem, SocketType};
+use socket::{Error as SocketError, Socket, SocketRef, SocketSet, SocketType};
 
 // NOTE: If these are changed, remember to change the corresponding `Bytes` len
 // in commands for now.
@@ -66,9 +66,7 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<SocketSetItem<L>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
+    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     pub fn data_service<'a>(
@@ -104,7 +102,7 @@ pub struct DataService<'a, C, N, L>
 where
     C: atat::AtatClient,
     N: 'static
-        + ArrayLength<Option<SocketSetItem<L>>>
+        + ArrayLength<Option<Socket<L>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
@@ -117,7 +115,7 @@ impl<'a, C, N, L> DataService<'a, C, N, L>
 where
     C: atat::AtatClient,
     N: 'static
-        + ArrayLength<Option<SocketSetItem<L>>>
+        + ArrayLength<Option<Socket<L>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
