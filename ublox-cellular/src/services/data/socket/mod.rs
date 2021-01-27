@@ -65,7 +65,7 @@ pub enum Socket<L: ArrayLength<u8>> {
 }
 
 #[non_exhaustive]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SocketType {
     Udp,
     Tcp,
@@ -115,27 +115,6 @@ impl<L: ArrayLength<u8>> Socket<L> {
     }
 }
 
-macro_rules! dispatch_socket {
-    ($self_:expr, |$socket:ident| $code:expr) => {
-        dispatch_socket!(@inner $self_, |$socket| $code);
-    };
-    (mut $self_:expr, |$socket:ident| $code:expr) => {
-        dispatch_socket!(@inner mut $self_, |$socket| $code);
-    };
-    (@inner $( $mut_:ident )* $self_:expr, |$socket:ident| $code:expr) => {
-        match *$self_ {
-            // #[cfg(feature = "socket-raw")]
-            // Socket::Raw(ref $( $mut_ )* $socket) => $code,
-            // #[cfg(all(feature = "socket-icmp", any(feature = "proto-ipv4", feature = "proto-ipv6")))]
-            // Socket::Icmp(ref $( $mut_ )* $socket) => $code,
-            #[cfg(feature = "socket-udp")]
-            Socket::Udp(ref $( $mut_ )* $socket) => $code,
-            #[cfg(feature = "socket-tcp")]
-            Socket::Tcp(ref $( $mut_ )* $socket) => $code,
-        }
-    };
-}
-
 impl<L: ArrayLength<u8>> Socket<L> {
     /// Return the socket handle.
     #[inline]
@@ -144,13 +123,31 @@ impl<L: ArrayLength<u8>> Socket<L> {
     }
 
     pub(crate) fn meta(&self) -> &SocketMeta {
-        dispatch_socket!(self, |socket| &socket.meta)
+        match self {
+            // #[cfg(feature = "socket-raw")]
+            // Socket::Raw(ref $( $mut_ )* $socket) => $code,
+            // #[cfg(all(feature = "socket-icmp", any(feature = "proto-ipv4", feature = "proto-ipv6")))]
+            // Socket::Icmp(ref $( $mut_ )* $socket) => $code,
+            #[cfg(feature = "socket-udp")]
+            Socket::Udp(ref socket) => &socket.meta,
+            #[cfg(feature = "socket-tcp")]
+            Socket::Tcp(ref socket) => &socket.meta,
+        }
     }
 }
 
 impl<L: ArrayLength<u8>> SocketSession for Socket<L> {
     fn finish(&mut self) {
-        dispatch_socket!(mut self, |socket| socket.finish())
+        match self {
+            // #[cfg(feature = "socket-raw")]
+            // Socket::Raw(ref $( $mut_ )* $socket) => $code,
+            // #[cfg(all(feature = "socket-icmp", any(feature = "proto-ipv4", feature = "proto-ipv6")))]
+            // Socket::Icmp(ref $( $mut_ )* $socket) => $code,
+            #[cfg(feature = "socket-udp")]
+            Socket::Udp(ref mut socket) => socket.finish(),
+            #[cfg(feature = "socket-tcp")]
+            Socket::Tcp(ref mut socket) => socket.finish(),
+        }
     }
 }
 
