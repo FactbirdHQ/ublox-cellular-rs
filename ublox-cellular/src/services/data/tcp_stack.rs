@@ -1,4 +1,3 @@
-use super::ssl::{SecurityProfileId, SSL};
 use super::DataService;
 use super::{
     socket::{Error as SocketError, SocketHandle, SocketSetItem, TcpSocket, TcpState},
@@ -55,8 +54,6 @@ where
             .map_err(Self::Error::from)?;
 
         if tcp.state() == TcpState::Created {
-            self.enable_ssl(*socket, SecurityProfileId(0))
-                .map_err(Self::Error::from)?;
 
             self.network
                 .send_internal(
