@@ -41,7 +41,7 @@ pub struct Config<RST, DTR, PWR, VINT> {
     pub(crate) pin: String<consts::U4>,
 }
 
-impl<RST, DTR, PWR, VINT> Default for Config<RST, DTR, PWR, VINT> {
+impl Default for Config<NoPin, NoPin, NoPin, NoPin> {
     fn default() -> Self {
         Config {
             rst_pin: None,

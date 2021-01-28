@@ -1,4 +1,4 @@
-use crate::services::data::socket::SocketSetItem;
+use crate::services::data::socket::Socket;
 use crate::{client::Device, error::Error as DeviceError};
 use atat::AtatClient;
 use embedded_hal::{
@@ -17,9 +17,7 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<SocketSetItem<L>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
+    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     pub fn location_service(&mut self) -> nb::Result<LocationService, DeviceError> {

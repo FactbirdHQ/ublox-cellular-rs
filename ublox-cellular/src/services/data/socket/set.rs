@@ -3,15 +3,6 @@ use super::{AnySocket, Error, Result, Socket, SocketRef, SocketType};
 use heapless::{ArrayLength, Vec};
 use serde::{Deserialize, Serialize};
 
-/// An item of a socket set.
-///
-/// The only reason this struct is public is to allow the socket set storage
-/// to be allocated externally.
-pub struct Item<L: ArrayLength<u8>> {
-    socket: Socket<L>,
-    refs: usize,
-}
-
 /// A handle, identifying a socket in a set.
 #[derive(
     Debug,
@@ -32,15 +23,15 @@ pub struct Handle(pub u8);
 #[derive(Default)]
 pub struct Set<N, L>
 where
-    N: ArrayLength<Option<Item<L>>>,
+    N: ArrayLength<Option<Socket<L>>>,
     L: ArrayLength<u8>,
 {
-    pub sockets: Vec<Option<Item<L>>, N>,
+    pub sockets: Vec<Option<Socket<L>>, N>,
 }
 
 impl<N, L> Set<N, L>
 where
-    N: ArrayLength<Option<Item<L>>>,
+    N: ArrayLength<Option<Socket<L>>>,
     L: ArrayLength<u8>,
 {
     /// Create a socket set using the provided storage.
@@ -71,20 +62,12 @@ where
     ///
     /// Returned as a [`SocketType`]
     pub fn socket_type(&self, handle: Handle) -> Option<SocketType> {
-        match self.sockets.iter().find_map(|i| {
-            if let Some(ref s) = i {
-                if s.socket.handle().0 == handle.0 {
-                    Some(s)
-                } else {
-                    None
-                }
-            } else {
-                None
+        if let Ok(index) = self.index_of(handle) {
+            if let Some(Some(socket)) = self.sockets.get(index) {
+                return Some(socket.get_type());
             }
-        }) {
-            Some(item) => Some(item.socket.get_type()),
-            None => None,
         }
+        None
     }
 
     /// Add a socket to the set with the reference count 1, and return its handle.
@@ -93,111 +76,64 @@ where
         T: Into<Socket<L>>,
     {
         let socket = socket.into();
-        for slot in self.sockets.iter_mut() {
-            if slot.is_none() {
-                let handle = socket.handle();
-                *slot = Some(Item { socket, refs: 1 });
-                return Ok(handle);
-            }
+        let handle = socket.handle();
+
+        if self.index_of(handle).is_ok() {
+            return Err(Error::DuplicateSocket);
         }
-        Err(Error::SocketSetFull)
+
+        self.sockets
+            .iter_mut()
+            .find(|s| s.is_none())
+            .ok_or(Error::SocketSetFull)?
+            .replace(socket);
+
+        Ok(handle)
     }
 
     /// Get a socket from the set by its handle, as mutable.
     pub fn get<T: AnySocket<L>>(&mut self, handle: Handle) -> Result<SocketRef<T>> {
-        match self.sockets.iter_mut().find_map(|i| {
-            if let Some(ref mut s) = i {
-                if s.socket.handle().0 == handle.0 {
-                    Some(s)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }) {
-            Some(item) => Ok(T::downcast(SocketRef::new(&mut item.socket))?),
+        let index = self.index_of(handle)?;
+
+        match self.sockets.get_mut(index).ok_or(Error::InvalidSocket)? {
+            Some(socket) => Ok(T::downcast(SocketRef::new(socket))?),
             None => Err(Error::InvalidSocket),
         }
+    }
+
+    pub fn index_of(&self, handle: Handle) -> Result<usize> {
+        self.sockets
+            .iter()
+            .position(|i| {
+                i.as_ref()
+                    .map(|s| s.handle().0 == handle.0)
+                    .unwrap_or(false)
+            })
+            .ok_or(Error::InvalidSocket)
     }
 
     /// Remove a socket from the set, without changing its state.
     pub fn remove(&mut self, handle: Handle) -> Result<Socket<L>> {
-        let index = self
-            .sockets
-            .iter_mut()
-            .position(|i| {
-                if let Some(s) = i {
-                    return s.socket.handle().0 == handle.0;
-                }
-                false
-            })
-            .ok_or(Error::InvalidSocket)?;
+        let index = self.index_of(handle)?;
+        let item: &mut Option<Socket<L>> =
+            self.sockets.get_mut(index).ok_or(Error::InvalidSocket)?;
 
-        let item: &mut Option<Item<L>> = unsafe { self.sockets.get_unchecked_mut(index) };
-
-        item.take()
-            .ok_or(Error::InvalidSocket)
-            .map(|item| item.socket)
-    }
-
-    /// Increase reference count by 1.
-    pub fn retain(&mut self, handle: Handle) -> Result<()> {
-        match self.sockets.iter_mut().find_map(|i| {
-            if let Some(ref mut s) = i {
-                if s.socket.handle().0 == handle.0 {
-                    Some(s)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }) {
-            Some(v) => v.refs += 1,
-            None => return Err(Error::InvalidSocket),
-        };
-        Ok(())
-    }
-
-    /// Decrease reference count by 1.
-    pub fn release(&mut self, handle: Handle) -> Result<()> {
-        match self.sockets.iter_mut().find_map(|i| {
-            if let Some(ref mut s) = i {
-                if s.socket.handle().0 == handle.0 {
-                    Some(s)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }) {
-            Some(v) => {
-                if v.refs == 0 {
-                    return Err(Error::Illegal);
-                }
-                v.refs -= 1;
-                Ok(())
-            }
-            None => Err(Error::InvalidSocket),
-        }
+        item.take().ok_or(Error::InvalidSocket)
     }
 
     /// Prune the sockets in this set.
     ///
-    /// Pruning affects sockets with reference count 0. Open sockets are closed.
-    /// Closed sockets are removed and dropped.
+    /// All sockets are removed and dropped.
     pub fn prune(&mut self) {
-        self.sockets.iter_mut().for_each(|item| {
-            item.take();
+        self.sockets.iter_mut().for_each(|slot| {
+            slot.take();
         })
     }
 
     /// Iterate every socket in this set.
     pub fn iter(&self) -> impl Iterator<Item = (Handle, &Socket<L>)> {
-        self.sockets.iter().filter_map(|i| {
-            if let Some(Item { ref socket, .. }) = i {
+        self.sockets.iter().filter_map(|slot| {
+            if let Some(socket) = slot {
                 Some((Handle(socket.handle().0), socket))
             } else {
                 None
@@ -207,12 +143,152 @@ where
 
     /// Iterate every socket in this set, as SocketRef.
     pub fn iter_mut(&mut self) -> impl Iterator<Item = (Handle, SocketRef<Socket<L>>)> {
-        self.sockets.iter_mut().filter_map(|i| {
-            if let Some(Item { ref mut socket, .. }) = i {
+        self.sockets.iter_mut().filter_map(|slot| {
+            if let Some(socket) = slot {
                 Some((Handle(socket.handle().0), SocketRef::new(socket)))
             } else {
                 None
             }
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::sockets::{TcpSocket, UdpSocket};
+
+    use super::*;
+    use heapless::consts;
+
+    #[test]
+    fn add_socket() {
+        let mut set = Set::<consts::U2, consts::U64>::new();
+
+        assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
+        assert_eq!(set.len(), 1);
+        assert_eq!(set.add(UdpSocket::new(1)), Ok(Handle(1)));
+        assert_eq!(set.len(), 2);
+    }
+
+    #[test]
+    fn remove_socket() {
+        let mut set = Set::<consts::U2, consts::U64>::new();
+
+        assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
+        assert_eq!(set.len(), 1);
+        assert_eq!(set.add(UdpSocket::new(1)), Ok(Handle(1)));
+        assert_eq!(set.len(), 2);
+
+        assert!(set.remove(Handle(0)).is_ok());
+        assert_eq!(set.len(), 1);
+
+        assert!(set.get::<TcpSocket<_>>(Handle(0)).is_err());
+
+        set.get::<UdpSocket<_>>(Handle(1))
+            .expect("failed to get udp socket");
+    }
+
+    #[test]
+    fn add_duplicate_socket() {
+        let mut set = Set::<consts::U2, consts::U64>::new();
+
+        assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
+        assert_eq!(set.len(), 1);
+        assert_eq!(set.add(UdpSocket::new(0)), Err(Error::DuplicateSocket));
+    }
+
+    #[test]
+    fn add_socket_to_full_set() {
+        let mut set = Set::<consts::U2, consts::U64>::new();
+
+        assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
+        assert_eq!(set.len(), 1);
+        assert_eq!(set.add(UdpSocket::new(1)), Ok(Handle(1)));
+        assert_eq!(set.len(), 2);
+        assert_eq!(set.add(UdpSocket::new(2)), Err(Error::SocketSetFull));
+    }
+
+    #[test]
+    fn get_socket() {
+        let mut set = Set::<consts::U2, consts::U64>::new();
+
+        assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
+        assert_eq!(set.len(), 1);
+        assert_eq!(set.add(UdpSocket::new(1)), Ok(Handle(1)));
+        assert_eq!(set.len(), 2);
+
+        set.get::<TcpSocket<_>>(Handle(0))
+            .expect("failed to get tcp socket");
+
+        set.get::<UdpSocket<_>>(Handle(1))
+            .expect("failed to get udp socket");
+    }
+
+    #[test]
+    fn get_socket_wrong_type() {
+        let mut set = Set::<consts::U2, consts::U64>::new();
+
+        assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
+        assert_eq!(set.len(), 1);
+        assert_eq!(set.add(UdpSocket::new(1)), Ok(Handle(1)));
+        assert_eq!(set.len(), 2);
+
+        assert!(set.get::<TcpSocket<_>>(Handle(1)).is_err());
+
+        set.get::<UdpSocket<_>>(Handle(1))
+            .expect("failed to get udp socket");
+    }
+
+    #[test]
+    fn get_socket_type() {
+        let mut set = Set::<consts::U2, consts::U64>::new();
+
+        assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
+        assert_eq!(set.len(), 1);
+        assert_eq!(set.add(UdpSocket::new(1)), Ok(Handle(1)));
+        assert_eq!(set.len(), 2);
+
+        assert_eq!(set.socket_type(Handle(0)), Some(SocketType::Tcp));
+        assert_eq!(set.socket_type(Handle(1)), Some(SocketType::Udp));
+    }
+
+    #[test]
+    fn replace_socket() {
+        let mut set = Set::<consts::U2, consts::U64>::new();
+
+        assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
+        assert_eq!(set.len(), 1);
+        assert_eq!(set.add(UdpSocket::new(1)), Ok(Handle(1)));
+        assert_eq!(set.len(), 2);
+
+        assert!(set.remove(Handle(0)).is_ok());
+        assert_eq!(set.len(), 1);
+
+        assert!(set.get::<TcpSocket<_>>(Handle(0)).is_err());
+
+        set.get::<UdpSocket<_>>(Handle(1))
+            .expect("failed to get udp socket");
+
+        assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
+        assert_eq!(set.len(), 2);
+
+        set.get::<TcpSocket<_>>(Handle(0))
+            .expect("failed to get tcp socket");
+    }
+
+    #[test]
+    fn prune_socket_set() {
+        let mut set = Set::<consts::U2, consts::U64>::new();
+
+        assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
+        assert_eq!(set.len(), 1);
+        assert_eq!(set.add(UdpSocket::new(1)), Ok(Handle(1)));
+        assert_eq!(set.len(), 2);
+
+        set.get::<TcpSocket<_>>(Handle(0))
+            .expect("failed to get tcp socket");
+
+        set.prune();
+        assert_eq!(set.len(), 0);
     }
 }

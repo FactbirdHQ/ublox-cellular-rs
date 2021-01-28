@@ -143,7 +143,7 @@ impl<T: Default + Clone, N: ArrayLength<T>> RingBuffer<T, N> {
     /// or return `Err(Error::Exhausted)` if the buffer is full.
     ///
     /// This function is a shortcut for `ring_buf.enqueue_one_with(Ok)`.
-    pub fn enqueue_one<'b>(&'b mut self) -> Result<&'b mut T> {
+    pub fn enqueue_one(&mut self) -> Result<&mut T> {
         self.enqueue_one_with(Ok)
     }
 

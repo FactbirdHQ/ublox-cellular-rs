@@ -26,7 +26,7 @@ use crate::{
     config::{Config, NoPin},
     error::Error,
     network::{AtTx, Network},
-    services::data::socket::{SocketSet, SocketSetItem},
+    services::data::socket::{Socket, SocketSet},
     state::Event,
     state::StateMachine,
     State,
@@ -44,7 +44,7 @@ where
     C: AtatClient,
     DLY: DelayMs<u32> + CountDown,
     N: 'static
-        + ArrayLength<Option<SocketSetItem<L>>>
+        + ArrayLength<Option<Socket<L>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
@@ -66,9 +66,7 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<SocketSetItem<L>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
+    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     pub fn new(client: C, delay: DLY, config: Config<RST, DTR, PWR, VINT>) -> Self {
@@ -149,15 +147,20 @@ where
             self.is_alive(10)?;
         }
 
-        self.network.clear_events()?;
-        if let Some(ref sockets) = self.sockets {
-            sockets.try_borrow_mut()?.prune();
-        }
+        self.clear_buffers()?;
 
         self.configure()?;
 
         self.network.push_event(Event::PwrOn)?;
 
+        Ok(())
+    }
+
+    pub(crate) fn clear_buffers(&mut self) -> Result<(), Error> {
+        self.network.clear_events()?;
+        if let Some(ref sockets) = self.sockets {
+            sockets.try_borrow_mut()?.prune();
+        }
         Ok(())
     }
 
@@ -315,23 +318,14 @@ where
 
     #[inline]
     pub(crate) fn restart(&self, sim_reset: bool) -> Result<(), Error> {
-        if sim_reset {
-            self.network.send_internal(
-                &SetModuleFunctionality {
-                    fun: Functionality::SilentResetWithSimReset,
-                    rst: None,
-                },
-                false,
-            )?;
+        let fun = if sim_reset {
+            Functionality::SilentResetWithSimReset
         } else {
-            self.network.send_internal(
-                &SetModuleFunctionality {
-                    fun: Functionality::SilentReset,
-                    rst: None,
-                },
-                false,
-            )?;
-        }
+            Functionality::SilentReset
+        };
+
+        self.network
+            .send_internal(&SetModuleFunctionality { fun, rst: None }, false)?;
 
         self.network.push_event(Event::PwrOff)?;
         Ok(())
@@ -402,12 +396,13 @@ where
         }
 
         let state = self.fsm.get_state();
-
-        if let Err(_) = match state {
+        let res = match state {
             State::Unknown => self.restart(true),
             State::Off => self.initialize(true),
             _ => Ok(()),
-        } {
+        };
+
+        if res.is_err() {
             match self.fsm.retry_or_fail(&mut self.delay) {
                 nb::Error::WouldBlock => return Err(nb::Error::WouldBlock),
                 nb::Error::Other(_) => {
@@ -419,12 +414,10 @@ where
             }
         }
 
-        if matches!(state, State::On | State::Registered) {
-            Ok(false)
-        } else if matches!(state, State::Connected) {
-            Ok(true)
-        } else {
-            Err(nb::Error::WouldBlock)
+        match state {
+            State::On | State::Registered => Ok(false),
+            State::Connected => Ok(true),
+            _ => Err(nb::Error::WouldBlock),
         }
     }
 
@@ -436,5 +429,102 @@ where
         }
 
         Ok(self.network.send_internal(cmd, true)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{
+        config::Config,
+        services::data::ContextState,
+        sockets::{SocketHandle, TcpSocket, UdpSocket},
+        APNInfo,
+    };
+    use crate::{
+        test_helpers::{MockAtClient, MockTimer},
+        ContextId,
+    };
+    use atat::typenum::Unsigned;
+    use heapless::consts;
+
+    type SocketSize = consts::U128;
+    type SocketSetLen = consts::U2;
+
+    static mut SOCKET_SET: Option<SocketSet<SocketSetLen, SocketSize>> = None;
+
+    #[test]
+    fn prune_on_initialize() {
+        let client = MockAtClient::new();
+        let timer = MockTimer::new();
+        let config = Config::default();
+
+        let socket_set: &'static mut _ = unsafe {
+            SOCKET_SET = Some(SocketSet::new());
+            SOCKET_SET.as_mut().unwrap_or_else(|| {
+                panic!("Failed to get the static com_queue");
+            })
+        };
+
+        let mut device =
+            Device::<_, _, SocketSetLen, SocketSize, _, _, _, _>::new(client, timer, config);
+        device.set_socket_storage(socket_set);
+
+        device.fsm.set_state(State::Connected);
+        assert_eq!(device.fsm.get_state(), State::Connected);
+        assert_eq!(device.spin(), Ok(true));
+
+        device.network.context_state.set(ContextState::Active);
+
+        let data_service = device
+            .data_service(ContextId(0), &APNInfo::default())
+            .unwrap();
+
+        let mut sockets = data_service.sockets.borrow_mut();
+
+        sockets
+            .add(TcpSocket::new(0))
+            .expect("Failed to add new tcp socket!");
+        assert_eq!(sockets.len(), 1);
+
+        let mut tcp = sockets
+            .get::<TcpSocket<_>>(SocketHandle(0))
+            .expect("Failed to get socket");
+
+        assert_eq!(tcp.rx_window(), SocketSize::to_usize());
+        let socket_data = b"This is socket data!!";
+        tcp.rx_enqueue_slice(socket_data);
+        assert_eq!(tcp.recv_queue(), socket_data.len());
+        assert_eq!(tcp.rx_window(), SocketSize::to_usize() - socket_data.len());
+
+        sockets
+            .add(UdpSocket::new(1))
+            .expect("Failed to add new udp socket!");
+        assert_eq!(sockets.len(), 2);
+
+        assert!(sockets.add(UdpSocket::new(0)).is_err());
+
+        drop(sockets);
+        drop(data_service);
+
+        device.clear_buffers().expect("Failed to clear buffers");
+
+        let data_service = device
+            .data_service(ContextId(0), &APNInfo::default())
+            .unwrap();
+
+        let mut sockets = data_service.sockets.borrow_mut();
+        assert_eq!(sockets.len(), 0);
+
+        sockets
+            .add(TcpSocket::new(0))
+            .expect("Failed to add new tcp socket!");
+        assert_eq!(sockets.len(), 1);
+
+        let tcp = sockets
+            .get::<TcpSocket<_>>(SocketHandle(0))
+            .expect("Failed to get socket");
+
+        assert_eq!(tcp.recv_queue(), 0);
     }
 }

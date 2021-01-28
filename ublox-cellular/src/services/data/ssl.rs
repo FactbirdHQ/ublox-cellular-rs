@@ -1,5 +1,5 @@
 use super::{
-    socket::{SocketHandle, SocketSetItem},
+    socket::{Socket, SocketHandle},
     DataService, Error,
 };
 use crate::{
@@ -39,9 +39,7 @@ pub trait SSL {
 impl<'a, C, N, L> SSL for DataService<'a, C, N, L>
 where
     C: atat::AtatClient,
-    N: ArrayLength<Option<SocketSetItem<L>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
+    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     fn import_certificate(
