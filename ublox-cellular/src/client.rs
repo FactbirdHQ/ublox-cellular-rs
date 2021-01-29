@@ -87,13 +87,6 @@ where
             },
             true,
         )?;
-        self.network.send_internal(
-            &SetModuleFunctionality {
-                fun: Functionality::SilentResetWithSimReset,
-                rst: None,
-            },
-            true,
-        )?;
 
         defmt::info!("Succefully factory reset modem! ");
         self.network.push_event(Event::FactoryReset)?;
@@ -118,9 +111,7 @@ where
             _ => false,
         };
 
-        self.is_alive(3).ok();
-
-        if vint_value {
+        if vint_value || self.is_alive(3).is_ok() {
             defmt::debug!("powering on, module is already on, flushing config...");
         } else {
             defmt::debug!("powering on.");
@@ -141,11 +132,12 @@ where
                     self.restart(false)?;
                 }
             }
-            self.delay
-                .try_delay_ms(crate::module_cfg::constants::BOOT_WAIT_TIME_MS)
-                .map_err(|_| Error::Busy)?;
-            self.is_alive(10)?;
         }
+
+        self.delay
+            .try_delay_ms(crate::module_cfg::constants::BOOT_WAIT_TIME_MS)
+            .map_err(|_| Error::Busy)?;
+        self.is_alive(10)?;
 
         self.clear_buffers()?;
 
@@ -157,6 +149,7 @@ where
     }
 
     pub(crate) fn clear_buffers(&mut self) -> Result<(), Error> {
+        self.network.at_tx.clear_urc_queue()?;
         self.network.clear_events()?;
         if let Some(ref sockets) = self.sockets {
             sockets.try_borrow_mut()?.prune();
@@ -182,7 +175,7 @@ where
         Err(error)
     }
 
-    pub(crate) fn configure(&self) -> Result<(), Error> {
+    pub(crate) fn configure(&mut self) -> Result<(), Error> {
         if self.config.baud_rate > 230_400_u32 {
             // Needs a way to reconfigure uart baud rate temporarily
             // Relevant issue: https://github.com/rust-embedded/embedded-hal/issues/79
@@ -209,7 +202,7 @@ where
         // Extended errors on
         self.network.send_internal(
             &SetReportMobileTerminationError {
-                n: TerminationErrorMode::Verbose,
+                n: TerminationErrorMode::Disabled,
             },
             false,
         )?;
@@ -291,12 +284,18 @@ where
             false,
         )?;
 
-        let PinStatus { code } = self.network.send_internal(&GetPinStatus, true)?;
-
-        if code != PinStatusCode::Ready {
-            // FIXME: Handle SIM Pin here
-            defmt::error!("PIN status not ready!!");
-            return Err(Error::Busy);
+        match self.network.send_internal(&GetPinStatus, true) {
+            Ok(PinStatus { code }) if code != PinStatusCode::Ready => {
+                // FIXME: Handle SIM Pin here
+                defmt::error!("PIN status not ready!!");
+                return Err(Error::Busy);
+            }
+            Err(e) => {
+                // Short-circuit to restart with sim-reset on error
+                self.fsm.set_max_retry_attempts(0);
+                return Err(e.into());
+            }
+            _ => {}
         }
 
         let OperatorSelection { mode, .. } =
@@ -334,9 +333,10 @@ where
     pub(crate) fn enable_registration_urcs(&self) -> Result<(), Error> {
         // if packet domain event reporting is not set it's not a stopper. We
         // might lack some events when we are dropped from the network.
+        // TODO: Re-enable this when it works, and is useful!
         if self
             .network
-            .set_packet_domain_event_reporting(true)
+            .set_packet_domain_event_reporting(false)
             .is_err()
         {
             defmt::warn!("Packet domain event reporting set failed");
@@ -379,7 +379,57 @@ where
         Ok(())
     }
 
-    pub fn spin(&mut self) -> nb::Result<bool, Error> {
+    fn handle_urc(&self, state: State) -> Result<(), Error> {
+        if let Some(ref sockets) = self.sockets {
+            self.network
+                .at_tx
+                .handle_urc(|urc| {
+                    match urc {
+                        // Blindly swallow all URC's if state is unknown
+                        _ if matches!(state, State::Unknown) => {}
+                        Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
+                            defmt::info!("[URC] SocketClosed {:u8}", socket.0);
+                            if let Ok(mut sockets) = sockets.try_borrow_mut() {
+                                sockets.remove(socket).ok();
+                            }
+                        }
+                        Urc::SocketDataAvailable(
+                            ip_transport_layer::urc::SocketDataAvailable { socket, length },
+                        )
+                        | Urc::SocketDataAvailableUDP(
+                            ip_transport_layer::urc::SocketDataAvailable { socket, length },
+                        ) => {
+                            defmt::trace!(
+                                "[Socket({:u8})] {:u16} bytes available",
+                                socket.0,
+                                length as u16
+                            );
+                            if let Ok(mut sockets) = sockets.try_borrow_mut() {
+                                if let Some((_, mut sock)) =
+                                    sockets.iter_mut().find(|(handle, _)| *handle == socket)
+                                {
+                                    sock.set_available_data(length);
+                                }
+                            } else {
+                                defmt::warn!(
+                                    "[Socket({:u8})] Failed to borrow socketset!",
+                                    socket.0
+                                );
+                            }
+                        }
+                        _ => return false,
+                    }
+                    true
+                })
+                .map_err(Error::Network)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub(crate) fn handle_events(&mut self) -> nb::Result<(), Error> {
+        let state = self.fsm.get_state();
+        self.handle_urc(state).map_err(Error::from)?;
         self.network.handle_urc().map_err(Error::from)?;
 
         // Always let events propagate the state of the FSM.
@@ -388,6 +438,12 @@ where
                 self.fsm.handle_event(cell_event);
             }
         }
+
+        Ok(())
+    }
+
+    pub fn spin(&mut self) -> nb::Result<bool, Error> {
+        self.handle_events()?;
 
         if self.fsm.is_retry() {
             if let Err(nb::Error::WouldBlock) = self.delay.try_wait() {

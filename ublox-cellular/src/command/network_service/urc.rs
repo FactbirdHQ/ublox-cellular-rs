@@ -3,7 +3,7 @@ use super::NetworkRegistrationStat;
 use atat::atat_derive::AtatResp;
 
 /// 7.14 Network registration status +CREG
-#[derive(Clone, AtatResp)]
+#[derive(Debug, Clone, AtatResp, defmt::Format)]
 pub struct NetworkRegistration {
     #[at_arg(position = 1)]
     pub stat: NetworkRegistrationStat,

@@ -64,7 +64,7 @@ pub enum Socket<L: ArrayLength<u8>> {
 }
 
 #[non_exhaustive]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
 pub enum SocketType {
     Udp,
     Tcp,

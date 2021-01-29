@@ -88,7 +88,7 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     /// `ShutdownForRead` state.
     #[inline]
     pub fn is_active(&self) -> bool {
-        !matches!(self.state, State::ShutdownForRead)
+        !matches!(self.state, State::ShutdownForRead | State::Created)
     }
 
     /// Return whether the transmit half of the full-duplex connection is open.

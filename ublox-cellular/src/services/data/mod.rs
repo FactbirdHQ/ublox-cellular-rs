@@ -130,7 +130,7 @@ where
         let mut data_service = Self { network, sockets };
 
         // Handle [`DataService`] related URCs
-        data_service.handle_urc()?;
+        // data_service.handle_urc()?;
 
         // Reset context state if data connection is lost
         if matches!(network.context_state.get(), ContextState::Active) && !connected {
@@ -211,9 +211,19 @@ where
         Ok(())
     }
 
-    fn activate_pdn(&self, cid: ContextId) -> Result<(), Error> {
-        if let Ok(state) = self.network.send_internal(&GetPDPContextState, true) {
-            if state.cid == cid && state.status != PDPContextStatus::Activated {
+    fn activate_pdn(&self, cid: ContextId, test: bool) -> Result<(), Error> {
+        if test {
+            if let Ok(state) = self.network.send_internal(&GetPDPContextState, true) {
+                if state.cid == cid && state.status != PDPContextStatus::Activated {
+                    self.network.send_internal(
+                        &SetPDPContextState {
+                            status: PDPContextStatus::Activated,
+                            cid: Some(cid),
+                        },
+                        true,
+                    )?;
+                }
+            } else {
                 self.network.send_internal(
                     &SetPDPContextState {
                         status: PDPContextStatus::Activated,
@@ -222,15 +232,8 @@ where
                     true,
                 )?;
             }
-        } else {
-            self.network.send_internal(
-                &SetPDPContextState {
-                    status: PDPContextStatus::Activated,
-                    cid: Some(cid),
-                },
-                true,
-            )?;
         }
+
 
         // TODO: Sometimes we get InvalidResponse on this?!
         self.network.send_internal(
@@ -328,21 +331,25 @@ where
                 /* check registration status. */
                 let service_status = self.network.is_registered().map_err(Error::from)?;
                 if service_status.ps_reg_status.is_registered() {
-                    // Emit Event::Attached
-                    self.network
-                        .push_event(Event::Attached)
-                        .map_err(Error::from)?;
+                    if service_status.operator.is_none() {
+                        // Emit Event::Attached
+                        self.network
+                            .push_event(Event::Attached)
+                            .map_err(Error::from)?;
+                    }
                 } else {
                     // FIXME: Try count here with some failure break?!
                     return Err(nb::Error::WouldBlock);
                 }
 
+                // let test = service_status.operator.is_none();
+                let test = true;
                 /* Activate PDN. */
-                if self.activate_pdn(cid).is_err() {
+                if self.activate_pdn(cid, test).is_err() {
                     defmt::warn!("Activate PDN failed. Deactivate the PDN and retry");
                     // Ignore any error here!
                     self.deactivate_pdn(cid).ok();
-                    if self.activate_pdn(cid).is_err() {
+                    if self.activate_pdn(cid, test).is_err() {
                         defmt::error!("Activate PDN failed after retry");
                         return Err(nb::Error::Other(Error::Network(
                             NetworkError::ActivationFailed,
@@ -356,49 +363,49 @@ where
         }
     }
 
-    fn handle_urc(&self) -> Result<(), Error> {
-        self.network
-            .at_tx
-            .handle_urc(|urc| {
-                match urc {
-                    Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
-                        defmt::info!("[URC] SocketClosed {:u8}", socket.0);
-                        if let Ok(mut sockets) = self.sockets.try_borrow_mut() {
-                            sockets.remove(socket).ok();
-                        }
-                    }
-                    Urc::SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable {
-                        socket,
-                        length,
-                    })
-                    | Urc::SocketDataAvailableUDP(ip_transport_layer::urc::SocketDataAvailable {
-                        socket,
-                        length,
-                    }) => {
-                        defmt::trace!(
-                            "[Socket({:u8})] {:u16} bytes available",
-                            socket.0,
-                            length as u16
-                        );
-                        if let Ok(mut sockets) = self.sockets.try_borrow_mut() {
-                            if let Some((_, mut sock)) =
-                                sockets.iter_mut().find(|(handle, _)| *handle == socket)
-                            {
-                                sock.set_available_data(length);
-                            }
-                        } else {
-                            defmt::warn!("[Socket({:u8})] Failed to borrow socketset!", socket.0);
-                        }
-                    }
-                    _ => {
-                        defmt::info!("[URC] (DataService) Unhandled URC");
-                        return false;
-                    }
-                }
-                true
-            })
-            .map_err(Error::Network)
-    }
+    // fn handle_urc(&self) -> Result<(), Error> {
+    //     self.network
+    //         .at_tx
+    //         .handle_urc(|urc| {
+    //             match urc {
+    //                 Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
+    //                     defmt::info!("[URC] SocketClosed {:u8}", socket.0);
+    //                     if let Ok(mut sockets) = self.sockets.try_borrow_mut() {
+    //                         sockets.remove(socket).ok();
+    //                     }
+    //                 }
+    //                 Urc::SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable {
+    //                     socket,
+    //                     length,
+    //                 })
+    //                 | Urc::SocketDataAvailableUDP(ip_transport_layer::urc::SocketDataAvailable {
+    //                     socket,
+    //                     length,
+    //                 }) => {
+    //                     defmt::trace!(
+    //                         "[Socket({:u8})] {:u16} bytes available",
+    //                         socket.0,
+    //                         length as u16
+    //                     );
+    //                     if let Ok(mut sockets) = self.sockets.try_borrow_mut() {
+    //                         if let Some((_, mut sock)) =
+    //                             sockets.iter_mut().find(|(handle, _)| *handle == socket)
+    //                         {
+    //                             sock.set_available_data(length);
+    //                         }
+    //                     } else {
+    //                         defmt::warn!("[Socket({:u8})] Failed to borrow socketset!", socket.0);
+    //                     }
+    //                 }
+    //                 _ => {
+    //                     defmt::info!("[URC] (DataService) Unhandled URC");
+    //                     return false;
+    //                 }
+    //             }
+    //             true
+    //         })
+    //         .map_err(Error::Network)
+    // }
 
     pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
         Ok(self.network.send_internal(cmd, true)?)

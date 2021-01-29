@@ -20,6 +20,7 @@ use core::{
     ops::DerefMut,
 };
 use hash32_derive::Hash32;
+use heapless::consts;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, PartialEq, defmt::Format)]
@@ -67,17 +68,26 @@ impl<C: AtatClient> AtTx<C> {
         }
     }
 
+    pub fn clear_urc_queue(&self) -> Result<(), Error> {
+        // self.client.try_borrow_mut()?.reset();
+        while self.client.try_borrow_mut()?.check_urc::<Urc>().is_some() {}
+        Ok(())
+    }
+
     pub fn handle_urc<F: FnOnce(Urc) -> bool>(&self, f: F) -> Result<(), Error> {
         self.client
             .try_borrow_mut()?
             .peek_urc_with::<Urc, _>(|urc| {
-                if !f(urc) {
+                if !f(urc.clone()) {
                     let a = self.urc_attempts.get();
                     if a < self.max_urc_attempts {
                         self.urc_attempts.set(a + 1);
                         return false;
                     } else {
-                        defmt::warn!("Dropping stale URC!");
+                        defmt::warn!(
+                            "Dropping stale URC! {:?}",
+                            defmt::Debug2Format::<consts::U256>(&urc)
+                        );
                     }
                 }
                 self.urc_attempts.set(0);
@@ -132,13 +142,13 @@ where
         );
 
         status.compare_and_set(
-            self.send_internal(&GetGPRSNetworkRegistrationStatus, true)?
+            self.send_internal(&GetEPSNetworkRegistrationStatus, true)?
                 .into(),
         );
 
         if !status.ps_reg_status.is_registered() {
             status.compare_and_set(
-                self.send_internal(&GetEPSNetworkRegistrationStatus, true)?
+                self.send_internal(&GetGPRSNetworkRegistrationStatus, true)?
                     .into(),
             );
         }
@@ -150,19 +160,16 @@ where
 
         service_status.network_registration_mode = mode;
         service_status.operator = oper;
-
-        if let Some(act) = act {
-            service_status.rat = act;
-        }
+        service_status.rat = act.unwrap_or_else(|| service_status.rat);
 
         Ok(service_status)
     }
 
     pub fn set_packet_domain_event_reporting(&self, enable: bool) -> Result<(), Error> {
         let mode = if enable {
-            PSEventReportingMode::DiscardUrcs
-        } else {
             PSEventReportingMode::CircularBufferUrcs
+        } else {
+            PSEventReportingMode::DiscardUrcs
         };
 
         self.send_internal(&SetPacketSwitchedEventReporting { mode, bfr: None }, true)?;
@@ -217,6 +224,9 @@ where
                 }) => {
                     defmt::info!("[URC] DataConnectionActivated {:u8}", result);
                     if let Ok(mut params) = self.network_status.try_borrow_mut() {
+                        while !params.events.is_empty() {
+                            params.events.dequeue();
+                        }
                         params.push_event(Event::DataActive);
                     }
                 }
@@ -225,18 +235,14 @@ where
                 }) => {
                     defmt::info!("[URC] DataConnectionDeactivated {:?}", profile_id);
                     if let Ok(mut params) = self.network_status.try_borrow_mut() {
+                        while !params.events.is_empty() {
+                            params.events.dequeue();
+                        }
                         params.push_event(Event::DataInactive);
                     }
                 }
                 Urc::MessageWaitingIndication(_) => {
                     defmt::info!("[URC] MessageWaitingIndication");
-                }
-                Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
-                    defmt::info!(
-                        "[URC] Socket {:?} closed! Should be followed by one from data layer!",
-                        socket
-                    );
-                    return false;
                 }
                 _ => return false,
             };

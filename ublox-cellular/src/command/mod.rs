@@ -23,7 +23,7 @@ pub struct NoResponse;
 #[at_cmd("", NoResponse)]
 pub struct AT;
 
-#[derive(Clone, AtatUrc)]
+#[derive(Debug, Clone, AtatUrc)]
 pub enum Urc {
     #[at_urc("+CGEV: NW DETACH")]
     NetworkDetach,

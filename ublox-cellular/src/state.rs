@@ -122,7 +122,7 @@ impl TryFrom<Event> for CellularEvent {
 impl StateMachine {
     pub(crate) const fn new() -> Self {
         Self {
-            max_retry_attempts: 10,
+            max_retry_attempts: 3,
             retry_count: None,
             inner: State::Off,
         }
@@ -183,7 +183,7 @@ impl StateMachine {
     }
 
     pub(crate) fn reset(&mut self) {
-        self.max_retry_attempts = 10;
+        self.max_retry_attempts = 3;
         self.retry_count = None;
     }
 

@@ -6,7 +6,7 @@ use embedded_nal::IpAddr;
 use heapless::{consts, String};
 
 /// +UUPSDA
-#[derive(Clone, AtatResp)]
+#[derive(Debug, Clone, AtatResp)]
 pub struct DataConnectionActivated {
     #[at_arg(position = 0)]
     pub result: u8,
@@ -15,14 +15,14 @@ pub struct DataConnectionActivated {
 }
 
 /// +UUPSDD
-#[derive(Clone, AtatResp)]
+#[derive(Debug, Clone, AtatResp)]
 pub struct DataConnectionDeactivated {
     #[at_arg(position = 0)]
     pub profile_id: ProfileId,
 }
 
 /// 18.27 GPRS network registration status +CGREG
-#[derive(Clone, AtatResp)]
+#[derive(Debug, Clone, AtatResp)]
 pub struct GPRSNetworkRegistration {
     #[at_arg(position = 1)]
     pub stat: GPRSNetworkRegistrationStat,
@@ -37,14 +37,14 @@ pub struct GPRSNetworkRegistration {
 }
 
 /// 18.28 Extended network registration status +UREG
-#[derive(Clone, AtatResp)]
+#[derive(Debug, Clone, AtatResp)]
 pub struct ExtendedPSNetworkRegistration {
     #[at_arg(position = 1)]
     pub state: ExtendedPSNetworkRegistrationState,
 }
 
 /// 18.36 EPS network registration status +CEREG
-#[derive(Clone, AtatResp)]
+#[derive(Debug, Clone, AtatResp)]
 pub struct EPSNetworkRegistration {
     #[at_arg(position = 1)]
     pub stat: EPSNetworkRegistrationStat,
