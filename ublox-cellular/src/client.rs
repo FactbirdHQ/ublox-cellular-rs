@@ -1,5 +1,5 @@
 use atat::AtatClient;
-use core::{cell::RefCell, convert::TryInto};
+use core::cell::RefCell;
 use embedded_hal::{
     blocking::delay::DelayMs,
     digital::{InputPin, OutputPin},
@@ -27,8 +27,7 @@ use crate::{
     error::Error,
     network::{AtTx, Network},
     services::data::socket::{Socket, SocketSet},
-    state::Event,
-    state::StateMachine,
+    state::{StateEvent, StateMachine},
     State,
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
@@ -74,7 +73,7 @@ where
             fsm: StateMachine::new(),
             config,
             delay,
-            network: Network::new(AtTx::new(client, 5)),
+            network: Network::new(AtTx::new(client, 10)),
             sockets: None,
         }
     }
@@ -85,11 +84,11 @@ where
                 fs_op: FSFactoryRestoreType::AllFiles,
                 nvm_op: NVMFactoryRestoreType::NVMFlashSectors,
             },
-            true,
+            false,
         )?;
 
-        defmt::info!("Succefully factory reset modem! ");
-        self.network.push_event(Event::FactoryReset)?;
+        defmt::info!("Successfully factory reset modem!");
+        self.network.set_state_change(StateEvent::Reset)?;
 
         Ok(())
     }
@@ -143,7 +142,7 @@ where
 
         self.configure()?;
 
-        self.network.push_event(Event::PwrOn)?;
+        self.network.set_state_change(StateEvent::PwrOn)?;
 
         Ok(())
     }
@@ -326,7 +325,24 @@ where
         self.network
             .send_internal(&SetModuleFunctionality { fun, rst: None }, false)?;
 
-        self.network.push_event(Event::PwrOff)?;
+        self.network.set_state_change(StateEvent::PwrOff)?;
+        Ok(())
+    }
+
+    /// Reset the module by driving it's RESET_N pin low for `NRST_PULL_TIME_MS`
+    pub fn reset(&mut self) -> Result<(), Error> {
+        match self.config.rst_pin {
+            Some(ref mut rst) => {
+                rst.try_set_low().ok();
+                self.delay
+                    .try_delay_ms(crate::module_cfg::constants::NRST_PULL_TIME_MS)
+                    .map_err(|_| Error::Busy)?;
+                rst.try_set_high().ok();
+            }
+            None => {}
+        }
+
+        self.network.set_state_change(StateEvent::Reset)?;
         Ok(())
     }
 
@@ -427,23 +443,21 @@ where
         }
     }
 
-    pub(crate) fn handle_events(&mut self) -> nb::Result<(), Error> {
+    pub(crate) fn handle_events(&mut self) -> Result<(), Error> {
         let state = self.fsm.get_state();
-        self.handle_urc(state).map_err(Error::from)?;
-        self.network.handle_urc().map_err(Error::from)?;
+        self.handle_urc(state)?;
+        self.network.handle_urc()?;
 
         // Always let events propagate the state of the FSM.
-        while let Some(event) = self.network.get_event().map_err(Error::from)? {
-            if let Ok(cell_event) = event.try_into() {
-                self.fsm.handle_event(cell_event);
-            }
-        }
+        self.fsm.handle_events(self.network.take_state_change()?);
+
+        // TODO: Handle cellId &
 
         Ok(())
     }
 
     pub fn spin(&mut self) -> nb::Result<bool, Error> {
-        self.handle_events()?;
+        self.handle_events().map_err(Error::from)?;
 
         if self.fsm.is_retry() {
             if let Err(nb::Error::WouldBlock) = self.delay.try_wait() {

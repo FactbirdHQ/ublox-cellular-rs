@@ -1,5 +1,3 @@
-use core::convert::TryFrom;
-
 use crate::{
     command::network_service,
     command::network_service::responses::NetworkRegistrationStatus,
@@ -14,10 +12,10 @@ use crate::{
     error::Error,
 };
 use embedded_hal::timer::CountDown;
-use heapless::{consts, spsc::Queue, String};
+use heapless::{consts, String};
 use network_service::types::NetworkRegistrationStat;
 
-#[derive(Debug, Clone, Copy, PartialEq, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
 pub enum State {
     /// StateMachine: CELLULAR module is off
     Off,
@@ -42,8 +40,8 @@ pub struct StateMachine {
     inner: State,
 }
 
-#[derive(defmt::Format)]
-pub enum CellularEvent {
+#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
+pub enum StateEvent {
     /// trigger: an module is powered on
     PwrOn,
     /// trigger: cellular module is powered off
@@ -65,59 +63,59 @@ pub enum CellularEvent {
     /// trigger: OTA finishes
     OtaDone,
 
-    FactoryReset,
+    Reset,
 }
 
-impl TryFrom<Event> for CellularEvent {
-    type Error = ();
+// impl TryFrom<Event> for StateEvent {
+//     type Error = ();
 
-    fn try_from(e: Event) -> Result<Self, Self::Error> {
-        Ok(match e {
-            Event::RegistrationStatusChanged(reg_type, status) => match reg_type {
-                RegType::Cgreg | RegType::Cereg if status.ps_reg_status.is_registered() => {
-                    Self::Attached
-                }
-                RegType::Cgreg | RegType::Cereg if !status.ps_reg_status.is_registered() => {
-                    Self::Detached
-                }
-                RegType::Creg if status.cs_reg_status.is_registered() => {
-                    /* CS attach won't count as CELLULAR_EVENT_ATTACHED. */
-                    return Err(());
-                }
-                RegType::Creg if !status.cs_reg_status.is_registered() => Self::Detached,
-                _ => {
-                    return Err(());
-                }
-            },
-            Event::RadioAccessTechnologyChanged(reg_type, rat) => {
-                defmt::info!(
-                    "[EVENT] CellularRadioAccessTechnologyChanged {:?} {:?}",
-                    reg_type,
-                    rat
-                );
-                return Err(());
-            }
-            Event::CellIDChanged(cell_id) => {
-                defmt::info!(
-                    "[EVENT] CellularCellIDChanged {:str}",
-                    cell_id.unwrap_or_default().as_str()
-                );
-                return Err(());
-            }
-            Event::PwrOn => Self::PwrOn,
-            Event::PwrOff => Self::PwrOff,
-            Event::RfOn => Self::RfOn,
-            Event::RfOff => Self::RfOff,
-            Event::Attached => Self::Attached,
-            Event::Detached => Self::Detached,
-            Event::DataActive => Self::DataActive,
-            Event::DataInactive => Self::DataInactive,
-            Event::Ota => Self::Ota,
-            Event::OtaDone => Self::OtaDone,
-            Event::FactoryReset => Self::FactoryReset,
-        })
-    }
-}
+//     fn try_from(e: Event) -> Result<Self, Self::Error> {
+//         Ok(match e {
+//             Event::RegistrationStatusChanged(reg_type, status) => match reg_type {
+//                 RegType::Cgreg | RegType::Cereg if status.ps_reg_status.is_registered() => {
+//                     Self::Attached
+//                 }
+//                 RegType::Cgreg | RegType::Cereg if !status.ps_reg_status.is_registered() => {
+//                     Self::Detached
+//                 }
+//                 RegType::Creg if status.cs_reg_status.is_registered() => {
+//                     /* CS attach won't count as CELLULAR_EVENT_ATTACHED. */
+//                     return Err(());
+//                 }
+//                 RegType::Creg if !status.cs_reg_status.is_registered() => Self::Detached,
+//                 _ => {
+//                     return Err(());
+//                 }
+//             },
+//             Event::RadioAccessTechnologyChanged(reg_type, rat) => {
+//                 defmt::info!(
+//                     "[EVENT] CellularRadioAccessTechnologyChanged {:?} {:?}",
+//                     reg_type,
+//                     rat
+//                 );
+//                 return Err(());
+//             }
+//             Event::CellIDChanged(cell_id) => {
+//                 defmt::info!(
+//                     "[EVENT] CellularCellIDChanged {:str}",
+//                     cell_id.unwrap_or_default().as_str()
+//                 );
+//                 return Err(());
+//             }
+//             Event::PwrOn => Self::PwrOn,
+//             Event::PwrOff => Self::PwrOff,
+//             Event::RfOn => Self::RfOn,
+//             Event::RfOff => Self::RfOff,
+//             Event::Attached => Self::Attached,
+//             Event::Detached => Self::Detached,
+//             Event::DataActive => Self::DataActive,
+//             Event::DataInactive => Self::DataInactive,
+//             Event::Ota => Self::Ota,
+//             Event::OtaDone => Self::OtaDone,
+//             Event::FactoryReset => Self::FactoryReset,
+//         })
+//     }
+// }
 
 impl StateMachine {
     pub(crate) const fn new() -> Self {
@@ -128,53 +126,62 @@ impl StateMachine {
         }
     }
 
-    pub(crate) fn handle_event(&mut self, event: CellularEvent) {
-        defmt::debug!(
-            "Handling cellular event: {:?}, from {:?}",
-            event,
-            self.get_state()
-        );
+    pub(crate) fn handle_registration_change(&mut self) {
+        // RegType::Cgreg | RegType::Cereg if status.ps_reg_status.is_registered() => {
+            //                     Self::Attached
+            //                 }
+            //                 RegType::Cgreg | RegType::Cereg if !status.ps_reg_status.is_registered() => {
+            //                     Self::Detached
+            //                 }
+            //                 RegType::Creg if status.cs_reg_status.is_registered() => {
+            //                     /* CS attach won't count as CELLULAR_EVENT_ATTACHED. */
+            //                     return Err(());
+            //                 }
+            //                 RegType::Creg if !status.cs_reg_status.is_registered() => Self::Detached,
+            //                 _ => {
+            //                     return Err(());
+            //                 }
+    }
 
-        if matches!(event, CellularEvent::FactoryReset) {
-            self.set_state(State::Unknown);
-            return;
-        }
+    pub(crate) fn handle_events(&mut self, state_event: Option<StateEvent>) {
+        if let Some(event) = state_event {
+            defmt::debug!(
+                "Handling cellular event: {:?}, from {:?}",
+                event,
+                self.get_state()
+            );
 
-        let new_state = match self.get_state() {
-            State::Unknown if matches!(event, CellularEvent::PwrOff) => State::Off,
-            State::Off if matches!(event, CellularEvent::PwrOn) => State::On,
-            State::Off if matches!(event, CellularEvent::Attached) => State::Registered,
-            State::On if matches!(event, CellularEvent::PwrOff) => State::Off,
-            State::On if matches!(event, CellularEvent::RfOff) => State::Rfoff,
-            State::On if matches!(event, CellularEvent::Attached) => State::Registered,
-            State::On if matches!(event, CellularEvent::Detached) => State::On,
-            State::On if matches!(event, CellularEvent::DataActive) => State::Connected,
-            State::Registered if matches!(event, CellularEvent::PwrOff) => State::Off,
-            State::Registered if matches!(event, CellularEvent::RfOff) => State::Rfoff,
-            State::Registered if matches!(event, CellularEvent::Detached) => State::On,
-            State::Registered if matches!(event, CellularEvent::DataActive) => State::Connected,
-            State::Registered
-                if matches!(event, CellularEvent::Attached | CellularEvent::DataInactive) =>
-            {
+            let new_state = match self.get_state() {
+                _ if matches!(event, StateEvent::PwrOff | StateEvent::Reset) => State::Off,
+                State::Off if matches!(event, StateEvent::PwrOn) => State::On,
+                State::Off if matches!(event, StateEvent::Attached) => State::Registered,
+                State::On if matches!(event, StateEvent::RfOff) => State::Rfoff,
+                State::On if matches!(event, StateEvent::Attached) => State::Registered,
+                State::On if matches!(event, StateEvent::Detached) => State::On,
+                State::On if matches!(event, StateEvent::DataActive) => State::Connected,
+                State::Registered if matches!(event, StateEvent::RfOff) => State::Rfoff,
+                State::Registered if matches!(event, StateEvent::Detached) => State::On,
+                State::Registered if matches!(event, StateEvent::DataActive) => State::Connected,
                 State::Registered
-            }
-            State::Connected if matches!(event, CellularEvent::PwrOff) => State::Off,
-            State::Connected if matches!(event, CellularEvent::RfOff) => State::Rfoff,
-            State::Connected if matches!(event, CellularEvent::Detached) => State::On,
-            State::Connected if matches!(event, CellularEvent::Ota) => State::Ota,
-            State::Connected if matches!(event, CellularEvent::DataInactive) => State::Registered,
-            State::Rfoff if matches!(event, CellularEvent::PwrOn) => State::Rfoff,
-            State::Rfoff if matches!(event, CellularEvent::PwrOff) => State::Off,
-            State::Rfoff if matches!(event, CellularEvent::RfOn) => State::On,
-            State::Ota if matches!(event, CellularEvent::OtaDone) => State::Off,
-            State::Ota if matches!(event, CellularEvent::PwrOff) => State::Off,
-            _ => {
-                defmt::error!("Wrong event received {:?}", event);
-                return;
-            }
-        };
+                    if matches!(event, StateEvent::Attached | StateEvent::DataInactive) =>
+                {
+                    State::Registered
+                }
+                State::Connected if matches!(event, StateEvent::RfOff) => State::Rfoff,
+                State::Connected if matches!(event, StateEvent::Detached) => State::On,
+                State::Connected if matches!(event, StateEvent::Ota) => State::Ota,
+                State::Connected if matches!(event, StateEvent::DataInactive) => State::Registered,
+                State::Rfoff if matches!(event, StateEvent::PwrOn) => State::Rfoff,
+                State::Rfoff if matches!(event, StateEvent::RfOn) => State::On,
+                State::Ota if matches!(event, StateEvent::OtaDone) => State::Off,
+                _ => {
+                    defmt::error!("Wrong event received {:?}", event);
+                    return;
+                }
+            };
 
-        self.set_state(new_state);
+            self.set_state(new_state);
+        }
     }
 
     #[allow(dead_code)]
@@ -331,7 +338,7 @@ pub struct NetworkStatus {
     // rac: u8,
     /// Registered network operator Tracking Area Code.
     // tac: u8,
-    pub events: Queue<Event, consts::U20, u8>,
+    pub events: Events,
 }
 
 impl From<&mut NetworkStatus> for ServiceStatus {
@@ -350,34 +357,13 @@ impl From<&mut NetworkStatus> for ServiceStatus {
     }
 }
 
-#[derive(Debug)]
-pub enum Event {
-    RadioAccessTechnologyChanged(RadioAccessNetwork, RatAct),
-    RegistrationStatusChanged(RegType, ServiceStatus),
-    CellIDChanged(Option<String<consts::U8>>),
+#[derive(Default)]
+pub struct Events {
+    pub(crate) radio_access_technology: Option<(RadioAccessNetwork, RatAct)>,
+    pub(crate) registration_status: Option<(RegType, ServiceStatus)>,
+    pub(crate) cell_id: Option<String<consts::U8>>,
 
-    /// trigger: an module is powered on
-    PwrOn,
-    /// trigger: cellular module is powered off
-    PwrOff,
-    /// trigger: airplane mode off
-    RfOn,
-    /// trigger: airplane mode on
-    RfOff,
-    /// trigger: attached to a network
-    Attached,
-    /// trigger: detached from a network
-    Detached,
-    /// trigger: data connect is active
-    DataActive,
-    /// trigger: data connection is inactive
-    DataInactive,
-    /// trigger: OTA starts
-    Ota,
-    /// trigger: OTA finishes
-    OtaDone,
-
-    FactoryReset,
+    pub(crate) state_change: Option<StateEvent>,
 }
 
 impl Default for RegistrationParams {
@@ -397,7 +383,7 @@ impl Default for RegistrationParams {
 impl NetworkStatus {
     pub fn new() -> Self {
         Self {
-            events: Queue::u8(),
+            events: Events::default(),
             rat: RatAct::default(),
             cs_reg_status: RegistrationStatus::default(),
             ps_reg_status: RegistrationStatus::default(),
@@ -409,8 +395,9 @@ impl NetworkStatus {
             lac: None,
         }
     }
-    pub fn push_event(&mut self, event: Event) {
-        self.events.enqueue(event).ok();
+
+    pub fn set_state_change(&mut self, state: StateEvent) {
+        self.events.state_change.replace(state);
     }
 
     pub fn compare_and_set(&mut self, new_params: RegistrationParams) {
@@ -418,18 +405,16 @@ impl NetworkStatus {
             RegType::Creg if self.cs_reg_status != new_params.status => {
                 self.cs_reg_status = new_params.status;
                 let status = self.into();
-                self.push_event(Event::RegistrationStatusChanged(
-                    new_params.reg_type,
-                    status,
-                ));
+                self.events
+                    .registration_status
+                    .replace((new_params.reg_type, status));
             }
             RegType::Cgreg | RegType::Cereg if self.ps_reg_status != new_params.status => {
                 self.ps_reg_status = new_params.status;
                 let status = self.into();
-                self.push_event(Event::RegistrationStatusChanged(
-                    new_params.reg_type,
-                    status,
-                ));
+                self.events
+                    .registration_status
+                    .replace((new_params.reg_type, status));
             }
             RegType::Unknown => {
                 defmt::error!("unknown reg type");
@@ -441,15 +426,14 @@ impl NetworkStatus {
         }
 
         if self.rat != new_params.act {
-            self.push_event(Event::RadioAccessTechnologyChanged(
-                new_params.reg_type.into(),
-                self.rat,
-            ));
+            self.events
+                .radio_access_technology
+                .replace((new_params.reg_type.into(), self.rat));
         }
         if new_params.cell_id.is_some() && self.cell_id != new_params.cell_id {
             self.cell_id = new_params.cell_id.clone();
             self.lac = new_params.lac;
-            self.push_event(Event::CellIDChanged(new_params.cell_id));
+            self.events.cell_id = new_params.cell_id;
         }
     }
 }
@@ -544,7 +528,7 @@ impl From<EPSNetworkRegistrationStatus> for RegistrationParams {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
 pub enum RegistrationStatus {
     /// State is unknown/uninitialized
     StatusNotAvailable,
@@ -644,7 +628,7 @@ impl From<EPSNetworkRegistrationStat> for RegistrationStatus {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
 pub enum RadioAccessNetwork {
     UnknownUnused = 0,
     Geran = 1,

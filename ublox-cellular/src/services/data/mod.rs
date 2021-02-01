@@ -8,34 +8,13 @@ mod udp_stack;
 
 mod hex;
 
-use crate::{
-    client::Device,
-    command::mobile_control::types::Functionality,
-    command::mobile_control::SetModuleFunctionality,
-    command::network_service::types::RatAct,
-    command::psn::types::GPRSAttachedState,
-    command::psn::types::PDPContextStatus,
-    command::psn::types::PacketSwitchedParam,
-    command::psn::GetGPRSAttached,
-    command::psn::GetPDPContextState,
-    command::psn::SetGPRSAttached,
-    command::psn::SetPDPContextDefinition,
-    command::psn::SetPDPContextState,
-    command::psn::SetPacketSwitchedAction,
-    command::psn::SetPacketSwitchedConfig,
-    command::{
+use crate::{ProfileId, client::Device, command::mobile_control::SetModuleFunctionality, command::mobile_control::types::Functionality, command::network_service::types::RatAct, command::psn::GetGPRSAttached, command::psn::GetPDPContextState, command::psn::SetGPRSAttached, command::psn::SetPDPContextDefinition, command::psn::SetPDPContextState, command::psn::SetPacketSwitchedAction, command::psn::SetPacketSwitchedConfig, command::psn::types::GPRSAttachedState, command::psn::types::PDPContextStatus, command::psn::types::PacketSwitchedParam, command::{
         ip_transport_layer::{
-            self,
             responses::{SocketData, UDPSocketData},
             ReadSocketData, ReadUDPSocketData,
         },
-        psn, Urc,
-    },
-    error::Error as DeviceError,
-    network::{ContextId, Error as NetworkError, Network},
-    state::Event,
-    ProfileId,
-};
+        psn,
+    }, error::Error as DeviceError, network::{ContextId, Error as NetworkError, Network}, state::StateEvent};
 use apn::{APNInfo, Apn};
 use atat::{typenum::Unsigned, AtatClient};
 use core::cell::RefCell;
@@ -334,7 +313,7 @@ where
                     if service_status.operator.is_none() {
                         // Emit Event::Attached
                         self.network
-                            .push_event(Event::Attached)
+                            .set_state_change(StateEvent::Attached)
                             .map_err(Error::from)?;
                     }
                 } else {

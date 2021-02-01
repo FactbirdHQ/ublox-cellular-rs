@@ -1,19 +1,11 @@
-use crate::{
-    command::network_service::responses::OperatorSelection,
-    command::network_service::GetOperatorSelection,
-    command::{
-        ip_transport_layer,
+use crate::{command::network_service::GetOperatorSelection, command::network_service::responses::OperatorSelection, command::{
         network_service::GetNetworkRegistrationStatus,
         psn::{
             self, types::PSEventReportingMode, GetEPSNetworkRegistrationStatus,
             GetGPRSNetworkRegistrationStatus, SetPacketSwitchedEventReporting,
         },
         Urc,
-    },
-    error::GenericError,
-    services::data::ContextState,
-    state::{Event, NetworkStatus, ServiceStatus},
-};
+    }, error::GenericError, services::data::ContextState, state::{StateEvent, Events, NetworkStatus, ServiceStatus}};
 use atat::{atat_derive::AtatLen, AtatClient};
 use core::{
     cell::{BorrowError, BorrowMutError, Cell, RefCell},
@@ -116,20 +108,17 @@ where
         }
     }
 
-    pub fn get_event(&self) -> Result<Option<Event>, Error> {
-        Ok(self.network_status.try_borrow_mut()?.events.dequeue())
+    pub fn take_state_change(&self) -> Result<Option<StateEvent>, Error> {
+        Ok(self.network_status.try_borrow_mut()?.events.state_change.take())
     }
 
-    pub fn push_event(&self, event: Event) -> Result<(), Error> {
-        self.network_status.try_borrow_mut()?.push_event(event);
+    pub fn set_state_change(&self, state: StateEvent) -> Result<(), Error> {
+        self.network_status.try_borrow_mut()?.set_state_change(state);
         Ok(())
     }
 
     pub fn clear_events(&self) -> Result<(), Error> {
-        let mut status = self.network_status.try_borrow_mut()?;
-        while !status.events.is_empty() {
-            status.events.dequeue();
-        }
+        self.network_status.try_borrow_mut()?.events = Events::default();
         Ok(())
     }
 
@@ -137,18 +126,18 @@ where
         let mut status = self.network_status.try_borrow_mut()?;
 
         status.compare_and_set(
-            self.send_internal(&GetNetworkRegistrationStatus, true)?
+            self.send_internal(&GetNetworkRegistrationStatus, false)?
                 .into(),
         );
 
         status.compare_and_set(
-            self.send_internal(&GetEPSNetworkRegistrationStatus, true)?
+            self.send_internal(&GetEPSNetworkRegistrationStatus, false)?
                 .into(),
         );
 
         if !status.ps_reg_status.is_registered() {
             status.compare_and_set(
-                self.send_internal(&GetGPRSNetworkRegistrationStatus, true)?
+                self.send_internal(&GetGPRSNetworkRegistrationStatus, false)?
                     .into(),
             );
         }
@@ -156,7 +145,7 @@ where
         let mut service_status: ServiceStatus = status.deref_mut().into();
 
         let OperatorSelection { mode, oper, act } =
-            self.send_internal(&GetOperatorSelection, true)?;
+            self.send_internal(&GetOperatorSelection, false)?;
 
         service_status.network_registration_mode = mode;
         service_status.operator = oper;
@@ -224,10 +213,7 @@ where
                 }) => {
                     defmt::info!("[URC] DataConnectionActivated {:u8}", result);
                     if let Ok(mut params) = self.network_status.try_borrow_mut() {
-                        while !params.events.is_empty() {
-                            params.events.dequeue();
-                        }
-                        params.push_event(Event::DataActive);
+                        params.set_state_change(StateEvent::DataActive);
                     }
                 }
                 Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
@@ -235,10 +221,7 @@ where
                 }) => {
                     defmt::info!("[URC] DataConnectionDeactivated {:?}", profile_id);
                     if let Ok(mut params) = self.network_status.try_borrow_mut() {
-                        while !params.events.is_empty() {
-                            params.events.dequeue();
-                        }
-                        params.push_event(Event::DataInactive);
+                        params.set_state_change(StateEvent::DataInactive);
                     }
                 }
                 Urc::MessageWaitingIndication(_) => {
@@ -339,11 +322,11 @@ mod tests {
 
         let network = Network::new(tx);
 
-        network.push_event(Event::Attached).unwrap();
-        network.push_event(Event::DataActive).unwrap();
-        network.push_event(Event::DataInactive).unwrap();
-        network.push_event(Event::Detached).unwrap();
-        network.push_event(Event::Attached).unwrap();
+        network.set_state_change(StateEvent::Attached).unwrap();
+        network.set_state_change(StateEvent::DataActive).unwrap();
+        network.set_state_change(StateEvent::DataInactive).unwrap();
+        network.set_state_change(StateEvent::Detached).unwrap();
+        network.set_state_change(StateEvent::Attached).unwrap();
 
         assert!(network.get_event().unwrap().is_some());
         assert!(network.clear_events().is_ok());

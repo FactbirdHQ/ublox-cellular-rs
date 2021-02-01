@@ -29,6 +29,12 @@ where
 
     /// Open a new TCP socket to the given address and port. The socket starts in the unconnected state.
     fn socket(&self) -> Result<Self::TcpSocket, Self::Error> {
+        let mut sockets = self.sockets.try_borrow_mut()?;
+
+        if sockets.len() >= sockets.capacity() {
+            return Err(Error::Socket(SocketError::SocketSetFull));
+        }
+
         let socket_resp = self.network.send_internal(
             &CreateSocket {
                 protocol: SocketProtocol::TCP,
@@ -37,10 +43,7 @@ where
             true,
         )?;
 
-        Ok(self
-            .sockets
-            .try_borrow_mut()?
-            .add(TcpSocket::new(socket_resp.socket.0))?)
+        Ok(sockets.add(TcpSocket::new(socket_resp.socket.0))?)
     }
 
     /// Connect to the given remote host and port.
@@ -80,7 +83,7 @@ where
     /// Check if this socket is still connected
     fn is_connected(&self, socket: &Self::TcpSocket) -> Result<bool, Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut()?;
-        Ok(sockets.get::<TcpSocket<_>>(*socket)?.is_active())
+        Ok(sockets.get::<TcpSocket<_>>(*socket)?.is_connected())
     }
 
     /// Write to the stream. Returns the number of bytes written is returned
@@ -137,8 +140,7 @@ where
             .get::<TcpSocket<_>>(*socket)
             .map_err(Self::Error::from)?;
 
-        let n = tcp.recv_slice(buffer).map_err(Self::Error::from)?;
-        Ok(n)
+        Ok(tcp.recv_slice(buffer).map_err(Self::Error::from)?)
     }
 
     /// Close an existing TCP socket.

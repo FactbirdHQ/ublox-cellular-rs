@@ -104,7 +104,8 @@ where
         }
     }
 
-    pub fn index_of(&self, handle: Handle) -> Result<usize> {
+    /// Get the index of a given socket in the set.
+    fn index_of(&self, handle: Handle) -> Result<usize> {
         self.sockets
             .iter()
             .position(|i| {
@@ -115,15 +116,16 @@ where
             .ok_or(Error::InvalidSocket)
     }
 
-    /// Remove a socket from the set, without changing its state.
-    pub fn remove(&mut self, handle: Handle) -> Result<Socket<L>> {
+    /// Remove a socket from the set
+    pub fn remove(&mut self, handle: Handle) -> Result<()> {
         let index = self.index_of(handle)?;
         let item: &mut Option<Socket<L>> =
             self.sockets.get_mut(index).ok_or(Error::InvalidSocket)?;
 
         defmt::error!("Removing socket! {:?} {:?}", handle.0, item.as_ref().map(|i| i.get_type()));
         
-        item.take().ok_or(Error::InvalidSocket)
+        item.take().ok_or(Error::InvalidSocket)?;
+        Ok(())
     }
 
     /// Prune the sockets in this set.

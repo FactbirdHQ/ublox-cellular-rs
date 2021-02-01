@@ -11,13 +11,8 @@ pub enum State {
     Created,
     /// TCP connected or UDP has an address
     Connected,
-    /// Block all reads
-    ShutdownForRead,
     /// Block all writes
     ShutdownForWrite,
-    /// Block all reads and writes, waiting for far end to complete closure, can
-    /// be tidied up.
-    Closing,
 }
 
 impl Default for State {
@@ -87,24 +82,8 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     /// In terms of the TCP state machine, the socket must be in the `Closed` or
     /// `ShutdownForRead` state.
     #[inline]
-    pub fn is_active(&self) -> bool {
-        !matches!(self.state, State::ShutdownForRead | State::Created)
-    }
-
-    /// Return whether the transmit half of the full-duplex connection is open.
-    ///
-    /// This function returns true if it's possible to send data and have it arrive
-    /// to the remote endpoint. However, it does not make any guarantees about the state
-    /// of the transmit buffer, and even if it returns true, [send](#method.send) may
-    /// not be able to enqueue any octets.
-    ///
-    /// In terms of the TCP state machine, the socket must be in the `Connected` or
-    /// `ShutdownForRead` state.
-    #[inline]
-    pub fn may_send(&self) -> bool {
-        // In `ShutdownForRead`, the remote endpoint has closed our receive half of the connection
-        // but we still can transmit indefinitely.
-        matches!(self.state, State::Connected | State::ShutdownForRead)
+    pub fn is_connected(&self) -> bool {
+        matches!(self.state, State::Connected)
     }
 
     /// Return whether the receive half of the full-duplex connection is open.
@@ -238,17 +217,6 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     }
 
     pub fn set_state(&mut self, state: State) {
-        // if self.state != state {
-        //     if self.remote_endpoint.addr.is_unspecified() {
-        //         net_trace!("{}:{}: state={}=>{}",
-        //                    self.meta.handle, self.local_endpoint,
-        //                    self.state, state);
-        //     } else {
-        //         net_trace!("{}:{}:{}: state={}=>{}",
-        //                    self.meta.handle, self.local_endpoint, self.remote_endpoint,
-        //                    self.state, state);
-        //     }
-        // }
         self.state = state
     }
 }
