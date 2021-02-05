@@ -23,6 +23,7 @@ serde = { version = "^1", default-features = false, features = ["derive"] }
 defmt = "^0.1"
 embedded-hal = "1.0.0-alpha.4"
 embedded-nal = "0.2.0"
+embedded-time = "0.10.1"
 hash32 = "^0.1.1"
 hash32-derive = "^0.1.0"
 nb = "^1"

@@ -1,47 +1,14 @@
 use atat::AtatClient;
-use embedded_hal::blocking::delay::DelayMs;
-use embedded_hal::timer::CountDown;
+use embedded_time::{rate::Fraction, Clock, Instant};
 
-pub struct MockTimer {
-    pub time: Option<u32>,
+#[derive(Debug)]
+pub struct MockAtClient {
+    pub n_urcs_dequeued: u8,
 }
-
-impl MockTimer {
-    pub fn new() -> Self {
-        MockTimer { time: None }
-    }
-}
-
-impl CountDown for MockTimer {
-    type Error = core::convert::Infallible;
-    type Time = u32;
-    fn try_start<T>(&mut self, count: T) -> Result<(), Self::Error>
-    where
-        T: Into<Self::Time>,
-    {
-        self.time = Some(count.into());
-        Ok(())
-    }
-    fn try_wait(&mut self) -> nb::Result<(), Self::Error> {
-        self.time = None;
-        Ok(())
-    }
-}
-
-impl DelayMs<u32> for MockTimer {
-    type Error = core::convert::Infallible;
-
-    fn try_delay_ms(&mut self, ms: u32) -> Result<(), Self::Error> {
-        self.try_start(ms)?;
-        nb::block!(self.try_wait())
-    }
-}
-
-pub struct MockAtClient {}
 
 impl MockAtClient {
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(n_urcs_dequeued: u8) -> Self {
+        Self { n_urcs_dequeued }
     }
 }
 
@@ -50,7 +17,13 @@ impl AtatClient for MockAtClient {
         todo!()
     }
 
-    fn peek_urc_with<URC: atat::AtatUrc, F: FnOnce(URC::Response) -> bool>(&mut self, _f: F) {}
+    fn peek_urc_with<URC: atat::AtatUrc, F: FnOnce(URC::Response) -> bool>(&mut self, f: F) {
+        if let Ok(urc) = URC::parse(b"+UREG:0") {
+            if f(urc) {
+                self.n_urcs_dequeued += 1;
+            }
+        }
+    }
 
     fn check_response<A: atat::AtatCmd>(
         &mut self,
@@ -61,5 +34,52 @@ impl AtatClient for MockAtClient {
 
     fn get_mode(&self) -> atat::Mode {
         todo!()
+    }
+}
+
+#[derive(Debug)]
+pub struct MockTimer {
+    forced_ms_time: Option<u32>,
+    start_time: std::time::SystemTime,
+}
+
+impl MockTimer {
+    pub fn new(forced_ms_time: Option<u32>) -> Self {
+        Self {
+            forced_ms_time,
+            start_time: std::time::SystemTime::now(),
+        }
+    }
+}
+
+impl Clock for MockTimer {
+    type T = u32;
+
+    const SCALING_FACTOR: Fraction = Fraction::new(1, 1000);
+
+    fn try_now(&self) -> Result<Instant<Self>, embedded_time::clock::Error> {
+        Ok(Instant::new(self.forced_ms_time.unwrap_or_else(|| {
+            self.start_time.elapsed().unwrap().as_millis() as u32
+        })))
+    }
+}
+
+mod tests {
+    use super::*;
+    use embedded_time::duration::*;
+
+    #[test]
+    fn mock_timer_works() {
+        let now = std::time::SystemTime::now();
+
+        let timer = MockTimer::new(None);
+        timer
+            .new_timer(1_u32.seconds())
+            .start()
+            .unwrap()
+            .wait()
+            .unwrap();
+
+        assert!(now.elapsed().unwrap().as_millis() >= 1_000);
     }
 }

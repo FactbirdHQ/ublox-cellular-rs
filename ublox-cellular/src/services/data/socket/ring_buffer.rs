@@ -1,8 +1,6 @@
 use super::{Error, Result};
 use core::cmp;
 
-use super::Resettable;
-
 use heapless::{ArrayLength, Vec};
 
 /// A ring buffer.
@@ -56,17 +54,6 @@ impl<T: Default + Clone, N: ArrayLength<T>> RingBuffer<T, N> {
     /// Return the maximum number of elements in the ring buffer.
     pub fn capacity(&self) -> usize {
         self.storage.capacity()
-    }
-
-    /// Clear the ring buffer, and reset every element.
-    pub fn reset(&mut self)
-    where
-        T: Resettable,
-    {
-        self.clear();
-        for elem in self.storage.iter_mut() {
-            elem.reset();
-        }
     }
 
     /// Return the current number of elements in the ring buffer.
@@ -431,7 +418,7 @@ impl<T: Default + core::fmt::Debug + Copy, N: ArrayLength<T>> From<Vec<T, N>> fo
 }
 
 #[cfg(test)]
-mod test {
+mod tests {
     use super::*;
     use heapless::consts;
 

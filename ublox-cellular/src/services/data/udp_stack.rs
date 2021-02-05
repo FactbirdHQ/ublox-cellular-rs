@@ -1,3 +1,5 @@
+use core::convert::TryInto;
+
 use super::DataService;
 use super::{
     socket::{Error as SocketError, Socket, SocketHandle, UdpSocket},
@@ -9,11 +11,14 @@ use crate::command::ip_transport_layer::{
 };
 use atat::typenum::Unsigned;
 use embedded_nal::{SocketAddr, UdpClient};
+use embedded_time::{Clock, duration::{Generic, Milliseconds}};
 use heapless::{ArrayLength, Bucket, Pos};
 
-impl<'a, C, N, L> UdpClient for DataService<'a, C, N, L>
+impl<'a, C, CLK, N, L> UdpClient for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
+    CLK: Clock,
+    Generic<CLK::T>: TryInto<Milliseconds>,
     N: 'static
         + ArrayLength<Option<Socket<L>>>
         + ArrayLength<Bucket<u8, usize>>
@@ -69,7 +74,7 @@ where
         }
 
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
-            defmt::trace!("Sending: {:?} bytes, {:?}", chunk.len(), chunk);
+            defmt::trace!("Sending: {:?} bytes", chunk.len());
             self.network
                 .send_internal(
                     &PrepareUDPSendToDataBinary {

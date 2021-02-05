@@ -1,22 +1,22 @@
-#![no_std]
+#![cfg_attr(not(test), no_std)]
+
 mod client;
 pub mod command;
 mod config;
 pub mod error;
-mod module_cfg;
 mod network;
 mod services;
-mod state;
+mod power;
+mod registration;
 
 #[cfg(test)]
 mod test_helpers;
 
 pub use client::Device as GsmClient;
-pub use config::Config;
+pub use config::{Config, NoPin};
 pub use network::{ContextId, ProfileId};
 pub use services::data::apn::{APNInfo, Apn};
 pub use services::data::ssl::SecurityProfileId;
-pub use state::State;
 
 // Re-export atat version in use
 pub use atat;

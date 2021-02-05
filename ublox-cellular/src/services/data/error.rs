@@ -3,7 +3,7 @@ use crate::error::GenericError;
 use crate::network::Error as NetworkError;
 use core::cell::{BorrowError, BorrowMutError};
 
-#[derive(Debug, PartialEq, defmt::Format)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     InvalidApn,
     SocketClosed,

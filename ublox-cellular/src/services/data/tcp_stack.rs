@@ -1,3 +1,5 @@
+use core::convert::TryInto;
+
 use super::ssl::{SecurityProfileId, SSL};
 use super::DataService;
 use super::{
@@ -10,11 +12,17 @@ use crate::command::ip_transport_layer::{
 };
 use atat::typenum::Unsigned;
 use embedded_nal::{SocketAddr, TcpClient};
+use embedded_time::{
+    duration::{Generic, Milliseconds},
+    Clock,
+};
 use heapless::{ArrayLength, Bucket, Pos};
 
-impl<'a, C, N, L> TcpClient for DataService<'a, C, N, L>
+impl<'a, C, CLK, N, L> TcpClient for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
+    CLK: Clock,
+    Generic<CLK::T>: TryInto<Milliseconds>,
     N: 'static
         + ArrayLength<Option<Socket<L>>>
         + ArrayLength<Bucket<u8, usize>>
@@ -94,7 +102,7 @@ where
         }
 
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
-            defmt::trace!("Sending: {:?} bytes, {:?}", chunk.len(), chunk);
+            defmt::trace!("Sending: {:?} bytes", chunk.len());
             self.network
                 .send_internal(
                     &PrepareWriteSocketDataBinary {

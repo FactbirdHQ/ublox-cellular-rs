@@ -5,14 +5,14 @@ use heapless::{consts, String};
 pub struct NoPin;
 
 impl InputPin for NoPin {
-    type Error = core::convert::Infallible;
+    type Error = ();
 
     fn try_is_high(&self) -> Result<bool, Self::Error> {
-        Ok(false)
+        Err(())
     }
 
     fn try_is_low(&self) -> Result<bool, Self::Error> {
-        Ok(true)
+        Err(())
     }
 }
 

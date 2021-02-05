@@ -11,6 +11,7 @@ use heapless::ArrayLength;
 
 #[cfg(feature = "socket-tcp")]
 pub use tcp::{State as TcpState, TcpSocket};
+
 #[cfg(feature = "socket-udp")]
 pub use udp::UdpSocket;
 
@@ -71,6 +72,25 @@ pub enum SocketType {
 }
 
 impl<L: ArrayLength<u8>> Socket<L> {
+    /// Return the socket handle.
+    #[inline]
+    pub fn handle(&self) -> SocketHandle {
+        self.meta().handle
+    }
+
+    pub(crate) fn meta(&self) -> &SocketMeta {
+        match self {
+            // #[cfg(feature = "socket-raw")]
+            // Socket::Raw(ref $( $mut_ )* $socket) => $code,
+            // #[cfg(all(feature = "socket-icmp", any(feature = "proto-ipv4", feature = "proto-ipv6")))]
+            // Socket::Icmp(ref $( $mut_ )* $socket) => $code,
+            #[cfg(feature = "socket-udp")]
+            Socket::Udp(ref socket) => &socket.meta,
+            #[cfg(feature = "socket-tcp")]
+            Socket::Tcp(ref socket) => &socket.meta,
+        }
+    }
+
     pub fn get_type(&self) -> SocketType {
         match self {
             Socket::Tcp(_) => SocketType::Tcp,
@@ -114,57 +134,27 @@ impl<L: ArrayLength<u8>> Socket<L> {
     }
 }
 
-impl<L: ArrayLength<u8>> Socket<L> {
-    /// Return the socket handle.
-    #[inline]
-    pub fn handle(&self) -> SocketHandle {
-        self.meta().handle
-    }
-
-    pub(crate) fn meta(&self) -> &SocketMeta {
-        match self {
-            // #[cfg(feature = "socket-raw")]
-            // Socket::Raw(ref $( $mut_ )* $socket) => $code,
-            // #[cfg(all(feature = "socket-icmp", any(feature = "proto-ipv4", feature = "proto-ipv6")))]
-            // Socket::Icmp(ref $( $mut_ )* $socket) => $code,
-            #[cfg(feature = "socket-udp")]
-            Socket::Udp(ref socket) => &socket.meta,
-            #[cfg(feature = "socket-tcp")]
-            Socket::Tcp(ref socket) => &socket.meta,
-        }
-    }
-}
-
 /// A conversion trait for network sockets.
 pub trait AnySocket<L: ArrayLength<u8>>: Sized {
     fn downcast(socket_ref: SocketRef<'_, Socket<L>>) -> Result<SocketRef<'_, Self>>;
 }
 
-/// A trait for setting a value to a known state.
-///
-/// In-place analog of Default.
-pub trait Resettable {
-    fn reset(&mut self);
-}
-
-macro_rules! from_socket {
-    ($socket:ty, $variant:ident) => {
-        impl<L: ArrayLength<u8>> AnySocket<L> for $socket {
-            fn downcast(ref_: SocketRef<'_, Socket<L>>) -> Result<SocketRef<'_, Self>> {
-                match SocketRef::into_inner(ref_) {
-                    Socket::$variant(ref mut socket) => Ok(SocketRef::new(socket)),
-                    _ => Err(Error::Illegal),
-                }
-            }
-        }
-    };
-}
-
-// #[cfg(feature = "socket-raw")]
-// from_socket!(RawSocket, Raw);
-// #[cfg(feature = "socket-icmp")]
-// from_socket!(IcmpSocket, Icmp);
-#[cfg(feature = "socket-udp")]
-from_socket!(UdpSocket<L>, Udp);
 #[cfg(feature = "socket-tcp")]
-from_socket!(TcpSocket<L>, Tcp);
+impl<L: ArrayLength<u8>> AnySocket<L> for TcpSocket<L> {
+    fn downcast(ref_: SocketRef<'_, Socket<L>>) -> Result<SocketRef<'_, Self>> {
+        match SocketRef::into_inner(ref_) {
+            Socket::Tcp(ref mut socket) => Ok(SocketRef::new(socket)),
+            _ => Err(Error::Illegal),
+        }
+    }
+}
+
+#[cfg(feature = "socket-udp")]
+impl<L: ArrayLength<u8>> AnySocket<L> for UdpSocket<L> {
+    fn downcast(ref_: SocketRef<'_, Socket<L>>) -> Result<SocketRef<'_, Self>> {
+        match SocketRef::into_inner(ref_) {
+            Socket::Udp(ref mut socket) => Ok(SocketRef::new(socket)),
+            _ => Err(Error::Illegal),
+        }
+    }
+}
