@@ -25,7 +25,6 @@ pub struct SecurityDataImport {
     md5_string: String<consts::U128>,
 }
 
-
 #[derive(Clone, PartialEq, AtatResp)]
 pub struct SecurityData {
     /// Type of the security data in verbose format:

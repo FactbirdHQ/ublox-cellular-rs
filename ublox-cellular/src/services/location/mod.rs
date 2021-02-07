@@ -11,12 +11,11 @@ impl<C, CLK, N, L, RST, DTR, PWR, VINT> Device<C, CLK, N, L, RST, DTR, PWR, VINT
 where
     C: AtatClient,
     CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
+    N: ArrayLength<Option<Socket<L, CLK>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     pub fn location_service(&mut self) -> nb::Result<LocationService, DeviceError> {

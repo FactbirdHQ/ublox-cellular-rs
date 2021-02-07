@@ -5,9 +5,9 @@ pub mod command;
 mod config;
 pub mod error;
 mod network;
-mod services;
 mod power;
 mod registration;
+mod services;
 
 #[cfg(test)]
 mod test_helpers;

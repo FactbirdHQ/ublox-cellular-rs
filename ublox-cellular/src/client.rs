@@ -16,7 +16,7 @@ use crate::{
     command::{
         network_service::{
             responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
-            SetOperatorSelection,
+            SetOperatorSelection, SetRadioAccessTechnology,
         },
         psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
     },
@@ -31,7 +31,10 @@ use crate::{
     },
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
-use network_service::{types::NetworkRegistrationUrcConfig, SetNetworkRegistrationStatus};
+use network_service::{
+    types::{NetworkRegistrationUrcConfig, RadioAccessTechnologySelected},
+    SetNetworkRegistrationStatus,
+};
 use psn::{
     types::{EPSNetworkRegistrationUrcConfig, GPRSNetworkRegistrationUrcConfig},
     SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
@@ -47,14 +50,13 @@ pub enum State {
 pub struct Device<C, CLK, N, L, RST, DTR, PWR, VINT>
 where
     C: AtatClient,
-    CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
+    CLK: 'static + Clock,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
     N: 'static
-        + ArrayLength<Option<Socket<L>>>
+        + ArrayLength<Option<Socket<L, CLK>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
@@ -65,7 +67,7 @@ where
     pub(crate) state: State,
     pub(crate) power_state: PowerState,
     // Ublox devices can hold a maximum of 6 active sockets
-    pub(crate) sockets: Option<RefCell<&'static mut SocketSet<N, L>>>,
+    pub(crate) sockets: Option<RefCell<&'static mut SocketSet<N, L, CLK>>>,
 }
 
 // TODO:
@@ -73,12 +75,13 @@ impl<C, CLK, N, L, RST, DTR, PWR, VINT> Drop for Device<C, CLK, N, L, RST, DTR, 
 where
     C: AtatClient,
     CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
+    N: ArrayLength<Option<Socket<L, CLK>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     fn drop(&mut self) {
@@ -93,12 +96,13 @@ impl<C, CLK, N, L, RST, DTR, PWR, VINT> Device<C, CLK, N, L, RST, DTR, PWR, VINT
 where
     C: AtatClient,
     CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
+    N: ArrayLength<Option<Socket<L, CLK>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     pub fn new(client: C, timer: CLK, config: Config<RST, DTR, PWR, VINT>) -> Self {
@@ -154,11 +158,14 @@ where
         return Err(Error::Busy);
     }
 
-    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<N, L>) {
+    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<N, L, CLK>) {
         self.sockets = Some(RefCell::new(socket_set));
     }
 
-    pub fn initialize(&mut self) -> Result<(), Error> {
+    pub fn initialize(&mut self) -> Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
         if self.power_state != PowerState::On {
             // Always re-configure the module when power has been off
             self.state = State::Off;
@@ -295,6 +302,13 @@ where
             false,
         )?;
 
+        // self.network.send_internal(
+        //     &SetRadioAccessTechnology {
+        //         selected_act: RadioAccessTechnologySelected::Lte,
+        //     },
+        //     false,
+        // )?;
+
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Full,
@@ -303,17 +317,16 @@ where
             true,
         )?;
 
-        
         let mut ns = self.network.status.try_borrow_mut()?;
         ns.reset();
         ns.set_connection_state(ConnectionState::Connecting);
         drop(ns);
-        
+
         self.enable_registration_urcs()?;
-        
+
         let OperatorSelection { mode, .. } =
-        self.network.send_internal(&GetOperatorSelection, true)?;
-        
+            self.network.send_internal(&GetOperatorSelection, true)?;
+
         if mode != OperatorSelectionMode::Automatic {
             self.network.send_internal(
                 &SetOperatorSelection {
@@ -424,7 +437,10 @@ where
         }
     }
 
-    pub(crate) fn process_events(&mut self) -> Result<(), Error> {
+    pub(crate) fn process_events(&mut self) -> Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
         if self.power_state != PowerState::On {
             return Err(Error::Uninitialized);
         }
@@ -439,7 +455,10 @@ where
         }
     }
 
-    pub fn spin(&mut self) -> nb::Result<(), Error> {
+    pub fn spin(&mut self) -> nb::Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
         self.initialize().ok();
 
         self.process_events().map_err(Error::from)?;

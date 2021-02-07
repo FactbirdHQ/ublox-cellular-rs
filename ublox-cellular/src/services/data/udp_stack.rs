@@ -11,16 +11,18 @@ use crate::command::ip_transport_layer::{
 };
 use atat::typenum::Unsigned;
 use embedded_nal::{SocketAddr, UdpClient};
-use embedded_time::{Clock, duration::{Generic, Milliseconds}};
+use embedded_time::{
+    duration::{Generic, Milliseconds},
+    Clock,
+};
 use heapless::{ArrayLength, Bucket, Pos};
 
 impl<'a, C, CLK, N, L> UdpClient for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
     CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
     N: 'static
-        + ArrayLength<Option<Socket<L>>>
+        + ArrayLength<Option<Socket<L, CLK>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
@@ -55,7 +57,7 @@ where
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let mut udp = sockets
-            .get::<UdpSocket<_>>(*socket)
+            .get::<UdpSocket<_, _>>(*socket)
             .map_err(Self::Error::from)?;
         udp.bind(remote).map_err(Self::Error::from)?;
         Ok(())
@@ -66,7 +68,7 @@ where
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let udp = sockets
-            .get::<UdpSocket<_>>(*socket)
+            .get::<UdpSocket<_, _>>(*socket)
             .map_err(Self::Error::from)?;
 
         if !udp.is_open() {
@@ -119,7 +121,7 @@ where
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let mut udp = sockets
-            .get::<UdpSocket<_>>(*socket)
+            .get::<UdpSocket<_, _>>(*socket)
             .map_err(Self::Error::from)?;
 
         let response = udp

@@ -1,3 +1,5 @@
+use embedded_time::TimeError;
+
 use super::socket::Error as SocketError;
 use crate::error::GenericError;
 use crate::network::Error as NetworkError;
@@ -46,6 +48,12 @@ impl From<BorrowMutError> for Error {
 
 impl From<BorrowError> for Error {
     fn from(e: BorrowError) -> Self {
+        Error::Generic(e.into())
+    }
+}
+
+impl From<TimeError> for Error {
+    fn from(e: TimeError) -> Self {
         Error::Generic(e.into())
     }
 }

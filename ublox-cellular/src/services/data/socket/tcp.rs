@@ -1,3 +1,5 @@
+use core::convert::TryInto;
+use embedded_time::{duration::*, Clock, Instant};
 use heapless::ArrayLength;
 
 use super::{Error, Result, RingBuffer, Socket, SocketHandle, SocketMeta};
@@ -27,23 +29,27 @@ impl Default for State {
 /// Note that, for listening sockets, there is no "backlog"; to be able to simultaneously
 /// accept several connections, as many sockets must be allocated, or any new connection
 /// attempts will be reset.
-pub struct TcpSocket<L: ArrayLength<u8>> {
+pub struct TcpSocket<L: ArrayLength<u8>, CLK: Clock> {
     pub(crate) meta: SocketMeta,
     state: State,
+    check_interval: Seconds<u32>,
     available_data: usize,
     rx_buffer: SocketBuffer<L>,
+    last_check_time: Option<Instant<CLK>>,
 }
 
-impl<L: ArrayLength<u8>> TcpSocket<L> {
+impl<L: ArrayLength<u8>, CLK: Clock> TcpSocket<L, CLK> {
     /// Create a socket using the given buffers.
-    pub fn new(socket_id: u8) -> TcpSocket<L> {
+    pub fn new(socket_id: u8) -> TcpSocket<L, CLK> {
         TcpSocket {
             meta: SocketMeta {
                 handle: SocketHandle(socket_id),
             },
             state: State::default(),
-            available_data: 0,
             rx_buffer: SocketBuffer::new(),
+            available_data: 0,
+            check_interval: Seconds(15),
+            last_check_time: None,
         }
     }
 
@@ -57,6 +63,18 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     #[inline]
     pub fn state(&self) -> State {
         self.state
+    }
+
+    pub fn should_update_available_data(&mut self, ts: Instant<CLK>) -> bool
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
+        self.last_check_time
+            .replace(ts)
+            .and_then(|ref last_check_time| ts.checked_duration_since(last_check_time))
+            .and_then(|dur| dur.try_into().ok())
+            .map(|dur: Milliseconds<u32>| dur >= self.check_interval)
+            .unwrap_or(false)
     }
 
     /// Set available data.
@@ -221,8 +239,8 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     }
 }
 
-impl<L: ArrayLength<u8>> Into<Socket<L>> for TcpSocket<L> {
-    fn into(self) -> Socket<L> {
+impl<L: ArrayLength<u8>, CLK: Clock> Into<Socket<L, CLK>> for TcpSocket<L, CLK> {
+    fn into(self) -> Socket<L, CLK> {
         Socket::Tcp(self)
     }
 }

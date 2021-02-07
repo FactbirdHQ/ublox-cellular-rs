@@ -43,9 +43,9 @@ pub mod responses;
 pub mod types;
 
 use atat::atat_derive::AtatCmd;
+use heapless::{consts, Vec};
 use responses::*;
 use types::*;
-use heapless::{Vec, consts};
 
 use super::NoResponse;
 use crate::services::data::ssl::SecurityProfileId;

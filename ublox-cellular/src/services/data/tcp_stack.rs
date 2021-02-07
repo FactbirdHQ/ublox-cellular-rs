@@ -22,9 +22,8 @@ impl<'a, C, CLK, N, L> TcpClient for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
     CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
     N: 'static
-        + ArrayLength<Option<Socket<L>>>
+        + ArrayLength<Option<Socket<L, CLK>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
@@ -62,7 +61,7 @@ where
     ) -> nb::Result<(), Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
         let mut tcp = sockets
-            .get::<TcpSocket<_>>(*socket)
+            .get::<TcpSocket<_, CLK>>(*socket)
             .map_err(Self::Error::from)?;
 
         if tcp.state() == TcpState::Created {
@@ -91,7 +90,7 @@ where
     /// Check if this socket is still connected
     fn is_connected(&self, socket: &Self::TcpSocket) -> Result<bool, Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut()?;
-        Ok(sockets.get::<TcpSocket<_>>(*socket)?.is_connected())
+        Ok(sockets.get::<TcpSocket<_, _>>(*socket)?.is_connected())
     }
 
     /// Write to the stream. Returns the number of bytes written is returned
@@ -145,7 +144,7 @@ where
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let mut tcp = sockets
-            .get::<TcpSocket<_>>(*socket)
+            .get::<TcpSocket<_, _>>(*socket)
             .map_err(Self::Error::from)?;
 
         Ok(tcp.recv_slice(buffer).map_err(Self::Error::from)?)

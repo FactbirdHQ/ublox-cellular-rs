@@ -32,12 +32,13 @@ impl<C, CLK, N, L, RST, DTR, PWR, VINT> Device<C, CLK, N, L, RST, DTR, PWR, VINT
 where
     C: AtatClient,
     CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
+    N: ArrayLength<Option<Socket<L, CLK>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     /// Check that the cellular module is alive.
@@ -59,7 +60,10 @@ where
     }
 
     /// Perform at full factory reset of the module, clearing all NVM sectors in the process
-    pub fn factory_reset(&mut self) -> Result<(), Error> {
+    pub fn factory_reset(&mut self) -> Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
         self.network.send_internal(
             &SetFactoryConfiguration {
                 fs_op: FSFactoryRestoreType::AllFiles,
@@ -78,7 +82,10 @@ where
     }
 
     /// Reset the module by sending AT CFUN command
-    pub(crate) fn soft_reset(&mut self, sim_reset: bool) -> Result<(), Error> {
+    pub(crate) fn soft_reset(&mut self, sim_reset: bool) -> Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
         defmt::trace!(
             "Attempting to soft reset of the modem with sim reset: {:?}.",
             sim_reset
@@ -101,7 +108,10 @@ where
     /// Reset the module by driving it's RESET_N pin low for 50 ms
     ///
     /// **NOTE** This function will reset NVM settings!
-    pub fn hard_reset(&mut self) -> Result<(), Error> {
+    pub fn hard_reset(&mut self) -> Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
         defmt::trace!("Attempting to hard reset of the modem.");
         match self.config.rst_pin {
             Some(ref mut rst) => {
@@ -135,7 +145,10 @@ where
         Ok(())
     }
 
-    pub fn power_on(&mut self) -> Result<(), Error> {
+    pub fn power_on(&mut self) -> Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
         defmt::info!(
             "Attempting to power on the modem with PWR_ON pin: {:bool} and VInt pin: {:bool}.",
             self.config.pwr_pin.is_some(),
@@ -156,8 +169,15 @@ where
                         .start()?
                         .wait()?;
                     pwr.try_set_high().ok();
+                    self.network
+                        .status
+                        .try_borrow()?
+                        .timer
+                        .new_timer(1.seconds())
+                        .start()?
+                        .wait()?;
 
-                    if let Err(e) = self.wait_power_state(PowerState::On, 1_000u32.milliseconds()) {
+                    if let Err(e) = self.wait_power_state(PowerState::On, 5_000u32.milliseconds()) {
                         defmt::error!("Failed to power on modem");
                         return Err(e);
                     } else {
@@ -256,11 +276,15 @@ where
         &mut self,
         expected: PowerState,
         timeout: Milliseconds<u32>,
-    ) -> Result<(), Error> {
+    ) -> Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
         let now = self.network.status.try_borrow()?.timer.try_now().unwrap();
 
         let mut res = false;
 
+        defmt::trace!("Waiting for the modem to reach {:?}.", expected);
         while self
             .network
             .status
@@ -287,12 +311,11 @@ where
                 .wait()?;
         }
 
-        defmt::trace!("Waiting for the modem to restart.");
         if res {
-            defmt::trace!("Successfully reset the modem.");
+            defmt::trace!("Success.");
             Ok(())
         } else {
-            defmt::error!("Failed to reset the modem.");
+            defmt::error!("Modem never reach {:?}.", expected);
             Err(Error::Generic(GenericError::Timeout))
         }
     }

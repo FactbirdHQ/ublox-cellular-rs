@@ -9,7 +9,10 @@ use crate::{
     command::ip_transport_layer::{types::*, *},
 };
 use atat::atat_derive::AtatLen;
-use embedded_time::{Clock, duration::{Generic, Milliseconds}};
+use embedded_time::{
+    duration::{Generic, Milliseconds},
+    Clock,
+};
 use heapless::{ArrayLength, Bucket, Pos};
 use serde::{Deserialize, Serialize};
 
@@ -43,8 +46,9 @@ impl<'a, C, CLK, N, L> SSL for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
     CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
-    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
+    N: ArrayLength<Option<Socket<L, CLK>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     fn import_certificate(

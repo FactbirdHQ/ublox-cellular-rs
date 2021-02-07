@@ -28,7 +28,6 @@ where
 impl<CLK> CellularRegistrationStatus<CLK>
 where
     CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
 {
     pub fn new() -> Self {
         Self {
@@ -38,7 +37,10 @@ where
         }
     }
 
-    pub fn duration(&self, ts: Instant<CLK>) -> Milliseconds<u32> {
+    pub fn duration(&self, ts: Instant<CLK>) -> Milliseconds<u32>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
         self.started
             .as_ref()
             .and_then(|started| ts.checked_duration_since(started))
@@ -222,7 +224,6 @@ where
     check_imsi: bool,
 
     pub(crate) cgi: CellularGlobalIdentity,
-
     // Radio Access Technology (RAT)
     // pub(crate) act: RatAct,
 }
@@ -243,11 +244,10 @@ impl Default for ConnectionState {
 impl<CLK> RegistrationState<CLK>
 where
     CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
 {
     pub fn new(timer: CLK) -> Self {
         Self {
-            timer, 
+            timer,
             reg_check_time: None,
             reg_start_time: None,
 
@@ -259,7 +259,6 @@ where
             check_imsi: false,
 
             cgi: CellularGlobalIdentity::default(),
-
             // act: RatAct::default(),
         }
     }

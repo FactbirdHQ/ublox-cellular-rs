@@ -24,6 +24,9 @@ use hash32_derive::Hash32;
 use heapless::consts;
 use serde::{Deserialize, Serialize};
 
+const REGISTRATION_CHECK_INTERVAL: Seconds<u32> = Seconds::<u32>(15);
+const REGISTRATION_TIMEOUT: Minutes<u32> = Minutes::<u32>(5);
+
 #[derive(Debug, PartialEq)]
 pub enum Error {
     Generic(GenericError),
@@ -138,7 +141,6 @@ impl<C: AtatClient> AtTx<C> {
 pub struct Network<C, CLK>
 where
     CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
 {
     pub(crate) status: RefCell<RegistrationState<CLK>>,
     pub(crate) context_state: Cell<ContextState>,
@@ -149,7 +151,6 @@ impl<C, CLK> Network<C, CLK>
 where
     C: AtatClient,
     CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
 {
     pub(crate) fn new(at_tx: AtTx<C>, timer: CLK) -> Self {
         Network {
@@ -173,7 +174,10 @@ where
         Ok(())
     }
 
-    pub fn process_events(&self) -> Result<(), Error> {
+    pub fn process_events(&self) -> Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
         if self.at_tx.consecutive_timeouts.get() > 10 {
             defmt::warn!("Resetting the modem due to consecutive AT timeouts");
             return Err(Error::Generic(GenericError::Timeout));
@@ -184,11 +188,7 @@ where
         self.intervene_registration()?;
         // self.check_running_imsi();
 
-
-
         let mut ns = self.status.try_borrow_mut()?;
-
-        let registration_check_interval = Seconds::<u32>(15);
 
         let now = ns.timer.try_now().map_err(TimeError::from)?;
         let should_check = ns
@@ -196,7 +196,7 @@ where
             .and_then(|ref reg_check_time| {
                 now.checked_duration_since(reg_check_time)
                     .and_then(|dur| dur.try_into().ok())
-                    .map(|dur| dur >= registration_check_interval)
+                    .map(|dur| dur >= REGISTRATION_CHECK_INTERVAL)
             })
             .unwrap_or(true);
 
@@ -210,16 +210,13 @@ where
         self.update_registration()?;
 
         let ns = self.status.try_borrow()?;
-
-        let registration_timeout = Minutes::<u32>(5);
-
         let now = ns.timer.try_now().map_err(TimeError::from)?;
         let is_timeout = ns
             .reg_start_time
             .and_then(|ref reg_start_time| {
                 now.checked_duration_since(reg_start_time)
                     .and_then(|dur| dur.try_into().ok())
-                    .map(|dur| dur >= registration_timeout)
+                    .map(|dur| dur >= REGISTRATION_TIMEOUT)
             })
             .unwrap_or(false);
 
@@ -252,26 +249,28 @@ where
         Ok(())
     }
 
-    pub fn intervene_registration(&self) -> Result<(), Error> {
+    pub fn intervene_registration(&self) -> Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
         let mut ns = self.status.try_borrow_mut()?;
-        
+
         if ns.conn_state != ConnectionState::Connecting {
             return Ok(());
         }
-        
-        let timeout = Seconds(ns.registration_interventions * 15);
-        
-        let ts = ns.timer.try_now().map_err(TimeError::from)?;
-        
+
+        let now = ns.timer.try_now().map_err(TimeError::from)?;
+
         // If EPS has been sticky for longer than `timeout`
-        if ns.eps.sticky() && ns.eps.duration(ts) >= timeout {
+        let timeout = Seconds(ns.registration_interventions * 15);
+        if ns.eps.sticky() && ns.eps.duration(now) >= timeout {
             // If (EPS + CSD) is not attempting registration
             if ns.eps.get_status() == registration::Status::NotRegistering
                 && ns.csd.get_status() == registration::Status::NotRegistering
             {
                 defmt::trace!(
                     "Sticky not registering state for {:?} s, PLMN reselection",
-                    Seconds::<u32>::from(ns.eps.duration(ts)).integer()
+                    Seconds::<u32>::from(ns.eps.duration(now)).integer()
                 );
 
                 ns.csd.reset();
@@ -293,7 +292,7 @@ where
             {
                 defmt::trace!(
                     "Sticky denied state for {:?} s, RF reset",
-                    Seconds::<u32>::from(ns.eps.duration(ts)).integer()
+                    Seconds::<u32>::from(ns.eps.duration(now)).integer()
                 );
                 ns.csd.reset();
                 ns.psd.reset();
@@ -320,13 +319,13 @@ where
         // If CSD has been sticky for longer than `timeout`,
         // and (CSD + PSD) is denied registration.
         if ns.csd.sticky()
-            && ns.csd.duration(ts) >= timeout
+            && ns.csd.duration(now) >= timeout
             && ns.csd.get_status() == registration::Status::Denied
             && ns.psd.get_status() == registration::Status::Denied
         {
             defmt::trace!(
                 "Sticky CSD and PSD denied state for {:?} s, RF reset",
-                Seconds::<u32>::from(ns.csd.duration(ts)).integer()
+                Seconds::<u32>::from(ns.csd.duration(now)).integer()
             );
             ns.csd.reset();
             ns.psd.reset();
@@ -353,13 +352,13 @@ where
         // and (PSD + EPS) is not attempting registration.
         if ns.csd.registered()
             && ns.psd.sticky()
-            && ns.psd.duration(ts) >= timeout
+            && ns.psd.duration(now) >= timeout
             && ns.psd.get_status() == registration::Status::NotRegistering
             && ns.eps.get_status() == registration::Status::NotRegistering
         {
             defmt::trace!(
                 "Sticky not registering PSD state for {:?} s, force GPRS attach",
-                Seconds::<u32>::from(ns.psd.duration(ts)).integer()
+                Seconds::<u32>::from(ns.psd.duration(now)).integer()
             );
             ns.psd.reset();
             ns.registration_interventions += 1;
