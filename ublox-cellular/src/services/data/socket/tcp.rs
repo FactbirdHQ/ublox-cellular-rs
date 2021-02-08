@@ -69,12 +69,19 @@ impl<L: ArrayLength<u8>, CLK: Clock> TcpSocket<L, CLK> {
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
-        self.last_check_time
-            .replace(ts)
-            .and_then(|ref last_check_time| ts.checked_duration_since(last_check_time))
+        let should_update = self
+            .last_check_time
+            .as_ref()
+            .and_then(|last_check_time| ts.checked_duration_since(last_check_time))
             .and_then(|dur| dur.try_into().ok())
             .map(|dur: Milliseconds<u32>| dur >= self.check_interval)
-            .unwrap_or(false)
+            .unwrap_or(true);
+
+        if should_update {
+            self.last_check_time.replace(ts);
+        }
+
+        should_update
     }
 
     /// Set available data.
