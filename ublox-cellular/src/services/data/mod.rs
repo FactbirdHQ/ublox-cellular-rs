@@ -514,13 +514,15 @@ where
                     .try_now()
                     .map_err(|e| Error::Generic(GenericError::Time(e.into())))?,
             ) {
-                self.network.send_internal(
+                if let Ok(SocketData { length, .. }) = self.network.send_internal(
                     &ReadSocketData {
                         socket: handle,
                         length: 0,
                     },
                     false,
-                )?;
+                ) {
+                    socket.set_available_data(length);
+                }
             }
 
             return Ok(());
