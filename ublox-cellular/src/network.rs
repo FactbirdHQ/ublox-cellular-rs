@@ -80,9 +80,8 @@ impl<C: AtatClient> AtTx<C> {
         }
     }
 
-    pub fn clear_urc_queue(&self) -> Result<(), Error> {
-        // self.client.try_borrow_mut()?.reset();
-        while self.client.try_borrow_mut()?.check_urc::<Urc>().is_some() {}
+    pub fn reset(&self) -> Result<(), Error> {
+        self.client.try_borrow_mut()?.reset();
         Ok(())
     }
 

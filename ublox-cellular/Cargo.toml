@@ -15,7 +15,7 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.8.0", features = ["derive"] }
+atat = { version = "0.8.4", features = ["derive"] }
 heapless = { version = "^0.5", features = ["serde"] }
 no-std-net = { version = "0.4.0", features = ["serde"] }
 serde = { version = "^1", default-features = false, features = ["derive"] }

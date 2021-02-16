@@ -35,6 +35,8 @@ impl AtatClient for MockAtClient {
     fn get_mode(&self) -> atat::Mode {
         todo!()
     }
+
+    fn reset(&mut self) {}
 }
 
 #[derive(Debug)]

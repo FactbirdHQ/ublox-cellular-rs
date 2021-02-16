@@ -180,7 +180,7 @@ where
     }
 
     pub(crate) fn clear_buffers(&mut self) -> Result<(), Error> {
-        self.network.at_tx.clear_urc_queue()?;
+        self.network.at_tx.reset()?;
         if let Some(ref sockets) = self.sockets {
             sockets.try_borrow_mut()?.prune();
         }
@@ -499,7 +499,7 @@ mod tests {
     type SocketSize = consts::U128;
     type SocketSetLen = consts::U2;
 
-    static mut SOCKET_SET: Option<SocketSet<SocketSetLen, SocketSize>> = None;
+    static mut SOCKET_SET: Option<SocketSet<SocketSetLen, SocketSize, MockTimer>> = None;
 
     #[test]
     fn prune_on_initialize() {
@@ -536,7 +536,7 @@ mod tests {
         assert_eq!(sockets.len(), 1);
 
         let mut tcp = sockets
-            .get::<TcpSocket<_>>(SocketHandle(0))
+            .get::<TcpSocket<_, _>>(SocketHandle(0))
             .expect("Failed to get socket");
 
         assert_eq!(tcp.rx_window(), SocketSize::to_usize());
@@ -568,7 +568,7 @@ mod tests {
         assert_eq!(sockets.len(), 1);
 
         let tcp = sockets
-            .get::<TcpSocket<_>>(SocketHandle(0))
+            .get::<TcpSocket<_, _>>(SocketHandle(0))
             .expect("Failed to get socket");
 
         assert_eq!(tcp.recv_queue(), 0);

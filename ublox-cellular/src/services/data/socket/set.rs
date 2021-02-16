@@ -172,14 +172,17 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::sockets::{TcpSocket, UdpSocket};
+    use crate::{
+        sockets::{TcpSocket, UdpSocket},
+        test_helpers::MockTimer,
+    };
 
     use super::*;
     use heapless::consts;
 
     #[test]
     fn add_socket() {
-        let mut set = Set::<consts::U2, consts::U64>::new();
+        let mut set = Set::<consts::U2, consts::U64, MockTimer>::new();
 
         assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
         assert_eq!(set.len(), 1);
@@ -189,7 +192,7 @@ mod tests {
 
     #[test]
     fn remove_socket() {
-        let mut set = Set::<consts::U2, consts::U64>::new();
+        let mut set = Set::<consts::U2, consts::U64, MockTimer>::new();
 
         assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
         assert_eq!(set.len(), 1);
@@ -199,15 +202,15 @@ mod tests {
         assert!(set.remove(Handle(0)).is_ok());
         assert_eq!(set.len(), 1);
 
-        assert!(set.get::<TcpSocket<_>>(Handle(0)).is_err());
+        assert!(set.get::<TcpSocket<_, _>>(Handle(0)).is_err());
 
-        set.get::<UdpSocket<_>>(Handle(1))
+        set.get::<UdpSocket<_, _>>(Handle(1))
             .expect("failed to get udp socket");
     }
 
     #[test]
     fn add_duplicate_socket() {
-        let mut set = Set::<consts::U2, consts::U64>::new();
+        let mut set = Set::<consts::U2, consts::U64, MockTimer>::new();
 
         assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
         assert_eq!(set.len(), 1);
@@ -216,7 +219,7 @@ mod tests {
 
     #[test]
     fn add_socket_to_full_set() {
-        let mut set = Set::<consts::U2, consts::U64>::new();
+        let mut set = Set::<consts::U2, consts::U64, MockTimer>::new();
 
         assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
         assert_eq!(set.len(), 1);
@@ -227,38 +230,38 @@ mod tests {
 
     #[test]
     fn get_socket() {
-        let mut set = Set::<consts::U2, consts::U64>::new();
+        let mut set = Set::<consts::U2, consts::U64, MockTimer>::new();
 
         assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
         assert_eq!(set.len(), 1);
         assert_eq!(set.add(UdpSocket::new(1)), Ok(Handle(1)));
         assert_eq!(set.len(), 2);
 
-        set.get::<TcpSocket<_>>(Handle(0))
+        set.get::<TcpSocket<_, _>>(Handle(0))
             .expect("failed to get tcp socket");
 
-        set.get::<UdpSocket<_>>(Handle(1))
+        set.get::<UdpSocket<_, _>>(Handle(1))
             .expect("failed to get udp socket");
     }
 
     #[test]
     fn get_socket_wrong_type() {
-        let mut set = Set::<consts::U2, consts::U64>::new();
+        let mut set = Set::<consts::U2, consts::U64, MockTimer>::new();
 
         assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
         assert_eq!(set.len(), 1);
         assert_eq!(set.add(UdpSocket::new(1)), Ok(Handle(1)));
         assert_eq!(set.len(), 2);
 
-        assert!(set.get::<TcpSocket<_>>(Handle(1)).is_err());
+        assert!(set.get::<TcpSocket<_, _>>(Handle(1)).is_err());
 
-        set.get::<UdpSocket<_>>(Handle(1))
+        set.get::<UdpSocket<_, _>>(Handle(1))
             .expect("failed to get udp socket");
     }
 
     #[test]
     fn get_socket_type() {
-        let mut set = Set::<consts::U2, consts::U64>::new();
+        let mut set = Set::<consts::U2, consts::U64, MockTimer>::new();
 
         assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
         assert_eq!(set.len(), 1);
@@ -271,7 +274,7 @@ mod tests {
 
     #[test]
     fn replace_socket() {
-        let mut set = Set::<consts::U2, consts::U64>::new();
+        let mut set = Set::<consts::U2, consts::U64, MockTimer>::new();
 
         assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
         assert_eq!(set.len(), 1);
@@ -281,28 +284,28 @@ mod tests {
         assert!(set.remove(Handle(0)).is_ok());
         assert_eq!(set.len(), 1);
 
-        assert!(set.get::<TcpSocket<_>>(Handle(0)).is_err());
+        assert!(set.get::<TcpSocket<_, _>>(Handle(0)).is_err());
 
-        set.get::<UdpSocket<_>>(Handle(1))
+        set.get::<UdpSocket<_, _>>(Handle(1))
             .expect("failed to get udp socket");
 
         assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
         assert_eq!(set.len(), 2);
 
-        set.get::<TcpSocket<_>>(Handle(0))
+        set.get::<TcpSocket<_, _>>(Handle(0))
             .expect("failed to get tcp socket");
     }
 
     #[test]
     fn prune_socket_set() {
-        let mut set = Set::<consts::U2, consts::U64>::new();
+        let mut set = Set::<consts::U2, consts::U64, MockTimer>::new();
 
         assert_eq!(set.add(TcpSocket::new(0)), Ok(Handle(0)));
         assert_eq!(set.len(), 1);
         assert_eq!(set.add(UdpSocket::new(1)), Ok(Handle(1)));
         assert_eq!(set.len(), 2);
 
-        set.get::<TcpSocket<_>>(Handle(0))
+        set.get::<TcpSocket<_, _>>(Handle(0))
             .expect("failed to get tcp socket");
 
         set.prune();
