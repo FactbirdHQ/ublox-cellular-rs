@@ -1,5 +1,3 @@
-use core::convert::TryInto;
-
 use super::DataService;
 use super::{
     socket::{Error as SocketError, Socket, SocketHandle, UdpSocket},
@@ -11,10 +9,7 @@ use crate::command::ip_transport_layer::{
 };
 use atat::typenum::Unsigned;
 use embedded_nal::{SocketAddr, UdpClient};
-use embedded_time::{
-    duration::{Generic, Milliseconds},
-    Clock,
-};
+use embedded_time::Clock;
 use heapless::{ArrayLength, Bucket, Pos};
 
 impl<'a, C, CLK, N, L> UdpClient for DataService<'a, C, CLK, N, L>

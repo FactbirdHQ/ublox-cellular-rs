@@ -29,23 +29,20 @@ use crate::{
         },
         psn::{
             self,
-            responses::{
-                GPRSAttached, PDPContextState, PacketSwitchedConfig, PacketSwitchedNetworkData,
-            },
+            responses::{GPRSAttached, PacketSwitchedConfig, PacketSwitchedNetworkData},
             types::PacketSwitchedParamReq,
             GetPDPContextState, GetPacketSwitchedConfig, GetPacketSwitchedNetworkData,
             SetGPRSAttached,
         },
     },
     error::{Error as DeviceError, GenericError},
-    network::{ContextId, Error as NetworkError, Network},
+    network::{ContextId, Network},
     ProfileId,
 };
 use apn::{APNInfo, Apn};
 use atat::{typenum::Unsigned, AtatClient};
 use core::{cell::RefCell, convert::TryInto};
 use embedded_hal::digital::{InputPin, OutputPin};
-use embedded_nal::Ipv4Addr;
 use embedded_time::{
     duration::{Generic, Milliseconds},
     Clock,
@@ -59,6 +56,9 @@ use psn::{
     GetGPRSAttached, SetAuthParameters,
 };
 use socket::{Error as SocketError, Socket, SocketRef, SocketSet, SocketType};
+
+#[cfg(feature = "upsd-context-activation")]
+use embedded_nal::Ipv4Addr;
 
 // NOTE: If these are changed, remember to change the corresponding `Bytes` len
 // in commands for now.
@@ -234,6 +234,7 @@ where
         Ok(data_service)
     }
 
+    #[allow(unused_variables)]
     fn connect(&mut self, apn_info: &APNInfo) -> nb::Result<(), Error> {
         if self.network.context_state.get() == ContextState::Active {
             return Ok(());

@@ -1,5 +1,3 @@
-use core::convert::TryInto;
-
 use super::ssl::{SecurityProfileId, SSL};
 use super::DataService;
 use super::{
@@ -12,10 +10,7 @@ use crate::command::ip_transport_layer::{
 };
 use atat::typenum::Unsigned;
 use embedded_nal::{SocketAddr, TcpClient};
-use embedded_time::{
-    duration::{Generic, Milliseconds},
-    Clock,
-};
+use embedded_time::Clock;
 use heapless::{ArrayLength, Bucket, Pos};
 
 impl<'a, C, CLK, N, L> TcpClient for DataService<'a, C, CLK, N, L>

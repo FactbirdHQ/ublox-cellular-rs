@@ -1,10 +1,7 @@
 use atat::AtatClient;
-use core::{convert::TryInto, fmt::Write};
+use core::fmt::Write;
 use embedded_nal::{AddrType, Dns};
-use embedded_time::{
-    duration::{Generic, Milliseconds},
-    Clock,
-};
+use embedded_time::Clock;
 use heapless::{consts, ArrayLength, Bucket, Pos, String};
 use no_std_net::IpAddr;
 

@@ -16,7 +16,7 @@ use crate::{
     command::{
         network_service::{
             responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
-            SetOperatorSelection, SetRadioAccessTechnology,
+            SetOperatorSelection,
         },
         psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
     },
@@ -31,10 +31,7 @@ use crate::{
     },
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
-use network_service::{
-    types::{NetworkRegistrationUrcConfig, RadioAccessTechnologySelected},
-    SetNetworkRegistrationStatus,
-};
+use network_service::{types::NetworkRegistrationUrcConfig, SetNetworkRegistrationStatus};
 use psn::{
     types::{EPSNetworkRegistrationUrcConfig, GPRSNetworkRegistrationUrcConfig},
     SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,

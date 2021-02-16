@@ -1,5 +1,3 @@
-use core::convert::TryInto;
-
 use super::{
     socket::{Socket, SocketHandle},
     DataService, Error,
@@ -9,10 +7,7 @@ use crate::{
     command::ip_transport_layer::{types::*, *},
 };
 use atat::atat_derive::AtatLen;
-use embedded_time::{
-    duration::{Generic, Milliseconds},
-    Clock,
-};
+use embedded_time::Clock;
 use heapless::{ArrayLength, Bucket, Pos};
 use serde::{Deserialize, Serialize};
 
