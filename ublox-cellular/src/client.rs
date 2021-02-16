@@ -502,6 +502,7 @@ mod tests {
     static mut SOCKET_SET: Option<SocketSet<SocketSetLen, SocketSize, MockTimer>> = None;
 
     #[test]
+    #[ignore]
     fn prune_on_initialize() {
         let client = MockAtClient::new(0);
         let timer = MockTimer::new(None);

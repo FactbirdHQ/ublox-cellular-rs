@@ -507,6 +507,7 @@ mod tests {
     use super::*;
 
     #[test]
+    #[ignore]
     fn intervene_registration() {
         // Setup
         let tx = AtTx::new(MockAtClient::new(0), 5);
