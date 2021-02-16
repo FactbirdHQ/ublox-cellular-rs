@@ -2,7 +2,7 @@
 use atat::atat_derive::AtatEnum;
 
 /// Indicates the basic message indication type
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
 pub enum MessageIndicationType {
     /// • 1: Voice Message Waiting (third level method) or Voice Message Waiting on Line 1
     /// (CPHS method)
@@ -22,7 +22,7 @@ pub enum MessageIndicationType {
 }
 
 /// Indicates whether the +UMWI URC is enabled or not
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
 pub enum MessageWaitingMode {
     /// • 0: disable the +UMWI URC
     Disabled = 0,

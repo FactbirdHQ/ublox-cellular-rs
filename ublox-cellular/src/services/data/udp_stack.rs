@@ -1,6 +1,6 @@
 use super::DataService;
 use super::{
-    socket::{Socket, SocketHandle, UdpSocket},
+    socket::{Error as SocketError, Socket, SocketHandle, UdpSocket},
     EgressChunkSize, Error,
 };
 use crate::command::ip_transport_layer::{
@@ -9,13 +9,15 @@ use crate::command::ip_transport_layer::{
 };
 use atat::typenum::Unsigned;
 use embedded_nal::{SocketAddr, UdpClient};
+use embedded_time::Clock;
 use heapless::{ArrayLength, Bucket, Pos};
 
-impl<'a, C, N, L> UdpClient for DataService<'a, C, N, L>
+impl<'a, C, CLK, N, L> UdpClient for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
+    CLK: Clock,
     N: 'static
-        + ArrayLength<Option<Socket<L>>>
+        + ArrayLength<Option<Socket<L, CLK>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
@@ -29,6 +31,12 @@ where
     /// Open a new UDP socket to the given address and port. UDP is connectionless,
     /// so unlike `TcpStack` no `connect()` is required.
     fn socket(&self) -> Result<Self::UdpSocket, Self::Error> {
+        let mut sockets = self.sockets.try_borrow_mut()?;
+
+        if sockets.len() >= sockets.capacity() {
+            return Err(Error::Socket(SocketError::SocketSetFull));
+        }
+
         let socket_resp = self.network.send_internal(
             &CreateSocket {
                 protocol: SocketProtocol::UDP,
@@ -37,16 +45,14 @@ where
             false,
         )?;
 
-        let socket = UdpSocket::new(socket_resp.socket.0);
-
-        Ok(self.sockets.try_borrow_mut()?.add(socket)?)
+        Ok(sockets.add(UdpSocket::new(socket_resp.socket.0))?)
     }
 
     fn connect(&self, socket: &mut Self::UdpSocket, remote: SocketAddr) -> Result<(), Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let mut udp = sockets
-            .get::<UdpSocket<_>>(*socket)
+            .get::<UdpSocket<_, _>>(*socket)
             .map_err(Self::Error::from)?;
         udp.bind(remote).map_err(Self::Error::from)?;
         Ok(())
@@ -57,7 +63,7 @@ where
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let udp = sockets
-            .get::<UdpSocket<_>>(*socket)
+            .get::<UdpSocket<_, _>>(*socket)
             .map_err(Self::Error::from)?;
 
         if !udp.is_open() {
@@ -65,7 +71,7 @@ where
         }
 
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
-            defmt::trace!("Sending: {:?} bytes, {:?}", chunk.len(), chunk);
+            defmt::trace!("Sending: {:?} bytes", chunk.len());
             self.network
                 .send_internal(
                     &PrepareUDPSendToDataBinary {
@@ -110,7 +116,7 @@ where
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let mut udp = sockets
-            .get::<UdpSocket<_>>(*socket)
+            .get::<UdpSocket<_, _>>(*socket)
             .map_err(Self::Error::from)?;
 
         let response = udp

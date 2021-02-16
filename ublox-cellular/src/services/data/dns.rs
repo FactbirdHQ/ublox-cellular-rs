@@ -1,16 +1,20 @@
 use atat::AtatClient;
 use core::fmt::Write;
 use embedded_nal::{AddrType, Dns};
+use embedded_time::Clock;
 use heapless::{consts, ArrayLength, Bucket, Pos, String};
 use no_std_net::IpAddr;
 
 use super::{socket::Socket, DataService, Error};
 use crate::command::dns::{self, types::ResolutionType};
 
-impl<'a, C, N, L> Dns for DataService<'a, C, N, L>
+impl<'a, C, CLK, N, L> Dns for DataService<'a, C, CLK, N, L>
 where
     C: AtatClient,
-    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
+    CLK: Clock,
+    N: ArrayLength<Option<Socket<L, CLK>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     type Error = Error;

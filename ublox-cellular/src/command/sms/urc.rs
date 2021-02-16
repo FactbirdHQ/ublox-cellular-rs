@@ -15,7 +15,7 @@ use atat::atat_derive::AtatResp;
 /// are not present, the information text response is an error result code
 /// ("+CME ERROR: operation not allowed" if +CMEE is set to 2) and no URCs will
 /// be displayed.
-#[derive(Clone, AtatResp)]
+#[derive(Debug, Clone, AtatResp)]
 pub struct MessageWaitingIndication {
     #[at_arg(position = 0)]
     pub status: u8,

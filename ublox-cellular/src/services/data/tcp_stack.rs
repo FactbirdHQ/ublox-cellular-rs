@@ -10,13 +10,15 @@ use crate::command::ip_transport_layer::{
 };
 use atat::typenum::Unsigned;
 use embedded_nal::{SocketAddr, TcpClient};
+use embedded_time::Clock;
 use heapless::{ArrayLength, Bucket, Pos};
 
-impl<'a, C, N, L> TcpClient for DataService<'a, C, N, L>
+impl<'a, C, CLK, N, L> TcpClient for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
+    CLK: Clock,
     N: 'static
-        + ArrayLength<Option<Socket<L>>>
+        + ArrayLength<Option<Socket<L, CLK>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
@@ -29,6 +31,12 @@ where
 
     /// Open a new TCP socket to the given address and port. The socket starts in the unconnected state.
     fn socket(&self) -> Result<Self::TcpSocket, Self::Error> {
+        let mut sockets = self.sockets.try_borrow_mut()?;
+
+        if sockets.len() >= sockets.capacity() {
+            return Err(Error::Socket(SocketError::SocketSetFull));
+        }
+
         let socket_resp = self.network.send_internal(
             &CreateSocket {
                 protocol: SocketProtocol::TCP,
@@ -37,10 +45,7 @@ where
             true,
         )?;
 
-        Ok(self
-            .sockets
-            .try_borrow_mut()?
-            .add(TcpSocket::new(socket_resp.socket.0))?)
+        Ok(sockets.add(TcpSocket::new(socket_resp.socket.0))?)
     }
 
     /// Connect to the given remote host and port.
@@ -51,7 +56,7 @@ where
     ) -> nb::Result<(), Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
         let mut tcp = sockets
-            .get::<TcpSocket<_>>(*socket)
+            .get::<TcpSocket<_, CLK>>(*socket)
             .map_err(Self::Error::from)?;
 
         if tcp.state() == TcpState::Created {
@@ -80,7 +85,7 @@ where
     /// Check if this socket is still connected
     fn is_connected(&self, socket: &Self::TcpSocket) -> Result<bool, Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut()?;
-        Ok(sockets.get::<TcpSocket<_>>(*socket)?.is_active())
+        Ok(sockets.get::<TcpSocket<_, _>>(*socket)?.is_connected())
     }
 
     /// Write to the stream. Returns the number of bytes written is returned
@@ -91,7 +96,7 @@ where
         }
 
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
-            defmt::trace!("Sending: {:?} bytes, {:?}", chunk.len(), chunk);
+            defmt::trace!("Sending: {:?} bytes", chunk.len());
             self.network
                 .send_internal(
                     &PrepareWriteSocketDataBinary {
@@ -134,11 +139,10 @@ where
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let mut tcp = sockets
-            .get::<TcpSocket<_>>(*socket)
+            .get::<TcpSocket<_, _>>(*socket)
             .map_err(Self::Error::from)?;
 
-        let n = tcp.recv_slice(buffer).map_err(Self::Error::from)?;
-        Ok(n)
+        Ok(tcp.recv_slice(buffer).map_err(Self::Error::from)?)
     }
 
     /// Close an existing TCP socket.

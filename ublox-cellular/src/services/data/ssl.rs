@@ -7,6 +7,7 @@ use crate::{
     command::ip_transport_layer::{types::*, *},
 };
 use atat::atat_derive::AtatLen;
+use embedded_time::Clock;
 use heapless::{ArrayLength, Bucket, Pos};
 use serde::{Deserialize, Serialize};
 
@@ -36,10 +37,13 @@ pub trait SSL {
     fn enable_ssl(&self, socket: SocketHandle, profile_id: SecurityProfileId) -> Result<(), Error>;
 }
 
-impl<'a, C, N, L> SSL for DataService<'a, C, N, L>
+impl<'a, C, CLK, N, L> SSL for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
-    N: ArrayLength<Option<Socket<L>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
+    CLK: Clock,
+    N: ArrayLength<Option<Socket<L, CLK>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     fn import_certificate(

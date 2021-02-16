@@ -43,6 +43,7 @@ pub mod responses;
 pub mod types;
 
 use atat::atat_derive::AtatCmd;
+use heapless::{consts, Vec};
 use responses::*;
 use types::*;
 
@@ -117,6 +118,10 @@ pub struct SendSecurityDataImport<'a> {
     #[at_arg(position = 0, len = 2048)]
     pub data: serde_at::ser::Bytes<'a>,
 }
+
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+USECMNG=3", Vec<SecurityData, consts::U3> , value_sep = false)]
+pub struct ListSecurityData;
 
 /// 26.1.3 SSL/TLS security layer profile manager +USECPRF
 ///

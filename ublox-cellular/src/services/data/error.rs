@@ -1,9 +1,11 @@
+use embedded_time::TimeError;
+
 use super::socket::Error as SocketError;
 use crate::error::GenericError;
 use crate::network::Error as NetworkError;
 use core::cell::{BorrowError, BorrowMutError};
 
-#[derive(Debug, PartialEq, defmt::Format)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     InvalidApn,
     SocketClosed,
@@ -46,6 +48,12 @@ impl From<BorrowMutError> for Error {
 
 impl From<BorrowError> for Error {
     fn from(e: BorrowError) -> Self {
+        Error::Generic(e.into())
+    }
+}
+
+impl From<TimeError> for Error {
+    fn from(e: TimeError) -> Self {
         Error::Generic(e.into())
     }
 }
