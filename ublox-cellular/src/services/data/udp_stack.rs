@@ -71,7 +71,7 @@ where
         }
 
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
-            defmt::trace!("Sending: {:?} bytes", chunk.len());
+            defmt::trace!("Sending: {} bytes", chunk.len());
             self.network
                 .send_internal(
                     &PrepareUDPSendToDataBinary {

@@ -576,7 +576,7 @@ where
         };
 
         if socket_handle != handle {
-            defmt::error!("WrongSocketType {:?} != {:?}", socket_handle, handle);
+            defmt::error!("WrongSocketType {} != {}", socket_handle, handle);
             return Err(Error::WrongSocketType);
         }
 
@@ -589,12 +589,7 @@ where
             // let hex_mode = self.config.try_borrow()?.hex_mode;
             let data_len = if hex_mode { data.len() / 2 } else { data.len() };
             if len > 0 && data_len != len {
-                defmt::error!(
-                    "BadLength {:?} != {:?}, {:str}",
-                    len,
-                    data_len,
-                    data.as_str()
-                );
+                defmt::error!("BadLength {} != {}, {=str}", len, data_len, data.as_str());
                 return Err(Error::BadLength);
             }
 

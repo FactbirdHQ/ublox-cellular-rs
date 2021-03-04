@@ -77,7 +77,7 @@ where
             tcp.set_state(TcpState::Connected);
             Ok(())
         } else {
-            defmt::error!("Cannot connect socket! Socket state: {:?}", tcp.state());
+            defmt::error!("Cannot connect socket! Socket state: {}", tcp.state());
             Err(Error::Socket(SocketError::Illegal).into())
         }
     }
@@ -96,7 +96,7 @@ where
         }
 
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
-            defmt::trace!("Sending: {:?} bytes", chunk.len());
+            defmt::trace!("Sending: {} bytes", chunk.len());
             self.network
                 .send_internal(
                     &PrepareWriteSocketDataBinary {

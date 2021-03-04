@@ -277,7 +277,7 @@ where
             return;
         }
 
-        defmt::trace!("Connection state changed to \"{:?}\"", state);
+        defmt::trace!("Connection state changed to \"{}\"", state);
         self.conn_state = state;
     }
 
