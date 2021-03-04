@@ -15,19 +15,18 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.8.4", features = ["derive"] }
-heapless = { version = "^0.5", features = ["serde"] }
-no-std-net = { version = "0.4.0", features = ["serde"] }
-serde = { version = "^1", default-features = false, features = ["derive"] }
-
-defmt = "^0.1"
+atat = { version = "0.9.0", features = ["derive"] }
+defmt = { version = "^0.2", features = []}
 embedded-hal = "1.0.0-alpha.4"
 embedded-nal = "0.2.0"
 embedded-time = "0.10.1"
 hash32 = "^0.1.1"
 hash32-derive = "^0.1.0"
+heapless = { version = "^0.5.5", features = ["serde"] }
 nb = "^1"
-serde_at = { version = "0.7.1" }
+no-std-net = { version = "0.4.0", features = ["serde"] }
+serde = { version = "^1", default-features = false, features = ["derive"] }
+serde_at = { version = "0.9.0" }
 typenum = "^1"
 
 [features]

@@ -87,7 +87,7 @@ where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
         defmt::trace!(
-            "Attempting to soft reset of the modem with sim reset: {:?}.",
+            "Attempting to soft reset of the modem with sim reset: {}.",
             sim_reset
         );
 
@@ -150,7 +150,7 @@ where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
         defmt::info!(
-            "Attempting to power on the modem with PWR_ON pin: {:bool} and VInt pin: {:bool}.",
+            "Attempting to power on the modem with PWR_ON pin: {=bool} and VInt pin: {=bool}.",
             self.config.pwr_pin.is_some(),
             self.config.vint_pin.is_some(),
         );
@@ -284,7 +284,7 @@ where
 
         let mut res = false;
 
-        defmt::trace!("Waiting for the modem to reach {:?}.", expected);
+        defmt::trace!("Waiting for the modem to reach {}.", expected);
         while self
             .network
             .status
@@ -315,7 +315,7 @@ where
             defmt::trace!("Success.");
             Ok(())
         } else {
-            defmt::error!("Modem never reach {:?}.", expected);
+            defmt::error!("Modem never reach {}.", expected);
             Err(Error::Generic(GenericError::Timeout))
         }
     }

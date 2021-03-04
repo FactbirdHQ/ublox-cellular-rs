@@ -393,7 +393,7 @@ where
                 .handle_urc(|urc| {
                     match urc {
                         Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
-                            defmt::info!("[URC] SocketClosed {:u8}", socket.0);
+                            defmt::info!("[URC] SocketClosed {=u8}", socket.0);
                             if let Ok(mut sockets) = sockets.try_borrow_mut() {
                                 if sockets.remove(socket).is_err() {
                                     defmt::warn!("Socket already closed!");
@@ -407,7 +407,7 @@ where
                             ip_transport_layer::urc::SocketDataAvailable { socket, length },
                         ) => {
                             defmt::trace!(
-                                "[Socket({:u8})] {:u16} bytes available",
+                                "[Socket({=u8})] {=u16} bytes available",
                                 socket.0,
                                 length as u16
                             );
@@ -419,7 +419,7 @@ where
                                 }
                             } else {
                                 defmt::warn!(
-                                    "[Socket({:u8})] Failed to borrow socketset!",
+                                    "[Socket({=u8})] Failed to borrow socketset!",
                                     socket.0
                                 );
                             }

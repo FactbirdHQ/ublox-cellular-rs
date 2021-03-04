@@ -21,7 +21,6 @@ use core::{
 };
 use embedded_time::{duration::*, Clock, TimeError};
 use hash32_derive::Hash32;
-use heapless::consts;
 use serde::{Deserialize, Serialize};
 
 const REGISTRATION_CHECK_INTERVAL: Seconds<u32> = Seconds::<u32>(15);
@@ -91,14 +90,9 @@ impl<C: AtatClient> AtTx<C> {
             .send(req)
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
-                    match core::str::from_utf8(&req.as_bytes()) {
-                        Ok(s) => defmt::error!("{:?}: [{:str}]", ate, s[..s.len() - 2]),
-                        Err(_) => defmt::error!(
-                            "{:?}: {:?}",
-                            ate,
-                            core::convert::AsRef::<[u8]>::as_ref(&req.as_bytes())
-                        ),
-                    };
+                    let request = req.as_bytes();
+                    defmt::error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
+
                     if let atat::Error::Timeout = ate {
                         let new_value = self.consecutive_timeouts.get() + 1;
                         self.consecutive_timeouts.set(new_value);
@@ -123,10 +117,7 @@ impl<C: AtatClient> AtTx<C> {
                         self.urc_attempts.set(a + 1);
                         return false;
                     } else {
-                        defmt::warn!(
-                            "Dropping stale URC! {:?}",
-                            defmt::Debug2Format::<consts::U256>(&urc)
-                        );
+                        defmt::warn!("Dropping stale URC! {}", defmt::Debug2Format(&urc));
                     }
                 }
                 self.urc_attempts.set(0);
@@ -268,7 +259,7 @@ where
                 && ns.csd.get_status() == registration::Status::NotRegistering
             {
                 defmt::trace!(
-                    "Sticky not registering state for {:?} s, PLMN reselection",
+                    "Sticky not registering state for {} s, PLMN reselection",
                     Seconds::<u32>::from(ns.eps.duration(now)).integer()
                 );
 
@@ -290,7 +281,7 @@ where
                 && ns.csd.get_status() == registration::Status::Denied
             {
                 defmt::trace!(
-                    "Sticky denied state for {:?} s, RF reset",
+                    "Sticky denied state for {} s, RF reset",
                     Seconds::<u32>::from(ns.eps.duration(now)).integer()
                 );
                 ns.csd.reset();
@@ -323,7 +314,7 @@ where
             && ns.psd.get_status() == registration::Status::Denied
         {
             defmt::trace!(
-                "Sticky CSD and PSD denied state for {:?} s, RF reset",
+                "Sticky CSD and PSD denied state for {} s, RF reset",
                 Seconds::<u32>::from(ns.csd.duration(now)).integer()
             );
             ns.csd.reset();
@@ -356,7 +347,7 @@ where
             && ns.eps.get_status() == registration::Status::NotRegistering
         {
             defmt::trace!(
-                "Sticky not registering PSD state for {:?} s, force GPRS attach",
+                "Sticky not registering PSD state for {} s, force GPRS attach",
                 Seconds::<u32>::from(ns.psd.duration(now)).integer()
             );
             ns.psd.reset();
@@ -432,7 +423,7 @@ where
                 Urc::ExtendedPSNetworkRegistration(psn::urc::ExtendedPSNetworkRegistration {
                     state,
                 }) => {
-                    defmt::info!("[URC] ExtendedPSNetworkRegistration {:?}", state);
+                    defmt::info!("[URC] ExtendedPSNetworkRegistration {}", state);
                 }
                 Urc::GPRSNetworkRegistration(reg_params) => {
                     if let Ok(mut params) = self.status.try_borrow_mut() {
@@ -459,13 +450,13 @@ where
                     result,
                     ip_addr: _,
                 }) => {
-                    defmt::info!("[URC] DataConnectionActivated {:u8}", result);
+                    defmt::info!("[URC] DataConnectionActivated {=u8}", result);
                     self.context_state.set(ContextState::Active);
                 }
                 Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
                     profile_id,
                 }) => {
-                    defmt::info!("[URC] DataConnectionDeactivated {:?}", profile_id);
+                    defmt::info!("[URC] DataConnectionDeactivated {}", profile_id);
                     self.context_state.set(ContextState::Activating);
                 }
                 Urc::MessageWaitingIndication(_) => {
@@ -484,10 +475,7 @@ where
     ) -> Result<A::Response, Error> {
         if check_urc {
             if let Err(e) = self.handle_urc() {
-                defmt::error!(
-                    "Failed handle URC  {:?}",
-                    defmt::Debug2Format::<consts::U64>(&e)
-                );
+                defmt::error!("Failed handle URC  {}", defmt::Debug2Format(&e));
             }
         }
 
