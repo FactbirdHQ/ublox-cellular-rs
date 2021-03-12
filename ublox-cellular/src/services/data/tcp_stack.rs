@@ -1,11 +1,12 @@
-use super::ssl::{SecurityProfileId, SSL};
+use super::ssl::SecurityProfileId;
 use super::DataService;
 use super::{
     socket::{Error as SocketError, Socket, SocketHandle, TcpSocket, TcpState},
     EgressChunkSize, Error,
 };
 use crate::command::ip_transport_layer::{
-    types::SocketProtocol, CloseSocket, ConnectSocket, CreateSocket, PrepareWriteSocketDataBinary,
+    types::{SocketProtocol, SslTlsStatus},
+    CloseSocket, ConnectSocket, CreateSocket, PrepareWriteSocketDataBinary, SetSocketSslState,
     WriteSocketDataBinary,
 };
 use atat::typenum::Unsigned;
@@ -60,7 +61,14 @@ where
             .map_err(Self::Error::from)?;
 
         if tcp.state() == TcpState::Created {
-            self.enable_ssl(*socket, SecurityProfileId(0))
+            self.network
+                .send_internal(
+                    &SetSocketSslState {
+                        socket: *socket,
+                        ssl_tls_status: SslTlsStatus::Enabled(SecurityProfileId(0)),
+                    },
+                    true,
+                )
                 .map_err(Self::Error::from)?;
 
             self.network
