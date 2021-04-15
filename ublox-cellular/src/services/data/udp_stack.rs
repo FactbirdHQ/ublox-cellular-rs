@@ -1,3 +1,5 @@
+use core::convert::TryInto;
+
 use super::DataService;
 use super::{
     socket::{Error as SocketError, Socket, SocketHandle, UdpSocket},
@@ -9,13 +11,17 @@ use crate::command::ip_transport_layer::{
 };
 use atat::typenum::Unsigned;
 use embedded_nal::{SocketAddr, UdpClient};
-use embedded_time::Clock;
+use embedded_time::{
+    duration::{Generic, Milliseconds},
+    Clock,
+};
 use heapless::{ArrayLength, Bucket, Pos};
 
 impl<'a, C, CLK, N, L> UdpClient for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
     CLK: Clock,
+    Generic<CLK::T>: TryInto<Milliseconds>,
     N: 'static
         + ArrayLength<Option<Socket<L, CLK>>>
         + ArrayLength<Bucket<u8, usize>>
@@ -34,7 +40,15 @@ where
         let mut sockets = self.sockets.try_borrow_mut()?;
 
         if sockets.len() >= sockets.capacity() {
-            return Err(Error::Socket(SocketError::SocketSetFull));
+            if let Ok(ts) = self.network.status.try_borrow_mut()?.timer.try_now() {
+                // Check if there are any sockets closed by remote, and close it
+                // if it has exceeded its timeout, in order to recycle it.
+                if sockets.recycle(&ts) {
+                    return Err(Error::Socket(SocketError::SocketSetFull));
+                }
+            } else {
+                return Err(Error::Socket(SocketError::SocketSetFull));
+            }
         }
 
         let socket_resp = self.network.send_internal(
