@@ -43,10 +43,7 @@ use apn::{APNInfo, Apn};
 use atat::{typenum::Unsigned, AtatClient};
 use core::{cell::RefCell, convert::TryInto};
 use embedded_hal::digital::{InputPin, OutputPin};
-use embedded_time::{
-    duration::{Generic, Milliseconds},
-    Clock,
-};
+use embedded_time::{Clock, duration::{Extensions, Generic, Milliseconds}};
 pub use error::Error;
 use heapless::{ArrayLength, Bucket, Pos};
 use psn::{
@@ -214,9 +211,6 @@ where
     {
         let mut data_service = Self { network, sockets };
 
-        // Handle [`DataService`] related URCs
-        // data_service.handle_urc()?;
-
         // Check if context is active, and create if not
         data_service.connect(apn_info)?;
 
@@ -236,10 +230,10 @@ where
 
     #[allow(unused_variables)]
     fn connect(&mut self, apn_info: &APNInfo) -> nb::Result<(), Error> {
-        if self.network.context_state.get() == ContextState::Active {
-            return Ok(());
+        match self.network.context_state.get() {
+            ContextState::Active => return Ok(()),
+            ContextState::Setup | ContextState::Activating => {}
         }
-
         // This step _shouldn't_ be necessary.  However,
         // for reasons I don't understand, SARA-R4 can be
         // registered but not attached (i.e. AT+CGATT
@@ -262,24 +256,37 @@ where
     }
 
     // Make sure we are attached to the cellular network.
-    fn attach_network(&self) -> Result<(), Error> {
-        let GPRSAttached { state } = self
-            .network
-            .send_internal(&GetGPRSAttached, true)
-            .map_err(Error::from)?;
-
-        if state == GPRSAttachedState::Detached {
-            self.network
-                .send_internal(
-                    &SetGPRSAttached {
-                        state: GPRSAttachedState::Attached,
-                    },
-                    true,
-                )
+    fn attach_network(&self) -> nb::Result<(), Error> {
+        // Wait for AT+CGATT to return 1
+        for _ in 0..10 {
+            let GPRSAttached { state } = self
+                .network
+                .send_internal(&GetGPRSAttached, true)
                 .map_err(Error::from)?;
+
+            if state == GPRSAttachedState::Attached {
+                return Ok(());
+            }
+
+            self.network
+                .status
+                .try_borrow().map_err(Error::from)?
+                .timer
+                .new_timer(1_u32.seconds())
+                .start().map_err(Error::from)?
+                .wait().map_err(Error::from)?;
         }
 
-        Ok(())
+        // self.network
+        //     .send_internal(
+        //         &SetGPRSAttached {
+        //             state: GPRSAttachedState::Attached,
+        //         },
+        //         true,
+        //     )
+        //     .map_err(Error::from)?;
+
+        Err(nb::Error::WouldBlock)
     }
 
     /// Activate context using AT+UPSD commands, required

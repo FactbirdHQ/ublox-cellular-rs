@@ -81,7 +81,7 @@ where
         let socket = socket.into();
         let handle = socket.handle();
 
-        defmt::error!("Adding socket! {} {}", handle.0, socket.get_type());
+        defmt::debug!("Adding socket! {} {}", handle.0, socket.get_type());
 
         if self.index_of(handle).is_ok() {
             return Err(Error::DuplicateSocket);
@@ -124,7 +124,7 @@ where
         let item: &mut Option<Socket<L, CLK>> =
             self.sockets.get_mut(index).ok_or(Error::InvalidSocket)?;
 
-        defmt::error!(
+        defmt::debug!(
             "Removing socket! {} {}",
             handle.0,
             item.as_ref().map(|i| i.get_type())
@@ -142,7 +142,7 @@ where
             .iter_mut()
             .enumerate()
             .for_each(|(index, slot)| {
-                defmt::error!("Removing socket @ index {}", index);
+                defmt::debug!("Removing socket @ index {}", index);
                 slot.take();
             })
     }
