@@ -1,7 +1,7 @@
 //! Unsolicited responses for Network service Commands
 use super::NetworkRegistrationStat;
 use atat::atat_derive::AtatResp;
-use heapless::{String, consts};
+use heapless::{consts, String};
 
 /// 7.14 Network registration status +CREG
 #[derive(Debug, Clone, AtatResp)]

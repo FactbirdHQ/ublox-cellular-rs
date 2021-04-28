@@ -43,7 +43,10 @@ use apn::{APNInfo, Apn};
 use atat::{typenum::Unsigned, AtatClient};
 use core::{cell::RefCell, convert::TryInto};
 use embedded_hal::digital::{InputPin, OutputPin};
-use embedded_time::{Clock, duration::{Extensions, Generic, Milliseconds}};
+use embedded_time::{
+    duration::{Extensions, Generic, Milliseconds},
+    Clock,
+};
 pub use error::Error;
 use heapless::{ArrayLength, Bucket, Pos};
 use psn::{
@@ -270,11 +273,14 @@ where
 
             self.network
                 .status
-                .try_borrow().map_err(Error::from)?
+                .try_borrow()
+                .map_err(Error::from)?
                 .timer
                 .new_timer(1_u32.seconds())
-                .start().map_err(Error::from)?
-                .wait().map_err(Error::from)?;
+                .start()
+                .map_err(Error::from)?
+                .wait()
+                .map_err(Error::from)?;
         }
 
         // self.network
