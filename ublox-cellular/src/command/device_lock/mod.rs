@@ -7,7 +7,7 @@ pub mod types;
 use atat::atat_derive::AtatCmd;
 use responses::*;
 
-use super::{NoResponse, error::UbloxError};
+use super::{error::UbloxError, NoResponse};
 
 /// 9.1 Enter PIN +CPIN
 ///

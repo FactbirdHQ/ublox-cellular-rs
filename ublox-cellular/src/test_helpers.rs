@@ -37,11 +37,10 @@ impl MockAtClient {
 }
 
 impl AtatClient for MockAtClient {
-    fn send<A>(&mut self, _cmd: &A) -> nb::Result<A::Response, atat::Error<A::Error>>
-    where
-        A: atat::AtatCmd,
-        A::Error: Into<UbloxError>,
-    {
+    fn send<A: atat::AtatCmd>(
+        &mut self,
+        _cmd: &A,
+    ) -> nb::Result<A::Response, atat::Error<A::Error>> {
         todo!()
     }
 

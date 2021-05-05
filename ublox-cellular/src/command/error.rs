@@ -685,8 +685,8 @@ mod tests {
             Ok(UbloxError::Cme(CmeError::PhoneFailure))
         );
         assert_eq!(
-            "+CME ERROR: 1500".parse::<UbloxError>(),
-            Ok(UbloxError::Cme(CmeError::WrongGpioIdentifier))
+            "+CME ERROR: 138".parse::<UbloxError>(),
+            Ok(UbloxError::Cme(CmeError::NetworkFailure))
         );
     }
 

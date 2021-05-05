@@ -4,18 +4,32 @@ use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_time::{duration::*, Clock};
 use heapless::{ArrayLength, Bucket, Pos};
 
-use crate::{command::device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus}, command::{
+use crate::{
+    command::device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
+    command::{
         control::{types::*, *},
         mobile_control::{types::*, *},
         system_features::{types::*, *},
         *,
-    }, command::{error::UbloxError, network_service::{
+    },
+    command::{
+        error::UbloxError,
+        network_service::{
             responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
             SetOperatorSelection,
-        }, psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting}}, config::Config, error::{Error, GenericError}, network::{AtTx, Network}, power::PowerState, registration::ConnectionState, services::data::{
+        },
+        psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
+    },
+    config::Config,
+    error::{Error, GenericError},
+    network::{AtTx, Network},
+    power::PowerState,
+    registration::ConnectionState,
+    services::data::{
         socket::{Socket, SocketSet},
         ContextState,
-    }};
+    },
+};
 use ip_transport_layer::{types::HexMode, SetHexMode};
 use network_service::{
     types::{NetworkRegistrationUrcConfig, RadioAccessTechnologySelected, RatPreferred},
@@ -483,8 +497,8 @@ where
         }
     }
 
-    pub fn send_at<A>(&self, cmd: &A) -> Result<A::Response, Error> 
-    where 
+    pub fn send_at<A>(&self, cmd: &A) -> Result<A::Response, Error>
+    where
         A: atat::AtatCmd,
         A::Error: Into<UbloxError>,
     {
