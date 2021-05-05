@@ -1,10 +1,7 @@
 use atat::AtatClient;
 use core::{cell::RefCell, convert::TryInto};
-use embedded_hal::{
-    blocking::delay::DelayMs,
-    digital::{InputPin, OutputPin},
-    timer::CountDown,
-};
+use embedded_hal::digital::{InputPin, OutputPin};
+use embedded_time::{duration::*, Clock};
 use heapless::{ArrayLength, Bucket, Pos};
 
 use crate::{
@@ -21,15 +18,17 @@ use crate::{
             responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
             SetOperatorSelection,
         },
-        psn::{types::GPRSAttachedState, SetGPRSAttached},
+        psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
     },
-    config::{Config, NoPin},
-    error::Error,
+    config::Config,
+    error::{Error, GenericError},
     network::{AtTx, Network},
-    services::data::socket::{SocketSet, SocketSetItem},
-    state::Event,
-    state::StateMachine,
-    State,
+    power::PowerState,
+    registration::ConnectionState,
+    services::data::{
+        socket::{Socket, SocketSet},
+        ContextState,
+    },
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
 use network_service::{types::NetworkRegistrationUrcConfig, SetNetworkRegistrationStatus};
@@ -39,122 +38,167 @@ use psn::{
 };
 use sms::{types::MessageWaitingMode, SetMessageWaitingIndication};
 
-pub struct Device<C, DLY, N, L, RST = NoPin, DTR = NoPin, PWR = NoPin, VINT = NoPin>
-where
-    C: AtatClient,
-    DLY: DelayMs<u32> + CountDown,
-    N: 'static
-        + ArrayLength<Option<SocketSetItem<L>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: 'static + ArrayLength<u8>,
-{
-    pub(crate) fsm: StateMachine,
-    pub(crate) config: Config<RST, DTR, PWR, VINT>,
-    pub(crate) delay: DLY,
-    pub(crate) network: Network<C>,
-    // Ublox devices can hold a maximum of 6 active sockets
-    pub(crate) sockets: Option<RefCell<&'static mut SocketSet<N, L>>>,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
+pub enum State {
+    Off,
+    On,
 }
 
-impl<C, DLY, N, L, RST, DTR, PWR, VINT> Device<C, DLY, N, L, RST, DTR, PWR, VINT>
+pub struct Device<C, CLK, N, L, RST, DTR, PWR, VINT>
 where
     C: AtatClient,
-    DLY: DelayMs<u32> + CountDown,
-    DLY::Time: From<u32>,
+    CLK: 'static + Clock,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<SocketSetItem<L>>>
+    N: 'static
+        + ArrayLength<Option<Socket<L, CLK>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>,
+    L: 'static + ArrayLength<u8>,
+{
+    pub(crate) config: Config<RST, DTR, PWR, VINT>,
+    pub(crate) network: Network<C, CLK>,
+
+    pub(crate) state: State,
+    pub(crate) power_state: PowerState,
+    // Ublox devices can hold a maximum of 6 active sockets
+    pub(crate) sockets: Option<RefCell<&'static mut SocketSet<N, L, CLK>>>,
+}
+
+// TODO:
+impl<C, CLK, N, L, RST, DTR, PWR, VINT> Drop for Device<C, CLK, N, L, RST, DTR, PWR, VINT>
+where
+    C: AtatClient,
+    CLK: Clock,
+    RST: OutputPin,
+    PWR: OutputPin,
+    DTR: OutputPin,
+    VINT: InputPin,
+    N: ArrayLength<Option<Socket<L, CLK>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
-    pub fn new(client: C, delay: DLY, config: Config<RST, DTR, PWR, VINT>) -> Self {
-        Device {
-            fsm: StateMachine::new(),
-            config,
-            delay,
-            network: Network::new(AtTx::new(client, 5)),
-            sockets: None,
+    fn drop(&mut self) {
+        if self.state != State::Off {
+            self.state = State::Off;
+            self.hard_power_off().ok();
         }
     }
+}
 
-    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<N, L>) {
+impl<C, CLK, N, L, RST, DTR, PWR, VINT> Device<C, CLK, N, L, RST, DTR, PWR, VINT>
+where
+    C: AtatClient,
+    CLK: Clock,
+    RST: OutputPin,
+    PWR: OutputPin,
+    DTR: OutputPin,
+    VINT: InputPin,
+    N: ArrayLength<Option<Socket<L, CLK>>>
+        + ArrayLength<Bucket<u8, usize>>
+        + ArrayLength<Option<Pos>>,
+    L: ArrayLength<u8>,
+{
+    pub fn new(client: C, timer: CLK, config: Config<RST, DTR, PWR, VINT>) -> Self {
+        let mut device = Device {
+            config,
+            state: State::Off,
+            power_state: PowerState::Off,
+            network: Network::new(AtTx::new(client, 10), timer),
+            sockets: None,
+        };
+
+        let power_state = device.power_state().unwrap_or(PowerState::Off);
+        device.power_state = power_state;
+        device
+    }
+
+    pub fn select_sim_card(&mut self) -> Result<(), Error> {
+        for _ in 0..2 {
+            match self.network.send_internal(&GetPinStatus, true) {
+                Ok(PinStatus { code }) if code == PinStatusCode::Ready => {
+                    return Ok(());
+                }
+                _ => {}
+            }
+
+            self.network
+                .status
+                .try_borrow()?
+                .timer
+                .new_timer(1.seconds())
+                .start()?
+                .wait()?;
+        }
+
+        // There was an error initializing the SIM
+        // We've seen issues on uBlox-based devices, as a precation, we'll cycle
+        // the modem here through minimal/full functional state.
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun: Functionality::Minimum,
+                rst: None,
+            },
+            true,
+        )?;
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun: Functionality::Full,
+                rst: None,
+            },
+            true,
+        )?;
+
+        return Err(Error::Busy);
+    }
+
+    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<N, L, CLK>) {
         self.sockets = Some(RefCell::new(socket_set));
     }
 
-    pub(crate) fn initialize(&mut self, leave_pwr_alone: bool) -> Result<(), Error> {
-        defmt::info!(
-            "Initialising with PWR_ON pin: {:bool} and VInt pin: {:bool}. Using PWR_ON pin: {:bool}",
-            self.config.pwr_pin.is_some(),
-            self.config.vint_pin.is_some(),
-            !leave_pwr_alone
-        );
+    pub fn initialize(&mut self) -> Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
+        if self.power_state != PowerState::On {
+            // Always re-configure the module when power has been off
+            self.state = State::Off;
 
-        let vint_value = match self.config.vint_pin {
-            Some(ref _vint) => false,
-            _ => false,
-        };
+            self.power_on()?;
 
-        self.is_alive(3).ok();
-
-        if vint_value {
-            defmt::debug!("powering on, module is already on, flushing config...");
-        } else {
-            defmt::debug!("powering on.");
-            match self.config.pwr_pin {
-                Some(ref mut pwr) if !leave_pwr_alone => {
-                    pwr.try_set_high().ok();
-                    self.delay
-                        .try_delay_ms(crate::module_cfg::constants::PWR_ON_PULL_TIME_MS)
-                        .map_err(|_| Error::Busy)?;
-                    pwr.try_set_low().ok();
-                    self.delay
-                        .try_delay_ms(crate::module_cfg::constants::PWR_ON_PULL_TIME_MS)
-                        .map_err(|_| Error::Busy)?;
-                    pwr.try_set_high().ok();
-                }
-                _ => {
-                    // Software restart
-                    self.restart(false)?;
-                }
-            }
-            self.delay
-                .try_delay_ms(crate::module_cfg::constants::BOOT_WAIT_TIME_MS)
-                .map_err(|_| Error::Busy)?;
             self.is_alive(10)?;
+
+            self.power_state = PowerState::On;
         }
 
-        self.network.clear_events()?;
-
         self.configure()?;
-
-        self.network.push_event(Event::PwrOn)?;
 
         Ok(())
     }
 
-    /// Check that the cellular module is alive.
-    ///
-    /// See if the cellular module is responding at the AT interface by poking
-    /// it with "AT" up to `attempts` times, waiting 1 second for an "OK"
-    /// response each time
-    pub(crate) fn is_alive(&self, attempts: u8) -> Result<(), Error> {
-        let mut error = Error::BaudDetection;
-        for _ in 0..attempts {
-            match self.network.send_internal(&AT, false) {
-                Ok(_) => {
-                    return Ok(());
-                }
-                Err(e) => error = e.into(),
-            };
+    pub(crate) fn clear_buffers(&mut self) -> Result<(), Error> {
+        self.network.at_tx.reset()?;
+        if let Some(ref sockets) = self.sockets {
+            sockets.try_borrow_mut()?.prune();
         }
-        Err(error)
+        Ok(())
     }
 
-    pub(crate) fn configure(&self) -> Result<(), Error> {
+    pub(crate) fn configure(&mut self) -> Result<(), Error> {
+        if matches!(self.state, State::On) {
+            return Ok(());
+        }
+
+        // Always re-configure the PDP contexts if we reconfigure the module
+        self.network.context_state.set(ContextState::Setup);
+
+        self.is_alive(2)?;
+
+        self.clear_buffers()?;
+
         if self.config.baud_rate > 230_400_u32 {
             // Needs a way to reconfigure uart baud rate temporarily
             // Relevant issue: https://github.com/rust-embedded/embedded-hal/issues/79
@@ -177,6 +221,8 @@ where
 
             // self.is_alive()?;
         }
+
+        self.select_sim_card()?;
 
         // Extended errors on
         self.network.send_internal(
@@ -227,8 +273,6 @@ where
             )?;
         }
 
-        // self.network.send_internal(&general::IdentificationInformation { n: 9 }, true)?;
-
         // Tell module whether we support flow control
         // FIXME: Use AT+IFC=2,2 instead of AT&K here
         if self.config.flow_control {
@@ -247,14 +291,6 @@ where
             )?;
         }
 
-        self.network.send_internal(
-            &SetModuleFunctionality {
-                fun: Functionality::Full,
-                rst: None,
-            },
-            true,
-        )?;
-
         // Disable Message Waiting URCs (UMWI)
         self.network.send_internal(
             &SetMessageWaitingIndication {
@@ -263,13 +299,27 @@ where
             false,
         )?;
 
-        let PinStatus { code } = self.network.send_internal(&GetPinStatus, true)?;
+        // self.network.send_internal(
+        //     &SetRadioAccessTechnology {
+        //         selected_act: RadioAccessTechnologySelected::Lte,
+        //     },
+        //     false,
+        // )?;
 
-        if code != PinStatusCode::Ready {
-            // FIXME: Handle SIM Pin here
-            defmt::error!("PIN status not ready!!");
-            return Err(Error::Busy);
-        }
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun: Functionality::Full,
+                rst: None,
+            },
+            true,
+        )?;
+
+        let mut ns = self.network.status.try_borrow_mut()?;
+        ns.reset();
+        ns.set_connection_state(ConnectionState::Connecting);
+        drop(ns);
+
+        self.enable_registration_urcs()?;
 
         let OperatorSelection { mode, .. } =
             self.network.send_internal(&GetOperatorSelection, true)?;
@@ -283,41 +333,27 @@ where
             )?;
         }
 
-        self.enable_registration_urcs()?;
+        self.network.update_registration()?;
 
-        Ok(())
-    }
+        self.network.reset_reg_time()?;
 
-    #[inline]
-    pub(crate) fn restart(&self, sim_reset: bool) -> Result<(), Error> {
-        if sim_reset {
-            self.network.send_internal(
-                &SetModuleFunctionality {
-                    fun: Functionality::SilentResetWithSimReset,
-                    rst: None,
-                },
-                false,
-            )?;
-        } else {
-            self.network.send_internal(
-                &SetModuleFunctionality {
-                    fun: Functionality::SilentReset,
-                    rst: None,
-                },
-                false,
-            )?;
-        }
-
-        self.network.push_event(Event::PwrOff)?;
+        self.state = State::On;
         Ok(())
     }
 
     pub(crate) fn enable_registration_urcs(&self) -> Result<(), Error> {
         // if packet domain event reporting is not set it's not a stopper. We
         // might lack some events when we are dropped from the network.
+        // TODO: Re-enable this when it works, and is useful!
         if self
             .network
-            .set_packet_domain_event_reporting(true)
+            .send_internal(
+                &SetPacketSwitchedEventReporting {
+                    mode: PSEventReportingMode::CircularBufferUrcs,
+                    bfr: None,
+                },
+                true,
+            )
             .is_err()
         {
             defmt::warn!("Packet domain event reporting set failed");
@@ -346,60 +382,91 @@ where
             },
             true,
         )?;
-        Ok(())
-    }
-
-    pub fn attach(&self) -> Result<(), Error> {
-        self.network.send_internal(
-            &SetGPRSAttached {
-                state: GPRSAttachedState::Attached,
-            },
-            true,
-        )?;
 
         Ok(())
     }
 
-    pub fn spin(&mut self) -> nb::Result<bool, Error> {
-        self.network.handle_urc().ok();
-
-        while let Some(event) = self
-            .network
-            .get_event()
-            .map_err(|e| nb::Error::Other(e.into()))?
-        {
-            if let Ok(cell_event) = event.try_into() {
-                self.fsm.handle_event(cell_event);
-            }
-        }
-
-        if self.fsm.is_retry() {
-            if let Err(nb::Error::WouldBlock) = self.delay.try_wait() {
-                return Err(nb::Error::WouldBlock);
-            }
-        }
-
-        let state = self.fsm.get_state();
-
-        if let Err(_) = match state {
-            State::Unknown => self.restart(true),
-            State::Off => self.initialize(true),
-            _ => Ok(()),
-        } {
-            match self.fsm.retry_or_fail(&mut self.delay) {
-                nb::Error::WouldBlock => return Err(nb::Error::WouldBlock),
-                nb::Error::Other(_) => {
-                    self.network.clear_events().ok();
-                    self.fsm.set_state(State::Unknown);
-                }
-            }
-        }
-
-        if matches!(state, State::On | State::Registered) {
-            Ok(false)
-        } else if matches!(state, State::Connected) {
-            Ok(true)
+    fn handle_urc(&self) -> Result<(), Error> {
+        if let Some(ref sockets) = self.sockets {
+            self.network
+                .at_tx
+                .handle_urc(|urc| {
+                    match urc {
+                        Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
+                            defmt::info!("[URC] SocketClosed {=u8}", socket.0);
+                            if let Ok(mut sockets) = sockets.try_borrow_mut() {
+                                if sockets.remove(socket).is_err() {
+                                    defmt::warn!("Socket already closed!");
+                                }
+                            }
+                        }
+                        Urc::SocketDataAvailable(
+                            ip_transport_layer::urc::SocketDataAvailable { socket, length },
+                        )
+                        | Urc::SocketDataAvailableUDP(
+                            ip_transport_layer::urc::SocketDataAvailable { socket, length },
+                        ) => {
+                            defmt::trace!(
+                                "[Socket({=u8})] {=u16} bytes available",
+                                socket.0,
+                                length as u16
+                            );
+                            if let Ok(mut sockets) = sockets.try_borrow_mut() {
+                                if let Some((_, mut sock)) =
+                                    sockets.iter_mut().find(|(handle, _)| *handle == socket)
+                                {
+                                    sock.set_available_data(length);
+                                }
+                            } else {
+                                defmt::warn!(
+                                    "[Socket({=u8})] Failed to borrow socketset!",
+                                    socket.0
+                                );
+                            }
+                        }
+                        _ => return false,
+                    }
+                    true
+                })
+                .map_err(Error::Network)
         } else {
+            Ok(())
+        }
+    }
+
+    pub(crate) fn process_events(&mut self) -> Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
+        if self.power_state != PowerState::On {
+            return Err(Error::Uninitialized);
+        }
+
+        self.handle_urc()?;
+
+        match self.network.process_events() {
+            // Catch "Resetting the modem due to the network registration timeout"
+            // as well as consecutive AT timeouts and do a hard reset.
+            Err(crate::network::Error::Generic(GenericError::Timeout)) => self.hard_reset(),
+            result => result.map_err(Error::from),
+        }
+    }
+
+    pub fn spin(&mut self) -> nb::Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
+        self.initialize().ok();
+
+        self.process_events().map_err(Error::from)?;
+
+        if self.network.is_connected().map_err(Error::from)? && self.state == State::On {
+            Ok(())
+        } else {
+            // Reset context state if data connection is lost (This will act as a safeguard if a URC is missed)
+            if self.network.context_state.get() == ContextState::Active {
+                self.network.context_state.set(ContextState::Activating);
+            }
             Err(nb::Error::WouldBlock)
         }
     }
@@ -407,10 +474,104 @@ where
     pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
         // At any point after init state, we should be able to fully send AT
         // commands.
-        if matches!(self.fsm.get_state(), State::Unknown | State::Off) {
+        if self.state != State::On {
+            defmt::error!("Still not initialized!");
             return Err(Error::Uninitialized);
         }
 
         Ok(self.network.send_internal(cmd, true)?)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_helpers::{MockAtClient, MockTimer};
+    use crate::{
+        config::Config,
+        services::data::ContextState,
+        sockets::{SocketHandle, TcpSocket, UdpSocket},
+        APNInfo,
+    };
+    use atat::typenum::Unsigned;
+    use heapless::consts;
+
+    type SocketSize = consts::U128;
+    type SocketSetLen = consts::U2;
+
+    static mut SOCKET_SET: Option<SocketSet<SocketSetLen, SocketSize, MockTimer>> = None;
+
+    #[test]
+    #[ignore]
+    fn prune_on_initialize() {
+        let client = MockAtClient::new(0);
+        let timer = MockTimer::new(None);
+        let config = Config::default();
+
+        let socket_set: &'static mut _ = unsafe {
+            SOCKET_SET = Some(SocketSet::new());
+            SOCKET_SET.as_mut().unwrap_or_else(|| {
+                panic!("Failed to get the static com_queue");
+            })
+        };
+
+        let mut device =
+            Device::<_, _, SocketSetLen, SocketSize, _, _, _, _>::new(client, timer, config);
+        device.set_socket_storage(socket_set);
+
+        // device.fsm.set_state(State::Connected);
+        // assert_eq!(device.fsm.get_state(), State::Connected);
+        device.state = State::On;
+        device.power_state = PowerState::On;
+        // assert_eq!(device.spin(), Ok(()));
+
+        device.network.context_state.set(ContextState::Active);
+
+        let data_service = device.data_service(&APNInfo::default()).unwrap();
+
+        let mut sockets = data_service.sockets.borrow_mut();
+
+        sockets
+            .add(TcpSocket::new(0))
+            .expect("Failed to add new tcp socket!");
+        assert_eq!(sockets.len(), 1);
+
+        let mut tcp = sockets
+            .get::<TcpSocket<_, _>>(SocketHandle(0))
+            .expect("Failed to get socket");
+
+        assert_eq!(tcp.rx_window(), SocketSize::to_usize());
+        let socket_data = b"This is socket data!!";
+        tcp.rx_enqueue_slice(socket_data);
+        assert_eq!(tcp.recv_queue(), socket_data.len());
+        assert_eq!(tcp.rx_window(), SocketSize::to_usize() - socket_data.len());
+
+        sockets
+            .add(UdpSocket::new(1))
+            .expect("Failed to add new udp socket!");
+        assert_eq!(sockets.len(), 2);
+
+        assert!(sockets.add(UdpSocket::new(0)).is_err());
+
+        drop(sockets);
+        drop(data_service);
+
+        device.clear_buffers().expect("Failed to clear buffers");
+
+        let data_service = device.data_service(&APNInfo::default()).unwrap();
+
+        let mut sockets = data_service.sockets.borrow_mut();
+        assert_eq!(sockets.len(), 0);
+
+        sockets
+            .add(TcpSocket::new(0))
+            .expect("Failed to add new tcp socket!");
+        assert_eq!(sockets.len(), 1);
+
+        let tcp = sockets
+            .get::<TcpSocket<_, _>>(SocketHandle(0))
+            .expect("Failed to get socket");
+
+        assert_eq!(tcp.recv_queue(), 0);
     }
 }

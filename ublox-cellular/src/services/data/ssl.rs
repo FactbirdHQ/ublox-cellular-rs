@@ -1,12 +1,7 @@
-use super::{
-    socket::{SocketHandle, SocketSetItem},
-    DataService, Error,
-};
-use crate::{
-    command::device_data_security::{types::*, *},
-    command::ip_transport_layer::{types::*, *},
-};
+use super::{socket::Socket, DataService, Error};
+use crate::command::device_data_security::{types::*, *};
 use atat::atat_derive::AtatLen;
+use embedded_time::Clock;
 use heapless::{ArrayLength, Bucket, Pos};
 use serde::{Deserialize, Serialize};
 
@@ -33,13 +28,15 @@ pub trait SSL {
         private_key: &[u8],
         password: Option<&str>,
     ) -> Result<(), Error>;
-    fn enable_ssl(&self, socket: SocketHandle, profile_id: SecurityProfileId) -> Result<(), Error>;
+    fn enable_ssl(&self, profile_id: SecurityProfileId, server_hostname: &str)
+        -> Result<(), Error>;
 }
 
-impl<'a, C, N, L> SSL for DataService<'a, C, N, L>
+impl<'a, C, CLK, N, L> SSL for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
-    N: ArrayLength<Option<SocketSetItem<L>>>
+    CLK: Clock,
+    N: ArrayLength<Option<Socket<L, CLK>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
@@ -155,7 +152,11 @@ where
         Ok(())
     }
 
-    fn enable_ssl(&self, socket: SocketHandle, profile_id: SecurityProfileId) -> Result<(), Error> {
+    fn enable_ssl(
+        &self,
+        profile_id: SecurityProfileId,
+        server_hostname: &str,
+    ) -> Result<(), Error> {
         self.network.send_internal(
             &SecurityProfileManager {
                 profile_id,
@@ -178,16 +179,8 @@ where
             &SecurityProfileManager {
                 profile_id,
                 operation: Some(SecurityProfileOperation::ExpectedServerHostname(
-                    "a3f8k0ccx04zas.iot.eu-west-1.amazonaws.com",
+                    server_hostname,
                 )),
-            },
-            true,
-        )?;
-
-        self.network.send_internal(
-            &SetSocketSslState {
-                socket,
-                ssl_tls_status: SslTlsStatus::Enabled(profile_id),
             },
             true,
         )?;

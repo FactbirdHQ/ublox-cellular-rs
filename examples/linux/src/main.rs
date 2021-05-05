@@ -5,7 +5,7 @@ use std::thread;
 
 use ublox_cellular::gprs::APNInfo;
 use ublox_cellular::prelude::*;
-use ublox_cellular::sockets::{Ipv4Addr, Mode, SocketAddrV4, SocketSet};
+use ublox_cellular::sockets::{Ipv4Addr, Mode, SocketAddrV4, SocketSet, Socket};
 use ublox_cellular::{error::Error as GSMError, Config, GsmClient};
 
 use atat::AtatClient;
@@ -23,7 +23,7 @@ where
     C: AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
-    N: ArrayLength<Option<ublox_cellular::sockets::SocketSetItem<L>>>,
+    N: ArrayLength<Option<Socket<L>>>,
     L: ArrayLength<u8>,
 {
     gsm.init(true)?;

@@ -1,25 +1,21 @@
-use crate::services::data::socket::SocketSetItem;
+use core::convert::TryInto;
+
+use crate::services::data::socket::Socket;
 use crate::{client::Device, error::Error as DeviceError};
 use atat::AtatClient;
-use embedded_hal::{
-    blocking::delay::DelayMs,
-    digital::{InputPin, OutputPin},
-    timer::CountDown,
-};
+use embedded_hal::digital::{InputPin, OutputPin};
+use embedded_time::{Clock, duration::{Generic, Milliseconds}};
 use heapless::{ArrayLength, Bucket, Pos};
 
-impl<C, DLY, N, L, RST, DTR, PWR, VINT> Device<C, DLY, N, L, RST, DTR, PWR, VINT>
+impl<C, CLK, N, L, RST, DTR, PWR, VINT> Device<C, CLK, N, L, RST, DTR, PWR, VINT>
 where
     C: AtatClient,
-    DLY: DelayMs<u32> + CountDown,
-    DLY::Time: From<u32>,
+    CLK: Clock,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<SocketSetItem<L>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
+    N: ArrayLength<Option<Socket<L, CLK>>> + ArrayLength<Bucket<u8, usize>> + ArrayLength<Option<Pos>>,
     L: ArrayLength<u8>,
 {
     pub fn location_service(&mut self) -> nb::Result<LocationService, DeviceError> {

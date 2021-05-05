@@ -6,7 +6,7 @@ use std::thread;
 
 use ublox_cellular::gprs::APNInfo;
 use ublox_cellular::prelude::*;
-use ublox_cellular::{error::Error as GSMError, sockets::SocketSet, Config, GsmClient};
+use ublox_cellular::{error::Error as GSMError, sockets::{SocketSet, Socket}, Config, GsmClient};
 
 use atat::{self, AtatClient, ClientBuilder, ComQueue, Queues, ResQueue, UrcQueue};
 use embedded_hal::digital::v2::OutputPin;
@@ -26,7 +26,7 @@ where
     C: AtatClient,
     RST: OutputPin,
     DTR: OutputPin,
-    N: ArrayLength<Option<ublox_cellular::sockets::SocketSetItem<L>>>,
+    N: ArrayLength<Option<Socket<L>>>,
     L: ArrayLength<u8>,
 {
     gsm.init(true)?;

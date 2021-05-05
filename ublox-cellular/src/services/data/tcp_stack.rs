@@ -1,22 +1,25 @@
-use super::ssl::{SecurityProfileId, SSL};
+use super::ssl::SecurityProfileId;
 use super::DataService;
 use super::{
-    socket::{Error as SocketError, SocketHandle, SocketSetItem, TcpSocket, TcpState},
+    socket::{Error as SocketError, Socket, SocketHandle, TcpSocket, TcpState},
     EgressChunkSize, Error,
 };
 use crate::command::ip_transport_layer::{
-    types::SocketProtocol, CloseSocket, ConnectSocket, CreateSocket, PrepareWriteSocketDataBinary,
+    types::{SocketProtocol, SslTlsStatus},
+    CloseSocket, ConnectSocket, CreateSocket, PrepareWriteSocketDataBinary, SetSocketSslState,
     WriteSocketDataBinary,
 };
 use atat::typenum::Unsigned;
-use embedded_nal::{Mode, SocketAddr, TcpStack};
+use embedded_nal::{SocketAddr, TcpClient};
+use embedded_time::Clock;
 use heapless::{ArrayLength, Bucket, Pos};
 
-impl<'a, C, N, L> TcpStack for DataService<'a, C, N, L>
+impl<'a, C, CLK, N, L> TcpClient for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
+    CLK: Clock,
     N: 'static
-        + ArrayLength<Option<SocketSetItem<L>>>
+        + ArrayLength<Option<Socket<L, CLK>>>
         + ArrayLength<Bucket<u8, usize>>
         + ArrayLength<Option<Pos>>,
     L: 'static + ArrayLength<u8>,
@@ -28,7 +31,13 @@ where
     type TcpSocket = SocketHandle;
 
     /// Open a new TCP socket to the given address and port. The socket starts in the unconnected state.
-    fn open(&self, _mode: Mode) -> Result<Self::TcpSocket, Self::Error> {
+    fn socket(&self) -> Result<Self::TcpSocket, Self::Error> {
+        let mut sockets = self.sockets.try_borrow_mut()?;
+
+        if sockets.len() >= sockets.capacity() {
+            return Err(Error::Socket(SocketError::SocketSetFull));
+        }
+
         let socket_resp = self.network.send_internal(
             &CreateSocket {
                 protocol: SocketProtocol::TCP,
@@ -37,56 +46,65 @@ where
             true,
         )?;
 
-        Ok(self
-            .sockets
-            .try_borrow_mut()?
-            .add(TcpSocket::new(socket_resp.socket.0))?)
+        Ok(sockets.add(TcpSocket::new(socket_resp.socket.0))?)
     }
 
     /// Connect to the given remote host and port.
     fn connect(
         &self,
-        socket: Self::TcpSocket,
+        socket: &mut Self::TcpSocket,
         remote: SocketAddr,
-    ) -> Result<Self::TcpSocket, Self::Error> {
-        let mut sockets = self.sockets.try_borrow_mut()?;
-        let mut tcp = sockets.get::<TcpSocket<_>>(socket)?;
+    ) -> nb::Result<(), Self::Error> {
+        let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
+        let mut tcp = sockets
+            .get::<TcpSocket<_, CLK>>(*socket)
+            .map_err(Self::Error::from)?;
 
         if tcp.state() == TcpState::Created {
-            self.enable_ssl(socket, SecurityProfileId(0))?;
+            self.network
+                .send_internal(
+                    &SetSocketSslState {
+                        socket: *socket,
+                        ssl_tls_status: SslTlsStatus::Enabled(SecurityProfileId(0)),
+                    },
+                    true,
+                )
+                .map_err(Self::Error::from)?;
 
-            self.network.send_internal(
-                &ConnectSocket {
-                    socket,
-                    remote_addr: remote.ip(),
-                    remote_port: remote.port(),
-                },
-                false,
-            )?;
+            self.network
+                .send_internal(
+                    &ConnectSocket {
+                        socket: *socket,
+                        remote_addr: remote.ip(),
+                        remote_port: remote.port(),
+                    },
+                    false,
+                )
+                .map_err(Self::Error::from)?;
 
             tcp.set_state(TcpState::Connected);
-            Ok(tcp.handle())
+            Ok(())
         } else {
-            defmt::error!("Cannot connect socket! Socket state: {:?}", tcp.state());
-            Err(Error::Socket(SocketError::Illegal))
+            defmt::error!("Cannot connect socket! Socket state: {}", tcp.state());
+            Err(Error::Socket(SocketError::Illegal).into())
         }
     }
 
     /// Check if this socket is still connected
     fn is_connected(&self, socket: &Self::TcpSocket) -> Result<bool, Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut()?;
-        Ok(sockets.get::<TcpSocket<_>>(*socket)?.is_active())
+        Ok(sockets.get::<TcpSocket<_, _>>(*socket)?.is_connected())
     }
 
     /// Write to the stream. Returns the number of bytes written is returned
     /// (which may be less than `buffer.len()`), or an error.
-    fn write(&self, socket: &mut Self::TcpSocket, buffer: &[u8]) -> nb::Result<usize, Self::Error> {
+    fn send(&self, socket: &mut Self::TcpSocket, buffer: &[u8]) -> nb::Result<usize, Self::Error> {
         if !self.is_connected(&socket)? {
-            return Err(nb::Error::Other(Error::SocketClosed));
+            return Err(Error::SocketClosed.into());
         }
 
         for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
-            defmt::trace!("Sending: {:?} bytes, {:?}", chunk.len(), chunk);
+            defmt::trace!("Sending: {} bytes", chunk.len());
             self.network
                 .send_internal(
                     &PrepareWriteSocketDataBinary {
@@ -95,13 +113,7 @@ where
                     },
                     false,
                 )
-                .map_err(|e| nb::Error::Other(e.into()))?;
-
-            // self.delay
-            //     .try_borrow_mut()
-            //     .map_err(|_| Error::BorrowMutError)?
-            //     .try_delay_ms(50)
-            //     .map_err(|_| Error::Busy)?;
+                .map_err(Self::Error::from)?;
 
             let response = self
                 .network
@@ -111,13 +123,13 @@ where
                     },
                     false,
                 )
-                .map_err(|e| nb::Error::Other(e.into()))?;
+                .map_err(Self::Error::from)?;
 
             if response.length != chunk.len() {
-                return Err(nb::Error::Other(Error::BadLength));
+                return Err(Error::BadLength.into());
             }
             if &response.socket != socket {
-                return Err(nb::Error::Other(Error::WrongSocketType));
+                return Err(Error::WrongSocketType.into());
             }
         }
 
@@ -127,37 +139,18 @@ where
     /// Read from the stream. Returns `Ok(n)`, which means `n` bytes of
     /// data have been received and they have been placed in
     /// `&buffer[0..n]`, or an error.
-    fn read(
+    fn receive(
         &self,
         socket: &mut Self::TcpSocket,
         buffer: &mut [u8],
     ) -> nb::Result<usize, Self::Error> {
-        let mut sockets = self
-            .sockets
-            .try_borrow_mut()
-            .map_err(|e| nb::Error::Other(e.into()))?;
+        let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
+
         let mut tcp = sockets
-            .get::<TcpSocket<_>>(*socket)
-            .map_err(|e| nb::Error::Other(e.into()))?;
+            .get::<TcpSocket<_, _>>(*socket)
+            .map_err(Self::Error::from)?;
 
-        tcp.recv_slice(buffer)
-            .map_err(|e| nb::Error::Other(e.into()))
-    }
-
-    fn read_with<F>(&self, socket: &mut Self::TcpSocket, f: F) -> nb::Result<usize, Self::Error>
-    where
-        F: FnOnce(&[u8], Option<&[u8]>) -> usize,
-    {
-        let mut sockets = self
-            .sockets
-            .try_borrow_mut()
-            .map_err(|e| nb::Error::Other(e.into()))?;
-        let mut tcp = sockets
-            .get::<TcpSocket<_>>(*socket)
-            .map_err(|e| nb::Error::Other(e.into()))?;
-
-        tcp.recv_wrapping(|a, b| f(a, b))
-            .map_err(|e| nb::Error::Other(e.into()))
+        Ok(tcp.recv_slice(buffer).map_err(Self::Error::from)?)
     }
 
     /// Close an existing TCP socket.

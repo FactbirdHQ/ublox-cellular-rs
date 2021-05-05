@@ -5,14 +5,14 @@ use heapless::{consts, String};
 pub struct NoPin;
 
 impl InputPin for NoPin {
-    type Error = core::convert::Infallible;
+    type Error = ();
 
     fn try_is_high(&self) -> Result<bool, Self::Error> {
-        Ok(false)
+        Err(())
     }
 
     fn try_is_low(&self) -> Result<bool, Self::Error> {
-        Ok(true)
+        Err(())
     }
 }
 
@@ -41,7 +41,7 @@ pub struct Config<RST, DTR, PWR, VINT> {
     pub(crate) pin: String<consts::U4>,
 }
 
-impl<RST, DTR, PWR, VINT> Default for Config<RST, DTR, PWR, VINT> {
+impl Default for Config<NoPin, NoPin, NoPin, NoPin> {
     fn default() -> Self {
         Config {
             rst_pin: None,

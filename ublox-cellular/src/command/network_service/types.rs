@@ -1,6 +1,6 @@
 //! Argument and parameter types used by Network service Commands and Responses
 use atat::atat_derive::AtatEnum;
-use heapless::{String, consts};
+use heapless::{consts, String};
 
 /// Is used to chose whether the network selection is automatically done by the
 /// MT or is forced by this command to the operator <oper> given in the format
@@ -26,7 +26,7 @@ pub enum OperatorSelectionMode {
     NetworkTimingAdvanceSearch = 8,
 
     #[at_arg(default)]
-    Unknown
+    Unknown,
 }
 /// Indicates the radio access technology
 #[derive(Debug, Clone, Copy, PartialEq, AtatEnum, defmt::Format)]
@@ -130,7 +130,6 @@ pub enum RadioAccessTechnologySelected {
     #[at_arg(value = 6)]
     UmtsLte(RatPreferred),
 }
-
 
 #[derive(Debug, Clone, PartialEq, AtatEnum)]
 pub enum OperatorNameFormat {

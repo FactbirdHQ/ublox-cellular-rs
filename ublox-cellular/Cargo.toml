@@ -15,37 +15,36 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-heapless = { version = "^0.5", features = ["serde"] }
-no-std-net = { version = "0.4.0", features = ["serde"] }
-embedded-hal = { version = "1.0.0-alpha.4" }
+atat = { version = "0.10.0", features = ["derive"] }
+defmt = { version = "^0.2", features = []}
+embedded-hal = "1.0.0-alpha.4"
+embedded-nal = "0.2.0"
+embedded-time = "0.10.1"
+hash32 = "^0.1.1"
+hash32-derive = "^0.1.0"
+heapless = { version = "^0.5.5", features = ["serde"] }
 nb = "^1"
-atat = { version = "0.6.0", features = ["derive"] }
-serde_at = { version = "0.6.0" }
+no-std-net = { version = "0.4.0", features = ["serde"] }
 serde = { version = "^1", default-features = false, features = ["derive"] }
-embedded-nal = { git = "https://github.com/BlackbirdHQ/embedded-nal", branch = "factbird-mini-1.0" }
+serde_at = { version = "0.10.0" }
 typenum = "^1"
-defmt = { version = "^0.1" }
-hash32 = "*"
-hash32-derive = "*"
 
 [features]
-default = [
-    "toby-r2",
-    "socket-udp",
-    "socket-tcp",
-]
+default = ["toby-r2", "socket-udp", "socket-tcp"]
 
-topy-l4 = []
-mpci-l2 = []
-lisa-u2 = []
-sara-g3 = []
-sara-g4 = []
-sara-u2 = []
-sara-u1 = []
-toby-l2 = []
-toby-r2 = []
 lara-r2 = []
 leon-g1 = []
+lisa-u2 = []
+mpci-l2 = []
+sara-g3 = []
+sara-g4 = []
+sara-u1 = []
+sara-u2 = ["upsd-context-activation"]
+toby-l2 = []
+toby-r2 = []
+topy-l4 = []
+
+upsd-context-activation = []
 
 socket-tcp = []
 socket-udp = []

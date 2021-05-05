@@ -1,3 +1,5 @@
+use core::convert::TryInto;
+use embedded_time::{duration::*, Clock, Instant};
 use heapless::ArrayLength;
 
 use super::{Error, Result, RingBuffer, Socket, SocketHandle, SocketMeta};
@@ -11,13 +13,8 @@ pub enum State {
     Created,
     /// TCP connected or UDP has an address
     Connected,
-    /// Block all reads
-    ShutdownForRead,
     /// Block all writes
     ShutdownForWrite,
-    /// Block all reads and writes, waiting for far end to complete closure, can
-    /// be tidied up.
-    Closing,
 }
 
 impl Default for State {
@@ -32,23 +29,27 @@ impl Default for State {
 /// Note that, for listening sockets, there is no "backlog"; to be able to simultaneously
 /// accept several connections, as many sockets must be allocated, or any new connection
 /// attempts will be reset.
-pub struct TcpSocket<L: ArrayLength<u8>> {
+pub struct TcpSocket<L: ArrayLength<u8>, CLK: Clock> {
     pub(crate) meta: SocketMeta,
     state: State,
+    check_interval: Seconds<u32>,
     available_data: usize,
     rx_buffer: SocketBuffer<L>,
+    last_check_time: Option<Instant<CLK>>,
 }
 
-impl<L: ArrayLength<u8>> TcpSocket<L> {
+impl<L: ArrayLength<u8>, CLK: Clock> TcpSocket<L, CLK> {
     /// Create a socket using the given buffers.
-    pub fn new(socket_id: u8) -> TcpSocket<L> {
+    pub fn new(socket_id: u8) -> TcpSocket<L, CLK> {
         TcpSocket {
             meta: SocketMeta {
                 handle: SocketHandle(socket_id),
             },
             state: State::default(),
-            available_data: 0,
             rx_buffer: SocketBuffer::new(),
+            available_data: 0,
+            check_interval: Seconds(15),
+            last_check_time: None,
         }
     }
 
@@ -62,6 +63,25 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     #[inline]
     pub fn state(&self) -> State {
         self.state
+    }
+
+    pub fn should_update_available_data(&mut self, ts: Instant<CLK>) -> bool
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
+        let should_update = self
+            .last_check_time
+            .as_ref()
+            .and_then(|last_check_time| ts.checked_duration_since(last_check_time))
+            .and_then(|dur| dur.try_into().ok())
+            .map(|dur: Milliseconds<u32>| dur >= self.check_interval)
+            .unwrap_or(true);
+
+        if should_update {
+            self.last_check_time.replace(ts);
+        }
+
+        should_update
     }
 
     /// Set available data.
@@ -87,24 +107,8 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     /// In terms of the TCP state machine, the socket must be in the `Closed` or
     /// `ShutdownForRead` state.
     #[inline]
-    pub fn is_active(&self) -> bool {
-        !matches!(self.state, State::ShutdownForRead)
-    }
-
-    /// Return whether the transmit half of the full-duplex connection is open.
-    ///
-    /// This function returns true if it's possible to send data and have it arrive
-    /// to the remote endpoint. However, it does not make any guarantees about the state
-    /// of the transmit buffer, and even if it returns true, [send](#method.send) may
-    /// not be able to enqueue any octets.
-    ///
-    /// In terms of the TCP state machine, the socket must be in the `Connected` or
-    /// `ShutdownForRead` state.
-    #[inline]
-    pub fn may_send(&self) -> bool {
-        // In `ShutdownForRead`, the remote endpoint has closed our receive half of the connection
-        // but we still can transmit indefinitely.
-        matches!(self.state, State::Connected | State::ShutdownForRead)
+    pub fn is_connected(&self) -> bool {
+        matches!(self.state, State::Connected)
     }
 
     /// Return whether the receive half of the full-duplex connection is open.
@@ -238,23 +242,12 @@ impl<L: ArrayLength<u8>> TcpSocket<L> {
     }
 
     pub fn set_state(&mut self, state: State) {
-        // if self.state != state {
-        //     if self.remote_endpoint.addr.is_unspecified() {
-        //         net_trace!("{}:{}: state={}=>{}",
-        //                    self.meta.handle, self.local_endpoint,
-        //                    self.state, state);
-        //     } else {
-        //         net_trace!("{}:{}:{}: state={}=>{}",
-        //                    self.meta.handle, self.local_endpoint, self.remote_endpoint,
-        //                    self.state, state);
-        //     }
-        // }
         self.state = state
     }
 }
 
-impl<L: ArrayLength<u8>> Into<Socket<L>> for TcpSocket<L> {
-    fn into(self) -> Socket<L> {
+impl<L: ArrayLength<u8>, CLK: Clock> Into<Socket<L, CLK>> for TcpSocket<L, CLK> {
+    fn into(self) -> Socket<L, CLK> {
         Socket::Tcp(self)
     }
 }

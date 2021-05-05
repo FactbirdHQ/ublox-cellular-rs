@@ -230,7 +230,7 @@ pub struct SetPDPContextState {
 
 /// 18.14 Read PDP context state +CGACT
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CGACT?", PDPContextState, timeout_ms = 150000, abortable = true)]
+#[at_cmd("+CGACT?", heapless::Vec<PDPContextState, heapless::consts::U7>, timeout_ms = 150000, abortable = true)]
 pub struct GetPDPContextState;
 
 /// 18.26 Packet switched event reporting +CGEREP

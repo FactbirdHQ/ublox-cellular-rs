@@ -1,11 +1,16 @@
+use embedded_time::TimeError;
+
 use crate::network::Error as NetworkError;
 use crate::services::data::Error as DataServiceError;
 use core::cell::{BorrowError, BorrowMutError};
 
-#[derive(Debug, defmt::Format)]
+#[derive(Debug, PartialEq)]
 pub enum GenericError {
     BorrowError,
     BorrowMutError,
+    Timeout,
+    Time(TimeError),
+    Unsupported,
 }
 
 impl From<BorrowMutError> for GenericError {
@@ -20,7 +25,13 @@ impl From<BorrowError> for GenericError {
     }
 }
 
-#[derive(Debug, defmt::Format)]
+impl From<TimeError> for GenericError {
+    fn from(e: TimeError) -> Self {
+        GenericError::Time(e)
+    }
+}
+
+#[derive(Debug, PartialEq)]
 #[non_exhaustive]
 pub enum Error {
     // General device errors
@@ -59,6 +70,12 @@ impl From<NetworkError> for Error {
             NetworkError::Generic(g) => Error::Generic(g),
             _ => Error::Network(e),
         }
+    }
+}
+
+impl From<TimeError> for Error {
+    fn from(e: TimeError) -> Self {
+        Error::Generic(e.into())
     }
 }
 

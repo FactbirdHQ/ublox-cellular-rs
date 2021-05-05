@@ -26,6 +26,8 @@ Relevant docs:
 Relevant repos:
 - https://github.com/u-blox/cellular
 - https://github.com/ARMmbed/mbed-os/blob/master/connectivity/drivers/cellular
+- https://github.com/particle-iot/device-os
+- https://github.com/u-blox/ubxlib
 
 
 ## Tests

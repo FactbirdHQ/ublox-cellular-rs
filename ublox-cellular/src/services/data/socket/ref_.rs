@@ -1,49 +1,14 @@
 use core::ops::{Deref, DerefMut};
-use heapless::ArrayLength;
-
-// #[cfg(all(
-//     feature = "socket-icmp",
-//     any(feature = "proto-ipv4", feature = "proto-ipv6")
-// ))]
-// use crate::socket::IcmpSocket;
-// #[cfg(feature = "socket-raw")]
-// use crate::socket::RawSocket;
-#[cfg(feature = "socket-tcp")]
-use super::TcpSocket;
-#[cfg(feature = "socket-udp")]
-use super::UdpSocket;
-
-/// A trait for tracking a socket usage session.
-///
-/// Allows implementation of custom drop logic that runs only if the socket was changed
-/// in specific ways. For example, drop logic for UDP would check if the local endpoint
-/// has changed, and if yes, notify the socket set.
-#[doc(hidden)]
-pub trait Session {
-    fn finish(&mut self) {}
-}
-
-// #[cfg(feature = "socket-raw")]
-// impl<'a, 'b> Session for RawSocket<'a, 'b> {}
-// #[cfg(all(
-//     feature = "socket-icmp",
-//     any(feature = "proto-ipv4", feature = "proto-ipv6")
-// ))]
-// impl<'a, 'b> Session for IcmpSocket<'a, 'b> {}
-#[cfg(feature = "socket-udp")]
-impl<L: ArrayLength<u8>> Session for UdpSocket<L> {}
-#[cfg(feature = "socket-tcp")]
-impl<L: ArrayLength<u8>> Session for TcpSocket<L> {}
 
 /// A smart pointer to a socket.
 ///
 /// Allows the network stack to efficiently determine if the socket state was changed in any way.
-pub struct Ref<'a, T: Session + 'a> {
+pub struct Ref<'a, T: 'a> {
     socket: &'a mut T,
     consumed: bool,
 }
 
-impl<'a, T: Session + 'a> Ref<'a, T> {
+impl<'a, T: 'a> Ref<'a, T> {
     /// Wrap a pointer to a socket to make a smart pointer.
     ///
     /// Calling this function is only necessary if your code is using [into_inner].
@@ -72,7 +37,7 @@ impl<'a, T: Session + 'a> Ref<'a, T> {
     }
 }
 
-impl<'a, T: Session> Deref for Ref<'a, T> {
+impl<'a, T> Deref for Ref<'a, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -80,16 +45,8 @@ impl<'a, T: Session> Deref for Ref<'a, T> {
     }
 }
 
-impl<'a, T: Session> DerefMut for Ref<'a, T> {
+impl<'a, T> DerefMut for Ref<'a, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.socket
     }
 }
-
-// impl<'a, T: Session> Drop for Ref<'a, T> {
-//     fn drop(&mut self) {
-//         if !self.consumed {
-//             Session::finish(self.socket);
-//         }
-//     }
-// }

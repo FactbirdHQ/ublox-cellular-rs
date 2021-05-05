@@ -501,14 +501,22 @@ impl FromStr for CmeError {
                 Self::RequestedApnNotSupportedInCurrentRatAndPlmnCombination
             }
             "169" | "IMSI unknown in VLR" => Self::ImsiUnknownInVlr,
-            "171" | "1149" | "Last PDN disconnection not allowed" => Self::LastPdnDisconnectionNotAllowed,
-            "172" | "189" | "1095" | "Semantically incorrect message" => Self::SemanticallyIncorrectMessage,
+            "171" | "1149" | "Last PDN disconnection not allowed" => {
+                Self::LastPdnDisconnectionNotAllowed
+            }
+            "172" | "189" | "1095" | "Semantically incorrect message" => {
+                Self::SemanticallyIncorrectMessage
+            }
             "173" | "Mandatory information element error" => Self::MandatoryInformationElementError,
             "174" | "1099" | "Information element non-existent or not implemented" => {
                 Self::InformationElementNonExistentOrNotImplemented
             }
             "175" | "194" | "1100" | "Conditional IE error" => Self::ConditionalIeError,
-            "176" | "197" | "1111" | "Protocol error, unspecified" | "Protocol error unspecified" => Self::ProtocolErrorUnspecified,
+            "176"
+            | "197"
+            | "1111"
+            | "Protocol error, unspecified"
+            | "Protocol error unspecified" => Self::ProtocolErrorUnspecified,
             "177" | "1008" | "Operator determined barring" => Self::OperatorDeterminedBarring,
             "178" | "Maximum number of PDP contexts reached" => {
                 Self::MaximumNumberOfPdpContextsReached

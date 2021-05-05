@@ -1,7 +1,7 @@
 //! Responses for Network service Commands
 use super::types::*;
 use atat::atat_derive::AtatResp;
-use heapless::{String, consts};
+use heapless::{consts, String};
 
 /// 7.3 Signal quality +CSQ
 #[derive(Clone, AtatResp, defmt::Format)]
