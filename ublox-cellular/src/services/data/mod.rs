@@ -14,7 +14,7 @@ mod hex;
 
 use crate::{
     client::Device,
-    command::mobile_control::types::Functionality,
+    command::mobile_control::types::{Functionality, ResetMode},
     command::mobile_control::SetModuleFunctionality,
     command::psn::types::PDPContextStatus,
     command::psn::types::PacketSwitchedParam,
@@ -93,7 +93,7 @@ where
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Minimum,
-                rst: None,
+                rst: Some(ResetMode::DontReset),
             },
             true,
         )?;
@@ -122,7 +122,7 @@ where
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Full,
-                rst: None,
+                rst: Some(ResetMode::DontReset),
             },
             true,
         )?;
@@ -149,7 +149,7 @@ where
                     .map_err(DeviceError::from)?;
                 return Err(nb::Error::WouldBlock);
             }
-            Ok(_) => {
+            Ok(()) => {
                 #[cfg(not(feature = "upsd-context-activation"))]
                 self.define_context(CONTEXT_ID, apn_info)
                     .map_err(DeviceError::from)?;

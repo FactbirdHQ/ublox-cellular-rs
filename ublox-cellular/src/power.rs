@@ -8,7 +8,10 @@ use heapless::{ArrayLength, Bucket, Pos};
 use crate::{
     client::Device,
     command::{
-        mobile_control::{types::Functionality, ModuleSwitchOff, SetModuleFunctionality},
+        mobile_control::{
+            types::{Functionality, ResetMode},
+            ModuleSwitchOff, SetModuleFunctionality,
+        },
         system_features::{
             types::{FSFactoryRestoreType, NVMFactoryRestoreType},
             SetFactoryConfiguration,
@@ -49,7 +52,7 @@ where
     pub(crate) fn is_alive(&self, attempts: u8) -> Result<(), Error> {
         let mut error = Error::BaudDetection;
         for _ in 0..attempts {
-            match self.network.send_internal(&AT, false) {
+            match self.network.at_tx.send_ignore_timeout(&AT) {
                 Ok(_) => {
                     return Ok(());
                 }
@@ -97,8 +100,13 @@ where
             Functionality::SilentReset
         };
 
-        self.network
-            .send_internal(&SetModuleFunctionality { fun, rst: None }, false)?;
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun,
+                rst: Some(ResetMode::DontReset),
+            },
+            false,
+        )?;
 
         self.wait_power_state(PowerState::On, 30_000u32.milliseconds())?;
 
