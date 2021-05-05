@@ -15,7 +15,7 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.9.0", features = ["derive"] }
+atat = { version = "0.10.0", features = ["derive"] }
 defmt = { version = "^0.2", features = []}
 embedded-hal = "1.0.0-alpha.4"
 embedded-nal = "0.2.0"
@@ -26,7 +26,7 @@ heapless = { version = "^0.5.5", features = ["serde"] }
 nb = "^1"
 no-std-net = { version = "0.4.0", features = ["serde"] }
 serde = { version = "^1", default-features = false, features = ["derive"] }
-serde_at = { version = "0.9.0" }
+serde_at = { version = "0.10.0" }
 typenum = "^1"
 
 [features]

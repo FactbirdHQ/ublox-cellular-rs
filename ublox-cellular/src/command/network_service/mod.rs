@@ -37,7 +37,8 @@ pub struct GetSignalQuality;
 pub struct SetOperatorSelection {
     #[at_arg(position = 0)]
     pub mode: OperatorSelectionMode,
-    // pub format: NetworkRegistrationUrcConfig,
+    #[at_arg(position = 1)]
+    pub format: Option<u8>,
 }
 
 #[derive(Clone, AtatCmd)]

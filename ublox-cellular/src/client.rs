@@ -5,8 +5,7 @@ use embedded_time::{duration::*, Clock};
 use heapless::{ArrayLength, Bucket, Pos};
 
 use crate::{
-    command::device_lock::GetPinStatus,
-    command::device_lock::{responses::PinStatus, types::PinStatusCode},
+    command::device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
     command::{
         control::{types::*, *},
         mobile_control::{types::*, *},
@@ -31,7 +30,10 @@ use crate::{
     },
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
-use network_service::{types::NetworkRegistrationUrcConfig, SetNetworkRegistrationStatus};
+use network_service::{
+    types::{NetworkRegistrationUrcConfig, RadioAccessTechnologySelected, RatPreferred},
+    SetNetworkRegistrationStatus, SetRadioAccessTechnology,
+};
 use psn::{
     types::{EPSNetworkRegistrationUrcConfig, GPRSNetworkRegistrationUrcConfig},
     SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
@@ -140,14 +142,14 @@ where
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Minimum,
-                rst: None,
+                rst: Some(ResetMode::DontReset),
             },
             true,
         )?;
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Full,
-                rst: None,
+                rst: Some(ResetMode::DontReset),
             },
             true,
         )?;
@@ -167,7 +169,12 @@ where
             // Always re-configure the module when power has been off
             self.state = State::Off;
 
-            self.power_on()?;
+            // Catch states where we have no vint sense, and the module is already in powered mode, 
+            // but for some reason doesn't answer to AT commands.
+            // This usually happens on programming after modem power on.
+            if self.power_on().is_err() {
+                self.hard_reset()?;
+            }
 
             self.is_alive(10)?;
 
@@ -184,6 +191,16 @@ where
         if let Some(ref sockets) = self.sockets {
             sockets.try_borrow_mut()?.prune();
         }
+
+        // Allow ATAT some time to clear the buffers
+        self.network
+                .status
+                .try_borrow()?
+                .timer
+                .new_timer(300_u32.milliseconds())
+                .start()?
+                .wait()?;
+
         Ok(())
     }
 
@@ -227,7 +244,7 @@ where
         // Extended errors on
         self.network.send_internal(
             &SetReportMobileTerminationError {
-                n: TerminationErrorMode::Disabled,
+                n: TerminationErrorMode::Enabled,
             },
             false,
         )?;
@@ -299,20 +316,20 @@ where
             false,
         )?;
 
-        // self.network.send_internal(
-        //     &SetRadioAccessTechnology {
-        //         selected_act: RadioAccessTechnologySelected::Lte,
-        //     },
-        //     false,
-        // )?;
-
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Full,
-                rst: None,
+                rst: Some(ResetMode::DontReset),
             },
             true,
         )?;
+
+        // self.network.send_internal(
+        //     &SetRadioAccessTechnology {
+        //         selected_act: RadioAccessTechnologySelected::GsmUmtsLte(RatPreferred::Lte, RatPreferred::Utran),
+        //     },
+        //     false,
+        // )?;
 
         let mut ns = self.network.status.try_borrow_mut()?;
         ns.reset();
@@ -321,13 +338,16 @@ where
 
         self.enable_registration_urcs()?;
 
+        // Set automatic operator selection, if not already set
         let OperatorSelection { mode, .. } =
             self.network.send_internal(&GetOperatorSelection, true)?;
 
-        if mode != OperatorSelectionMode::Automatic {
+        // Only run AT+COPS=0 if currently de-registered, to avoid PLMN reselection
+        if !matches!(mode, OperatorSelectionMode::Automatic | OperatorSelectionMode::Manual ) {
             self.network.send_internal(
                 &SetOperatorSelection {
                     mode: OperatorSelectionMode::Automatic,
+                    format: Some(2),
                 },
                 true,
             )?;
@@ -456,9 +476,11 @@ where
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
-        self.initialize().ok();
+        let res = self.initialize();
 
         self.process_events().map_err(Error::from)?;
+
+        res?;
 
         if self.network.is_connected().map_err(Error::from)? && self.state == State::On {
             Ok(())

@@ -1,6 +1,9 @@
 use crate::{
     command::{
-        mobile_control::{types::Functionality, SetModuleFunctionality},
+        mobile_control::{
+            types::{Functionality, ResetMode},
+            SetModuleFunctionality,
+        },
         network_service::{
             types::OperatorSelectionMode, GetNetworkRegistrationStatus, SetOperatorSelection,
         },
@@ -84,6 +87,31 @@ impl<C: AtatClient> AtTx<C> {
         Ok(())
     }
 
+    pub fn send_ignore_timeout<A: atat::AtatCmd>(&self, req: &A) -> Result<A::Response, Error> {
+        self.client
+            .try_borrow_mut()?
+            .send(req)
+            .map_err(|e| match e {
+                nb::Error::Other(ate) => {
+                    let request = req.as_bytes();
+
+                    if let atat::Error::Timeout = ate {
+                        let new_value = self.consecutive_timeouts.get() + 1;
+                        self.consecutive_timeouts.set(new_value);
+                    } else {
+                        defmt::error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
+                    }
+                    // Error::AT(ate)
+                    Error::_Unknown
+                }
+                nb::Error::WouldBlock => Error::_Unknown,
+            })
+            .map(|res| {
+                self.consecutive_timeouts.set(0);
+                res
+            })
+    }
+
     pub fn send<A: atat::AtatCmd>(&self, req: &A) -> Result<A::Response, Error> {
         self.client
             .try_borrow_mut()?
@@ -97,7 +125,8 @@ impl<C: AtatClient> AtTx<C> {
                         let new_value = self.consecutive_timeouts.get() + 1;
                         self.consecutive_timeouts.set(new_value);
                     }
-                    Error::AT(ate)
+                    // Error::AT(ate)
+                    Error::_Unknown
                 }
                 nb::Error::WouldBlock => Error::_Unknown,
             })
@@ -258,7 +287,7 @@ where
             if ns.eps.get_status() == registration::Status::NotRegistering
                 && ns.csd.get_status() == registration::Status::NotRegistering
             {
-                defmt::trace!(
+                defmt::debug!(
                     "Sticky not registering state for {} s, PLMN reselection",
                     Seconds::<u32>::from(ns.eps.duration(now)).integer()
                 );
@@ -270,6 +299,7 @@ where
                 self.send_internal(
                     &SetOperatorSelection {
                         mode: OperatorSelectionMode::Automatic,
+                        format: Some(2),
                     },
                     false,
                 )
@@ -280,7 +310,7 @@ where
             } else if ns.eps.get_status() == registration::Status::Denied
                 && ns.csd.get_status() == registration::Status::Denied
             {
-                defmt::trace!(
+                defmt::debug!(
                     "Sticky denied state for {} s, RF reset",
                     Seconds::<u32>::from(ns.eps.duration(now)).integer()
                 );
@@ -291,14 +321,14 @@ where
                 self.send_internal(
                     &SetModuleFunctionality {
                         fun: Functionality::Minimum,
-                        rst: None,
+                        rst: Some(ResetMode::DontReset),
                     },
                     false,
                 )?;
                 self.send_internal(
                     &SetModuleFunctionality {
                         fun: Functionality::Full,
-                        rst: None,
+                        rst: Some(ResetMode::DontReset),
                     },
                     false,
                 )?;
@@ -313,7 +343,7 @@ where
             && ns.csd.get_status() == registration::Status::Denied
             && ns.psd.get_status() == registration::Status::Denied
         {
-            defmt::trace!(
+            defmt::debug!(
                 "Sticky CSD and PSD denied state for {} s, RF reset",
                 Seconds::<u32>::from(ns.csd.duration(now)).integer()
             );
@@ -324,14 +354,14 @@ where
             self.send_internal(
                 &SetModuleFunctionality {
                     fun: Functionality::Minimum,
-                    rst: None,
+                    rst: Some(ResetMode::DontReset),
                 },
                 false,
             )?;
             self.send_internal(
                 &SetModuleFunctionality {
                     fun: Functionality::Full,
-                    rst: None,
+                    rst: Some(ResetMode::DontReset),
                 },
                 false,
             )?;
@@ -346,7 +376,7 @@ where
             && ns.psd.get_status() == registration::Status::NotRegistering
             && ns.eps.get_status() == registration::Status::NotRegistering
         {
-            defmt::trace!(
+            defmt::debug!(
                 "Sticky not registering PSD state for {} s, force GPRS attach",
                 Seconds::<u32>::from(ns.psd.duration(now)).integer()
             );
@@ -367,10 +397,11 @@ where
                 ns.csd.reset();
                 ns.psd.reset();
                 ns.eps.reset();
-                defmt::trace!("GPRS attach failed, try PLMN reselection");
+                defmt::warn!("GPRS attach failed, try PLMN reselection");
                 self.send_internal(
                     &SetOperatorSelection {
                         mode: OperatorSelectionMode::Automatic,
+                        format: Some(2),
                     },
                     true,
                 )?;
