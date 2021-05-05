@@ -12,33 +12,16 @@ mod udp_stack;
 
 mod hex;
 
-use crate::{
-    client::Device,
-    command::mobile_control::types::{Functionality, ResetMode},
-    command::mobile_control::SetModuleFunctionality,
-    command::psn::types::PDPContextStatus,
-    command::psn::types::PacketSwitchedParam,
-    command::psn::SetPDPContextDefinition,
-    command::psn::SetPDPContextState,
-    command::psn::SetPacketSwitchedAction,
-    command::psn::SetPacketSwitchedConfig,
-    command::{
-        ip_transport_layer::{
+use crate::{ProfileId, client::Device, command::mobile_control::SetModuleFunctionality, command::mobile_control::types::{Functionality, ResetMode}, command::psn::SetPDPContextDefinition, command::psn::SetPDPContextState, command::psn::SetPacketSwitchedAction, command::psn::SetPacketSwitchedConfig, command::psn::types::PDPContextStatus, command::psn::types::PacketSwitchedParam, command::{error::UbloxError, ip_transport_layer::{
             responses::{SocketData, UDPSocketData},
             ReadSocketData, ReadUDPSocketData,
-        },
-        psn::{
+        }, psn::{
             self,
             responses::{GPRSAttached, PacketSwitchedConfig, PacketSwitchedNetworkData},
             types::PacketSwitchedParamReq,
             GetPDPContextState, GetPacketSwitchedConfig, GetPacketSwitchedNetworkData,
             SetGPRSAttached,
-        },
-    },
-    error::{Error as DeviceError, GenericError},
-    network::{ContextId, Network},
-    ProfileId,
-};
+        }}, error::{Error as DeviceError, GenericError}, network::{ContextId, Network}};
 use apn::{APNInfo, Apn};
 use atat::{typenum::Unsigned, AtatClient};
 use core::{cell::RefCell, convert::TryInto};
@@ -506,7 +489,11 @@ where
         }
     }
 
-    pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
+    pub fn send_at<A>(&self, cmd: &A) -> Result<A::Response, Error>
+    where
+        A: atat::AtatCmd,
+        A::Error: Into<UbloxError>,
+    {
         Ok(self.network.send_internal(cmd, true)?)
     }
 

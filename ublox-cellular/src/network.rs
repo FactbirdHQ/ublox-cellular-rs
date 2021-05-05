@@ -1,5 +1,6 @@
 use crate::{
     command::{
+        error::UbloxError,
         mobile_control::{
             types::{Functionality, ResetMode},
             SetModuleFunctionality,
@@ -87,7 +88,11 @@ impl<C: AtatClient> AtTx<C> {
         Ok(())
     }
 
-    pub fn send_ignore_timeout<A: atat::AtatCmd>(&self, req: &A) -> Result<A::Response, Error> {
+    pub fn send_ignore_timeout<A>(&self, req: &A) -> Result<A::Response, Error>
+    where
+        A: atat::AtatCmd,
+        A::Error: Into<UbloxError>,
+    {
         self.client
             .try_borrow_mut()?
             .send(req)
@@ -95,14 +100,27 @@ impl<C: AtatClient> AtTx<C> {
                 nb::Error::Other(ate) => {
                     let request = req.as_bytes();
 
-                    if let atat::Error::Timeout = ate {
-                        let new_value = self.consecutive_timeouts.get() + 1;
-                        self.consecutive_timeouts.set(new_value);
-                    } else {
+                    if !matches!(ate, atat::Error::Timeout) {
                         defmt::error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
                     }
-                    // Error::AT(ate)
-                    Error::_Unknown
+
+                    match ate {
+                        atat::Error::Error(ubx) => {
+                            let u: UbloxError = ubx.into();
+                            Error::AT(atat::Error::Error(u))
+                        }
+                        atat::Error::Timeout => {
+                            let new_value = self.consecutive_timeouts.get() + 1;
+                            self.consecutive_timeouts.set(new_value);
+                            Error::AT(atat::Error::Timeout)
+                        }
+                        atat::Error::Read => Error::AT(atat::Error::Read),
+                        atat::Error::Write => Error::AT(atat::Error::Write),
+                        atat::Error::InvalidResponse => Error::AT(atat::Error::InvalidResponse),
+                        atat::Error::Aborted => Error::AT(atat::Error::Aborted),
+                        atat::Error::Overflow => Error::AT(atat::Error::Overflow),
+                        atat::Error::Parse => Error::AT(atat::Error::Parse),
+                    }
                 }
                 nb::Error::WouldBlock => Error::_Unknown,
             })
@@ -112,7 +130,11 @@ impl<C: AtatClient> AtTx<C> {
             })
     }
 
-    pub fn send<A: atat::AtatCmd>(&self, req: &A) -> Result<A::Response, Error> {
+    pub fn send<A>(&self, req: &A) -> Result<A::Response, Error>
+    where
+        A: atat::AtatCmd,
+        A::Error: Into<UbloxError>,
+    {
         self.client
             .try_borrow_mut()?
             .send(req)
@@ -121,12 +143,23 @@ impl<C: AtatClient> AtTx<C> {
                     let request = req.as_bytes();
                     defmt::error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
 
-                    if let atat::Error::Timeout = ate {
-                        let new_value = self.consecutive_timeouts.get() + 1;
-                        self.consecutive_timeouts.set(new_value);
+                    match ate {
+                        atat::Error::Error(ubx) => {
+                            let u: UbloxError = ubx.into();
+                            Error::AT(atat::Error::Error(u))
+                        }
+                        atat::Error::Timeout => {
+                            let new_value = self.consecutive_timeouts.get() + 1;
+                            self.consecutive_timeouts.set(new_value);
+                            Error::AT(atat::Error::Timeout)
+                        }
+                        atat::Error::Read => Error::AT(atat::Error::Read),
+                        atat::Error::Write => Error::AT(atat::Error::Write),
+                        atat::Error::InvalidResponse => Error::AT(atat::Error::InvalidResponse),
+                        atat::Error::Aborted => Error::AT(atat::Error::Aborted),
+                        atat::Error::Overflow => Error::AT(atat::Error::Overflow),
+                        atat::Error::Parse => Error::AT(atat::Error::Parse),
                     }
-                    // Error::AT(ate)
-                    Error::_Unknown
                 }
                 nb::Error::WouldBlock => Error::_Unknown,
             })
@@ -502,7 +535,7 @@ where
     pub(crate) fn send_internal<A>(&self, req: &A, check_urc: bool) -> Result<A::Response, Error>
     where
         A: atat::AtatCmd,
-        // A::Error: Into<UbloxError>
+        A::Error: Into<UbloxError>,
     {
         if check_urc {
             if let Err(e) = self.handle_urc() {

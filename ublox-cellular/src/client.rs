@@ -4,31 +4,18 @@ use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_time::{duration::*, Clock};
 use heapless::{ArrayLength, Bucket, Pos};
 
-use crate::{
-    command::device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
-    command::{
+use crate::{command::device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus}, command::{
         control::{types::*, *},
         mobile_control::{types::*, *},
         system_features::{types::*, *},
         *,
-    },
-    command::{
-        network_service::{
+    }, command::{error::UbloxError, network_service::{
             responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
             SetOperatorSelection,
-        },
-        psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
-    },
-    config::Config,
-    error::{Error, GenericError},
-    network::{AtTx, Network},
-    power::PowerState,
-    registration::ConnectionState,
-    services::data::{
+        }, psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting}}, config::Config, error::{Error, GenericError}, network::{AtTx, Network}, power::PowerState, registration::ConnectionState, services::data::{
         socket::{Socket, SocketSet},
         ContextState,
-    },
-};
+    }};
 use ip_transport_layer::{types::HexMode, SetHexMode};
 use network_service::{
     types::{NetworkRegistrationUrcConfig, RadioAccessTechnologySelected, RatPreferred},
@@ -169,7 +156,7 @@ where
             // Always re-configure the module when power has been off
             self.state = State::Off;
 
-            // Catch states where we have no vint sense, and the module is already in powered mode, 
+            // Catch states where we have no vint sense, and the module is already in powered mode,
             // but for some reason doesn't answer to AT commands.
             // This usually happens on programming after modem power on.
             if self.power_on().is_err() {
@@ -194,12 +181,12 @@ where
 
         // Allow ATAT some time to clear the buffers
         self.network
-                .status
-                .try_borrow()?
-                .timer
-                .new_timer(300_u32.milliseconds())
-                .start()?
-                .wait()?;
+            .status
+            .try_borrow()?
+            .timer
+            .new_timer(300_u32.milliseconds())
+            .start()?
+            .wait()?;
 
         Ok(())
     }
@@ -343,7 +330,10 @@ where
             self.network.send_internal(&GetOperatorSelection, true)?;
 
         // Only run AT+COPS=0 if currently de-registered, to avoid PLMN reselection
-        if !matches!(mode, OperatorSelectionMode::Automatic | OperatorSelectionMode::Manual ) {
+        if !matches!(
+            mode,
+            OperatorSelectionMode::Automatic | OperatorSelectionMode::Manual
+        ) {
             self.network.send_internal(
                 &SetOperatorSelection {
                     mode: OperatorSelectionMode::Automatic,
@@ -493,7 +483,11 @@ where
         }
     }
 
-    pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
+    pub fn send_at<A>(&self, cmd: &A) -> Result<A::Response, Error> 
+    where 
+        A: atat::AtatCmd,
+        A::Error: Into<UbloxError>,
+    {
         // At any point after init state, we should be able to fully send AT
         // commands.
         if self.state != State::On {

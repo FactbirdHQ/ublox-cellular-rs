@@ -7,7 +7,7 @@ pub mod types;
 use atat::atat_derive::AtatCmd;
 use responses::*;
 
-use super::NoResponse;
+use super::{NoResponse, error::UbloxError};
 
 /// 9.1 Enter PIN +CPIN
 ///
@@ -15,7 +15,7 @@ use super::NoResponse;
 /// times, the PUK must be inserted in place of the PIN, followed by the <newpin> which replaces the old pin in
 /// the SIM.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CPIN?", PinStatus)]
+#[at_cmd("+CPIN?", PinStatus, error = "UbloxError")]
 pub struct GetPinStatus;
 
 /// 9.1 Enter PIN +CPIN

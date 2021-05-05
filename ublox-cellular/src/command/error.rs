@@ -46,11 +46,9 @@ impl FromStr for CmsError {
     }
 }
 
-// FIXME: Re-enable remaining error types once https://github.com/knurling-rs/defmt/pull/302 is released
 /// Mobile termination error result codes +CME ERROR
 #[derive(Debug, PartialEq, defmt::Format)]
 pub enum CmeError {
-    // #[at_arg(0, "Phone failure")]
     PhoneFailure,
     NoConnectionToPhone,
     PhoneAdaptorLinkReserved,
@@ -171,128 +169,128 @@ pub enum CmeError {
     USimPin2Required,
     USimPuk2Required,
     InvalidMemoryIndex,
-    SmscAddressUnknown,
-    NoCnmaAcknowledgementExpected,
-    UnknownError,
-    VoiceCallActive,
-    IncorrectSecurityCode,
-    MaxAttemptsReached,
-    UnassignedUnallocatedNumber,
-    NoRouteToDestination,
-    ChannelUnacceptable,
-    NormalCallClearing,
-    NoUserResponding,
-    UserAlertingNoAnswer,
-    CallRejected,
-    NumberChanged,
-    NonSelectedUserClearing,
-    DestinationOutOfOrder,
-    InvalidNumberFormatIncompleteNumber,
-    FacilityRejected,
-    ResponseToStatusEnquiry,
-    NormalUnspecified,
-    NoCircuitChannelAvailable,
-    NetworkOutOfOrder,
-    TemporaryFailure,
-    SwitchingEquipmentCongestion,
-    AccessInformationDiscarded,
-    RequestedCircuitChannelNotAvailable,
-    ResourcesUnavailableUnspecified,
-    QualityOfServiceUnavailable,
-    RequestedFacilityNotSubscribed,
-    IncomingCallsBarredWithinTheCug,
-    CollisionWithNetworkInitiatedRequest,
-    BearerCapabilityNotAuthorized,
-    BearerCapabilityNotPresentlyAvailable,
-    UnsupportedQciValue,
-    ServiceOrOptionNotAvailableUnspecified,
-    BearerServiceNotImplemented,
-    AcmEqualToOrGreaterThanAcMmax,
-    RequestedFacilityNotImplemented,
-    OnlyRestrictedDigitalInformationBearerCapabilityIsAvailable,
-    ServiceOrOptionNotImplementedUnspecified,
-    InvalidTransactionIdentifierValue,
-    UserNotMemberOfCug,
-    IncompatibleDestination,
-    InvalidTransitNetworkSelection,
-    InvalidMandatoryInformation,
-    MessageTypeNonExistentOrNotImplemented,
-    MessageTypeNotCompatibleWithProtocolState,
-    MessageNotCompatibleWithProtocolState,
-    RecoveryOnTimerExpiry,
-    ApnRestrictionValueIncompatibleWithActiveEpsBearerContext,
-    InterworkingUnspecified,
-    NetworkError,
-    InvalidEpsBearerIdentity,
-    EmmErrorUnspecified,
-    EsmErrorUnspecified,
-    NumberNotAllowed,
-    CcbsPossible,
-    WrongGpioIdentifier,
-    SetGpioDefaultError,
-    SelectGpioModeError,
-    ReadGpioError,
-    WriteGpioError,
-    GpioBusy,
-    WrongAdcIdentifier,
-    ReadAdcError,
-    IPv4OnlyAllowed,
-    IPv6OnlyAllowed,
-    WrongRingerIdentifier,
-    LlcOrSndcpFailure,
-    RegularDeactivation,
-    ReactivationRequested,
-    SingleAddressBearersOnlyAllowed,
-    ApnRestrictionValIncompatibleWithPdpContext,
-    PdpActivationRejected,
-    GprsGenericOperationError,
-    GprsInvalidApn,
-    GprsAuthenticationFailure,
-    GprsQoSParametersInconsistent,
-    GprsNetworkFailure,
-    GprsContextBusy,
-    CsdGenericOperationError,
-    CsdUndefinedProfile,
-    CsdContextBusy,
-    PlmnScanNotAllowed,
-    FfsError,
-    PdpTypeIPv4OnlyAllowed,
-    PdpTypeIPv6OnlyAllowed,
-    FileNotFound,
-    CannotOpenFile,
-    TacValueNotAllowed,
-    OtpFailure,
-    WrongCheckDigit,
-    BufferFull,
-    FfsInitializing,
-    FfsAlreadyOpenFile,
-    FfsNotOpenFile,
-    FfsFileNotFound,
-    FfsFileAlreadyCreated,
-    FfsIllegalId,
-    FfsIllegalFileHandle,
-    FfsIllegalType,
-    FfsIllegalMode,
-    FfsFileRange,
-    FfsOperationNotPossible,
-    FfsWriteError,
-    FfsUserIdError,
-    FfsInternalFatalError,
-    FfsMemoryResourceError,
-    FfsMaximumNumberOfFilesExceeded,
-    FfsMemoryNotAvailable,
-    FfsInvalidFilename,
-    FfsStreamingNotEnabled,
-    FfsOperationNotAllowedOnStaticFile,
-    FfsMemoryTableInconsistency,
-    FfsNotAFactoryDefaultFile,
-    FfsRequestedMemoryTemporaryNotAvailable,
-    FfsOperationNotAllowedForADirectory,
-    FfsDirectorySpaceNotAvailable,
-    FfsTooManyStreamingFilesOpen,
-    FfsRequestedDynamicMemoryTemporaryNotAvailable,
-    FfsUserProvidedANullParameterInsteadOfASuitableBuffer,
-    FfsTimeout,
+    // SmscAddressUnknown,
+    // NoCnmaAcknowledgementExpected,
+    // UnknownError,
+    // VoiceCallActive,
+    // IncorrectSecurityCode,
+    // MaxAttemptsReached,
+    // UnassignedUnallocatedNumber,
+    // NoRouteToDestination,
+    // ChannelUnacceptable,
+    // NormalCallClearing,
+    // NoUserResponding,
+    // UserAlertingNoAnswer,
+    // CallRejected,
+    // NumberChanged,
+    // NonSelectedUserClearing,
+    // DestinationOutOfOrder,
+    // InvalidNumberFormatIncompleteNumber,
+    // FacilityRejected,
+    // ResponseToStatusEnquiry,
+    // NormalUnspecified,
+    // NoCircuitChannelAvailable,
+    // NetworkOutOfOrder,
+    // TemporaryFailure,
+    // SwitchingEquipmentCongestion,
+    // AccessInformationDiscarded,
+    // RequestedCircuitChannelNotAvailable,
+    // ResourcesUnavailableUnspecified,
+    // QualityOfServiceUnavailable,
+    // RequestedFacilityNotSubscribed,
+    // IncomingCallsBarredWithinTheCug,
+    // CollisionWithNetworkInitiatedRequest,
+    // BearerCapabilityNotAuthorized,
+    // BearerCapabilityNotPresentlyAvailable,
+    // UnsupportedQciValue,
+    // ServiceOrOptionNotAvailableUnspecified,
+    // BearerServiceNotImplemented,
+    // AcmEqualToOrGreaterThanAcMmax,
+    // RequestedFacilityNotImplemented,
+    // OnlyRestrictedDigitalInformationBearerCapabilityIsAvailable,
+    // ServiceOrOptionNotImplementedUnspecified,
+    // InvalidTransactionIdentifierValue,
+    // UserNotMemberOfCug,
+    // IncompatibleDestination,
+    // InvalidTransitNetworkSelection,
+    // InvalidMandatoryInformation,
+    // MessageTypeNonExistentOrNotImplemented,
+    // MessageTypeNotCompatibleWithProtocolState,
+    // MessageNotCompatibleWithProtocolState,
+    // RecoveryOnTimerExpiry,
+    // ApnRestrictionValueIncompatibleWithActiveEpsBearerContext,
+    // InterworkingUnspecified,
+    // NetworkError,
+    // InvalidEpsBearerIdentity,
+    // EmmErrorUnspecified,
+    // EsmErrorUnspecified,
+    // NumberNotAllowed,
+    // CcbsPossible,
+    // WrongGpioIdentifier,
+    // SetGpioDefaultError,
+    // SelectGpioModeError,
+    // ReadGpioError,
+    // WriteGpioError,
+    // GpioBusy,
+    // WrongAdcIdentifier,
+    // ReadAdcError,
+    // IPv4OnlyAllowed,
+    // IPv6OnlyAllowed,
+    // WrongRingerIdentifier,
+    // LlcOrSndcpFailure,
+    // RegularDeactivation,
+    // ReactivationRequested,
+    // SingleAddressBearersOnlyAllowed,
+    // ApnRestrictionValIncompatibleWithPdpContext,
+    // PdpActivationRejected,
+    // GprsGenericOperationError,
+    // GprsInvalidApn,
+    // GprsAuthenticationFailure,
+    // GprsQoSParametersInconsistent,
+    // GprsNetworkFailure,
+    // GprsContextBusy,
+    // CsdGenericOperationError,
+    // CsdUndefinedProfile,
+    // CsdContextBusy,
+    // PlmnScanNotAllowed,
+    // FfsError,
+    // PdpTypeIPv4OnlyAllowed,
+    // PdpTypeIPv6OnlyAllowed,
+    // FileNotFound,
+    // CannotOpenFile,
+    // TacValueNotAllowed,
+    // OtpFailure,
+    // WrongCheckDigit,
+    // BufferFull,
+    // FfsInitializing,
+    // FfsAlreadyOpenFile,
+    // FfsNotOpenFile,
+    // FfsFileNotFound,
+    // FfsFileAlreadyCreated,
+    // FfsIllegalId,
+    // FfsIllegalFileHandle,
+    // FfsIllegalType,
+    // FfsIllegalMode,
+    // FfsFileRange,
+    // FfsOperationNotPossible,
+    // FfsWriteError,
+    // FfsUserIdError,
+    // FfsInternalFatalError,
+    // FfsMemoryResourceError,
+    // FfsMaximumNumberOfFilesExceeded,
+    // FfsMemoryNotAvailable,
+    // FfsInvalidFilename,
+    // FfsStreamingNotEnabled,
+    // FfsOperationNotAllowedOnStaticFile,
+    // FfsMemoryTableInconsistency,
+    // FfsNotAFactoryDefaultFile,
+    // FfsRequestedMemoryTemporaryNotAvailable,
+    // FfsOperationNotAllowedForADirectory,
+    // FfsDirectorySpaceNotAvailable,
+    // FfsTooManyStreamingFilesOpen,
+    // FfsRequestedDynamicMemoryTemporaryNotAvailable,
+    // FfsUserProvidedANullParameterInsteadOfASuitableBuffer,
+    // FfsTimeout,
     // CommandLineTooLong,
     // CallBarredFixedDialingNumbersOnly,
     // SecRemoteObjectWrongState,
@@ -358,450 +356,312 @@ impl FromStr for CmeError {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s.trim() {
-            "0" | "Phone failure" => Self::PhoneFailure,
-            "1" | "No connection to phone" => Self::NoConnectionToPhone,
-            "2" | "Phone-adaptor link reserved" => Self::PhoneAdaptorLinkReserved,
-            "3" | "302" | "Operation not allowed" => Self::OperationNotAllowed,
-            "4" | "303" | "Operation not supported" => Self::OperationNotSupported,
-            "5" | "PH-SIM PIN required" => Self::PhSimPinRequired,
-            "6" | "PH-FSIM PIN required" => Self::PhFsimPinRequired,
-            "7" | "PH-FSIM PUK required" => Self::PhFsimPukRequired,
-            "10" | "SIM not inserted" => Self::SimNotInserted,
-            "11" | "SIM PIN required" => Self::SimPinRequired,
-            "12" | "SIM PUK required" => Self::SimPukRequired,
-            "13" | "SIM failure" => Self::SimFailure,
-            "14" | "SIM busy" => Self::SimBusy,
-            "15" | "SIM wrong" => Self::SimWrong,
-            "16" | "Incorrect password" => Self::IncorrectPassword,
-            "17" | "SIM PIN2 required" => Self::SimPin2Required,
-            "18" | "SIM PUK2 required" => Self::SimPuk2Required,
-            "20" | "322" | "Memory full" => Self::MemoryFull,
-            "21" | "Invalid index" => Self::InvalidIndex,
-            "22" | "Network not found" => Self::NetworkNotFound,
-            "23" | "320" | "Memory failure" => Self::MemoryFailure,
-            "24" | "Text string too long" => Self::TextStringTooLong,
-            "25" | "Invalid characters in text string" => Self::InvalidCharactersInTextString,
-            "26" | "Dial string too long" => Self::DialStringTooLong,
-            "27" | "Invalid characters in dial string" => Self::InvalidCharactersInDialString,
-            "30" | "331" | "No network service" => Self::NoNetworkService,
-            "31" | "332" | "Network timeout" => Self::NetworkTimeout,
-            "32" | "Network not allowed - emergency calls only" => {
-                Self::NetworkNotAllowedEmergencyCallsOnly
-            }
-            "40" | "Network personalisation PIN required" => {
-                Self::NetworkPersonalisationPinRequired
-            }
-            "41" | "Network personalisation PUK required" => {
-                Self::NetworkPersonalisationPukRequired
-            }
-            "42" | "Network subset personalisation PIN required" => {
-                Self::NetworkSubsetPersonalisationPinRequired
-            }
-            "43" | "Network subset personalisation PUK required" => {
-                Self::NetworkSubsetPersonalisationPukRequired
-            }
-            "44" | "Service provider personalisation PIN required" => {
-                Self::ServiceProviderPersonalisationPinRequired
-            }
-            "45" | "Service provider personalisation PUK required" => {
-                Self::ServiceProviderPersonalisationPukRequired
-            }
-            "46" | "Corporate personalisation PIN required" => {
-                Self::CorporatePersonalisationPinRequired
-            }
-            "47" | "Corporate personalisation PUK required" => {
-                Self::CorporatePersonalisationPukRequired
-            }
-            "50" | "Incorrect parameters" => Self::IncorrectParameters,
-            "51" | "Command implemented but currently disabled" => {
-                Self::CommandImplementedButCurrentlyDisabled
-            }
-            "52" | "Command aborted by user" => Self::CommandAbortedByUser,
-            "53" | "Not attached to network due to MT functionality restrictions" => {
-                Self::NotAttachedToNetworkDueToMtFunctionalityRestrictions
-            }
-            "54" | "Modem not allowed - MT restricted to emergency calls only" => {
-                Self::ModemNotAllowedMtRestrictedToEmergencyCallsOnly
-            }
-            "55" | "Operation not allowed because of MT functionality restrictions" => {
-                Self::OperationNotAllowedBecauseOfMtFunctionalityRestrictions
-            }
-            "56" | "Fixed dial number only allowed - called number is not a fixed dial number" => {
-                Self::FixedDialNumberOnlyAllowedCalledNumberIsNotAFixedDialNumber
-            }
-            "57" | "Temporarily out of service due to other MT usage" => {
-                Self::TemporarilyOutOfServiceDueToOtherMtUsage
-            }
-            "100" | "Unknown" => Self::Unknown,
-            "103" | "Illegal MS" => Self::IllegalMs,
-            "106" | "Illegal ME" => Self::IllegalMe,
-            "107" | "GPRS services not allowed" => Self::GprsServicesNotAllowed,
-            "108" | "GPRS and non GPRS services not allowed" => {
-                Self::GprsAndNonGprsServicesNotAllowed
-            }
-            "111" | "PLMN not allowed" => Self::PlmnNotAllowed,
-            "112" | "Location area not allowed" => Self::LocationAreaNotAllowed,
-            "113" | "Roaming not allowed in this location area" => {
-                Self::RoamingNotAllowedInThisLocationArea
-            }
-            "114" | "GPRS services not allowed in this PLMN" => {
-                Self::GprsServicesNotAllowedInThisPlmn
-            }
-            "115" | "No Suitable Cells In Location Area" => Self::NoSuitableCellsInLocationArea,
-            "122" | "170" | "Congestion" => Self::Congestion,
-            "125" | "Not authorized for this CSG" => Self::NotAuthorizedForThisCsg,
-            "126" | "Insufficient resources" => Self::InsufficientResources,
-            "127" | "Missing or unknown APN" => Self::MissingOrUnknownApn,
-            "128" | "1549" | "Unknown PDP address or PDP type" => Self::UnknownPdpAddressOrPdpType,
-            "129" | "User authentication failed" => Self::UserAuthenticationFailed,
-            "130" | "Request rejected by Serving GW or PDN GW" => {
-                Self::RequestRejectedByServingGwOrPdnGw
-            }
-            "131" | "Request rejected, unspecified" => Self::RequestRejectedUnspecified,
-            "132" | "Service option not supported" => Self::ServiceOptionNotSupported,
-            "133" | "Requested service option not subscribed" => {
-                Self::RequestedServiceOptionNotSubscribed
-            }
-            "134" | "Service option temporarily out of order" => {
-                Self::ServiceOptionTemporarilyOutOfOrder
-            }
-            "135" | "NS-api already used" => Self::NsApiAlreadyUsed,
-            "137" | "EPS QoS not accepted" => Self::EpsQoSNotAccepted,
-            "138" | "168" | "Network failure" => Self::NetworkFailure,
-            "140" | "Feature not supported" => Self::FeatureNotSupported,
-            "141" | "Semantic error in the TFT operation" => Self::SemanticErrorInTheTftOperation,
-            "142" | "Syntactical error in the TFT operation" => {
-                Self::SyntacticalErrorInTheTftOperation
-            }
-            "143" | "Unknown PDP context" => Self::UnknownPdpContext,
-            "144" | "Semantic errors in packet filter(s)" => Self::SemanticErrorsInPacketFilterS,
-            "145" | "Syntactical errors in packet filter(s)" => {
-                Self::SyntacticalErrorsInPacketFilterS
-            }
-            "146" | "PDP context without TFT already activated" => {
-                Self::PdpContextWithoutTftAlreadyActivated
-            }
-            "147" | "PTI mismatch" => Self::PtiMismatch,
-            "148" | "Unspecified GPRS error" => Self::UnspecifiedGprsError,
-            "149" | "PDP authentication failure" => Self::PdpAuthenticationFailure,
-            "150" | "Invalid mobile class" => Self::InvalidMobileClass,
-            "153" | "ESM information not received" => Self::EsmInformationNotReceived,
-            "154" | "PDN connection does not exist" => Self::PdnConnectionDoesNotExist,
-            "155" | "Multiple PDN connections for a given APN not allowed" => {
-                Self::MultiplePdnConnectionsForAGivenApnNotAllowed
-            }
-            "156" | "1017" | "User Busy" => Self::UserBusy,
-            "159" | "Uplink Busy/ Flow Control" => Self::UplinkBusyFlowControl,
-            "160" | "Bearer handling not supported" => Self::BearerHandlingNotSupported,
-            "165" | "Maximum number of EPS bearers reached" => {
-                Self::MaximumNumberOfEpsBearersReached
-            }
-            "166" | "179" | "Requested APN not supported in current RAT and PLMN combination" => {
-                Self::RequestedApnNotSupportedInCurrentRatAndPlmnCombination
-            }
-            "169" | "IMSI unknown in VLR" => Self::ImsiUnknownInVlr,
-            "171" | "1149" | "Last PDN disconnection not allowed" => {
-                Self::LastPdnDisconnectionNotAllowed
-            }
-            "172" | "189" | "1095" | "Semantically incorrect message" => {
-                Self::SemanticallyIncorrectMessage
-            }
-            "173" | "Mandatory information element error" => Self::MandatoryInformationElementError,
-            "174" | "1099" | "Information element non-existent or not implemented" => {
-                Self::InformationElementNonExistentOrNotImplemented
-            }
-            "175" | "194" | "1100" | "Conditional IE error" => Self::ConditionalIeError,
-            "176"
-            | "197"
-            | "1111"
-            | "Protocol error, unspecified"
-            | "Protocol error unspecified" => Self::ProtocolErrorUnspecified,
-            "177" | "1008" | "Operator determined barring" => Self::OperatorDeterminedBarring,
-            "178" | "Maximum number of PDP contexts reached" => {
-                Self::MaximumNumberOfPdpContextsReached
-            }
-            "180" | "Request rejected, bearer control mode violation" => {
-                Self::RequestRejectedBearerControlModeViolation
-            }
-            "181" | "Invalid PTI value" => Self::InvalidPtiValue,
-            "190" | "Invalid mandatory IE" => Self::InvalidMandatoryIe,
-            "191" | "Message type non existent" => Self::MessageTypeNonExistent,
-            "192" | "Message type not compatible" => Self::MessageTypeNotCompatible,
-            "193" | "IE non existent" => Self::IeNonExistent,
-            "195" | "Message not compatible" => Self::MessageNotCompatible,
-            "254" | "Invalid error mapping" => Self::InvalidErrorMapping,
-            "255" | "Internal error" => Self::InternalError,
-            "262" | "SIM blocked" => Self::SimBlocked,
-            "300" | "ME failure" => Self::MeFailure,
-            "301" | "SMS service of ME reserved" => Self::SmsServiceOfMeReserved,
-            "304" | "Invalid PDU mode parameter" => Self::InvalidPduModeParameter,
-            "305" | "Invalid text mode parameter" => Self::InvalidTextModeParameter,
-            "310" | "(U)SIM not inserted" => Self::USimNotInserted,
-            "311" | "(U)SIM PIN required" => Self::USimPinRequired,
-            "312" | "PH-(U)SIM PIN required" => Self::PhUSimPinRequired,
-            "313" | "(U)SIM failure" => Self::USimFailure,
-            "314" | "(U)SIM busy" => Self::USimBusy,
-            "315" | "(U)SIM wrong" => Self::USimWrong,
-            "316" | "(U)SIM PUK required" => Self::USimPukRequired,
-            "317" | "(U)SIM PIN2 required" => Self::USimPin2Required,
-            "318" | "(U)SIM PUK2 required" => Self::USimPuk2Required,
-            "321" | "Invalid memory index" => Self::InvalidMemoryIndex,
-            "330" | "SMSC address unknown" => Self::SmscAddressUnknown,
-            "340" | "No +CNMA acknowledgement expected" => Self::NoCnmaAcknowledgementExpected,
-            "500" | "Unknown error" => Self::UnknownError,
-            "608" | "Voice call active" => Self::VoiceCallActive,
-            "701" | "Incorrect security code" => Self::IncorrectSecurityCode,
-            "702" | "Max attempts reached" => Self::MaxAttemptsReached,
-            "1001" | "Unassigned (unallocated) number" => Self::UnassignedUnallocatedNumber,
-            "1003" | "No route to destination" => Self::NoRouteToDestination,
-            "1006" | "Channel unacceptable" => Self::ChannelUnacceptable,
-            "1016" | "Normal call clearing" => Self::NormalCallClearing,
-            "1018" | "No user responding" => Self::NoUserResponding,
-            "1019" | "User alerting, no answer" => Self::UserAlertingNoAnswer,
-            "1021" | "Call rejected" => Self::CallRejected,
-            "1022" | "Number changed" => Self::NumberChanged,
-            "1026" | "Non selected user clearing" => Self::NonSelectedUserClearing,
-            "1027" | "Destination out of order" => Self::DestinationOutOfOrder,
-            "1028" | "Invalid number format (incomplete number)" => {
-                Self::InvalidNumberFormatIncompleteNumber
-            }
-            "1029" | "Facility rejected" => Self::FacilityRejected,
-            "1030" | "Response to STATUS ENQUIRY" => Self::ResponseToStatusEnquiry,
-            "1031" | "Normal, unspecified" => Self::NormalUnspecified,
-            "1034" | "No circuit/channel available" => Self::NoCircuitChannelAvailable,
-            "1038" | "Network out of order" => Self::NetworkOutOfOrder,
-            "1041" | "Temporary failure" => Self::TemporaryFailure,
-            "1042" | "Switching equipment congestion" => Self::SwitchingEquipmentCongestion,
-            "1043" | "Access information discarded" => Self::AccessInformationDiscarded,
-            "1044" | "requested circuit/channel not available" => {
-                Self::RequestedCircuitChannelNotAvailable
-            }
-            "1047" | "Resources unavailable, unspecified" => Self::ResourcesUnavailableUnspecified,
-            "1049" | "Quality of service unavailable" => Self::QualityOfServiceUnavailable,
-            "1050" | "Requested facility not subscribed" => Self::RequestedFacilityNotSubscribed,
-            "1055" | "Incoming calls barred within the CUG" => {
-                Self::IncomingCallsBarredWithinTheCug
-            }
-            "1056" | "Collision with network initiated request" => {
-                Self::CollisionWithNetworkInitiatedRequest
-            }
-            "1057" | "Bearer capability not authorized" => Self::BearerCapabilityNotAuthorized,
-            "1058" | "Bearer capability not presently available" => {
-                Self::BearerCapabilityNotPresentlyAvailable
-            }
-            "1059" | "Unsupported QCI value" => Self::UnsupportedQciValue,
-            "1063" | "Service or option not available, unspecified" => {
-                Self::ServiceOrOptionNotAvailableUnspecified
-            }
-            "1065" | "Bearer service not implemented" => Self::BearerServiceNotImplemented,
-            "1068" | "ACM equal to or greater than ACMmax" => Self::AcmEqualToOrGreaterThanAcMmax,
-            "1069" | "Requested facility not implemented" => Self::RequestedFacilityNotImplemented,
-            "1070" | "Only restricted digital information bearer capability is available" => {
-                Self::OnlyRestrictedDigitalInformationBearerCapabilityIsAvailable
-            }
-            "1079" | "Service or option not implemented, unspecified" => {
-                Self::ServiceOrOptionNotImplementedUnspecified
-            }
-            "1081" | "1546" | "Invalid transaction identifier value" => {
-                Self::InvalidTransactionIdentifierValue
-            }
-            "1087" | "User not member of CUG" => Self::UserNotMemberOfCug,
-            "1088" | "Incompatible destination" => Self::IncompatibleDestination,
-            "1091" | "Invalid transit network selection" => Self::InvalidTransitNetworkSelection,
-            "1096" | "Invalid mandatory information" => Self::InvalidMandatoryInformation,
-            "1097" | "Message type non-existent or not implemented" => {
-                Self::MessageTypeNonExistentOrNotImplemented
-            }
-            "1098" | "Message type not compatible with protocol state" => {
-                Self::MessageTypeNotCompatibleWithProtocolState
-            }
-            "1101" | "Message not compatible with protocol state" => {
-                Self::MessageNotCompatibleWithProtocolState
-            }
-            "1102" | "Recovery on timer expiry" => Self::RecoveryOnTimerExpiry,
-            "1112" | "APN restriction value incompatible with active EPS bearer context" => {
-                Self::ApnRestrictionValueIncompatibleWithActiveEpsBearerContext
-            }
-            "1127" | "Interworking, unspecified" => Self::InterworkingUnspecified,
-            "1142" | "Network Error" => Self::NetworkError,
-            "1143" | "Invalid EPS bearer identity" => Self::InvalidEpsBearerIdentity,
-            "1243" | "Emm Error Unspecified" => Self::EmmErrorUnspecified,
-            "1244" | "Esm Error Unspecified" => Self::EsmErrorUnspecified,
-            "1279" | "Number not allowed" => Self::NumberNotAllowed,
-            "1283" | "CCBS possible" => Self::CcbsPossible,
-            "1500" | "Wrong GPIO identifier" => Self::WrongGpioIdentifier,
-            "1501" | "Set GPIO default error" => Self::SetGpioDefaultError,
-            "1502" | "Select GPIO mode error" => Self::SelectGpioModeError,
-            "1503" | "Read GPIO error" => Self::ReadGpioError,
-            "1504" | "Write GPIO error" => Self::WriteGpioError,
-            "1505" | "GPIO busy" => Self::GpioBusy,
-            "1520" | "Wrong ADC identifier" => Self::WrongAdcIdentifier,
-            "1521" | "Read ADC error" => Self::ReadAdcError,
-            "1530" | "IPv4 only allowed" => Self::IPv4OnlyAllowed,
-            "1531" | "IPv6 only allowed" => Self::IPv6OnlyAllowed,
-            "1540" | "Wrong ringer identifier" => Self::WrongRingerIdentifier,
-            "1542" | "LLC or SNDCP failure" => Self::LlcOrSndcpFailure,
-            "1543" | "Regular deactivation" => Self::RegularDeactivation,
-            "1544" | "Reactivation requested" => Self::ReactivationRequested,
-            "1545" | "Single address bearers only allowed" => Self::SingleAddressBearersOnlyAllowed,
-            "1547" | "APN restriction val incompatible with PDP context" => {
-                Self::ApnRestrictionValIncompatibleWithPdpContext
-            }
-            "1548" | "PDP activation rejected" => Self::PdpActivationRejected,
-            "1550" | "GPRS generic operation error" => Self::GprsGenericOperationError,
-            "1551" | "GPRS invalid APN" => Self::GprsInvalidApn,
-            "1552" | "GPRS authentication failure" => Self::GprsAuthenticationFailure,
-            "1553" | "GPRS QoS parameters inconsistent" => Self::GprsQoSParametersInconsistent,
-            "1554" | "GPRS network failure" => Self::GprsNetworkFailure,
-            "1555" | "GPRS context busy" => Self::GprsContextBusy,
-            "1556" | "CSD generic operation error" => Self::CsdGenericOperationError,
-            "1557" | "CSD undefined profile" => Self::CsdUndefinedProfile,
-            "1558" | "CSD context busy" => Self::CsdContextBusy,
-            "1559" | "PLMN scan not allowed" => Self::PlmnScanNotAllowed,
-            "1600" | "FFS error" => Self::FfsError,
-            "1560" | "PDP type IPv4 only allowed" => Self::PdpTypeIPv4OnlyAllowed,
-            "1561" | "PDP type IPv6 only allowed" => Self::PdpTypeIPv6OnlyAllowed,
-            "1612" | "FILE NOT FOUND" => Self::FileNotFound,
-            "1613" | "Cannot open file" => Self::CannotOpenFile,
-            "1614" | "TAC value not allowed" => Self::TacValueNotAllowed,
-            "1615" | "OTP failure" => Self::OtpFailure,
-            "1616" | "Wrong Check Digit" => Self::WrongCheckDigit,
-            "1620" | "Buffer full" => Self::BufferFull,
-            "1621" | "FFS initializing" => Self::FfsInitializing,
-            "1622" | "FFS already open file" => Self::FfsAlreadyOpenFile,
-            "1623" | "FFS not open file" => Self::FfsNotOpenFile,
-            "1624" | "FFS file not found" => Self::FfsFileNotFound,
-            "1625" | "FFS file already created" => Self::FfsFileAlreadyCreated,
-            "1626" | "FFS illegal id" => Self::FfsIllegalId,
-            "1627" | "FFS illegal file handle" => Self::FfsIllegalFileHandle,
-            "1628" | "FFS illegal type" => Self::FfsIllegalType,
-            "1629" | "FFS illegal mode" => Self::FfsIllegalMode,
-            "1630" | "FFS file range" => Self::FfsFileRange,
-            "1631" | "FFS operation not possible" => Self::FfsOperationNotPossible,
-            "1632" | "FFS write error" => Self::FfsWriteError,
-            "1633" | "FFS user id error" => Self::FfsUserIdError,
-            "1634" | "FFS internal fatal error" => Self::FfsInternalFatalError,
-            "1635" | "FFS memory resource error" => Self::FfsMemoryResourceError,
-            "1636" | "FFS maximum number of files exceeded" => {
-                Self::FfsMaximumNumberOfFilesExceeded
-            }
-            "1637" | "FFS memory not available" => Self::FfsMemoryNotAvailable,
-            "1638" | "FFS invalid filename" => Self::FfsInvalidFilename,
-            "1639" | "FFS streaming not enabled" => Self::FfsStreamingNotEnabled,
-            "1640" | "FFS operation not allowed on static file" => {
-                Self::FfsOperationNotAllowedOnStaticFile
-            }
-            "1641" | "FFS memory table inconsistency" => Self::FfsMemoryTableInconsistency,
-            "1642" | "FFS not a factory default file" => Self::FfsNotAFactoryDefaultFile,
-            "1643" | "FFS requested memory temporary not available" => {
-                Self::FfsRequestedMemoryTemporaryNotAvailable
-            }
-            "1644" | "FFS operation not allowed for a directory" => {
-                Self::FfsOperationNotAllowedForADirectory
-            }
-            "1645" | "FFS directory space not available" => Self::FfsDirectorySpaceNotAvailable,
-            "1646" | "FFS too many streaming files open" => Self::FfsTooManyStreamingFilesOpen,
-            "1647" | "FFS requested dynamic memory temporary not available" => {
-                Self::FfsRequestedDynamicMemoryTemporaryNotAvailable
-            }
-            "1648" | "FFS user provided a NULL parameter instead of a suitable buffer" => {
-                Self::FfsUserProvidedANullParameterInsteadOfASuitableBuffer
-            }
-            "1649" | "FFS timeout" => Self::FfsTimeout,
-            // "1650" | "Command line too long" => Self::CommandLineTooLong,
-            // "1660" | "Call barred - Fixed dialing numbers only" => {
-            //     Self::CallBarredFixedDialingNumbersOnly
-            // }
-            // "1670" | "SEC remote object wrong state" => Self::SecRemoteObjectWrongState,
-            // "1671" | "SEC ROT not personalized" => Self::SecRotNotPersonalized,
-            // "1672" | "SEC loss of connectivity" => Self::SecLossOfConnectivity,
-            // "1673" | "SEC service not authorized" => Self::SecServiceNotAuthorized,
-            // "1674" | "SEC FW package installation required" => {
-            //     Self::SecFwPackageInstallationRequired
-            // }
-            // "1675" | "SEC FW package not valid" => Self::SecFwPackageNotValid,
-            // "1676" | "SEC resource not available" => Self::SecResourceNotAvailable,
-            // "1677" | "SEC data not available" => Self::SecDataNotAvailable,
-            // "1678" | "SEC timeout" => Self::SecTimeout,
-            // "1679" | "SEC data inconsistent or unsupported" => {
-            //     Self::SecDataInconsistentOrUnsupported
-            // }
-            // "1680" | "SEC pspk lock pending" => Self::SecPspkLockPending,
-            // "1681" | "SEC C2C already paired" => Self::SecC2CAlreadyPaired,
-            // "1682" | "SEC C2C channels consumed" => Self::SecC2CChannelsConsumed,
-            // "1683" | "SEC C2C pairing not present" => Self::SecC2CPairingNotPresent,
-            // "1684" | "SEC busy" => Self::SecBusy,
-            // "1700" | "GPS GPIO not configured" => Self::GpsGpioNotConfigured,
-            // "1701" | "GPS GPIO ownership error" => Self::GpsGpioOwnershipError,
-            // "1702" | "Invalid operation with GPS ON" => Self::InvalidOperationWithGpsOn,
-            // "1703" | "Invalid operation with GPS OFF" => Self::InvalidOperationWithGpsOff,
-            // "1704" | "Invalid GPS aiding mode" => Self::InvalidGpsAidingMode,
-            // "1705" | "Reserved GPS aiding mode" => Self::ReservedGpsAidingMode,
-            // "1706" | "GPS aiding mode already set" => Self::GpsAidingModeAlreadySet,
-            // "1707" | "Invalid GPS trace mode" => Self::InvalidGpsTraceMode,
-            // "1708" | "Parameter valid only in case of GPS OTA" => {
-            //     Self::ParameterValidOnlyInCaseOfGpsOta
-            // }
-            // "1709" | "GPS trace invalid server" => Self::GpsTraceInvalidServer,
-            // "1710" | "Invalid TimeZone" => Self::InvalidTimeZone,
-            // "1711" | "Invalid value" => Self::InvalidValue,
-            // "1712" | "Invalid parameter" => Self::InvalidParameter,
-            // "1713" | "Invalid operation with LOC running / GPS Busy" => {
-            //     Self::InvalidOperationWithLocRunningGpsBusy
-            // }
-            // "1800" | "No ongoing call" => Self::NoOngoingCall,
-            // "1801" | "IBM busy / eCall already armed/active" => {
-            //     Self::IbmBusyECallAlreadyArmedActive
-            // }
-            // "1802" | "IBM feature off / eCall feature off" => Self::IbmFeatureOffECallFeatureOff,
-            // "1803" | "Wrong IBM requested" => Self::WrongIbmRequested,
-            // "1804" | "Audio resource not available" => Self::AudioResourceNotAvailable,
-            // "1805" | "ECALL restriction" => Self::EcallRestriction,
-            // "1806" | "eCall invalid dial number" => Self::ECallInvalidDialNumber,
-            // "1900" | "No SAP Server Connection" => Self::NoSapServerConnection,
-            // "1901" | "SAP Protocol Error" => Self::SapProtocolError,
-            // "1902" | "SAP Connection failure" => Self::SapConnectionFailure,
-            // "1903" | "SAP Server Disconnection" => Self::SapServerDisconnection,
-            // "1904" | "SAP Other terminal using service" => Self::SapOtherTerminalUsingService,
-            // "1910" | "USECMNG import timeout expired (no input for > 20 s)" => {
-            //     Self::UsecmngImportTimeoutExpired
-            // }
-            // "1911" | "USECMNG import file size exceeds limit" => {
-            //     Self::UsecmngImportFileSizeExceedsLimit
-            // }
-            // "1912" | "USECMNG no memory available" => Self::UsecmngNoMemoryAvailable,
-            // "1913" | "USECMNG invalid certificate/key format" => {
-            //     Self::UsecmngInvalidCertificateKeyFormat
-            // }
-            // "1914" | "USECMNG database full" => Self::UsecmngDatabaseFull,
-            // "1950" | "CDC-ECM is not available" => Self::CdcEcmIsNotAvailable,
-            // "1951" | "CDC-ECM is busy" => Self::CdcEcmIsBusy,
-            // "1952" | "No DHCP Packets received from the DTE" => {
-            //     Self::NoDhcpPacketsReceivedFromTheDte
-            // }
-            // "2000" | "Command timeout" => Self::CommandTimeout,
-            // "3000" | "Command aborted" => Self::CommandAborted,
-            // "4000" | "APN configuration mismatch" => Self::ApnConfigurationMismatch,
-            // "4001" | "IP type configuration mismatch" => Self::IpTypeConfigurationMismatch,
-            // "5000" | "FOTA package download state or name mismatch" => {
-            //     Self::FotaPackageDownloadStateOrNameMismatch
-            // }
-            // "5001" | "FOTA package data corrupted" => Self::FotaPackageDataCorrupted,
-            // "5002" | "FOTA memory is in use" => Self::FotaMemoryIsInUse,
-            _ => return Err(()),
+        Ok(match s.trim().parse::<u16>() {
+            Ok(0) => Self::PhoneFailure,
+            Ok(1) => Self::NoConnectionToPhone,
+            Ok(2) => Self::PhoneAdaptorLinkReserved,
+            Ok(3) | Ok(302) => Self::OperationNotAllowed,
+            Ok(4) | Ok(303) => Self::OperationNotSupported,
+            Ok(5) => Self::PhSimPinRequired,
+            Ok(6) => Self::PhFsimPinRequired,
+            Ok(7) => Self::PhFsimPukRequired,
+            Ok(10) => Self::SimNotInserted,
+            Ok(11) => Self::SimPinRequired,
+            Ok(12) => Self::SimPukRequired,
+            Ok(13) => Self::SimFailure,
+            Ok(14) => Self::SimBusy,
+            Ok(15) => Self::SimWrong,
+            Ok(16) => Self::IncorrectPassword,
+            Ok(17) => Self::SimPin2Required,
+            Ok(18) => Self::SimPuk2Required,
+            Ok(20) | Ok(322) => Self::MemoryFull,
+            Ok(21) => Self::InvalidIndex,
+            Ok(22) => Self::NetworkNotFound,
+            Ok(23) | Ok(320) => Self::MemoryFailure,
+            Ok(24) => Self::TextStringTooLong,
+            Ok(25) => Self::InvalidCharactersInTextString,
+            Ok(26) => Self::DialStringTooLong,
+            Ok(27) => Self::InvalidCharactersInDialString,
+            Ok(30) | Ok(331) => Self::NoNetworkService,
+            Ok(31) | Ok(332) => Self::NetworkTimeout,
+            Ok(32) => Self::NetworkNotAllowedEmergencyCallsOnly,
+            Ok(40) => Self::NetworkPersonalisationPinRequired,
+            Ok(41) => Self::NetworkPersonalisationPukRequired,
+            Ok(42) => Self::NetworkSubsetPersonalisationPinRequired,
+            Ok(43) => Self::NetworkSubsetPersonalisationPukRequired,
+            Ok(44) => Self::ServiceProviderPersonalisationPinRequired,
+            Ok(45) => Self::ServiceProviderPersonalisationPukRequired,
+            Ok(46) => Self::CorporatePersonalisationPinRequired,
+            Ok(47) => Self::CorporatePersonalisationPukRequired,
+            Ok(50) => Self::IncorrectParameters,
+            Ok(51) => Self::CommandImplementedButCurrentlyDisabled,
+            Ok(52) => Self::CommandAbortedByUser,
+            Ok(53) => Self::NotAttachedToNetworkDueToMtFunctionalityRestrictions,
+            Ok(54) => Self::ModemNotAllowedMtRestrictedToEmergencyCallsOnly,
+            Ok(55) => Self::OperationNotAllowedBecauseOfMtFunctionalityRestrictions,
+            Ok(56) => Self::FixedDialNumberOnlyAllowedCalledNumberIsNotAFixedDialNumber,
+            Ok(57) => Self::TemporarilyOutOfServiceDueToOtherMtUsage,
+            Ok(100) => Self::Unknown,
+            Ok(103) => Self::IllegalMs,
+            Ok(106) => Self::IllegalMe,
+            Ok(107) => Self::GprsServicesNotAllowed,
+            Ok(108) => Self::GprsAndNonGprsServicesNotAllowed,
+            Ok(111) => Self::PlmnNotAllowed,
+            Ok(112) => Self::LocationAreaNotAllowed,
+            Ok(113) => Self::RoamingNotAllowedInThisLocationArea,
+            Ok(114) => Self::GprsServicesNotAllowedInThisPlmn,
+            Ok(115) => Self::NoSuitableCellsInLocationArea,
+            Ok(122) | Ok(170) => Self::Congestion,
+            Ok(125) => Self::NotAuthorizedForThisCsg,
+            Ok(126) => Self::InsufficientResources,
+            Ok(127) => Self::MissingOrUnknownApn,
+            Ok(128) | Ok(1549) => Self::UnknownPdpAddressOrPdpType,
+            Ok(129) => Self::UserAuthenticationFailed,
+            Ok(130) => Self::RequestRejectedByServingGwOrPdnGw,
+            Ok(131) => Self::RequestRejectedUnspecified,
+            Ok(132) => Self::ServiceOptionNotSupported,
+            Ok(133) => Self::RequestedServiceOptionNotSubscribed,
+            Ok(134) => Self::ServiceOptionTemporarilyOutOfOrder,
+            Ok(135) => Self::NsApiAlreadyUsed,
+            Ok(137) => Self::EpsQoSNotAccepted,
+            Ok(138) | Ok(168) => Self::NetworkFailure,
+            Ok(140) => Self::FeatureNotSupported,
+            Ok(141) => Self::SemanticErrorInTheTftOperation,
+            Ok(142) => Self::SyntacticalErrorInTheTftOperation,
+            Ok(143) => Self::UnknownPdpContext,
+            Ok(144) => Self::SemanticErrorsInPacketFilterS,
+            Ok(145) => Self::SyntacticalErrorsInPacketFilterS,
+            Ok(146) => Self::PdpContextWithoutTftAlreadyActivated,
+            Ok(147) => Self::PtiMismatch,
+            Ok(148) => Self::UnspecifiedGprsError,
+            Ok(149) => Self::PdpAuthenticationFailure,
+            Ok(150) => Self::InvalidMobileClass,
+            Ok(153) => Self::EsmInformationNotReceived,
+            Ok(154) => Self::PdnConnectionDoesNotExist,
+            Ok(155) => Self::MultiplePdnConnectionsForAGivenApnNotAllowed,
+            Ok(156) | Ok(1017) => Self::UserBusy,
+            Ok(159) => Self::UplinkBusyFlowControl,
+            Ok(160) => Self::BearerHandlingNotSupported,
+            Ok(165) => Self::MaximumNumberOfEpsBearersReached,
+            Ok(166) | Ok(179) => Self::RequestedApnNotSupportedInCurrentRatAndPlmnCombination,
+            Ok(169) => Self::ImsiUnknownInVlr,
+            Ok(171) | Ok(1149) => Self::LastPdnDisconnectionNotAllowed,
+            Ok(172) | Ok(189) | Ok(1095) => Self::SemanticallyIncorrectMessage,
+            Ok(173) => Self::MandatoryInformationElementError,
+            Ok(174) | Ok(1099) => Self::InformationElementNonExistentOrNotImplemented,
+            Ok(175) | Ok(194) | Ok(1100) => Self::ConditionalIeError,
+            Ok(176) | Ok(197) | Ok(1111) => Self::ProtocolErrorUnspecified,
+            Ok(177) | Ok(1008) => Self::OperatorDeterminedBarring,
+            Ok(178) => Self::MaximumNumberOfPdpContextsReached,
+            Ok(180) => Self::RequestRejectedBearerControlModeViolation,
+            Ok(181) => Self::InvalidPtiValue,
+            Ok(190) => Self::InvalidMandatoryIe,
+            Ok(191) => Self::MessageTypeNonExistent,
+            Ok(192) => Self::MessageTypeNotCompatible,
+            Ok(193) => Self::IeNonExistent,
+            Ok(195) => Self::MessageNotCompatible,
+            Ok(254) => Self::InvalidErrorMapping,
+            Ok(255) => Self::InternalError,
+            Ok(262) => Self::SimBlocked,
+            Ok(300) => Self::MeFailure,
+            Ok(301) => Self::SmsServiceOfMeReserved,
+            Ok(304) => Self::InvalidPduModeParameter,
+            Ok(305) => Self::InvalidTextModeParameter,
+            Ok(310) => Self::USimNotInserted,
+            Ok(311) => Self::USimPinRequired,
+            Ok(312) => Self::PhUSimPinRequired,
+            Ok(313) => Self::USimFailure,
+            Ok(314) => Self::USimBusy,
+            Ok(315) => Self::USimWrong,
+            Ok(316) => Self::USimPukRequired,
+            Ok(317) => Self::USimPin2Required,
+            Ok(318) => Self::USimPuk2Required,
+            Ok(321) => Self::InvalidMemoryIndex,
+            // Ok(330) => Self::SmscAddressUnknown,
+            // Ok(340) => Self::NoCnmaAcknowledgementExpected,
+            // Ok(500) => Self::UnknownError,
+            // Ok(608) => Self::VoiceCallActive,
+            // Ok(701) => Self::IncorrectSecurityCode,
+            // Ok(702) => Self::MaxAttemptsReached,
+            // Ok(1001) => Self::UnassignedUnallocatedNumber,
+            // Ok(1003) => Self::NoRouteToDestination,
+            // Ok(1006) => Self::ChannelUnacceptable,
+            // Ok(1016) => Self::NormalCallClearing,
+            // Ok(1018) => Self::NoUserResponding,
+            // Ok(1019) => Self::UserAlertingNoAnswer,
+            // Ok(1021) => Self::CallRejected,
+            // Ok(1022) => Self::NumberChanged,
+            // Ok(1026) => Self::NonSelectedUserClearing,
+            // Ok(1027) => Self::DestinationOutOfOrder,
+            // Ok(1028) => Self::InvalidNumberFormatIncompleteNumber,
+            // Ok(1029) => Self::FacilityRejected,
+            // Ok(1030) => Self::ResponseToStatusEnquiry,
+            // Ok(1031) => Self::NormalUnspecified,
+            // Ok(1034) => Self::NoCircuitChannelAvailable,
+            // Ok(1038) => Self::NetworkOutOfOrder,
+            // Ok(1041) => Self::TemporaryFailure,
+            // Ok(1042) => Self::SwitchingEquipmentCongestion,
+            // Ok(1043) => Self::AccessInformationDiscarded,
+            // Ok(1044) => Self::RequestedCircuitChannelNotAvailable,
+            // Ok(1047) => Self::ResourcesUnavailableUnspecified,
+            // Ok(1049) => Self::QualityOfServiceUnavailable,
+            // Ok(1050) => Self::RequestedFacilityNotSubscribed,
+            // Ok(1055) => Self::IncomingCallsBarredWithinTheCug,
+            // Ok(1056) => Self::CollisionWithNetworkInitiatedRequest,
+            // Ok(1057) => Self::BearerCapabilityNotAuthorized,
+            // Ok(1058) => Self::BearerCapabilityNotPresentlyAvailable,
+            // Ok(1059) => Self::UnsupportedQciValue,
+            // Ok(1063) => Self::ServiceOrOptionNotAvailableUnspecified,
+            // Ok(1065) => Self::BearerServiceNotImplemented,
+            // Ok(1068) => Self::AcmEqualToOrGreaterThanAcMmax,
+            // Ok(1069) => Self::RequestedFacilityNotImplemented,
+            // Ok(1070) => Self::OnlyRestrictedDigitalInformationBearerCapabilityIsAvailable,
+            // Ok(1079) => Self::ServiceOrOptionNotImplementedUnspecified,
+            // Ok(1081) | Ok(1546) => Self::InvalidTransactionIdentifierValue,
+            // Ok(1087) => Self::UserNotMemberOfCug,
+            // Ok(1088) => Self::IncompatibleDestination,
+            // Ok(1091) => Self::InvalidTransitNetworkSelection,
+            // Ok(1096) => Self::InvalidMandatoryInformation,
+            // Ok(1097) => Self::MessageTypeNonExistentOrNotImplemented,
+            // Ok(1098) => Self::MessageTypeNotCompatibleWithProtocolState,
+            // Ok(1101) => Self::MessageNotCompatibleWithProtocolState,
+            // Ok(1102) => Self::RecoveryOnTimerExpiry,
+            // Ok(1112) => Self::ApnRestrictionValueIncompatibleWithActiveEpsBearerContext,
+            // Ok(1127) => Self::InterworkingUnspecified,
+            // Ok(1142) => Self::NetworkError,
+            // Ok(1143) => Self::InvalidEpsBearerIdentity,
+            // Ok(1243) => Self::EmmErrorUnspecified,
+            // Ok(1244) => Self::EsmErrorUnspecified,
+            // Ok(1279) => Self::NumberNotAllowed,
+            // Ok(1283) => Self::CcbsPossible,
+            // Ok(1500) => Self::WrongGpioIdentifier,
+            // Ok(1501) => Self::SetGpioDefaultError,
+            // Ok(1502) => Self::SelectGpioModeError,
+            // Ok(1503) => Self::ReadGpioError,
+            // Ok(1504) => Self::WriteGpioError,
+            // Ok(1505) => Self::GpioBusy,
+            // Ok(1520) => Self::WrongAdcIdentifier,
+            // Ok(1521) => Self::ReadAdcError,
+            // Ok(1530) => Self::IPv4OnlyAllowed,
+            // Ok(1531) => Self::IPv6OnlyAllowed,
+            // Ok(1540) => Self::WrongRingerIdentifier,
+            // Ok(1542) => Self::LlcOrSndcpFailure,
+            // Ok(1543) => Self::RegularDeactivation,
+            // Ok(1544) => Self::ReactivationRequested,
+            // Ok(1545) => Self::SingleAddressBearersOnlyAllowed,
+            // Ok(1547) => Self::ApnRestrictionValIncompatibleWithPdpContext,
+            // Ok(1548) => Self::PdpActivationRejected,
+            // Ok(1550) => Self::GprsGenericOperationError,
+            // Ok(1551) => Self::GprsInvalidApn,
+            // Ok(1552) => Self::GprsAuthenticationFailure,
+            // Ok(1553) => Self::GprsQoSParametersInconsistent,
+            // Ok(1554) => Self::GprsNetworkFailure,
+            // Ok(1555) => Self::GprsContextBusy,
+            // Ok(1556) => Self::CsdGenericOperationError,
+            // Ok(1557) => Self::CsdUndefinedProfile,
+            // Ok(1558) => Self::CsdContextBusy,
+            // Ok(1559) => Self::PlmnScanNotAllowed,
+            // Ok(1600) => Self::FfsError,
+            // Ok(1560) => Self::PdpTypeIPv4OnlyAllowed,
+            // Ok(1561) => Self::PdpTypeIPv6OnlyAllowed,
+            // Ok(1612) => Self::FileNotFound,
+            // Ok(1613) => Self::CannotOpenFile,
+            // Ok(1614) => Self::TacValueNotAllowed,
+            // Ok(1615) => Self::OtpFailure,
+            // Ok(1616) => Self::WrongCheckDigit,
+            // Ok(1620) => Self::BufferFull,
+            // Ok(1621) => Self::FfsInitializing,
+            // Ok(1622) => Self::FfsAlreadyOpenFile,
+            // Ok(1623) => Self::FfsNotOpenFile,
+            // Ok(1624) => Self::FfsFileNotFound,
+            // Ok(1625) => Self::FfsFileAlreadyCreated,
+            // Ok(1626) => Self::FfsIllegalId,
+            // Ok(1627) => Self::FfsIllegalFileHandle,
+            // Ok(1628) => Self::FfsIllegalType,
+            // Ok(1629) => Self::FfsIllegalMode,
+            // Ok(1630) => Self::FfsFileRange,
+            // Ok(1631) => Self::FfsOperationNotPossible,
+            // Ok(1632) => Self::FfsWriteError,
+            // Ok(1633) => Self::FfsUserIdError,
+            // Ok(1634) => Self::FfsInternalFatalError,
+            // Ok(1635) => Self::FfsMemoryResourceError,
+            // Ok(1636) => Self::FfsMaximumNumberOfFilesExceeded,
+            // Ok(1637) => Self::FfsMemoryNotAvailable,
+            // Ok(1638) => Self::FfsInvalidFilename,
+            // Ok(1639) => Self::FfsStreamingNotEnabled,
+            // Ok(1640) => Self::FfsOperationNotAllowedOnStaticFile,
+            // Ok(1641) => Self::FfsMemoryTableInconsistency,
+            // Ok(1642) => Self::FfsNotAFactoryDefaultFile,
+            // Ok(1643) => Self::FfsRequestedMemoryTemporaryNotAvailable,
+            // Ok(1644) => Self::FfsOperationNotAllowedForADirectory,
+            // Ok(1645) => Self::FfsDirectorySpaceNotAvailable,
+            // Ok(1646) => Self::FfsTooManyStreamingFilesOpen,
+            // Ok(1647) => Self::FfsRequestedDynamicMemoryTemporaryNotAvailable,
+            // Ok(1648) => Self::FfsUserProvidedANullParameterInsteadOfASuitableBuffer,
+            // Ok(1649) => Self::FfsTimeout,
+            // Ok(1650) => Self::CommandLineTooLong,
+            // Ok(1660) => Self::CallBarredFixedDialingNumbersOnly,
+            // Ok(1670) => Self::SecRemoteObjectWrongState,
+            // Ok(1671) => Self::SecRotNotPersonalized,
+            // Ok(1672) => Self::SecLossOfConnectivity,
+            // Ok(1673) => Self::SecServiceNotAuthorized,
+            // Ok(1674) => Self::SecFwPackageInstallationRequired,
+            // Ok(1675) => Self::SecFwPackageNotValid,
+            // Ok(1676) => Self::SecResourceNotAvailable,
+            // Ok(1677) => Self::SecDataNotAvailable,
+            // Ok(1678) => Self::SecTimeout,
+            // Ok(1679) => Self::SecDataInconsistentOrUnsupported,
+            // Ok(1680) => Self::SecPspkLockPending,
+            // Ok(1681) => Self::SecC2CAlreadyPaired,
+            // Ok(1682) => Self::SecC2CChannelsConsumed,
+            // Ok(1683) => Self::SecC2CPairingNotPresent,
+            // Ok(1684) => Self::SecBusy,
+            // Ok(1700) => Self::GpsGpioNotConfigured,
+            // Ok(1701) => Self::GpsGpioOwnershipError,
+            // Ok(1702) => Self::InvalidOperationWithGpsOn,
+            // Ok(1703) => Self::InvalidOperationWithGpsOff,
+            // Ok(1704) => Self::InvalidGpsAidingMode,
+            // Ok(1705) => Self::ReservedGpsAidingMode,
+            // Ok(1706) => Self::GpsAidingModeAlreadySet,
+            // Ok(1707) => Self::InvalidGpsTraceMode,
+            // Ok(1708) => Self::ParameterValidOnlyInCaseOfGpsOta,
+            // Ok(1709) => Self::GpsTraceInvalidServer,
+            // Ok(1710) => Self::InvalidTimeZone,
+            // Ok(1711) => Self::InvalidValue,
+            // Ok(1712) => Self::InvalidParameter,
+            // Ok(1713) => Self::InvalidOperationWithLocRunningGpsBusy,
+            // Ok(1800) => Self::NoOngoingCall,
+            // Ok(1801) => Self::IbmBusyECallAlreadyArmedActive,
+            // Ok(1802) => Self::IbmFeatureOffECallFeatureOff,
+            // Ok(1803) => Self::WrongIbmRequested,
+            // Ok(1804) => Self::AudioResourceNotAvailable,
+            // Ok(1805) => Self::EcallRestriction,
+            // Ok(1806) => Self::ECallInvalidDialNumber,
+            // Ok(1900) => Self::NoSapServerConnection,
+            // Ok(1901) => Self::SapProtocolError,
+            // Ok(1902) => Self::SapConnectionFailure,
+            // Ok(1903) => Self::SapServerDisconnection,
+            // Ok(1904) => Self::SapOtherTerminalUsingService,
+            // Ok(1910) => Self::UsecmngImportTimeoutExpired,
+            // Ok(1911) => Self::UsecmngImportFileSizeExceedsLimit,
+            // Ok(1912) => Self::UsecmngNoMemoryAvailable,
+            // Ok(1913) => Self::UsecmngInvalidCertificateKeyFormat,
+            // Ok(1914) => Self::UsecmngDatabaseFull,
+            // Ok(1950) => Self::CdcEcmIsNotAvailable,
+            // Ok(1951) => Self::CdcEcmIsBusy,
+            // Ok(1952) => Self::NoDhcpPacketsReceivedFromTheDte,
+            // Ok(2000) => Self::CommandTimeout,
+            // Ok(3000) => Self::CommandAborted,
+            // Ok(4000) => Self::ApnConfigurationMismatch,
+            // Ok(4001) => Self::IpTypeConfigurationMismatch,
+            // Ok(5000) => Self::FotaPackageDownloadStateOrNameMismatch,
+            // Ok(5001) => Self::FotaPackageDataCorrupted,
+            // Ok(5002) => Self::FotaMemoryIsInUse,
+            Ok(_) => return Err(()),
+            Err(_) => return Err(()),
         })
     }
 }
-
-// Idea:
-
-// #[derive(AtatErr)]
-// #[at_err("+CME ERROR")]
-// pub enum CmeError {
-//     #[at_arg(0, "Phone failure")]
-//     PhoneFailure,
-// }
 
 #[cfg(test)]
 mod tests {
@@ -826,18 +686,6 @@ mod tests {
         );
         assert_eq!(
             "+CME ERROR: 1500".parse::<UbloxError>(),
-            Ok(UbloxError::Cme(CmeError::WrongGpioIdentifier))
-        );
-    }
-
-    #[test]
-    fn verbose_error() {
-        assert_eq!(
-            "+CME ERROR: Phone failure".parse::<UbloxError>(),
-            Ok(UbloxError::Cme(CmeError::PhoneFailure))
-        );
-        assert_eq!(
-            "+CME ERROR: Wrong GPIO identifier".parse::<UbloxError>(),
             Ok(UbloxError::Cme(CmeError::WrongGpioIdentifier))
         );
     }

@@ -37,12 +37,16 @@ impl MockAtClient {
 }
 
 impl AtatClient for MockAtClient {
-    fn send<A: atat::AtatCmd>(&mut self, _cmd: &A) -> nb::Result<A::Response, atat::Error> {
+    fn send<A>(&mut self, _cmd: &A) -> nb::Result<A::Response, atat::Error<A::Error>>
+    where
+        A: atat::AtatCmd,
+        A::Error: Into<UbloxError>,
+    {
         todo!()
     }
 
     fn peek_urc_with<URC: atat::AtatUrc, F: FnOnce(URC::Response) -> bool>(&mut self, f: F) {
-        if let Ok(urc) = URC::parse(b"+UREG:0") {
+        if let Some(urc) = URC::parse(b"+UREG:0") {
             if f(urc) {
                 self.n_urcs_dequeued += 1;
             }
@@ -52,7 +56,7 @@ impl AtatClient for MockAtClient {
     fn check_response<A: atat::AtatCmd>(
         &mut self,
         _cmd: &A,
-    ) -> nb::Result<A::Response, atat::Error> {
+    ) -> nb::Result<A::Response, atat::Error<A::Error>> {
         todo!()
     }
 
