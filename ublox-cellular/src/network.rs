@@ -88,9 +88,9 @@ impl<C: AtatClient> AtTx<C> {
         Ok(())
     }
 
-    pub fn send_ignore_timeout<A>(&self, req: &A) -> Result<A::Response, Error>
+    pub fn send_ignore_timeout<A, const LEN: usize>(&self, req: &A) -> Result<A::Response, Error>
     where
-        A: atat::AtatCmd,
+        A: atat::AtatCmd<LEN>,
         A::Error: Into<UbloxError>,
     {
         self.client
@@ -98,10 +98,10 @@ impl<C: AtatClient> AtTx<C> {
             .send(req)
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
-                    let request = req.as_bytes();
+                    // let request = req.as_bytes();
 
                     if !matches!(ate, atat::Error::Timeout) {
-                        defmt::error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
+                        // defmt::error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
                     }
 
                     match ate {
@@ -130,9 +130,9 @@ impl<C: AtatClient> AtTx<C> {
             })
     }
 
-    pub fn send<A>(&self, req: &A) -> Result<A::Response, Error>
+    pub fn send<A, const LEN: usize>(&self, req: &A) -> Result<A::Response, Error>
     where
-        A: atat::AtatCmd,
+        A: atat::AtatCmd<LEN>,
         A::Error: Into<UbloxError>,
     {
         self.client
@@ -140,8 +140,8 @@ impl<C: AtatClient> AtTx<C> {
             .send(req)
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
-                    let request = req.as_bytes();
-                    defmt::error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
+                    // let request = req.as_bytes();
+                    // defmt::error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
 
                     match ate {
                         atat::Error::Error(ubx) => {
@@ -532,9 +532,9 @@ where
         })
     }
 
-    pub(crate) fn send_internal<A>(&self, req: &A, check_urc: bool) -> Result<A::Response, Error>
+    pub(crate) fn send_internal<A, const LEN: usize>(&self, req: &A, check_urc: bool) -> Result<A::Response, Error>
     where
-        A: atat::AtatCmd,
+        A: atat::AtatCmd<LEN>,
         A::Error: Into<UbloxError>,
     {
         if check_urc {

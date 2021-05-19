@@ -16,18 +16,16 @@ doctest = false
 
 [dependencies]
 atat = { version = "0.10.0", features = ["derive"] }
-defmt = { version = "^0.2", features = []}
+defmt = { version = "^0.2" }
 embedded-hal = "1.0.0-alpha.4"
-embedded-nal = "0.2.0"
-embedded-time = "0.10.1"
-hash32 = "^0.1.1"
+embedded-nal = "0.4.0"
+embedded-time = "0.11.0"
+hash32 = "^0.2.1"
 hash32-derive = "^0.1.0"
-heapless = { version = "^0.5.5", features = ["serde"] }
+heapless = { version = "^0.7", features = ["serde"] }
 nb = "^1"
-no-std-net = { version = "0.4.0", features = ["serde"] }
+no-std-net = { version = "0.5.0", features = ["serde"] }
 serde = { version = "^1", default-features = false, features = ["derive"] }
-serde_at = { version = "0.10.0" }
-typenum = "^1"
 
 [features]
 default = ["toby-r2", "socket-udp", "socket-tcp"]

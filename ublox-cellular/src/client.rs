@@ -2,7 +2,6 @@ use atat::AtatClient;
 use core::{cell::RefCell, convert::TryInto};
 use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_time::{duration::*, Clock};
-use heapless::{ArrayLength, Bucket, Pos};
 
 use crate::{
     command::device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
@@ -26,14 +25,14 @@ use crate::{
     power::PowerState,
     registration::ConnectionState,
     services::data::{
-        socket::{Socket, SocketSet},
+        socket::SocketSet,
         ContextState,
     },
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
 use network_service::{
-    types::{NetworkRegistrationUrcConfig, RadioAccessTechnologySelected, RatPreferred},
-    SetNetworkRegistrationStatus, SetRadioAccessTechnology,
+    types::NetworkRegistrationUrcConfig,
+    SetNetworkRegistrationStatus,
 };
 use psn::{
     types::{EPSNetworkRegistrationUrcConfig, GPRSNetworkRegistrationUrcConfig},
@@ -47,7 +46,7 @@ pub enum State {
     On,
 }
 
-pub struct Device<C, CLK, N, L, RST, DTR, PWR, VINT>
+pub struct Device<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
 where
     C: AtatClient,
     CLK: 'static + Clock,
@@ -55,11 +54,6 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: 'static
-        + ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: 'static + ArrayLength<u8>,
 {
     pub(crate) config: Config<RST, DTR, PWR, VINT>,
     pub(crate) network: Network<C, CLK>,
@@ -67,11 +61,10 @@ where
     pub(crate) state: State,
     pub(crate) power_state: PowerState,
     // Ublox devices can hold a maximum of 6 active sockets
-    pub(crate) sockets: Option<RefCell<&'static mut SocketSet<N, L, CLK>>>,
+    pub(crate) sockets: Option<RefCell<&'static mut SocketSet<CLK, N, L>>>,
 }
 
-// TODO:
-impl<C, CLK, N, L, RST, DTR, PWR, VINT> Drop for Device<C, CLK, N, L, RST, DTR, PWR, VINT>
+impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Drop for Device<C, CLK, RST, DTR, PWR, VINT, N, L>
 where
     C: AtatClient,
     CLK: Clock,
@@ -79,10 +72,6 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: ArrayLength<u8>,
 {
     fn drop(&mut self) {
         if self.state != State::Off {
@@ -92,7 +81,7 @@ where
     }
 }
 
-impl<C, CLK, N, L, RST, DTR, PWR, VINT> Device<C, CLK, N, L, RST, DTR, PWR, VINT>
+impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Device<C, CLK, RST, DTR, PWR, VINT, N, L>
 where
     C: AtatClient,
     CLK: Clock,
@@ -100,10 +89,6 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: ArrayLength<u8>,
 {
     pub fn new(client: C, timer: CLK, config: Config<RST, DTR, PWR, VINT>) -> Self {
         let mut device = Device {
@@ -158,7 +143,7 @@ where
         return Err(Error::Busy);
     }
 
-    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<N, L, CLK>) {
+    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<CLK, N, L>) {
         self.sockets = Some(RefCell::new(socket_set));
     }
 
@@ -497,9 +482,9 @@ where
         }
     }
 
-    pub fn send_at<A>(&self, cmd: &A) -> Result<A::Response, Error>
+    pub fn send_at<A, const LEN: usize>(&self, cmd: &A) -> Result<A::Response, Error>
     where
-        A: atat::AtatCmd,
+        A: atat::AtatCmd<LEN>,
         A::Error: Into<UbloxError>,
     {
         // At any point after init state, we should be able to fully send AT
@@ -523,13 +508,11 @@ mod tests {
         sockets::{SocketHandle, TcpSocket, UdpSocket},
         APNInfo,
     };
-    use atat::typenum::Unsigned;
-    use heapless::consts;
 
-    type SocketSize = consts::U128;
-    type SocketSetLen = consts::U2;
+    const SocketSize: usize = 128;
+    const SocketSetLen: usize = 2;
 
-    static mut SOCKET_SET: Option<SocketSet<SocketSetLen, SocketSize, MockTimer>> = None;
+    static mut SOCKET_SET: Option<SocketSet<MockTimer, SocketSetLen, SocketSize>> = None;
 
     #[test]
     #[ignore]
@@ -546,7 +529,7 @@ mod tests {
         };
 
         let mut device =
-            Device::<_, _, SocketSetLen, SocketSize, _, _, _, _>::new(client, timer, config);
+            Device::<_, _, _, _, _, _, SocketSetLen, SocketSize>::new(client, timer, config);
         device.set_socket_storage(socket_set);
 
         // device.fsm.set_state(State::Connected);
@@ -567,14 +550,14 @@ mod tests {
         assert_eq!(sockets.len(), 1);
 
         let mut tcp = sockets
-            .get::<TcpSocket<_, _>>(SocketHandle(0))
+            .get::<TcpSocket<_, SocketSize>>(SocketHandle(0))
             .expect("Failed to get socket");
 
-        assert_eq!(tcp.rx_window(), SocketSize::to_usize());
+        assert_eq!(tcp.rx_window(), SocketSize);
         let socket_data = b"This is socket data!!";
         tcp.rx_enqueue_slice(socket_data);
         assert_eq!(tcp.recv_queue(), socket_data.len());
-        assert_eq!(tcp.rx_window(), SocketSize::to_usize() - socket_data.len());
+        assert_eq!(tcp.rx_window(), SocketSize - socket_data.len());
 
         sockets
             .add(UdpSocket::new(1))
@@ -599,7 +582,7 @@ mod tests {
         assert_eq!(sockets.len(), 1);
 
         let tcp = sockets
-            .get::<TcpSocket<_, _>>(SocketHandle(0))
+            .get::<TcpSocket<_, SocketSize>>(SocketHandle(0))
             .expect("Failed to get socket");
 
         assert_eq!(tcp.recv_queue(), 0);

@@ -1,11 +1,10 @@
 use core::convert::TryInto;
 use embedded_time::{duration::*, Clock, Instant};
-use heapless::ArrayLength;
 
 use super::{Error, Result, RingBuffer, Socket, SocketHandle, SocketMeta};
 
 /// A TCP socket ring buffer.
-pub type SocketBuffer<N> = RingBuffer<u8, N>;
+pub type SocketBuffer<const N: usize> = RingBuffer<u8, N>;
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, defmt::Format)]
 pub enum State {
@@ -29,7 +28,7 @@ impl Default for State {
 /// Note that, for listening sockets, there is no "backlog"; to be able to simultaneously
 /// accept several connections, as many sockets must be allocated, or any new connection
 /// attempts will be reset.
-pub struct TcpSocket<L: ArrayLength<u8>, CLK: Clock> {
+pub struct TcpSocket<CLK: Clock, const L: usize> {
     pub(crate) meta: SocketMeta,
     state: State,
     check_interval: Seconds<u32>,
@@ -38,9 +37,9 @@ pub struct TcpSocket<L: ArrayLength<u8>, CLK: Clock> {
     last_check_time: Option<Instant<CLK>>,
 }
 
-impl<L: ArrayLength<u8>, CLK: Clock> TcpSocket<L, CLK> {
+impl<CLK: Clock, const L: usize> TcpSocket<CLK, L> {
     /// Create a socket using the given buffers.
-    pub fn new(socket_id: u8) -> TcpSocket<L, CLK> {
+    pub fn new(socket_id: u8) -> TcpSocket<CLK, L> {
         TcpSocket {
             meta: SocketMeta {
                 handle: SocketHandle(socket_id),
@@ -246,8 +245,8 @@ impl<L: ArrayLength<u8>, CLK: Clock> TcpSocket<L, CLK> {
     }
 }
 
-impl<L: ArrayLength<u8>, CLK: Clock> Into<Socket<L, CLK>> for TcpSocket<L, CLK> {
-    fn into(self) -> Socket<L, CLK> {
+impl<CLK: Clock, const L: usize> Into<Socket<CLK, L>> for TcpSocket<CLK, L> {
+    fn into(self) -> Socket<CLK, L> {
         Socket::Tcp(self)
     }
 }

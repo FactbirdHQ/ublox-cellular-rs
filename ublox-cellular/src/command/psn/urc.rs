@@ -3,7 +3,7 @@ use super::types::*;
 use crate::{command::network_service::types::RatAct, network::ProfileId};
 use atat::atat_derive::AtatResp;
 use embedded_nal::IpAddr;
-use heapless::{consts, String};
+use heapless::String;
 
 /// +UUPSDA
 #[derive(Debug, Clone, AtatResp)]
@@ -27,13 +27,13 @@ pub struct GPRSNetworkRegistration {
     #[at_arg(position = 1)]
     pub stat: GPRSNetworkRegistrationStat,
     #[at_arg(position = 2)]
-    pub lac: Option<String<consts::U4>>,
+    pub lac: Option<String<4>>,
     #[at_arg(position = 3)]
-    pub ci: Option<String<consts::U8>>,
+    pub ci: Option<String<8>>,
     #[at_arg(position = 4)]
     pub act: Option<RatAct>,
     #[at_arg(position = 5)]
-    pub rac: Option<String<consts::U2>>,
+    pub rac: Option<String<2>>,
 }
 
 /// 18.28 Extended network registration status +UREG
@@ -49,9 +49,9 @@ pub struct EPSNetworkRegistration {
     #[at_arg(position = 1)]
     pub stat: EPSNetworkRegistrationStat,
     #[at_arg(position = 2)]
-    pub tac: Option<String<consts::U4>>,
+    pub tac: Option<String<4>>,
     #[at_arg(position = 3)]
-    pub ci: Option<String<consts::U8>>,
+    pub ci: Option<String<8>>,
     #[at_arg(position = 4)]
     pub act: Option<RatAct>,
     #[at_arg(position = 5)]

@@ -1,6 +1,6 @@
 //! Argument and parameter types used by Network service Commands and Responses
 use atat::atat_derive::AtatEnum;
-use heapless::{consts, String};
+use heapless::String;
 
 /// Is used to chose whether the network selection is automatically done by the
 /// MT or is forced by this command to the operator <oper> given in the format
@@ -134,9 +134,9 @@ pub enum RadioAccessTechnologySelected {
 #[derive(Debug, Clone, PartialEq, AtatEnum)]
 pub enum OperatorNameFormat {
     #[at_arg(value = 0)]
-    Long(String<consts::U24>),
+    Long(String<24>),
     #[at_arg(value = 1)]
-    Short(String<consts::U10>),
+    Short(String<10>),
     #[at_arg(value = 2)]
-    Numeric(String<consts::U6>),
+    Numeric(String<6>),
 }

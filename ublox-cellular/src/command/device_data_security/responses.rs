@@ -1,7 +1,7 @@
 //! Responses for Device and data security Commands
 use super::types::*;
 use atat::atat_derive::AtatResp;
-use heapless::{consts, String};
+use heapless::String;
 
 /// 26.1.2 SSL/TLS certificates and private keys manager
 #[derive(Clone, PartialEq, AtatResp)]
@@ -19,10 +19,10 @@ pub struct SecurityDataImport {
     /// SARA-G3:**
     /// - The maximum length is 200 characters
     #[at_arg(position = 2)]
-    internal_name: String<consts::U200>,
+    internal_name: String<200>,
     /// MD5 formatted string.
     #[at_arg(position = 3)]
-    md5_string: String<consts::U128>,
+    md5_string: String<128>,
 }
 
 #[derive(Clone, PartialEq, AtatResp)]
@@ -35,7 +35,7 @@ pub struct SecurityData {
     /// • "VC": signature verification certificate
     /// • "PU": signature verification public key
     #[at_arg(position = 1)]
-    cert_type: String<consts::U2>,
+    cert_type: String<2>,
     /// Unique identifier of an imported certificate or private key. If an
     /// existing name is used the data will be overridden.
     ///
@@ -43,13 +43,13 @@ pub struct SecurityData {
     /// SARA-G3:**
     /// - The maximum length is 200 characters
     #[at_arg(position = 2)]
-    internal_name: String<consts::U200>,
+    internal_name: String<200>,
     /// Certificate subject (issued to) common name; applicable only for trusted root and
     /// client certificates.
     #[at_arg(position = 3)]
-    common_name: Option<String<consts::U100>>,
+    common_name: Option<String<100>>,
     /// Certificate expiration (valid to date); applicable only for trusted root and client
     /// certificates.
     #[at_arg(position = 4)]
-    expiration_date: Option<String<consts::U100>>,
+    expiration_date: Option<String<100>>,
 }

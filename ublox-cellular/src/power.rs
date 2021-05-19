@@ -3,7 +3,6 @@ use core::convert::TryInto;
 use atat::AtatClient;
 use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_time::{duration::*, Clock};
-use heapless::{ArrayLength, Bucket, Pos};
 
 use crate::{
     client::Device,
@@ -19,7 +18,6 @@ use crate::{
         AT,
     },
     error::{Error, GenericError},
-    sockets::Socket,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
@@ -31,7 +29,7 @@ pub enum PowerState {
     TransientOn,
 }
 
-impl<C, CLK, N, L, RST, DTR, PWR, VINT> Device<C, CLK, N, L, RST, DTR, PWR, VINT>
+impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Device<C, CLK, RST, DTR, PWR, VINT, N, L>
 where
     C: AtatClient,
     CLK: Clock,
@@ -39,10 +37,6 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: ArrayLength<u8>,
 {
     /// Check that the cellular module is alive.
     ///

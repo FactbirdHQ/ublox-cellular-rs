@@ -33,7 +33,6 @@ use crate::{
             responses::{GPRSAttached, PacketSwitchedConfig, PacketSwitchedNetworkData},
             types::PacketSwitchedParamReq,
             GetPDPContextState, GetPacketSwitchedConfig, GetPacketSwitchedNetworkData,
-            SetGPRSAttached,
         },
     },
     error::{Error as DeviceError, GenericError},
@@ -41,7 +40,7 @@ use crate::{
     ProfileId,
 };
 use apn::{APNInfo, Apn};
-use atat::{typenum::Unsigned, AtatClient};
+use atat::AtatClient;
 use core::{cell::RefCell, convert::TryInto};
 use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_time::{
@@ -49,7 +48,6 @@ use embedded_time::{
     Clock,
 };
 pub use error::Error;
-use heapless::{ArrayLength, Bucket, Pos};
 use psn::{
     types::{
         AuthenticationType, GPRSAttachedState, PacketSwitchedAction, PacketSwitchedNetworkDataParam,
@@ -63,15 +61,15 @@ use embedded_nal::Ipv4Addr;
 
 // NOTE: If these are changed, remember to change the corresponding `Bytes` len
 // in commands for now.
-pub type IngressChunkSize = heapless::consts::U256;
-pub type EgressChunkSize = heapless::consts::U1024;
+pub const INGRESS_CHUNK_SIZE: usize = 256;
+pub const EGRESS_CHUNK_SIZE: usize = 1024;
 
 const PROFILE_ID: ProfileId = ProfileId(1);
 
 #[cfg(not(feature = "upsd-context-activation"))]
 const CONTEXT_ID: ContextId = ContextId(1);
 
-impl<C, CLK, N, L, RST, DTR, PWR, VINT> Device<C, CLK, N, L, RST, DTR, PWR, VINT>
+impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Device<C, CLK, RST, DTR, PWR, VINT, N, L>
 where
     C: AtatClient,
     CLK: Clock,
@@ -79,10 +77,6 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: ArrayLength<u8>,
 {
     /// Define a PDP context
     #[cfg(not(feature = "upsd-context-activation"))]
@@ -181,34 +175,24 @@ pub enum ContextState {
     Active,
 }
 
-pub struct DataService<'a, C, CLK, N, L>
+pub struct DataService<'a, C, CLK, const N: usize, const L: usize>
 where
     C: atat::AtatClient,
     CLK: 'static + Clock,
-    N: 'static
-        + ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: 'static + ArrayLength<u8>,
 {
     network: &'a Network<C, CLK>,
-    pub(crate) sockets: &'a RefCell<&'static mut SocketSet<N, L, CLK>>,
+    pub(crate) sockets: &'a RefCell<&'static mut SocketSet<CLK, N, L>>,
 }
 
-impl<'a, C, CLK, N, L> DataService<'a, C, CLK, N, L>
+impl<'a, C, CLK, const N: usize, const L: usize> DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
     CLK: 'static + Clock,
-    N: 'static
-        + ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: 'static + ArrayLength<u8>,
 {
     pub fn try_new(
         apn_info: &APNInfo,
         network: &'a Network<C, CLK>,
-        sockets: &'a RefCell<&'static mut SocketSet<N, L, CLK>>,
+        sockets: &'a RefCell<&'static mut SocketSet<CLK, N, L>>,
     ) -> nb::Result<Self, Error>
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
@@ -507,15 +491,15 @@ where
         }
     }
 
-    pub fn send_at<A>(&self, cmd: &A) -> Result<A::Response, Error>
+    pub fn send_at<A, const LEN: usize>(&self, cmd: &A) -> Result<A::Response, Error>
     where
-        A: atat::AtatCmd,
+        A: atat::AtatCmd<LEN>,
         A::Error: Into<UbloxError>,
     {
         Ok(self.network.send_internal(cmd, true)?)
     }
 
-    pub(crate) fn socket_ingress(&self, mut socket: SocketRef<Socket<L, CLK>>) -> Result<(), Error>
+    pub(crate) fn socket_ingress(&self, mut socket: SocketRef<Socket<CLK, L>>) -> Result<(), Error>
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
@@ -553,7 +537,7 @@ where
 
         // Request [`IngressChunkSize`] if it is available, otherwise request
         // maximum available data
-        let wanted_len = core::cmp::min(available_data, IngressChunkSize::to_usize());
+        let wanted_len = core::cmp::min(available_data, INGRESS_CHUNK_SIZE);
         // Check if socket.buffer has room for wanted_len, and ingress the smallest of the two
         let requested_len = core::cmp::min(wanted_len, socket.rx_window());
 
@@ -617,7 +601,11 @@ where
                 data.as_bytes()
             };
 
-            socket.rx_enqueue_slice(demangled);
+            let enqueued = socket.rx_enqueue_slice(demangled);
+            if enqueued != demangled.len() {
+                // This should never happen, due to the `requested_len` check above
+                defmt::error!("Failed to enqueue full slice of data! {} != {}", enqueued, demangled.len());
+            }
 
             Ok(())
         } else {

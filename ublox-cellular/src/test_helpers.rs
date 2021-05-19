@@ -37,7 +37,7 @@ impl MockAtClient {
 }
 
 impl AtatClient for MockAtClient {
-    fn send<A: atat::AtatCmd>(
+    fn send<A: atat::AtatCmd<LEN>, const LEN: usize>(
         &mut self,
         _cmd: &A,
     ) -> nb::Result<A::Response, atat::Error<A::Error>> {
@@ -52,7 +52,7 @@ impl AtatClient for MockAtClient {
         }
     }
 
-    fn check_response<A: atat::AtatCmd>(
+    fn check_response<A: atat::AtatCmd<LEN>, const LEN: usize>(
         &mut self,
         _cmd: &A,
     ) -> nb::Result<A::Response, atat::Error<A::Error>> {

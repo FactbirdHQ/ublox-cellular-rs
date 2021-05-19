@@ -1,9 +1,8 @@
 //! Responses for Internet protocol transport layer Commands
 use super::types::*;
-use crate::services::data::{socket::SocketHandle, IngressChunkSize};
+use crate::services::data::{socket::SocketHandle, INGRESS_CHUNK_SIZE};
 use atat::atat_derive::AtatResp;
-use core::ops::Mul;
-use heapless::{consts, String};
+use heapless::String;
 use no_std_net::IpAddr;
 
 /// 25.3 Create Socket +USOCR
@@ -46,8 +45,8 @@ pub struct SocketData {
     #[at_arg(position = 1)]
     pub length: usize,
     #[at_arg(position = 2)]
-    // Note: Data max length is `IngressChunkSize` * 2, due to hex encoding
-    pub data: Option<String<<IngressChunkSize as Mul<consts::U2>>::Output>>,
+    // Note: Data max length is `INGRESS_CHUNK_SIZE` * 2, due to hex encoding
+    pub data: Option<String<{ INGRESS_CHUNK_SIZE * 2 }>>,
 }
 
 /// 25.13 Read UDP Socket Data +USORF
@@ -62,8 +61,8 @@ pub struct UDPSocketData {
     #[at_arg(position = 3)]
     pub length: usize,
     #[at_arg(position = 4)]
-    // Note: Data max length is `IngressChunkSize` * 2, due to hex encoding
-    pub data: Option<String<<IngressChunkSize as Mul<consts::U2>>::Output>>,
+    // Note: Data max length is `INGRESS_CHUNK_SIZE` * 2, due to hex encoding
+    pub data: Option<String<{ INGRESS_CHUNK_SIZE * 2 }>>,
 }
 
 /// 25.25 Socket control +USOCTL

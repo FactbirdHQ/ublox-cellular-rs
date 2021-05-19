@@ -1,26 +1,19 @@
 use super::DataService;
 use super::{
-    socket::{Error as SocketError, Socket, SocketHandle, UdpSocket},
-    EgressChunkSize, Error,
+    socket::{Error as SocketError, SocketHandle, UdpSocket},
+    EGRESS_CHUNK_SIZE, Error,
 };
 use crate::command::ip_transport_layer::{
     types::SocketProtocol, CloseSocket, CreateSocket, PrepareUDPSendToDataBinary,
     UDPSendToDataBinary,
 };
-use atat::typenum::Unsigned;
-use embedded_nal::{SocketAddr, UdpClient};
+use embedded_nal::{SocketAddr, UdpClientStack};
 use embedded_time::Clock;
-use heapless::{ArrayLength, Bucket, Pos};
 
-impl<'a, C, CLK, N, L> UdpClient for DataService<'a, C, CLK, N, L>
+impl<'a, C, CLK, const N: usize, const L: usize> UdpClientStack for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
     CLK: Clock,
-    N: 'static
-        + ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: 'static + ArrayLength<u8>,
 {
     type Error = Error;
 
@@ -30,7 +23,7 @@ where
 
     /// Open a new UDP socket to the given address and port. UDP is connectionless,
     /// so unlike `TcpStack` no `connect()` is required.
-    fn socket(&self) -> Result<Self::UdpSocket, Self::Error> {
+    fn socket(&mut self) -> Result<Self::UdpSocket, Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut()?;
 
         if sockets.len() >= sockets.capacity() {
@@ -48,29 +41,29 @@ where
         Ok(sockets.add(UdpSocket::new(socket_resp.socket.0))?)
     }
 
-    fn connect(&self, socket: &mut Self::UdpSocket, remote: SocketAddr) -> Result<(), Self::Error> {
+    fn connect(&mut self, socket: &mut Self::UdpSocket, remote: SocketAddr) -> Result<(), Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let mut udp = sockets
-            .get::<UdpSocket<_, _>>(*socket)
+            .get::<UdpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
         udp.bind(remote).map_err(Self::Error::from)?;
         Ok(())
     }
 
     /// Send a datagram to the remote host.
-    fn send(&self, socket: &mut Self::UdpSocket, buffer: &[u8]) -> nb::Result<(), Self::Error> {
+    fn send(&mut self, socket: &mut Self::UdpSocket, buffer: &[u8]) -> nb::Result<(), Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let udp = sockets
-            .get::<UdpSocket<_, _>>(*socket)
+            .get::<UdpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
 
         if !udp.is_open() {
             return Err(Error::SocketClosed.into());
         }
 
-        for chunk in buffer.chunks(EgressChunkSize::to_usize()) {
+        for chunk in buffer.chunks(EGRESS_CHUNK_SIZE) {
             defmt::trace!("Sending: {} bytes", chunk.len());
             self.network
                 .send_internal(
@@ -88,7 +81,7 @@ where
                 .network
                 .send_internal(
                     &UDPSendToDataBinary {
-                        data: serde_at::ser::Bytes(chunk),
+                        data: atat::serde_at::ser::Bytes(chunk),
                     },
                     false,
                 )
@@ -109,14 +102,14 @@ where
     /// means a datagram of size `n` has been received and it has been placed
     /// in `&buffer[0..n]`, or an error.
     fn receive(
-        &self,
+        &mut self,
         socket: &mut Self::UdpSocket,
         buffer: &mut [u8],
     ) -> nb::Result<(usize, SocketAddr), Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let mut udp = sockets
-            .get::<UdpSocket<_, _>>(*socket)
+            .get::<UdpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
 
         let response = udp
@@ -127,7 +120,7 @@ where
     }
 
     /// Close an existing UDP socket.
-    fn close(&self, socket: Self::UdpSocket) -> Result<(), Self::Error> {
+    fn close(&mut self, socket: Self::UdpSocket) -> Result<(), Self::Error> {
         self.network.send_internal(&CloseSocket { socket }, false)?;
         self.sockets.try_borrow_mut()?.remove(socket)?;
         Ok(())

@@ -6,3 +6,8 @@ members = [
     # "examples/linux_mqtt",
     # "examples/linux_jobs",
 ]
+
+
+[patch.crates-io]
+atat = { path = "../atat/atat" }
+embedded-nal = { path = "../embedded-nal" }

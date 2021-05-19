@@ -64,5 +64,5 @@ pub enum Urc {
 }
 
 impl atat::AtatLen for crate::services::data::socket::SocketHandle {
-    type Len = heapless::consts::U1;
+    const LEN: usize = 1;
 }

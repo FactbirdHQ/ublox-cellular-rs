@@ -1,6 +1,6 @@
 use crate::network::ContextId;
 use atat::atat_derive::AtatEnum;
-use heapless::{consts, String};
+use heapless::String;
 use no_std_net::IpAddr;
 
 /// Indicates the state of PDP context activation
@@ -22,16 +22,16 @@ pub enum PacketSwitchedParam {
     /// "apn.provider.com"; the maximum length is 99. The factory-programmed
     /// value is an empty string.
     #[at_arg(value = 1)]
-    APN(String<consts::U99>),
+    APN(String<99>),
     /// • 2: username - <param_val> is the user name text string for the
     /// authentication phase. The factory-programmed value is an empty string.
     #[at_arg(value = 2)]
-    Username(String<consts::U64>),
+    Username(String<64>),
     /// • 3: password - <param_val> is the password text string for the
     /// authentication phase. Note: the AT+UPSD read command with param_tag = 3
     /// is not allowed and the read all command does not display it
     #[at_arg(value = 3)]
-    Password(String<consts::U64>),
+    Password(String<64>),
     /// • 4: DNS1 - <param_val> is the text string of the primary DNS address.
     /// IPv4 DNS addresses are specified in dotted decimal notation form (i.e.
     /// four numbers in range 0-255 separated by periods, e.g.

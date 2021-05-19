@@ -136,24 +136,24 @@ impl<'de> Deserialize<'de> for PinStatusCode {
 mod test {
     use super::*;
     use crate::command::device_lock::responses::PinStatus;
-    use heapless::{consts, String};
-    use serde_at::de::from_str;
-    use serde_at::ser::to_string;
+    use heapless::String;
+    use atat::serde_at::de::from_str;
+    use atat::serde_at::ser::to_string;
 
     #[test]
     fn serialize_pin_status() {
-        let options = serde_at::SerializeOptions {
+        let options = atat::serde_at::SerializeOptions {
             value_sep: false,
-            ..serde_at::SerializeOptions::default()
+            ..atat::serde_at::SerializeOptions::default()
         };
-        let s = to_string::<consts::U32, consts::U32, _>(
+        let s = to_string::<_, 32, 32>(
             &PinStatusCode::PhNetSubPin,
             String::from(""),
             options,
         )
         .unwrap();
 
-        assert_eq!(s, String::<consts::U32>::from("PH-NETSUB PIN"))
+        assert_eq!(s, String::<32>::from("PH-NETSUB PIN"))
     }
 
     #[test]

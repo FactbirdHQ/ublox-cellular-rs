@@ -43,7 +43,7 @@ pub mod responses;
 pub mod types;
 
 use atat::atat_derive::AtatCmd;
-use heapless::{consts, Vec};
+use heapless::Vec;
 use responses::*;
 use types::*;
 
@@ -116,11 +116,11 @@ pub struct PrepareSecurityDataImport<'a> {
 )]
 pub struct SendSecurityDataImport<'a> {
     #[at_arg(position = 0, len = 2048)]
-    pub data: serde_at::ser::Bytes<'a>,
+    pub data: atat::serde_at::ser::Bytes<'a>,
 }
 
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+USECMNG=3", Vec<SecurityData, consts::U3> , value_sep = false)]
+#[at_cmd("+USECMNG=3", Vec<SecurityData, 3> , value_sep = false)]
 pub struct ListSecurityData;
 
 /// 26.1.3 SSL/TLS security layer profile manager +USECPRF
@@ -137,12 +137,12 @@ pub struct ListSecurityData;
 ///   (operation: None).
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USECPRF", NoResponse)]
-pub struct SecurityProfileManager<'a> {
+pub struct SecurityProfileManager {
     /// USECMNG security profile identifier, in range 0-4; if it is not followed
     /// by other parameters the profile settings will be reset (set to
     /// factory-programmed value)
     #[at_arg(position = 0, len = 1)]
     pub profile_id: SecurityProfileId,
     #[at_arg(position = 1)]
-    pub operation: Option<SecurityProfileOperation<'a>>,
+    pub operation: Option<SecurityProfileOperation>,
 }

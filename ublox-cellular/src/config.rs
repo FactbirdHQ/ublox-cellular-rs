@@ -1,6 +1,6 @@
 use crate::APNInfo;
 use embedded_hal::digital::{InputPin, OutputPin};
-use heapless::{consts, String};
+use heapless::String;
 
 pub struct NoPin;
 
@@ -38,7 +38,7 @@ pub struct Config<RST, DTR, PWR, VINT> {
     pub(crate) hex_mode: bool,
     pub(crate) flow_control: bool,
     pub(crate) apn_info: APNInfo,
-    pub(crate) pin: String<consts::U4>,
+    pub(crate) pin: String<4>,
 }
 
 impl Default for Config<NoPin, NoPin, NoPin, NoPin> {

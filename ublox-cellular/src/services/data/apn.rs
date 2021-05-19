@@ -1,8 +1,8 @@
-use heapless::{consts, String};
+use heapless::String;
 
 #[derive(Debug, Clone)]
 pub enum Apn {
-    Given(String<consts::U99>),
+    Given(String<99>),
     Automatic,
 }
 
@@ -15,8 +15,8 @@ impl Default for Apn {
 #[derive(Debug, Clone, Default)]
 pub struct APNInfo {
     pub apn: Apn,
-    pub user_name: Option<String<consts::U64>>,
-    pub password: Option<String<consts::U64>>,
+    pub user_name: Option<String<64>>,
+    pub password: Option<String<64>>,
 }
 
 impl APNInfo {
