@@ -13,6 +13,20 @@ use types::*;
 #[at_cmd("+CGMI", ManufacturerId)]
 pub struct GetManufacturerId;
 
+/// 4.3 Model identification +CGMM
+///
+/// Text string identifying the model identification.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+CGMI", ModelId)]
+pub struct GetModelId;
+
+/// 4.5 Firmware version identification +CGMR
+///
+/// Returns the firmware version of the module.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+CGMR", FirmwareVersion)]
+pub struct GetFirmwareVersion;
+
 /// 4.7 IMEI identification +CGSN
 ///
 /// Returns the product serial number, the International Mobile Equipment Identity (IMEI) of the MT.
