@@ -535,10 +535,10 @@ mod tests {
         APNInfo,
     };
 
-    const SocketSize: usize = 128;
-    const SocketSetLen: usize = 2;
+    const SOCKET_SIZE: usize = 128;
+    const SOCKET_SET_LEN: usize = 2;
 
-    static mut SOCKET_SET: Option<SocketSet<MockTimer, SocketSetLen, SocketSize>> = None;
+    static mut SOCKET_SET: Option<SocketSet<MockTimer, SOCKET_SET_LEN, SOCKET_SIZE>> = None;
 
     #[test]
     #[ignore]
@@ -555,7 +555,7 @@ mod tests {
         };
 
         let mut device =
-            Device::<_, _, _, _, _, _, SocketSetLen, SocketSize>::new(client, timer, config);
+            Device::<_, _, _, _, _, _, SOCKET_SET_LEN, SOCKET_SIZE>::new(client, timer, config);
         device.set_socket_storage(socket_set);
 
         // device.fsm.set_state(State::Connected);
@@ -576,14 +576,14 @@ mod tests {
         assert_eq!(sockets.len(), 1);
 
         let mut tcp = sockets
-            .get::<TcpSocket<_, SocketSize>>(SocketHandle(0))
+            .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
             .expect("Failed to get socket");
 
-        assert_eq!(tcp.rx_window(), SocketSize);
+        assert_eq!(tcp.rx_window(), SOCKET_SIZE);
         let socket_data = b"This is socket data!!";
         tcp.rx_enqueue_slice(socket_data);
         assert_eq!(tcp.recv_queue(), socket_data.len());
-        assert_eq!(tcp.rx_window(), SocketSize - socket_data.len());
+        assert_eq!(tcp.rx_window(), SOCKET_SIZE - socket_data.len());
 
         sockets
             .add(UdpSocket::new(1))
@@ -608,7 +608,7 @@ mod tests {
         assert_eq!(sockets.len(), 1);
 
         let tcp = sockets
-            .get::<TcpSocket<_, SocketSize>>(SocketHandle(0))
+            .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
             .expect("Failed to get socket");
 
         assert_eq!(tcp.recv_queue(), 0);
