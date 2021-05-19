@@ -120,6 +120,26 @@ impl<CLK: Clock, const L: usize> Socket<CLK, L> {
         }
     }
 
+    pub fn recycle(&self, ts: &Instant<CLK>) -> bool
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
+        match self {
+            Socket::Tcp(s) => s.recycle(ts),
+            Socket::Udp(s) => s.recycle(ts),
+        }
+    }
+
+    pub fn closed_by_remote(&mut self, ts: Instant<CLK>)
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
+        match self {
+            Socket::Tcp(s) => s.closed_by_remote(ts),
+            Socket::Udp(s) => s.closed_by_remote(ts),
+        }
+    }
+
     pub fn set_available_data(&mut self, available_data: usize) {
         match self {
             Socket::Tcp(s) => s.set_available_data(available_data),

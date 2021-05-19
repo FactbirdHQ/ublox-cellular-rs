@@ -1,3 +1,5 @@
+use core::convert::TryInto;
+
 use super::ssl::SecurityProfileId;
 use super::DataService;
 use super::{
@@ -10,12 +12,16 @@ use crate::command::ip_transport_layer::{
     WriteSocketDataBinary,
 };
 use embedded_nal::{SocketAddr, TcpClientStack};
-use embedded_time::Clock;
+use embedded_time::{
+    duration::{Generic, Milliseconds},
+    Clock,
+};
 
 impl<'a, C, CLK, const N: usize, const L: usize> TcpClientStack for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
     CLK: Clock,
+    Generic<CLK::T>: TryInto<Milliseconds>,
 {
     type Error = Error;
 
@@ -27,8 +33,17 @@ where
     fn socket(&mut self) -> Result<Self::TcpSocket, Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut()?;
 
+        // Check if there are any unused sockets available
         if sockets.len() >= sockets.capacity() {
-            return Err(Error::Socket(SocketError::SocketSetFull));
+            if let Ok(ts) = self.network.status.try_borrow_mut()?.timer.try_now() {
+                // Check if there are any sockets closed by remote, and close it
+                // if it has exceeded its timeout, in order to recycle it.
+                if sockets.recycle(&ts) {
+                    return Err(Error::Socket(SocketError::SocketSetFull));
+                }
+            } else {
+                return Err(Error::Socket(SocketError::SocketSetFull));
+            }
         }
 
         let socket_resp = self.network.send_internal(
@@ -53,7 +68,7 @@ where
             .get::<TcpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
 
-        if tcp.state() == TcpState::Created {
+        if matches!(tcp.state(), TcpState::Created) {
             self.network
                 .send_internal(
                     &SetSocketSslState {
@@ -78,7 +93,7 @@ where
             tcp.set_state(TcpState::Connected);
             Ok(())
         } else {
-            defmt::error!("Cannot connect socket! Socket state: {}", tcp.state());
+            defmt::error!("Cannot connect socket!");
             Err(Error::Socket(SocketError::Illegal).into())
         }
     }

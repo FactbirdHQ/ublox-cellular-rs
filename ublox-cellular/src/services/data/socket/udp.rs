@@ -17,9 +17,11 @@ pub struct UdpSocket<CLK: Clock, const L: usize> {
     pub(crate) meta: SocketMeta,
     pub(crate) endpoint: SocketAddr,
     check_interval: Seconds<u32>,
+    read_timeout: Option<Seconds<u32>>,
     available_data: usize,
     rx_buffer: SocketBuffer<L>,
     last_check_time: Option<Instant<CLK>>,
+    closed_time: Option<Instant<CLK>>,
 }
 
 impl<CLK: Clock, const L: usize> UdpSocket<CLK, L> {
@@ -30,10 +32,12 @@ impl<CLK: Clock, const L: usize> UdpSocket<CLK, L> {
                 handle: SocketHandle(socket_id),
             },
             check_interval: Seconds(15),
+            read_timeout: Some(Seconds(15)),
             endpoint: SocketAddrV4::new(Ipv4Addr::unspecified(), 0).into(),
             available_data: 0,
             rx_buffer: SocketBuffer::new(),
             last_check_time: None,
+            closed_time: None,
         }
     }
 
@@ -59,6 +63,28 @@ impl<CLK: Clock, const L: usize> UdpSocket<CLK, L> {
             .and_then(|dur| dur.try_into().ok())
             .map(|dur: Milliseconds<u32>| dur >= self.check_interval)
             .unwrap_or(false)
+    }
+
+    pub fn recycle(&self, ts: &Instant<CLK>) -> bool
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
+        if let Some(read_timeout) = self.read_timeout {
+            self.closed_time
+                .and_then(|ref closed_time| ts.checked_duration_since(closed_time))
+                .and_then(|dur| dur.try_into().ok())
+                .map(|dur: Milliseconds<u32>| dur >= read_timeout)
+                .unwrap_or(false)
+        } else {
+            false
+        }
+    }
+
+    pub fn closed_by_remote(&mut self, ts: Instant<CLK>)
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
+        self.closed_time.replace(ts);
     }
 
     /// Set available data.

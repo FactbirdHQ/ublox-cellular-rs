@@ -1,6 +1,11 @@
+use core::convert::TryInto;
+
 use super::{AnySocket, Error, Result, Socket, SocketRef, SocketType};
 
-use embedded_time::Clock;
+use embedded_time::{
+    duration::{Generic, Milliseconds},
+    Clock, Instant,
+};
 use heapless::Vec;
 use serde::{Deserialize, Serialize};
 
@@ -141,6 +146,17 @@ where
                 defmt::debug!("Removing socket @ index {}", index);
                 slot.take();
             })
+    }
+
+    pub fn recycle(&mut self, ts: &Instant<CLK>) -> bool
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
+        let h = self.iter().find(|(_, s)| s.recycle(ts)).map(|(h, _)| h);
+        if h.is_none() {
+            return false;
+        }
+        self.remove(h.unwrap()).is_ok()
     }
 
     /// Iterate every socket in this set.

@@ -6,17 +6,17 @@ use super::{Error, Result, RingBuffer, Socket, SocketHandle, SocketMeta};
 /// A TCP socket ring buffer.
 pub type SocketBuffer<const N: usize> = RingBuffer<u8, N>;
 
-#[derive(Debug, PartialEq, Eq, Clone, Copy, defmt::Format)]
-pub enum State {
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+pub enum State<CLK: Clock> {
     /// Freshly created, unsullied
     Created,
     /// TCP connected or UDP has an address
     Connected,
-    /// Block all writes
-    ShutdownForWrite,
+    /// Block all writes (Socket is closed by remote)
+    ShutdownForWrite(Instant<CLK>),
 }
 
-impl Default for State {
+impl<CLK: Clock> Default for State<CLK> {
     fn default() -> Self {
         State::Created
     }
@@ -30,8 +30,9 @@ impl Default for State {
 /// attempts will be reset.
 pub struct TcpSocket<CLK: Clock, const L: usize> {
     pub(crate) meta: SocketMeta,
-    state: State,
+    state: State<CLK>,
     check_interval: Seconds<u32>,
+    read_timeout: Option<Seconds<u32>>,
     available_data: usize,
     rx_buffer: SocketBuffer<L>,
     last_check_time: Option<Instant<CLK>>,
@@ -48,6 +49,7 @@ impl<CLK: Clock, const L: usize> TcpSocket<CLK, L> {
             rx_buffer: SocketBuffer::new(),
             available_data: 0,
             check_interval: Seconds(15),
+            read_timeout: Some(Seconds(15)),
             last_check_time: None,
         }
     }
@@ -60,8 +62,8 @@ impl<CLK: Clock, const L: usize> TcpSocket<CLK, L> {
 
     /// Return the connection state, in terms of the TCP state machine.
     #[inline]
-    pub fn state(&self) -> State {
-        self.state
+    pub fn state(&self) -> &State<CLK> {
+        &self.state
     }
 
     pub fn should_update_available_data(&mut self, ts: Instant<CLK>) -> bool
@@ -83,6 +85,31 @@ impl<CLK: Clock, const L: usize> TcpSocket<CLK, L> {
         should_update
     }
 
+    pub fn recycle(&self, ts: &Instant<CLK>) -> bool
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
+        if let Some(read_timeout) = self.read_timeout {
+            match self.state {
+                State::Created | State::Connected => false,
+                State::ShutdownForWrite(ref closed_time) => ts
+                    .checked_duration_since(closed_time)
+                    .and_then(|dur| dur.try_into().ok())
+                    .map(|dur: Milliseconds<u32>| dur >= read_timeout)
+                    .unwrap_or(false),
+            }
+        } else {
+            false
+        }
+    }
+
+    pub fn closed_by_remote(&mut self, ts: Instant<CLK>)
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
+        self.set_state(State::ShutdownForWrite(ts))
+    }
+
     /// Set available data.
     pub fn set_available_data(&mut self, available_data: usize) {
         self.available_data = available_data;
@@ -98,13 +125,7 @@ impl<CLK: Clock, const L: usize> TcpSocket<CLK, L> {
     /// This function returns true if the socket is actively exchanging packets
     /// with a remote endpoint. Note that this does not mean that it is possible
     /// to send or receive data through the socket; for that, use
-    /// [can_send](#method.can_send) or [can_recv](#method.can_recv).
-    ///
-    /// If a connection is established, [abort](#method.close) will send a reset
-    /// to the remote endpoint.
-    ///
-    /// In terms of the TCP state machine, the socket must be in the `Closed` or
-    /// `ShutdownForRead` state.
+    /// [can_recv](#method.can_recv).
     #[inline]
     pub fn is_connected(&self) -> bool {
         matches!(self.state, State::Connected)
@@ -121,8 +142,7 @@ impl<CLK: Clock, const L: usize> TcpSocket<CLK, L> {
     #[inline]
     pub fn may_recv(&self) -> bool {
         match self.state {
-            State::Connected => true,
-            State::ShutdownForWrite => true,
+            State::Connected | State::ShutdownForWrite(_) => true,
             // If we have something in the receive buffer, we can receive that.
             _ if !self.rx_buffer.is_empty() => true,
             _ => false,
@@ -240,7 +260,7 @@ impl<CLK: Clock, const L: usize> TcpSocket<CLK, L> {
         self.rx_buffer.len()
     }
 
-    pub fn set_state(&mut self, state: State) {
+    pub fn set_state(&mut self, state: State<CLK>) {
         self.state = state
     }
 }

@@ -303,6 +303,13 @@ where
         )?;
 
         self.network.send_internal(
+            &SetAutomaticTimezoneUpdate {
+                on_off: AutomaticTimezone::EnabledLocal,
+            },
+            false,
+        )?;
+
+        self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Full,
                 rst: Some(ResetMode::DontReset),
@@ -395,7 +402,10 @@ where
         Ok(())
     }
 
-    fn handle_urc(&self) -> Result<(), Error> {
+    fn handle_urc(&self) -> Result<(), Error>
+    where
+        Generic<CLK::T>: TryInto<Milliseconds>,
+    {
         if let Some(ref sockets) = self.sockets {
             self.network
                 .at_tx
@@ -404,9 +414,25 @@ where
                         Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
                             defmt::info!("[URC] SocketClosed {=u8}", socket.0);
                             if let Ok(mut sockets) = sockets.try_borrow_mut() {
-                                if sockets.remove(socket).is_err() {
-                                    defmt::warn!("Socket already closed!");
+                                if let Some((_, mut sock)) =
+                                    sockets.iter_mut().find(|(handle, _)| *handle == socket)
+                                {
+                                    // FIXME: Error handling here rather than unwrap!
+                                    let ts = self
+                                        .network
+                                        .status
+                                        .try_borrow()
+                                        .unwrap()
+                                        .timer
+                                        .try_now()
+                                        .unwrap();
+                                    sock.closed_by_remote(ts);
                                 }
+                            } else {
+                                defmt::warn!(
+                                    "[Socket({=u8})] Failed to borrow socketset!",
+                                    socket.0
+                                );
                             }
                         }
                         Urc::SocketDataAvailable(
