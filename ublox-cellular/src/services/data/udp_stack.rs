@@ -3,7 +3,7 @@ use core::convert::TryInto;
 use super::DataService;
 use super::{
     socket::{Error as SocketError, SocketHandle, UdpSocket},
-    EGRESS_CHUNK_SIZE, Error,
+    Error, EGRESS_CHUNK_SIZE,
 };
 use crate::command::ip_transport_layer::{
     types::SocketProtocol, CloseSocket, CreateSocket, PrepareUDPSendToDataBinary,
@@ -55,7 +55,11 @@ where
         Ok(sockets.add(UdpSocket::new(socket_resp.socket.0))?)
     }
 
-    fn connect(&mut self, socket: &mut Self::UdpSocket, remote: SocketAddr) -> Result<(), Self::Error> {
+    fn connect(
+        &mut self,
+        socket: &mut Self::UdpSocket,
+        remote: SocketAddr,
+    ) -> Result<(), Self::Error> {
         let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
 
         let mut udp = sockets

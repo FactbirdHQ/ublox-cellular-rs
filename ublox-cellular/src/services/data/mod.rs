@@ -69,7 +69,8 @@ const PROFILE_ID: ProfileId = ProfileId(1);
 #[cfg(not(feature = "upsd-context-activation"))]
 const CONTEXT_ID: ContextId = ContextId(1);
 
-impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Device<C, CLK, RST, DTR, PWR, VINT, N, L>
+impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
+    Device<C, CLK, RST, DTR, PWR, VINT, N, L>
 where
     C: AtatClient,
     CLK: Clock,
@@ -604,7 +605,11 @@ where
             let enqueued = socket.rx_enqueue_slice(demangled);
             if enqueued != demangled.len() {
                 // This should never happen, due to the `requested_len` check above
-                defmt::error!("Failed to enqueue full slice of data! {} != {}", enqueued, demangled.len());
+                defmt::error!(
+                    "Failed to enqueue full slice of data! {} != {}",
+                    enqueued,
+                    demangled.len()
+                );
             }
 
             Ok(())

@@ -6,7 +6,7 @@ pub mod types;
 pub mod urc;
 
 use atat::atat_derive::AtatCmd;
-use no_std_net::IpAddr;
+use embedded_nal::IpAddr;
 use responses::*;
 use types::*;
 

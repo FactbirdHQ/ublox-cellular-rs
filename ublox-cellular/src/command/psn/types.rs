@@ -1,7 +1,7 @@
 use crate::network::ContextId;
 use atat::atat_derive::AtatEnum;
+use embedded_nal::IpAddr;
 use heapless::String;
-use no_std_net::IpAddr;
 
 /// Indicates the state of PDP context activation
 #[derive(Clone, PartialEq, AtatEnum)]

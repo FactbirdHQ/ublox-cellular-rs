@@ -4,7 +4,7 @@ use super::ssl::SecurityProfileId;
 use super::DataService;
 use super::{
     socket::{Error as SocketError, SocketHandle, TcpSocket, TcpState},
-    EGRESS_CHUNK_SIZE, Error,
+    Error, EGRESS_CHUNK_SIZE,
 };
 use crate::command::ip_transport_layer::{
     types::{SocketProtocol, SslTlsStatus},
@@ -106,7 +106,11 @@ where
 
     /// Write to the stream. Returns the number of bytes written is returned
     /// (which may be less than `buffer.len()`), or an error.
-    fn send(&mut self, socket: &mut Self::TcpSocket, buffer: &[u8]) -> nb::Result<usize, Self::Error> {
+    fn send(
+        &mut self,
+        socket: &mut Self::TcpSocket,
+        buffer: &[u8],
+    ) -> nb::Result<usize, Self::Error> {
         if !self.is_connected(&socket)? {
             return Err(Error::SocketClosed.into());
         }

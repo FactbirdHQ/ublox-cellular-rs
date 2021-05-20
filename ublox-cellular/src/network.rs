@@ -532,7 +532,11 @@ where
         })
     }
 
-    pub(crate) fn send_internal<A, const LEN: usize>(&self, req: &A, check_urc: bool) -> Result<A::Response, Error>
+    pub(crate) fn send_internal<A, const LEN: usize>(
+        &self,
+        req: &A,
+        check_urc: bool,
+    ) -> Result<A::Response, Error>
     where
         A: atat::AtatCmd<LEN>,
         A::Error: Into<UbloxError>,

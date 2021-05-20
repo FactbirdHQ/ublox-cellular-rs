@@ -2,8 +2,8 @@
 use super::types::*;
 use crate::services::data::{socket::SocketHandle, INGRESS_CHUNK_SIZE};
 use atat::atat_derive::AtatResp;
+use embedded_nal::IpAddr;
 use heapless::String;
-use no_std_net::IpAddr;
 
 /// 25.3 Create Socket +USOCR
 #[derive(Debug, Clone, AtatResp)]

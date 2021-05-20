@@ -2,8 +2,8 @@ use super::{DataService, Error};
 use crate::command::device_data_security::{types::*, *};
 use atat::atat_derive::AtatLen;
 use embedded_time::Clock;
-use serde::{Deserialize, Serialize};
 use heapless::String;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, AtatLen)]
 pub struct SecurityProfileId(pub u8);
@@ -103,7 +103,11 @@ where
         self.network.send_internal(
             &SecurityProfileManager {
                 profile_id,
-                operation: Some(SecurityProfileOperation::TrustedRootCertificateInternalName(String::from(name))),
+                operation: Some(
+                    SecurityProfileOperation::TrustedRootCertificateInternalName(String::from(
+                        name,
+                    )),
+                ),
             },
             true,
         )?;
@@ -140,7 +144,9 @@ where
         self.network.send_internal(
             &SecurityProfileManager {
                 profile_id,
-                operation: Some(SecurityProfileOperation::ClientPrivateKeyInternalName(String::from(name))),
+                operation: Some(SecurityProfileOperation::ClientPrivateKeyInternalName(
+                    String::from(name),
+                )),
             },
             true,
         )?;

@@ -29,7 +29,8 @@ pub enum PowerState {
     TransientOn,
 }
 
-impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Device<C, CLK, RST, DTR, PWR, VINT, N, L>
+impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
+    Device<C, CLK, RST, DTR, PWR, VINT, N, L>
 where
     C: AtatClient,
     CLK: Clock,

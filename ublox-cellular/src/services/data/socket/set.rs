@@ -29,14 +29,14 @@ pub struct Handle(pub u8);
 #[derive(Default)]
 pub struct Set<CLK, const N: usize, const L: usize>
 where
-    CLK: Clock
+    CLK: Clock,
 {
     pub sockets: Vec<Option<Socket<CLK, L>>, N>,
 }
 
 impl<CLK, const N: usize, const L: usize> Set<CLK, N, L>
 where
-    CLK: Clock
+    CLK: Clock,
 {
     /// Create a socket set using the provided storage.
     pub fn new() -> Set<CLK, N, L> {

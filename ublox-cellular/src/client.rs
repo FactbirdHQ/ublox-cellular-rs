@@ -24,16 +24,10 @@ use crate::{
     network::{AtTx, Network},
     power::PowerState,
     registration::ConnectionState,
-    services::data::{
-        socket::SocketSet,
-        ContextState,
-    },
+    services::data::{socket::SocketSet, ContextState},
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
-use network_service::{
-    types::NetworkRegistrationUrcConfig,
-    SetNetworkRegistrationStatus,
-};
+use network_service::{types::NetworkRegistrationUrcConfig, SetNetworkRegistrationStatus};
 use psn::{
     types::{EPSNetworkRegistrationUrcConfig, GPRSNetworkRegistrationUrcConfig},
     SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
@@ -64,7 +58,8 @@ where
     pub(crate) sockets: Option<RefCell<&'static mut SocketSet<CLK, N, L>>>,
 }
 
-impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Drop for Device<C, CLK, RST, DTR, PWR, VINT, N, L>
+impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Drop
+    for Device<C, CLK, RST, DTR, PWR, VINT, N, L>
 where
     C: AtatClient,
     CLK: Clock,
@@ -81,7 +76,8 @@ where
     }
 }
 
-impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Device<C, CLK, RST, DTR, PWR, VINT, N, L>
+impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
+    Device<C, CLK, RST, DTR, PWR, VINT, N, L>
 where
     C: AtatClient,
     CLK: Clock,
