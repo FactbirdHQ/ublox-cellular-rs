@@ -2,19 +2,18 @@ use core::cmp::min;
 use core::convert::TryInto;
 
 use embedded_time::{duration::*, Clock, Instant};
-use heapless::ArrayLength;
 
 use super::{Error, Result, RingBuffer, Socket, SocketHandle, SocketMeta};
 pub use embedded_nal::{Ipv4Addr, SocketAddr, SocketAddrV4};
 
 /// A UDP socket ring buffer.
-pub type SocketBuffer<N> = RingBuffer<u8, N>;
+pub type SocketBuffer<const N: usize> = RingBuffer<u8, N>;
 
 /// A User Datagram Protocol socket.
 ///
 /// A UDP socket is bound to a specific endpoint, and owns transmit and receive
 /// packet buffers.
-pub struct UdpSocket<L: ArrayLength<u8>, CLK: Clock> {
+pub struct UdpSocket<CLK: Clock, const L: usize> {
     pub(crate) meta: SocketMeta,
     pub(crate) endpoint: SocketAddr,
     check_interval: Seconds<u32>,
@@ -25,9 +24,9 @@ pub struct UdpSocket<L: ArrayLength<u8>, CLK: Clock> {
     closed_time: Option<Instant<CLK>>,
 }
 
-impl<L: ArrayLength<u8>, CLK: Clock> UdpSocket<L, CLK> {
+impl<CLK: Clock, const L: usize> UdpSocket<CLK, L> {
     /// Create an UDP socket with the given buffers.
-    pub fn new(socket_id: u8) -> UdpSocket<L, CLK> {
+    pub fn new(socket_id: u8) -> UdpSocket<CLK, L> {
         UdpSocket {
             meta: SocketMeta {
                 handle: SocketHandle(socket_id),
@@ -229,8 +228,8 @@ impl<L: ArrayLength<u8>, CLK: Clock> UdpSocket<L, CLK> {
     }
 }
 
-impl<L: ArrayLength<u8>, CLK: Clock> Into<Socket<L, CLK>> for UdpSocket<L, CLK> {
-    fn into(self) -> Socket<L, CLK> {
+impl<CLK: Clock, const L: usize> Into<Socket<CLK, L>> for UdpSocket<CLK, L> {
+    fn into(self) -> Socket<CLK, L> {
         Socket::Udp(self)
     }
 }

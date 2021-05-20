@@ -1,8 +1,8 @@
-use super::{socket::Socket, DataService, Error};
+use super::{DataService, Error};
 use crate::command::device_data_security::{types::*, *};
 use atat::atat_derive::AtatLen;
 use embedded_time::Clock;
-use heapless::{ArrayLength, Bucket, Pos};
+use heapless::String;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, AtatLen)]
@@ -32,14 +32,10 @@ pub trait SSL {
         -> Result<(), Error>;
 }
 
-impl<'a, C, CLK, N, L> SSL for DataService<'a, C, CLK, N, L>
+impl<'a, C, CLK, const N: usize, const L: usize> SSL for DataService<'a, C, CLK, N, L>
 where
     C: atat::AtatClient,
     CLK: Clock,
-    N: ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: ArrayLength<u8>,
 {
     fn import_certificate(
         &self,
@@ -61,7 +57,7 @@ where
 
         self.network.send_internal(
             &SendSecurityDataImport {
-                data: serde_at::ser::Bytes(certificate),
+                data: atat::serde_at::ser::Bytes(certificate),
             },
             true,
         )?;
@@ -70,7 +66,7 @@ where
             &SecurityProfileManager {
                 profile_id,
                 operation: Some(SecurityProfileOperation::ClientCertificateInternalName(
-                    name,
+                    String::from(name),
                 )),
             },
             true,
@@ -99,7 +95,7 @@ where
 
         self.network.send_internal(
             &SendSecurityDataImport {
-                data: serde_at::ser::Bytes(root_ca),
+                data: atat::serde_at::ser::Bytes(root_ca),
             },
             true,
         )?;
@@ -107,7 +103,11 @@ where
         self.network.send_internal(
             &SecurityProfileManager {
                 profile_id,
-                operation: Some(SecurityProfileOperation::TrustedRootCertificateInternalName(name)),
+                operation: Some(
+                    SecurityProfileOperation::TrustedRootCertificateInternalName(String::from(
+                        name,
+                    )),
+                ),
             },
             true,
         )?;
@@ -136,7 +136,7 @@ where
 
         self.network.send_internal(
             &SendSecurityDataImport {
-                data: serde_at::ser::Bytes(private_key),
+                data: atat::serde_at::ser::Bytes(private_key),
             },
             true,
         )?;
@@ -144,7 +144,9 @@ where
         self.network.send_internal(
             &SecurityProfileManager {
                 profile_id,
-                operation: Some(SecurityProfileOperation::ClientPrivateKeyInternalName(name)),
+                operation: Some(SecurityProfileOperation::ClientPrivateKeyInternalName(
+                    String::from(name),
+                )),
             },
             true,
         )?;
@@ -179,7 +181,7 @@ where
             &SecurityProfileManager {
                 profile_id,
                 operation: Some(SecurityProfileOperation::ExpectedServerHostname(
-                    server_hostname,
+                    String::from(server_hostname),
                 )),
             },
             true,

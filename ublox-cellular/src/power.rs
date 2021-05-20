@@ -3,12 +3,14 @@ use core::convert::TryInto;
 use atat::AtatClient;
 use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_time::{duration::*, Clock};
-use heapless::{ArrayLength, Bucket, Pos};
 
 use crate::{
     client::Device,
     command::{
-        mobile_control::{types::Functionality, ModuleSwitchOff, SetModuleFunctionality},
+        mobile_control::{
+            types::{Functionality, ResetMode},
+            ModuleSwitchOff, SetModuleFunctionality,
+        },
         system_features::{
             types::{FSFactoryRestoreType, NVMFactoryRestoreType},
             SetFactoryConfiguration,
@@ -16,7 +18,6 @@ use crate::{
         AT,
     },
     error::{Error, GenericError},
-    sockets::Socket,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
@@ -28,7 +29,8 @@ pub enum PowerState {
     TransientOn,
 }
 
-impl<C, CLK, N, L, RST, DTR, PWR, VINT> Device<C, CLK, N, L, RST, DTR, PWR, VINT>
+impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
+    Device<C, CLK, RST, DTR, PWR, VINT, N, L>
 where
     C: AtatClient,
     CLK: Clock,
@@ -36,10 +38,6 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: ArrayLength<u8>,
 {
     /// Check that the cellular module is alive.
     ///
@@ -49,7 +47,7 @@ where
     pub(crate) fn is_alive(&self, attempts: u8) -> Result<(), Error> {
         let mut error = Error::BaudDetection;
         for _ in 0..attempts {
-            match self.network.send_internal(&AT, false) {
+            match self.network.at_tx.send_ignore_timeout(&AT) {
                 Ok(_) => {
                     return Ok(());
                 }
@@ -97,8 +95,13 @@ where
             Functionality::SilentReset
         };
 
-        self.network
-            .send_internal(&SetModuleFunctionality { fun, rst: None }, false)?;
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun,
+                rst: Some(ResetMode::DontReset),
+            },
+            false,
+        )?;
 
         self.wait_power_state(PowerState::On, 30_000u32.milliseconds())?;
 

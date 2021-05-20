@@ -13,7 +13,7 @@ use crate::command::{
     },
 };
 use embedded_time::{duration::*, Clock, Instant};
-use heapless::{consts, String};
+use heapless::String;
 
 #[derive(Debug, Clone, Default)]
 pub struct CellularRegistrationStatus<CLK>
@@ -148,8 +148,8 @@ pub struct RegistrationParams {
     pub(crate) status: Status,
     act: RatAct,
 
-    cell_id: Option<String<consts::U8>>,
-    lac: Option<String<consts::U4>>,
+    cell_id: Option<String<8>>,
+    lac: Option<String<4>>,
     // active_time: Option<u16>,
     // periodic_tau: Option<u16>,
 }
@@ -193,9 +193,9 @@ impl From<RegType> for RadioAccessNetwork {
 #[derive(Debug, Clone, Default)]
 pub struct CellularGlobalIdentity {
     /// Registered network operator cell Id.
-    cell_id: Option<String<consts::U8>>,
+    cell_id: Option<String<8>>,
     /// Registered network operator Location Area Code.
-    lac: Option<String<consts::U4>>,
+    lac: Option<String<4>>,
     // Registered network operator Routing Area Code.
     // rac: u8,
     // Registered network operator Tracking Area Code.

@@ -2,11 +2,9 @@ use atat::AtatClient;
 use core::{cell::RefCell, convert::TryInto};
 use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_time::{duration::*, Clock};
-use heapless::{ArrayLength, Bucket, Pos};
 
 use crate::{
-    command::device_lock::GetPinStatus,
-    command::device_lock::{responses::PinStatus, types::PinStatusCode},
+    command::device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
     command::{
         control::{types::*, *},
         mobile_control::{types::*, *},
@@ -14,6 +12,7 @@ use crate::{
         *,
     },
     command::{
+        error::UbloxError,
         network_service::{
             responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
             SetOperatorSelection,
@@ -25,10 +24,7 @@ use crate::{
     network::{AtTx, Network},
     power::PowerState,
     registration::ConnectionState,
-    services::data::{
-        socket::{Socket, SocketSet},
-        ContextState,
-    },
+    services::data::{socket::SocketSet, ContextState},
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
 use network_service::{types::NetworkRegistrationUrcConfig, SetNetworkRegistrationStatus};
@@ -44,7 +40,7 @@ pub enum State {
     On,
 }
 
-pub struct Device<C, CLK, N, L, RST, DTR, PWR, VINT>
+pub struct Device<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
 where
     C: AtatClient,
     CLK: 'static + Clock,
@@ -52,11 +48,6 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: 'static
-        + ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: 'static + ArrayLength<u8>,
 {
     pub(crate) config: Config<RST, DTR, PWR, VINT>,
     pub(crate) network: Network<C, CLK>,
@@ -64,10 +55,11 @@ where
     pub(crate) state: State,
     pub(crate) power_state: PowerState,
     // Ublox devices can hold a maximum of 6 active sockets
-    pub(crate) sockets: Option<RefCell<&'static mut SocketSet<N, L, CLK>>>,
+    pub(crate) sockets: Option<RefCell<&'static mut SocketSet<CLK, N, L>>>,
 }
 
-impl<C, CLK, N, L, RST, DTR, PWR, VINT> Drop for Device<C, CLK, N, L, RST, DTR, PWR, VINT>
+impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Drop
+    for Device<C, CLK, RST, DTR, PWR, VINT, N, L>
 where
     C: AtatClient,
     CLK: Clock,
@@ -75,10 +67,6 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: ArrayLength<u8>,
 {
     fn drop(&mut self) {
         if self.state != State::Off {
@@ -88,7 +76,8 @@ where
     }
 }
 
-impl<C, CLK, N, L, RST, DTR, PWR, VINT> Device<C, CLK, N, L, RST, DTR, PWR, VINT>
+impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
+    Device<C, CLK, RST, DTR, PWR, VINT, N, L>
 where
     C: AtatClient,
     CLK: Clock,
@@ -96,10 +85,6 @@ where
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
-    N: ArrayLength<Option<Socket<L, CLK>>>
-        + ArrayLength<Bucket<u8, usize>>
-        + ArrayLength<Option<Pos>>,
-    L: ArrayLength<u8>,
 {
     pub fn new(client: C, timer: CLK, config: Config<RST, DTR, PWR, VINT>) -> Self {
         let mut device = Device {
@@ -139,14 +124,14 @@ where
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Minimum,
-                rst: None,
+                rst: Some(ResetMode::DontReset),
             },
             true,
         )?;
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Full,
-                rst: None,
+                rst: Some(ResetMode::DontReset),
             },
             true,
         )?;
@@ -154,7 +139,7 @@ where
         return Err(Error::Busy);
     }
 
-    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<N, L, CLK>) {
+    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<CLK, N, L>) {
         self.sockets = Some(RefCell::new(socket_set));
     }
 
@@ -166,7 +151,12 @@ where
             // Always re-configure the module when power has been off
             self.state = State::Off;
 
-            self.power_on()?;
+            // Catch states where we have no vint sense, and the module is already in powered mode,
+            // but for some reason doesn't answer to AT commands.
+            // This usually happens on programming after modem power on.
+            if self.power_on().is_err() {
+                self.hard_reset()?;
+            }
 
             self.is_alive(10)?;
 
@@ -183,6 +173,16 @@ where
         if let Some(ref sockets) = self.sockets {
             sockets.try_borrow_mut()?.prune();
         }
+
+        // Allow ATAT some time to clear the buffers
+        self.network
+            .status
+            .try_borrow()?
+            .timer
+            .new_timer(300_u32.milliseconds())
+            .start()?
+            .wait()?;
+
         Ok(())
     }
 
@@ -226,7 +226,7 @@ where
         // Extended errors on
         self.network.send_internal(
             &SetReportMobileTerminationError {
-                n: TerminationErrorMode::Disabled,
+                n: TerminationErrorMode::Enabled,
             },
             false,
         )?;
@@ -298,13 +298,6 @@ where
             false,
         )?;
 
-        // self.network.send_internal(
-        //     &SetRadioAccessTechnology {
-        //         selected_act: RadioAccessTechnologySelected::Lte,
-        //     },
-        //     false,
-        // )?;
-
         self.network.send_internal(
             &SetAutomaticTimezoneUpdate {
                 on_off: AutomaticTimezone::EnabledLocal,
@@ -315,10 +308,17 @@ where
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Full,
-                rst: None,
+                rst: Some(ResetMode::DontReset),
             },
             true,
         )?;
+
+        // self.network.send_internal(
+        //     &SetRadioAccessTechnology {
+        //         selected_act: RadioAccessTechnologySelected::GsmUmtsLte(RatPreferred::Lte, RatPreferred::Utran),
+        //     },
+        //     false,
+        // )?;
 
         let mut ns = self.network.status.try_borrow_mut()?;
         ns.reset();
@@ -327,13 +327,19 @@ where
 
         self.enable_registration_urcs()?;
 
+        // Set automatic operator selection, if not already set
         let OperatorSelection { mode, .. } =
             self.network.send_internal(&GetOperatorSelection, true)?;
 
-        if mode != OperatorSelectionMode::Automatic {
+        // Only run AT+COPS=0 if currently de-registered, to avoid PLMN reselection
+        if !matches!(
+            mode,
+            OperatorSelectionMode::Automatic | OperatorSelectionMode::Manual
+        ) {
             self.network.send_internal(
                 &SetOperatorSelection {
                     mode: OperatorSelectionMode::Automatic,
+                    format: Some(2),
                 },
                 true,
             )?;
@@ -481,9 +487,11 @@ where
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
-        self.initialize().ok();
+        let res = self.initialize();
 
         self.process_events().map_err(Error::from)?;
+
+        res?;
 
         if self.network.is_connected().map_err(Error::from)? && self.state == State::On {
             Ok(())
@@ -496,7 +504,11 @@ where
         }
     }
 
-    pub fn send_at<A: atat::AtatCmd>(&self, cmd: &A) -> Result<A::Response, Error> {
+    pub fn send_at<A, const LEN: usize>(&self, cmd: &A) -> Result<A::Response, Error>
+    where
+        A: atat::AtatCmd<LEN>,
+        A::Error: Into<UbloxError>,
+    {
         // At any point after init state, we should be able to fully send AT
         // commands.
         if self.state != State::On {
@@ -518,13 +530,11 @@ mod tests {
         sockets::{SocketHandle, TcpSocket, UdpSocket},
         APNInfo,
     };
-    use atat::typenum::Unsigned;
-    use heapless::consts;
 
-    type SocketSize = consts::U128;
-    type SocketSetLen = consts::U2;
+    const SOCKET_SIZE: usize = 128;
+    const SOCKET_SET_LEN: usize = 2;
 
-    static mut SOCKET_SET: Option<SocketSet<SocketSetLen, SocketSize, MockTimer>> = None;
+    static mut SOCKET_SET: Option<SocketSet<MockTimer, SOCKET_SET_LEN, SOCKET_SIZE>> = None;
 
     #[test]
     #[ignore]
@@ -541,7 +551,7 @@ mod tests {
         };
 
         let mut device =
-            Device::<_, _, SocketSetLen, SocketSize, _, _, _, _>::new(client, timer, config);
+            Device::<_, _, _, _, _, _, SOCKET_SET_LEN, SOCKET_SIZE>::new(client, timer, config);
         device.set_socket_storage(socket_set);
 
         // device.fsm.set_state(State::Connected);
@@ -562,14 +572,14 @@ mod tests {
         assert_eq!(sockets.len(), 1);
 
         let mut tcp = sockets
-            .get::<TcpSocket<_, _>>(SocketHandle(0))
+            .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
             .expect("Failed to get socket");
 
-        assert_eq!(tcp.rx_window(), SocketSize::to_usize());
+        assert_eq!(tcp.rx_window(), SOCKET_SIZE);
         let socket_data = b"This is socket data!!";
         tcp.rx_enqueue_slice(socket_data);
         assert_eq!(tcp.recv_queue(), socket_data.len());
-        assert_eq!(tcp.rx_window(), SocketSize::to_usize() - socket_data.len());
+        assert_eq!(tcp.rx_window(), SOCKET_SIZE - socket_data.len());
 
         sockets
             .add(UdpSocket::new(1))
@@ -594,7 +604,7 @@ mod tests {
         assert_eq!(sockets.len(), 1);
 
         let tcp = sockets
-            .get::<TcpSocket<_, _>>(SocketHandle(0))
+            .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
             .expect("Failed to get socket");
 
         assert_eq!(tcp.recv_queue(), 0);

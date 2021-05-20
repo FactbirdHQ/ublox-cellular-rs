@@ -1,7 +1,7 @@
 //! Responses for Network service Commands
 use super::types::*;
 use atat::atat_derive::AtatResp;
-use heapless::{consts, String};
+use heapless::String;
 
 /// 7.3 Signal quality +CSQ
 #[derive(Clone, AtatResp, defmt::Format)]
@@ -38,9 +38,9 @@ pub struct NetworkRegistrationStatus {
     #[at_arg(position = 1)]
     pub stat: NetworkRegistrationStat,
     #[at_arg(position = 2)]
-    pub lac: Option<String<consts::U4>>,
+    pub lac: Option<String<4>>,
     #[at_arg(position = 3)]
-    pub ci: Option<String<consts::U8>>,
+    pub ci: Option<String<8>>,
     #[at_arg(position = 4)]
     pub act_status: Option<u8>,
 }
