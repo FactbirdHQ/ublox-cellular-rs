@@ -27,7 +27,7 @@ nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
 
 # Enable `serde` feature of `no-std-net`
-no-std-net = { version = "*", features = ["serde"] }
+no-std-net = { version = "^0.5", features = ["serde"] }
 
 [features]
 default = ["toby-r2", "socket-udp", "socket-tcp"]
