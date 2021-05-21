@@ -58,7 +58,8 @@ where
         socket: &mut Self::UdpSocket,
         remote: SocketAddr,
     ) -> Result<(), Self::Error> {
-        let mut udp = self.sockets
+        let mut udp = self
+            .sockets
             .get::<UdpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
         udp.bind(remote).map_err(Self::Error::from)?;
@@ -67,7 +68,8 @@ where
 
     /// Send a datagram to the remote host.
     fn send(&mut self, socket: &mut Self::UdpSocket, buffer: &[u8]) -> nb::Result<(), Self::Error> {
-        let udp = self.sockets
+        let udp = self
+            .sockets
             .get::<UdpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
 
@@ -118,8 +120,8 @@ where
         socket: &mut Self::UdpSocket,
         buffer: &mut [u8],
     ) -> nb::Result<(usize, SocketAddr), Self::Error> {
-
-        let mut udp = self.sockets
+        let mut udp = self
+            .sockets
             .get::<UdpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
 

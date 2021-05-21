@@ -28,8 +28,11 @@ pub trait SSL {
         private_key: &[u8],
         password: Option<&str>,
     ) -> Result<(), Error>;
-    fn enable_ssl(&mut self, profile_id: SecurityProfileId, server_hostname: &str)
-        -> Result<(), Error>;
+    fn enable_ssl(
+        &mut self,
+        profile_id: SecurityProfileId,
+        server_hostname: &str,
+    ) -> Result<(), Error>;
 }
 
 impl<'a, C, CLK, const N: usize, const L: usize> SSL for DataService<'a, C, CLK, N, L>

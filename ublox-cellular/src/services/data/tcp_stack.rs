@@ -61,7 +61,8 @@ where
         socket: &mut Self::TcpSocket,
         remote: SocketAddr,
     ) -> nb::Result<(), Self::Error> {
-        let mut tcp = self.sockets
+        let mut tcp = self
+            .sockets
             .get::<TcpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
 
@@ -97,7 +98,10 @@ where
 
     /// Check if this socket is still connected
     fn is_connected(&mut self, socket: &Self::TcpSocket) -> Result<bool, Self::Error> {
-        Ok(self.sockets.get::<TcpSocket<CLK, L>>(*socket)?.is_connected())
+        Ok(self
+            .sockets
+            .get::<TcpSocket<CLK, L>>(*socket)?
+            .is_connected())
     }
 
     /// Write to the stream. Returns the number of bytes written is returned
@@ -152,7 +156,8 @@ where
         socket: &mut Self::TcpSocket,
         buffer: &mut [u8],
     ) -> nb::Result<usize, Self::Error> {
-        let mut tcp = self.sockets
+        let mut tcp = self
+            .sockets
             .get::<TcpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
 
