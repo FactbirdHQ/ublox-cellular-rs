@@ -35,17 +35,17 @@ use crate::{
             GetPDPContextState, GetPacketSwitchedConfig, GetPacketSwitchedNetworkData,
         },
     },
-    error::{Error as DeviceError, GenericError},
+    error::Error as DeviceError,
     network::{ContextId, Network},
     ProfileId,
 };
 use apn::{APNInfo, Apn};
 use atat::AtatClient;
-use core::{cell::RefCell, convert::TryInto};
+use core::convert::TryInto;
 use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_time::{
     duration::{Extensions, Generic, Milliseconds},
-    Clock,
+    Clock, TimeError,
 };
 pub use error::Error;
 use psn::{
@@ -54,7 +54,7 @@ use psn::{
     },
     GetGPRSAttached, SetAuthParameters,
 };
-use socket::{Error as SocketError, Socket, SocketRef, SocketSet, SocketType};
+use socket::{Error as SocketError, SocketSet, SocketType};
 
 #[cfg(feature = "upsd-context-activation")]
 use embedded_nal::Ipv4Addr;
@@ -81,8 +81,8 @@ where
 {
     /// Define a PDP context
     #[cfg(not(feature = "upsd-context-activation"))]
-    fn define_context(&self, cid: ContextId, apn_info: &APNInfo) -> Result<(), Error> {
-        if self.network.context_state.get() != ContextState::Setup {
+    fn define_context(&mut self, cid: ContextId, apn_info: &APNInfo) -> Result<(), Error> {
+        if self.network.context_state != ContextState::Setup {
             return Ok(());
         }
 
@@ -123,7 +123,7 @@ where
             true,
         )?;
 
-        self.network.context_state.set(ContextState::Activating);
+        self.network.context_state = ContextState::Activating;
         Ok(())
     }
 
@@ -155,8 +155,8 @@ where
 
         // At this point we WILL be registered on the network!
 
-        if let Some(ref sockets) = self.sockets {
-            match DataService::try_new(apn_info, &self.network, sockets) {
+        if let Some(sockets) = self.sockets.as_deref_mut() {
+            match DataService::try_new(apn_info, &mut self.network, sockets) {
                 Ok(service) => Ok(service),
                 Err(nb::Error::Other(e)) => Err(nb::Error::Other(e.into())),
                 Err(nb::Error::WouldBlock) => Err(nb::Error::WouldBlock),
@@ -181,8 +181,8 @@ where
     C: atat::AtatClient,
     CLK: 'static + Clock,
 {
-    network: &'a Network<C, CLK>,
-    pub(crate) sockets: &'a RefCell<&'static mut SocketSet<CLK, N, L>>,
+    network: &'a mut Network<C, CLK>,
+    pub(crate) sockets: &'a mut SocketSet<CLK, N, L>,
 }
 
 impl<'a, C, CLK, const N: usize, const L: usize> DataService<'a, C, CLK, N, L>
@@ -192,8 +192,8 @@ where
 {
     pub fn try_new(
         apn_info: &APNInfo,
-        network: &'a Network<C, CLK>,
-        sockets: &'a RefCell<&'static mut SocketSet<CLK, N, L>>,
+        network: &'a mut Network<C, CLK>,
+        sockets: &'a mut SocketSet<CLK, N, L>,
     ) -> nb::Result<Self, Error>
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
@@ -207,19 +207,14 @@ where
 
         // Attempt to ingress data from every open socket, into it's
         // internal rx buffer
-        data_service
-            .sockets
-            .try_borrow_mut()
-            .map_err(Error::from)?
-            .iter_mut()
-            .try_for_each(|(_, socket)| data_service.socket_ingress(socket))?;
+        data_service.socket_ingress_all()?;
 
         Ok(data_service)
     }
 
     #[allow(unused_variables)]
     fn connect(&mut self, apn_info: &APNInfo) -> nb::Result<(), Error> {
-        match self.network.context_state.get() {
+        match self.network.context_state {
             ContextState::Active => return Ok(()),
             ContextState::Setup | ContextState::Activating => {}
         }
@@ -245,7 +240,7 @@ where
     }
 
     // Make sure we are attached to the cellular network.
-    fn attach_network(&self) -> nb::Result<(), Error> {
+    fn attach_network(&mut self) -> nb::Result<(), Error> {
         // Wait for AT+CGATT to return 1
         for _ in 0..10 {
             let GPRSAttached { state } = self
@@ -259,8 +254,6 @@ where
 
             self.network
                 .status
-                .try_borrow()
-                .map_err(Error::from)?
                 .timer
                 .new_timer(1_u32.seconds())
                 .start()
@@ -289,7 +282,7 @@ where
         profile_id: ProfileId,
         apn_info: &APNInfo,
     ) -> nb::Result<(), Error> {
-        if self.network.context_state.get() == ContextState::Active {
+        if self.network.context_state == ContextState::Active {
             return Ok(());
         }
 
@@ -306,7 +299,7 @@ where
             .map_err(Error::from)?;
 
         if param_tag == 0 {
-            self.network.context_state.set(ContextState::Activating);
+            self.network.context_state = ContextState::Activating;
 
             // SARA-U2 pattern: everything is done through AT+UPSD
             // Set up the APN
@@ -381,7 +374,7 @@ where
                 .map_err(Error::from)?;
         }
 
-        self.network.context_state.set(ContextState::Active);
+        self.network.context_state = ContextState::Active;
         Ok(())
     }
 
@@ -389,7 +382,7 @@ where
     /// for SARA-R4/R5 and TOBY modules.
     #[cfg(not(feature = "upsd-context-activation"))]
     fn activate_context(&mut self, cid: ContextId, profile_id: ProfileId) -> nb::Result<(), Error> {
-        if self.network.context_state.get() == ContextState::Active {
+        if self.network.context_state == ContextState::Active {
             return Ok(());
         }
 
@@ -475,7 +468,7 @@ where
                     .map_err(Error::from)?;
             }
 
-            self.network.context_state.set(ContextState::Active);
+            self.network.context_state = ContextState::Active;
             Ok(())
         } else {
             self.network
@@ -492,7 +485,7 @@ where
         }
     }
 
-    pub fn send_at<A, const LEN: usize>(&self, cmd: &A) -> Result<A::Response, Error>
+    pub fn send_at<A, const LEN: usize>(&mut self, cmd: &A) -> Result<A::Response, Error>
     where
         A: atat::AtatCmd<LEN>,
         A::Error: Into<UbloxError>,
@@ -500,121 +493,120 @@ where
         Ok(self.network.send_internal(cmd, true)?)
     }
 
-    pub(crate) fn socket_ingress(&self, mut socket: SocketRef<Socket<CLK, L>>) -> Result<(), Error>
+    pub(crate) fn socket_ingress_all(&mut self) -> Result<(), Error>
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
-        let handle = socket.handle();
+        for (handle, mut socket) in self.sockets.iter_mut() {
+            let available_data = socket.available_data();
 
-        let available_data = socket.available_data();
-
-        if available_data == 0 {
-            // Check for new socket data available at regular intervals, just in case a URC is missed
-            if socket.should_update_available_data(
-                self.network
-                    .status
-                    .try_borrow()?
-                    .timer
-                    .try_now()
-                    .map_err(|e| Error::Generic(GenericError::Time(e.into())))?,
-            ) {
-                if let Ok(SocketData { length, .. }) = self.network.send_internal(
-                    &ReadSocketData {
-                        socket: handle,
-                        length: 0,
-                    },
-                    false,
+            if available_data == 0 {
+                // Check for new socket data available at regular intervals, just in case a URC is missed
+                if socket.should_update_available_data(
+                    self.network
+                        .status
+                        .timer
+                        .try_now()
+                        .map_err(TimeError::from)?,
                 ) {
-                    socket.set_available_data(length);
+                    if let Ok(SocketData { length, .. }) = self.network.send_internal(
+                        &ReadSocketData {
+                            socket: handle,
+                            length: 0,
+                        },
+                        false,
+                    ) {
+                        socket.set_available_data(length);
+                    }
                 }
+
+                return Ok(());
             }
 
-            return Ok(());
-        }
-
-        if !socket.can_recv() {
-            return Err(Error::BufferFull);
-        }
-
-        // Request [`IngressChunkSize`] if it is available, otherwise request
-        // maximum available data
-        let wanted_len = core::cmp::min(available_data, INGRESS_CHUNK_SIZE);
-        // Check if socket.buffer has room for wanted_len, and ingress the smallest of the two
-        let requested_len = core::cmp::min(wanted_len, socket.rx_window());
-
-        let (socket_handle, mut data, len) = match socket.get_type() {
-            SocketType::Tcp => {
-                // Allow room for 2x length (Hex), and command overhead
-                let SocketData {
-                    socket,
-                    data,
-                    length,
-                } = self.network.send_internal(
-                    &ReadSocketData {
-                        socket: handle,
-                        length: requested_len,
-                    },
-                    false,
-                )?;
-
-                (socket, data, length)
-            }
-            SocketType::Udp => {
-                // Allow room for 2x length (Hex), and command overhead
-                let UDPSocketData {
-                    socket,
-                    data,
-                    length,
-                    ..
-                } = self.network.send_internal(
-                    &ReadUDPSocketData {
-                        socket: handle,
-                        length: requested_len,
-                    },
-                    false,
-                )?;
-
-                (socket, data, length)
-            }
-        };
-
-        if socket_handle != handle {
-            defmt::error!("WrongSocketType {} != {}", socket_handle, handle);
-            return Err(Error::WrongSocketType);
-        }
-
-        if len == 0 {
-            socket.set_available_data(0);
-        }
-
-        if let Some(ref mut data) = data {
-            let hex_mode = true;
-            // let hex_mode = self.config.try_borrow()?.hex_mode;
-            let data_len = if hex_mode { data.len() / 2 } else { data.len() };
-            if len > 0 && data_len != len {
-                defmt::error!("BadLength {} != {}, {=str}", len, data_len, data.as_str());
-                return Err(Error::BadLength);
+            if !socket.can_recv() {
+                return Err(Error::BufferFull);
             }
 
-            let demangled = if hex_mode {
-                hex::from_hex(unsafe { data.as_bytes_mut() }).map_err(|_| Error::InvalidHex)?
-            } else {
-                data.as_bytes()
+            // Request [`IngressChunkSize`] if it is available, otherwise request
+            // maximum available data
+            let wanted_len = core::cmp::min(available_data, INGRESS_CHUNK_SIZE);
+            // Check if socket.buffer has room for wanted_len, and ingress the smallest of the two
+            let requested_len = core::cmp::min(wanted_len, socket.rx_window());
+
+            let (socket_handle, mut data, len) = match socket.get_type() {
+                SocketType::Tcp => {
+                    // Allow room for 2x length (Hex), and command overhead
+                    let SocketData {
+                        socket,
+                        data,
+                        length,
+                    } = self.network.send_internal(
+                        &ReadSocketData {
+                            socket: handle,
+                            length: requested_len,
+                        },
+                        false,
+                    )?;
+
+                    (socket, data, length)
+                }
+                SocketType::Udp => {
+                    // Allow room for 2x length (Hex), and command overhead
+                    let UDPSocketData {
+                        socket,
+                        data,
+                        length,
+                        ..
+                    } = self.network.send_internal(
+                        &ReadUDPSocketData {
+                            socket: handle,
+                            length: requested_len,
+                        },
+                        false,
+                    )?;
+
+                    (socket, data, length)
+                }
             };
 
-            let enqueued = socket.rx_enqueue_slice(demangled);
-            if enqueued != demangled.len() {
-                // This should never happen, due to the `requested_len` check above
-                defmt::error!(
-                    "Failed to enqueue full slice of data! {} != {}",
-                    enqueued,
-                    demangled.len()
-                );
+            if socket_handle != handle {
+                defmt::error!("WrongSocketType {} != {}", socket_handle, handle);
+                return Err(Error::WrongSocketType);
             }
 
-            Ok(())
-        } else {
-            Err(Error::Socket(SocketError::Exhausted))
+            if len == 0 {
+                socket.set_available_data(0);
+            }
+
+            if let Some(ref mut data) = data {
+                let hex_mode = true;
+                // let hex_mode = self.config.hex_mode;
+                let data_len = if hex_mode { data.len() / 2 } else { data.len() };
+                if len > 0 && data_len != len {
+                    defmt::error!("BadLength {} != {}, {=str}", len, data_len, data.as_str());
+                    return Err(Error::BadLength);
+                }
+
+                let demangled = if hex_mode {
+                    hex::from_hex(unsafe { data.as_bytes_mut() }).map_err(|_| Error::InvalidHex)?
+                } else {
+                    data.as_bytes()
+                };
+
+                let enqueued = socket.rx_enqueue_slice(demangled);
+                if enqueued != demangled.len() {
+                    // This should never happen, due to the `requested_len` check above
+                    defmt::error!(
+                        "Failed to enqueue full slice of data! {} != {}",
+                        enqueued,
+                        demangled.len()
+                    );
+                }
+            } else {
+                return Err(Error::Socket(SocketError::Exhausted));
+            }
         }
+
+        Ok(())
     }
 }

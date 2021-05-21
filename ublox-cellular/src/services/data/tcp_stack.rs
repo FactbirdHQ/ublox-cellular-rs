@@ -31,14 +31,12 @@ where
 
     /// Open a new TCP socket to the given address and port. The socket starts in the unconnected state.
     fn socket(&mut self) -> Result<Self::TcpSocket, Self::Error> {
-        let mut sockets = self.sockets.try_borrow_mut()?;
-
         // Check if there are any unused sockets available
-        if sockets.len() >= sockets.capacity() {
-            if let Ok(ts) = self.network.status.try_borrow_mut()?.timer.try_now() {
+        if self.sockets.len() >= self.sockets.capacity() {
+            if let Ok(ts) = self.network.status.timer.try_now() {
                 // Check if there are any sockets closed by remote, and close it
                 // if it has exceeded its timeout, in order to recycle it.
-                if sockets.recycle(&ts) {
+                if self.sockets.recycle(&ts) {
                     return Err(Error::Socket(SocketError::SocketSetFull));
                 }
             } else {
@@ -54,7 +52,7 @@ where
             true,
         )?;
 
-        Ok(sockets.add(TcpSocket::new(socket_resp.socket.0))?)
+        Ok(self.sockets.add(TcpSocket::new(socket_resp.socket.0))?)
     }
 
     /// Connect to the given remote host and port.
@@ -63,8 +61,7 @@ where
         socket: &mut Self::TcpSocket,
         remote: SocketAddr,
     ) -> nb::Result<(), Self::Error> {
-        let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
-        let mut tcp = sockets
+        let mut tcp = self.sockets
             .get::<TcpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
 
@@ -100,8 +97,7 @@ where
 
     /// Check if this socket is still connected
     fn is_connected(&mut self, socket: &Self::TcpSocket) -> Result<bool, Self::Error> {
-        let mut sockets = self.sockets.try_borrow_mut()?;
-        Ok(sockets.get::<TcpSocket<CLK, L>>(*socket)?.is_connected())
+        Ok(self.sockets.get::<TcpSocket<CLK, L>>(*socket)?.is_connected())
     }
 
     /// Write to the stream. Returns the number of bytes written is returned
@@ -156,9 +152,7 @@ where
         socket: &mut Self::TcpSocket,
         buffer: &mut [u8],
     ) -> nb::Result<usize, Self::Error> {
-        let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
-
-        let mut tcp = sockets
+        let mut tcp = self.sockets
             .get::<TcpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
 
@@ -168,7 +162,7 @@ where
     /// Close an existing TCP socket.
     fn close(&mut self, socket: Self::TcpSocket) -> Result<(), Self::Error> {
         self.network.send_internal(&CloseSocket { socket }, false)?;
-        self.sockets.try_borrow_mut()?.remove(socket)?;
+        self.sockets.remove(socket)?;
         Ok(())
     }
 }

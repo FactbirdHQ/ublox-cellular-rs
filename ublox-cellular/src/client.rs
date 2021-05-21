@@ -1,5 +1,5 @@
 use atat::AtatClient;
-use core::{cell::RefCell, convert::TryInto};
+use core::convert::TryInto;
 use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_time::{duration::*, Clock};
 
@@ -55,7 +55,7 @@ where
     pub(crate) state: State,
     pub(crate) power_state: PowerState,
     // Ublox devices can hold a maximum of 6 active sockets
-    pub(crate) sockets: Option<RefCell<&'static mut SocketSet<CLK, N, L>>>,
+    pub(crate) sockets: Option<&'static mut SocketSet<CLK, N, L>>,
 }
 
 impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Drop
@@ -111,7 +111,6 @@ where
 
             self.network
                 .status
-                .try_borrow()?
                 .timer
                 .new_timer(1.seconds())
                 .start()?
@@ -140,7 +139,7 @@ where
     }
 
     pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<CLK, N, L>) {
-        self.sockets = Some(RefCell::new(socket_set));
+        self.sockets = Some(socket_set);
     }
 
     pub fn initialize(&mut self) -> Result<(), Error>
@@ -170,14 +169,13 @@ where
 
     pub(crate) fn clear_buffers(&mut self) -> Result<(), Error> {
         self.network.at_tx.reset()?;
-        if let Some(ref sockets) = self.sockets {
-            sockets.try_borrow_mut()?.prune();
+        if let Some(sockets) = self.sockets.as_deref_mut() {
+            sockets.prune();
         }
 
         // Allow ATAT some time to clear the buffers
         self.network
             .status
-            .try_borrow()?
             .timer
             .new_timer(300_u32.milliseconds())
             .start()?
@@ -192,7 +190,7 @@ where
         }
 
         // Always re-configure the PDP contexts if we reconfigure the module
-        self.network.context_state.set(ContextState::Setup);
+        self.network.context_state = ContextState::Setup;
 
         self.is_alive(2)?;
 
@@ -320,10 +318,10 @@ where
         //     false,
         // )?;
 
-        let mut ns = self.network.status.try_borrow_mut()?;
-        ns.reset();
-        ns.set_connection_state(ConnectionState::Connecting);
-        drop(ns);
+        self.network.status.reset();
+        self.network
+            .status
+            .set_connection_state(ConnectionState::Connecting);
 
         self.enable_registration_urcs()?;
 
@@ -353,7 +351,7 @@ where
         Ok(())
     }
 
-    pub(crate) fn enable_registration_urcs(&self) -> Result<(), Error> {
+    pub(crate) fn enable_registration_urcs(&mut self) -> Result<(), Error> {
         // if packet domain event reporting is not set it's not a stopper. We
         // might lack some events when we are dropped from the network.
         // TODO: Re-enable this when it works, and is useful!
@@ -398,37 +396,27 @@ where
         Ok(())
     }
 
-    fn handle_urc(&self) -> Result<(), Error>
+    fn handle_urc(&mut self) -> Result<(), Error>
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
-        if let Some(ref sockets) = self.sockets {
+        if let Some(sockets) = self.sockets.as_deref_mut() {
+            let ts = self
+                .network
+                .status
+                .timer
+                .try_now()
+                .map_err(|e| Error::Generic(GenericError::Time(e.into())))?;
             self.network
                 .at_tx
                 .handle_urc(|urc| {
                     match urc {
                         Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
                             defmt::info!("[URC] SocketClosed {=u8}", socket.0);
-                            if let Ok(mut sockets) = sockets.try_borrow_mut() {
-                                if let Some((_, mut sock)) =
-                                    sockets.iter_mut().find(|(handle, _)| *handle == socket)
-                                {
-                                    // FIXME: Error handling here rather than unwrap!
-                                    let ts = self
-                                        .network
-                                        .status
-                                        .try_borrow()
-                                        .unwrap()
-                                        .timer
-                                        .try_now()
-                                        .unwrap();
-                                    sock.closed_by_remote(ts);
-                                }
-                            } else {
-                                defmt::warn!(
-                                    "[Socket({=u8})] Failed to borrow socketset!",
-                                    socket.0
-                                );
+                            if let Some((_, mut sock)) =
+                                sockets.iter_mut().find(|(handle, _)| *handle == socket)
+                            {
+                                sock.closed_by_remote(ts);
                             }
                         }
                         Urc::SocketDataAvailable(
@@ -442,17 +430,10 @@ where
                                 socket.0,
                                 length as u16
                             );
-                            if let Ok(mut sockets) = sockets.try_borrow_mut() {
-                                if let Some((_, mut sock)) =
-                                    sockets.iter_mut().find(|(handle, _)| *handle == socket)
-                                {
-                                    sock.set_available_data(length);
-                                }
-                            } else {
-                                defmt::warn!(
-                                    "[Socket({=u8})] Failed to borrow socketset!",
-                                    socket.0
-                                );
+                            if let Some((_, mut sock)) =
+                                sockets.iter_mut().find(|(handle, _)| *handle == socket)
+                            {
+                                sock.set_available_data(length);
                             }
                         }
                         _ => return false,
@@ -497,14 +478,14 @@ where
             Ok(())
         } else {
             // Reset context state if data connection is lost (This will act as a safeguard if a URC is missed)
-            if self.network.context_state.get() == ContextState::Active {
-                self.network.context_state.set(ContextState::Activating);
+            if self.network.context_state == ContextState::Active {
+                self.network.context_state = ContextState::Activating;
             }
             Err(nb::Error::WouldBlock)
         }
     }
 
-    pub fn send_at<A, const LEN: usize>(&self, cmd: &A) -> Result<A::Response, Error>
+    pub fn send_at<A, const LEN: usize>(&mut self, cmd: &A) -> Result<A::Response, Error>
     where
         A: atat::AtatCmd<LEN>,
         A::Error: Into<UbloxError>,
@@ -560,18 +541,17 @@ mod tests {
         device.power_state = PowerState::On;
         // assert_eq!(device.spin(), Ok(()));
 
-        device.network.context_state.set(ContextState::Active);
+        device.network.context_state = ContextState::Active;
 
         let data_service = device.data_service(&APNInfo::default()).unwrap();
 
-        let mut sockets = data_service.sockets.borrow_mut();
-
-        sockets
+        self.sockets
             .add(TcpSocket::new(0))
             .expect("Failed to add new tcp socket!");
         assert_eq!(sockets.len(), 1);
 
-        let mut tcp = sockets
+        let mut tcp = self
+            .sockets
             .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
             .expect("Failed to get socket");
 
@@ -581,29 +561,28 @@ mod tests {
         assert_eq!(tcp.recv_queue(), socket_data.len());
         assert_eq!(tcp.rx_window(), SOCKET_SIZE - socket_data.len());
 
-        sockets
+        self.sockets
             .add(UdpSocket::new(1))
             .expect("Failed to add new udp socket!");
-        assert_eq!(sockets.len(), 2);
+        assert_eq!(self.sockets.len(), 2);
 
-        assert!(sockets.add(UdpSocket::new(0)).is_err());
+        assert!(self.sockets.add(UdpSocket::new(0)).is_err());
 
-        drop(sockets);
         drop(data_service);
 
         device.clear_buffers().expect("Failed to clear buffers");
 
         let data_service = device.data_service(&APNInfo::default()).unwrap();
 
-        let mut sockets = data_service.sockets.borrow_mut();
-        assert_eq!(sockets.len(), 0);
+        assert_eq!(self.sockets.len(), 0);
 
-        sockets
+        self.sockets
             .add(TcpSocket::new(0))
             .expect("Failed to add new tcp socket!");
-        assert_eq!(sockets.len(), 1);
+        assert_eq!(self.sockets.len(), 1);
 
-        let tcp = sockets
+        let tcp = self
+            .sockets
             .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
             .expect("Failed to get socket");
 

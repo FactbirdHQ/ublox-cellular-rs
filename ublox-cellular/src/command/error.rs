@@ -40,9 +40,9 @@ impl FromStr for CmsError {
     type Err = ();
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s.trim() {
+        match s.trim() {
             _ => return Err(()),
-        })
+        }
     }
 }
 

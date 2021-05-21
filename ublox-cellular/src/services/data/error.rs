@@ -3,7 +3,6 @@ use embedded_time::TimeError;
 use super::socket::Error as SocketError;
 use crate::error::GenericError;
 use crate::network::Error as NetworkError;
-use core::cell::{BorrowError, BorrowMutError};
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
@@ -37,18 +36,6 @@ impl From<NetworkError> for Error {
 impl From<SocketError> for Error {
     fn from(e: SocketError) -> Self {
         Error::Socket(e)
-    }
-}
-
-impl From<BorrowMutError> for Error {
-    fn from(e: BorrowMutError) -> Self {
-        Error::Generic(e.into())
-    }
-}
-
-impl From<BorrowError> for Error {
-    fn from(e: BorrowError) -> Self {
-        Error::Generic(e.into())
     }
 }
 
