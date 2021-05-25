@@ -545,12 +545,13 @@ mod tests {
 
         let data_service = device.data_service(&APNInfo::default()).unwrap();
 
-        self.sockets
+        data_service
+            .sockets
             .add(TcpSocket::new(0))
             .expect("Failed to add new tcp socket!");
-        assert_eq!(sockets.len(), 1);
+        assert_eq!(data_service.sockets.len(), 1);
 
-        let mut tcp = self
+        let mut tcp = data_service
             .sockets
             .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
             .expect("Failed to get socket");
@@ -561,12 +562,13 @@ mod tests {
         assert_eq!(tcp.recv_queue(), socket_data.len());
         assert_eq!(tcp.rx_window(), SOCKET_SIZE - socket_data.len());
 
-        self.sockets
+        data_service
+            .sockets
             .add(UdpSocket::new(1))
             .expect("Failed to add new udp socket!");
-        assert_eq!(self.sockets.len(), 2);
+        assert_eq!(data_service.sockets.len(), 2);
 
-        assert!(self.sockets.add(UdpSocket::new(0)).is_err());
+        assert!(data_service.sockets.add(UdpSocket::new(0)).is_err());
 
         drop(data_service);
 
@@ -574,14 +576,15 @@ mod tests {
 
         let data_service = device.data_service(&APNInfo::default()).unwrap();
 
-        assert_eq!(self.sockets.len(), 0);
+        assert_eq!(data_service.sockets.len(), 0);
 
-        self.sockets
+        data_service
+            .sockets
             .add(TcpSocket::new(0))
             .expect("Failed to add new tcp socket!");
-        assert_eq!(self.sockets.len(), 1);
+        assert_eq!(data_service.sockets.len(), 1);
 
-        let tcp = self
+        let tcp = data_service
             .sockets
             .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
             .expect("Failed to get socket");
