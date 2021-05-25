@@ -15,7 +15,7 @@ where
 {
     type Error = Error;
 
-    fn get_host_by_address(&self, ip_addr: IpAddr) -> nb::Result<String<256>, Self::Error> {
+    fn get_host_by_address(&mut self, ip_addr: IpAddr) -> nb::Result<String<256>, Self::Error> {
         let mut ip_str = String::<256>::new();
         write!(&mut ip_str, "{}", ip_addr).map_err(|_| Error::BadLength)?;
 
@@ -34,7 +34,7 @@ where
     }
 
     fn get_host_by_name(
-        &self,
+        &mut self,
         hostname: &str,
         addr_type: AddrType,
     ) -> nb::Result<IpAddr, Self::Error> {

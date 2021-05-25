@@ -44,7 +44,7 @@ where
     /// See if the cellular module is responding at the AT interface by poking
     /// it with "AT" up to `attempts` times, waiting 1 second for an "OK"
     /// response each time
-    pub(crate) fn is_alive(&self, attempts: u8) -> Result<(), Error> {
+    pub(crate) fn is_alive(&mut self, attempts: u8) -> Result<(), Error> {
         let mut error = Error::BaudDetection;
         for _ in 0..attempts {
             match self.network.at_tx.send_ignore_timeout(&AT) {
@@ -123,7 +123,6 @@ where
 
                 self.network
                     .status
-                    .try_borrow()?
                     .timer
                     .new_timer(50.milliseconds())
                     .start()?
@@ -132,7 +131,6 @@ where
                 rst.try_set_high().ok();
                 self.network
                     .status
-                    .try_borrow()?
                     .timer
                     .new_timer(1.seconds())
                     .start()?
@@ -166,7 +164,6 @@ where
                     pwr.try_set_low().ok();
                     self.network
                         .status
-                        .try_borrow()?
                         .timer
                         .new_timer(50.microseconds())
                         .start()?
@@ -174,7 +171,6 @@ where
                     pwr.try_set_high().ok();
                     self.network
                         .status
-                        .try_borrow()?
                         .timer
                         .new_timer(1.seconds())
                         .start()?
@@ -210,7 +206,6 @@ where
 
         self.network
             .status
-            .try_borrow()?
             .timer
             .new_timer(10.seconds())
             .start()?
@@ -229,7 +224,6 @@ where
                     pwr.try_set_low().ok();
                     self.network
                         .status
-                        .try_borrow()?
                         .timer
                         .new_timer(1.seconds())
                         .start()?
@@ -241,7 +235,6 @@ where
 
                     self.network
                         .status
-                        .try_borrow()?
                         .timer
                         .new_timer(10.seconds())
                         .start()?
@@ -283,7 +276,7 @@ where
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
-        let now = self.network.status.try_borrow()?.timer.try_now().unwrap();
+        let now = self.network.status.timer.try_now().unwrap();
 
         let mut res = false;
 
@@ -291,7 +284,6 @@ where
         while self
             .network
             .status
-            .try_borrow()?
             .timer
             .try_now()
             .ok()
@@ -307,7 +299,6 @@ where
 
             self.network
                 .status
-                .try_borrow()?
                 .timer
                 .new_timer(5.milliseconds())
                 .start()?

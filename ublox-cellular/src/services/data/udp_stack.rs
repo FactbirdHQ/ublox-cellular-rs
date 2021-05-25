@@ -30,13 +30,11 @@ where
     /// Open a new UDP socket to the given address and port. UDP is connectionless,
     /// so unlike `TcpStack` no `connect()` is required.
     fn socket(&mut self) -> Result<Self::UdpSocket, Self::Error> {
-        let mut sockets = self.sockets.try_borrow_mut()?;
-
-        if sockets.len() >= sockets.capacity() {
-            if let Ok(ts) = self.network.status.try_borrow_mut()?.timer.try_now() {
+        if self.sockets.len() >= self.sockets.capacity() {
+            if let Ok(ts) = self.network.status.timer.try_now() {
                 // Check if there are any sockets closed by remote, and close it
                 // if it has exceeded its timeout, in order to recycle it.
-                if sockets.recycle(&ts) {
+                if self.sockets.recycle(&ts) {
                     return Err(Error::Socket(SocketError::SocketSetFull));
                 }
             } else {
@@ -52,7 +50,7 @@ where
             false,
         )?;
 
-        Ok(sockets.add(UdpSocket::new(socket_resp.socket.0))?)
+        Ok(self.sockets.add(UdpSocket::new(socket_resp.socket.0))?)
     }
 
     fn connect(
@@ -60,9 +58,8 @@ where
         socket: &mut Self::UdpSocket,
         remote: SocketAddr,
     ) -> Result<(), Self::Error> {
-        let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
-
-        let mut udp = sockets
+        let mut udp = self
+            .sockets
             .get::<UdpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
         udp.bind(remote).map_err(Self::Error::from)?;
@@ -71,9 +68,8 @@ where
 
     /// Send a datagram to the remote host.
     fn send(&mut self, socket: &mut Self::UdpSocket, buffer: &[u8]) -> nb::Result<(), Self::Error> {
-        let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
-
-        let udp = sockets
+        let udp = self
+            .sockets
             .get::<UdpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
 
@@ -124,9 +120,8 @@ where
         socket: &mut Self::UdpSocket,
         buffer: &mut [u8],
     ) -> nb::Result<(usize, SocketAddr), Self::Error> {
-        let mut sockets = self.sockets.try_borrow_mut().map_err(Self::Error::from)?;
-
-        let mut udp = sockets
+        let mut udp = self
+            .sockets
             .get::<UdpSocket<CLK, L>>(*socket)
             .map_err(Self::Error::from)?;
 
@@ -140,7 +135,7 @@ where
     /// Close an existing UDP socket.
     fn close(&mut self, socket: Self::UdpSocket) -> Result<(), Self::Error> {
         self.network.send_internal(&CloseSocket { socket }, false)?;
-        self.sockets.try_borrow_mut()?.remove(socket)?;
+        self.sockets.remove(socket)?;
         Ok(())
     }
 }

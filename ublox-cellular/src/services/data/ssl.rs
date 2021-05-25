@@ -10,26 +10,29 @@ pub struct SecurityProfileId(pub u8);
 
 pub trait SSL {
     fn import_certificate(
-        &self,
+        &mut self,
         profile_id: SecurityProfileId,
         name: &str,
         certificate: &[u8],
     ) -> Result<(), Error>;
     fn import_root_ca(
-        &self,
+        &mut self,
         profile_id: SecurityProfileId,
         name: &str,
         root_ca: &[u8],
     ) -> Result<(), Error>;
     fn import_private_key(
-        &self,
+        &mut self,
         profile_id: SecurityProfileId,
         name: &str,
         private_key: &[u8],
         password: Option<&str>,
     ) -> Result<(), Error>;
-    fn enable_ssl(&self, profile_id: SecurityProfileId, server_hostname: &str)
-        -> Result<(), Error>;
+    fn enable_ssl(
+        &mut self,
+        profile_id: SecurityProfileId,
+        server_hostname: &str,
+    ) -> Result<(), Error>;
 }
 
 impl<'a, C, CLK, const N: usize, const L: usize> SSL for DataService<'a, C, CLK, N, L>
@@ -38,7 +41,7 @@ where
     CLK: Clock,
 {
     fn import_certificate(
-        &self,
+        &mut self,
         profile_id: SecurityProfileId,
         name: &str,
         certificate: &[u8],
@@ -76,7 +79,7 @@ where
     }
 
     fn import_root_ca(
-        &self,
+        &mut self,
         profile_id: SecurityProfileId,
         name: &str,
         root_ca: &[u8],
@@ -116,7 +119,7 @@ where
     }
 
     fn import_private_key(
-        &self,
+        &mut self,
         profile_id: SecurityProfileId,
         name: &str,
         private_key: &[u8],
@@ -155,7 +158,7 @@ where
     }
 
     fn enable_ssl(
-        &self,
+        &mut self,
         profile_id: SecurityProfileId,
         server_hostname: &str,
     ) -> Result<(), Error> {
