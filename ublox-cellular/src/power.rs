@@ -22,11 +22,8 @@ use crate::{
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
 pub enum PowerState {
-    Unknown,
     Off,
     On,
-    TransientOff,
-    TransientOn,
 }
 
 impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
