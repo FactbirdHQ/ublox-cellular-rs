@@ -91,7 +91,11 @@ where
             tcp.set_state(TcpState::Connected);
             Ok(())
         } else {
-            defmt::error!("Cannot connect socket!");
+            defmt::error!(
+                "Cannot connect socket! Socket: {} is in state: {}",
+                socket,
+                tcp.state()
+            );
             Err(Error::Socket(SocketError::Illegal).into())
         }
     }
@@ -131,7 +135,7 @@ where
                 .network
                 .send_internal(
                     &WriteSocketDataBinary {
-                        data: atat::serde_at::ser::Bytes(chunk),
+                        data: serde_bytes::Bytes::new(chunk),
                     },
                     false,
                 )

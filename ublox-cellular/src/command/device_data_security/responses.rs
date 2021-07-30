@@ -22,7 +22,7 @@ pub struct SecurityDataImport {
     internal_name: String<200>,
     /// MD5 formatted string.
     #[at_arg(position = 3)]
-    md5_string: String<128>,
+    md5_string: String<32>,
 }
 
 #[derive(Clone, PartialEq, AtatResp)]

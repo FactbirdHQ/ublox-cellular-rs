@@ -60,7 +60,7 @@ where
 
         self.network.send_internal(
             &SendSecurityDataImport {
-                data: atat::serde_at::ser::Bytes(certificate),
+                data: serde_bytes::Bytes::new(certificate),
             },
             true,
         )?;
@@ -98,7 +98,7 @@ where
 
         self.network.send_internal(
             &SendSecurityDataImport {
-                data: atat::serde_at::ser::Bytes(root_ca),
+                data: serde_bytes::Bytes::new(root_ca),
             },
             true,
         )?;
@@ -139,7 +139,7 @@ where
 
         self.network.send_internal(
             &SendSecurityDataImport {
-                data: atat::serde_at::ser::Bytes(private_key),
+                data: serde_bytes::Bytes::new(private_key),
             },
             true,
         )?;

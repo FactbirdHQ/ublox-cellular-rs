@@ -95,8 +95,7 @@ where
             sockets: None,
         };
 
-        let power_state = device.power_state().unwrap_or(PowerState::Off);
-        device.power_state = power_state;
+        device.power_state = device.power_state().unwrap_or(PowerState::Off);
         device
     }
 
@@ -396,7 +395,7 @@ where
         Ok(())
     }
 
-    fn handle_urc(&mut self) -> Result<(), Error>
+    fn handle_urc_internal(&mut self) -> Result<(), Error>
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
@@ -454,7 +453,7 @@ where
             return Err(Error::Uninitialized);
         }
 
-        self.handle_urc()?;
+        self.handle_urc_internal()?;
 
         match self.network.process_events() {
             // Catch "Resetting the modem due to the network registration timeout"
@@ -498,6 +497,10 @@ where
         }
 
         Ok(self.network.send_internal(cmd, true)?)
+    }
+
+    pub fn handle_urc<F: FnOnce(Urc) -> bool>(&mut self, f: F) -> Result<(), Error> {
+        self.network.at_tx.handle_urc(f).map_err(Error::Network)
     }
 }
 

@@ -169,7 +169,7 @@ pub struct WriteSocketDataBinary<'a> {
     // FIXME:
     // #[at_arg(position = 0, len = EgressChunkSize::to_usize())]
     #[at_arg(position = 0, len = 1024)]
-    pub data: atat::serde_at::ser::Bytes<'a>,
+    pub data: &'a serde_bytes::Bytes,
 }
 
 ///25.11 SendTo command (UDP only) +USOST
@@ -203,7 +203,7 @@ pub struct PrepareUDPSendToDataBinary {
 )]
 pub struct UDPSendToDataBinary<'a> {
     #[at_arg(position = 0, len = 512)]
-    pub data: atat::serde_at::ser::Bytes<'a>,
+    pub data: &'a serde_bytes::Bytes,
 }
 
 /// 25.12 Read Socket Data +USORD

@@ -9,6 +9,8 @@ mod power;
 mod registration;
 mod services;
 
+pub use serde_bytes;
+
 #[cfg(test)]
 mod test_helpers;
 
@@ -17,6 +19,7 @@ pub use config::{Config, NoPin};
 pub use network::{ContextId, ProfileId};
 pub use services::data::apn::{APNInfo, Apn};
 pub use services::data::ssl::SecurityProfileId;
+pub use services::data::DataService;
 
 // Re-export atat version in use
 pub use atat;

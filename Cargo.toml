@@ -6,3 +6,7 @@ members = [
     # "examples/linux_mqtt",
     # "examples/linux_jobs",
 ]
+
+[patch.crates-io]
+atat = { path = "../atat/atat" }
+# serde_at = { path = "../atat/serde_at" }

@@ -162,8 +162,8 @@ impl<C: AtatClient> AtTx<C> {
                 if a < max {
                     a += 1;
                     return false;
-                } else {
-                    defmt::warn!("Dropping stale URC! {}", defmt::Debug2Format(&urc));
+                    // } else {
+                    // defmt::warn!("Dropping stale URC! {}", defmt::Debug2Format(&urc));
                 }
             }
             a = 0;
@@ -521,7 +521,7 @@ where
     {
         if check_urc {
             if let Err(e) = self.handle_urc() {
-                defmt::error!("Failed handle URC  {}", defmt::Debug2Format(&e));
+                // defmt::error!("Failed handle URC  {}", defmt::Debug2Format(&e));
             }
         }
 

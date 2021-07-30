@@ -16,6 +16,16 @@ pub enum State<CLK: Clock> {
     ShutdownForWrite(Instant<CLK>),
 }
 
+impl<CLK: Clock> defmt::Format for State<CLK> {
+    fn format(&self, fmt: defmt::Formatter) {
+        match self {
+            State::Created => defmt::write!(fmt, "State::Created"),
+            State::Connected => defmt::write!(fmt, "State::Connected"),
+            State::ShutdownForWrite(_) => defmt::write!(fmt, "State::ShutdownForWrite"),
+        }
+    }
+}
+
 impl<CLK: Clock> Default for State<CLK> {
     fn default() -> Self {
         State::Created
@@ -70,6 +80,12 @@ impl<CLK: Clock, const L: usize> TcpSocket<CLK, L> {
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
+        // Cannot request available data on a socket that is closed by the
+        // module
+        if !self.is_connected() {
+            return false;
+        }
+
         let should_update = self
             .last_check_time
             .as_ref()
@@ -107,7 +123,8 @@ impl<CLK: Clock, const L: usize> TcpSocket<CLK, L> {
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
-        self.set_state(State::ShutdownForWrite(ts))
+        self.set_state(State::ShutdownForWrite(ts));
+        self.set_available_data(0);
     }
 
     /// Set available data.

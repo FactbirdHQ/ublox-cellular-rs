@@ -7,8 +7,10 @@ pub mod control;
 pub mod device_data_security;
 pub mod device_lock;
 pub mod dns;
+pub mod file_system;
 pub mod general;
 pub mod gpio;
+pub mod http;
 pub mod ip_transport_layer;
 pub mod mobile_control;
 pub mod network_service;
@@ -61,6 +63,9 @@ pub enum Urc {
     EPSNetworkRegistration(psn::urc::EPSNetworkRegistration),
     #[at_urc("+UREG")]
     ExtendedPSNetworkRegistration(psn::urc::ExtendedPSNetworkRegistration),
+
+    #[at_urc("+UUHTTPCR")]
+    HttpResponse(http::urc::HttpResponse),
 }
 
 impl atat::AtatLen for crate::services::data::socket::SocketHandle {
