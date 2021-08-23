@@ -521,7 +521,7 @@ where
     {
         if check_urc {
             if let Err(e) = self.handle_urc() {
-                // defmt::error!("Failed handle URC  {}", defmt::Debug2Format(&e));
+                defmt::error!("Failed handle URC  {}", defmt::Debug2Format(&e));
             }
         }
 

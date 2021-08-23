@@ -7,6 +7,6 @@ members = [
     # "examples/linux_jobs",
 ]
 
-[patch.crates-io]
-atat = { path = "../atat/atat" }
+# [patch.crates-io]
+# atat = { path = "../atat/atat" }
 # serde_at = { path = "../atat/serde_at" }

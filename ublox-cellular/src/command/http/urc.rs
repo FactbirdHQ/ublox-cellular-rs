@@ -1,6 +1,5 @@
 //! Unsolicited responses for HTTP Commands
 use atat::atat_derive::AtatResp;
-use heapless::String;
 
 /// 7.14 Network registration status +CREG
 #[derive(Debug, Clone, AtatResp)]

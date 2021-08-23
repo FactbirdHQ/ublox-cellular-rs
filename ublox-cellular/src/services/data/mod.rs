@@ -613,7 +613,7 @@ where
                 Ok(())
             })
             .filter_map(Result::err)
-            .for_each(|e| {
+            .for_each(|_e| {
                 // defmt::error!(
                 //     "Failed to ingress data for socket! {:?}",
                 //     defmt::Debug2Format(&e)
