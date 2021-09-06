@@ -146,8 +146,7 @@ mod test {
             value_sep: false,
             ..atat::serde_at::SerializeOptions::default()
         };
-        let s =
-            to_string::<_, 32, 32>(&PinStatusCode::PhNetSubPin, String::from(""), options).unwrap();
+        let s = to_string::<_, 32>(&PinStatusCode::PhNetSubPin, "", options).unwrap();
 
         assert_eq!(s, String::<32>::from("PH-NETSUB PIN"))
     }

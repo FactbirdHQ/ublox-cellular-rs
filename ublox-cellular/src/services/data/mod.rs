@@ -20,7 +20,6 @@ use crate::{
     command::psn::types::PacketSwitchedParam,
     command::psn::SetPDPContextDefinition,
     command::psn::SetPDPContextState,
-    command::psn::SetPacketSwitchedAction,
     command::psn::SetPacketSwitchedConfig,
     command::{
         error::UbloxError,
@@ -35,6 +34,7 @@ use crate::{
             GetPDPContextState, GetPacketSwitchedConfig, GetPacketSwitchedNetworkData,
         },
     },
+    command::{psn::SetPacketSwitchedAction, Urc},
     error::Error as DeviceError,
     network::{ContextId, Network},
     ProfileId,
@@ -493,6 +493,10 @@ where
         Ok(self.network.send_internal(cmd, true)?)
     }
 
+    pub fn handle_urc<F: FnOnce(Urc) -> bool>(&mut self, f: F) -> Result<(), Error> {
+        self.network.at_tx.handle_urc(f).map_err(Error::Network)
+    }
+
     pub(crate) fn socket_ingress_all(&mut self) -> Result<(), Error>
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
@@ -609,11 +613,11 @@ where
                 Ok(())
             })
             .filter_map(Result::err)
-            .for_each(|e| {
-                defmt::error!(
-                    "Failed to ingress data for socket! {:?}",
-                    defmt::Debug2Format(&e)
-                )
+            .for_each(|_e| {
+                // defmt::error!(
+                //     "Failed to ingress data for socket! {:?}",
+                //     defmt::Debug2Format(&e)
+                // )
             });
         Ok(())
     }

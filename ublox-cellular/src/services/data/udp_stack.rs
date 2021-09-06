@@ -95,7 +95,7 @@ where
                 .network
                 .send_internal(
                     &UDPSendToDataBinary {
-                        data: atat::serde_at::ser::Bytes(chunk),
+                        data: serde_bytes::Bytes::new(chunk),
                     },
                     false,
                 )
