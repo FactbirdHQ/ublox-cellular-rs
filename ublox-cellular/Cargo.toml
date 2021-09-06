@@ -15,11 +15,7 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-# atat = { version = "0.11.0", features = ["derive", "defmt"] }
-atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "6b353de", features = [
-    "derive",
-    "defmt",
-] }
+atat = { version = "0.12.0", features = ["derive", "defmt"] }
 defmt = { version = "^0.2" }
 embedded-hal = "1.0.0-alpha.4"
 embedded-nal = "0.6.0"
