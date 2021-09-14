@@ -1,6 +1,6 @@
 [package]
 name = "ublox-cellular-rs"
-version = "0.3.1-alpha.0"
+version = "0.3.0"
 authors = ["Mathias Koch <mk@blackbird.online>"]
 description = "Driver crate for u-blox cellular devices, implementation follows 'UBX-13002752 - R65'"
 readme = "../README.md"
@@ -15,7 +15,7 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.12.0", features = ["derive", "defmt"] }
+atat = { version = "0.13.0", features = ["derive", "defmt"] }
 defmt = { version = "^0.2" }
 embedded-hal = "1.0.0-alpha.4"
 embedded-nal = "0.6.0"
