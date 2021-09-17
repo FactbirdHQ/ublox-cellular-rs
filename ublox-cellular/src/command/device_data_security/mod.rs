@@ -116,7 +116,7 @@ pub struct PrepareSecurityDataImport<'a> {
 )]
 pub struct SendSecurityDataImport<'a> {
     #[at_arg(position = 0, len = 2048)]
-    pub data: &'a serde_bytes::Bytes,
+    pub data: &'a atat::serde_bytes::Bytes,
 }
 
 #[derive(Clone, AtatCmd)]

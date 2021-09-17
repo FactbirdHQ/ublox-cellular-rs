@@ -1,6 +1,6 @@
 //! Unsolicited responses for Internet protocol transport layer Commands
-use crate::services::data::socket::SocketHandle;
 use atat::atat_derive::AtatResp;
+use ublox_sockets::SocketHandle;
 
 /// +UUSORD/+UUSORF
 #[derive(Debug, Clone, AtatResp, defmt::Format)]

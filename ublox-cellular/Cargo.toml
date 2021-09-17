@@ -15,7 +15,7 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.13.0", features = ["derive", "defmt"] }
+atat = { version = "0.13.1", features = ["derive", "defmt", "bytes"] }
 defmt = { version = "^0.2" }
 embedded-hal = "1.0.0-alpha.4"
 embedded-nal = "0.6.0"
@@ -25,8 +25,7 @@ hash32-derive = "^0.1.0"
 heapless = { version = "^0.7", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
-serde_bytes = { version = "^0.11", default-features = false }
-heapless-bytes = { version = "0.3.0" }
+ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets" }
 
 # Enable `serde` feature of `no-std-net`
 no-std-net = { version = "^0.5", features = ["serde"] }
@@ -48,8 +47,8 @@ topy-l4 = []
 
 upsd-context-activation = []
 
-socket-tcp = []
-socket-udp = []
+socket-tcp = ["ublox-sockets/socket-tcp"]
+socket-udp = ["ublox-sockets/socket-udp"]
 
 defmt-default = []
 defmt-trace = []

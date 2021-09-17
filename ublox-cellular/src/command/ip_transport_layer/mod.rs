@@ -11,7 +11,7 @@ use responses::*;
 use types::*;
 
 use super::NoResponse;
-use crate::services::data::socket::SocketHandle;
+use ublox_sockets::SocketHandle;
 
 /// 25.3 Create Socket +USOCR
 ///
@@ -169,7 +169,7 @@ pub struct WriteSocketDataBinary<'a> {
     // FIXME:
     // #[at_arg(position = 0, len = EgressChunkSize::to_usize())]
     #[at_arg(position = 0, len = 1024)]
-    pub data: &'a serde_bytes::Bytes,
+    pub data: &'a atat::serde_bytes::Bytes,
 }
 
 ///25.11 SendTo command (UDP only) +USOST
@@ -203,7 +203,7 @@ pub struct PrepareUDPSendToDataBinary {
 )]
 pub struct UDPSendToDataBinary<'a> {
     #[at_arg(position = 0, len = 512)]
-    pub data: &'a serde_bytes::Bytes,
+    pub data: &'a atat::serde_bytes::Bytes,
 }
 
 /// 25.12 Read Socket Data +USORD

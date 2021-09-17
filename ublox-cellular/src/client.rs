@@ -2,6 +2,7 @@ use atat::AtatClient;
 use core::convert::TryInto;
 use embedded_hal::digital::{InputPin, OutputPin};
 use embedded_time::{duration::*, Clock};
+use ublox_sockets::SocketSet;
 
 use crate::{
     command::device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
@@ -24,7 +25,7 @@ use crate::{
     network::{AtTx, Network},
     power::PowerState,
     registration::ConnectionState,
-    services::data::{socket::SocketSet, ContextState},
+    services::data::ContextState,
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
 use network_service::{types::NetworkRegistrationUrcConfig, SetNetworkRegistrationStatus};
@@ -138,7 +139,12 @@ where
     }
 
     pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<CLK, N, L>) {
-        self.sockets = Some(socket_set);
+        socket_set.prune();
+        self.sockets.replace(socket_set);
+    }
+
+    pub fn take_socket_storage(&mut self) -> Option<&'static mut SocketSet<CLK, N, L>> {
+        self.sockets.take()
     }
 
     pub fn initialize(&mut self) -> Result<(), Error>
@@ -168,7 +174,7 @@ where
 
     pub(crate) fn clear_buffers(&mut self) -> Result<(), Error> {
         self.network.at_tx.reset()?;
-        if let Some(sockets) = self.sockets.as_deref_mut() {
+        if let Some(ref mut sockets) = self.sockets.as_deref_mut() {
             sockets.prune();
         }
 
@@ -399,7 +405,7 @@ where
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
-        if let Some(sockets) = self.sockets.as_deref_mut() {
+        if let Some(ref mut sockets) = self.sockets.as_deref_mut() {
             let ts = self
                 .network
                 .status
@@ -506,14 +512,11 @@ where
 
 #[cfg(test)]
 mod tests {
+    use ublox_sockets::{SocketHandle, TcpSocket, UdpSocket};
+
     use super::*;
     use crate::test_helpers::{MockAtClient, MockTimer};
-    use crate::{
-        config::Config,
-        services::data::ContextState,
-        sockets::{SocketHandle, TcpSocket, UdpSocket},
-        APNInfo,
-    };
+    use crate::{config::Config, services::data::ContextState, APNInfo};
 
     const SOCKET_SIZE: usize = 128;
     const SOCKET_SET_LEN: usize = 2;
@@ -546,52 +549,53 @@ mod tests {
 
         device.network.context_state = ContextState::Active;
 
-        let data_service = device.data_service(&APNInfo::default()).unwrap();
+        let mut data_service = device.data_service(&APNInfo::default()).unwrap();
 
-        data_service
-            .sockets
-            .add(TcpSocket::new(0))
-            .expect("Failed to add new tcp socket!");
-        assert_eq!(data_service.sockets.len(), 1);
+        if let Some(ref mut sockets) = data_service.sockets {
+            sockets
+                .add(TcpSocket::new(0))
+                .expect("Failed to add new tcp socket!");
+            assert_eq!(sockets.len(), 1);
 
-        let mut tcp = data_service
-            .sockets
-            .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
-            .expect("Failed to get socket");
+            let mut tcp = sockets
+                .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
+                .expect("Failed to get socket");
 
-        assert_eq!(tcp.rx_window(), SOCKET_SIZE);
-        let socket_data = b"This is socket data!!";
-        tcp.rx_enqueue_slice(socket_data);
-        assert_eq!(tcp.recv_queue(), socket_data.len());
-        assert_eq!(tcp.rx_window(), SOCKET_SIZE - socket_data.len());
+            assert_eq!(tcp.rx_window(), SOCKET_SIZE);
+            let socket_data = b"This is socket data!!";
+            tcp.rx_enqueue_slice(socket_data);
+            assert_eq!(tcp.recv_queue(), socket_data.len());
+            assert_eq!(tcp.rx_window(), SOCKET_SIZE - socket_data.len());
 
-        data_service
-            .sockets
-            .add(UdpSocket::new(1))
-            .expect("Failed to add new udp socket!");
-        assert_eq!(data_service.sockets.len(), 2);
+            sockets
+                .add(UdpSocket::new(1))
+                .expect("Failed to add new udp socket!");
+            assert_eq!(sockets.len(), 2);
 
-        assert!(data_service.sockets.add(UdpSocket::new(0)).is_err());
+            assert!(sockets.add(UdpSocket::new(0)).is_err());
+        } else {
+            panic!()
+        }
 
         drop(data_service);
 
         device.clear_buffers().expect("Failed to clear buffers");
 
-        let data_service = device.data_service(&APNInfo::default()).unwrap();
+        let mut data_service = device.data_service(&APNInfo::default()).unwrap();
+        if let Some(ref mut sockets) = data_service.sockets {
+            assert_eq!(sockets.len(), 0);
 
-        assert_eq!(data_service.sockets.len(), 0);
+            sockets
+                .add(TcpSocket::new(0))
+                .expect("Failed to add new tcp socket!");
+            assert_eq!(sockets.len(), 1);
 
-        data_service
-            .sockets
-            .add(TcpSocket::new(0))
-            .expect("Failed to add new tcp socket!");
-        assert_eq!(data_service.sockets.len(), 1);
-
-        let tcp = data_service
-            .sockets
-            .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
-            .expect("Failed to get socket");
-
-        assert_eq!(tcp.recv_queue(), 0);
+            let tcp = sockets
+                .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
+                .expect("Failed to get socket");
+            assert_eq!(tcp.recv_queue(), 0);
+        } else {
+            panic!()
+        }
     }
 }

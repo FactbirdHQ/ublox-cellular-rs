@@ -1,7 +1,7 @@
 //! Responses for File system Commands
 use atat::atat_derive::AtatResp;
+use atat::heapless_bytes::Bytes;
 use heapless::String;
-use heapless_bytes::Bytes;
 
 /// 22.4 Read file +URDFILE
 #[derive(Debug, PartialEq, AtatResp)]

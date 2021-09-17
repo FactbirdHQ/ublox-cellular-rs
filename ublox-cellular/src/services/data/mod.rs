@@ -1,7 +1,6 @@
 pub mod apn;
 pub mod dns;
 pub mod error;
-pub mod socket;
 pub mod ssl;
 
 #[cfg(feature = "socket-tcp")]
@@ -54,7 +53,7 @@ use psn::{
     },
     GetGPRSAttached, SetAuthParameters,
 };
-use socket::{Error as SocketError, SocketSet, SocketType};
+use ublox_sockets::{Error as SocketError, SocketSet, SocketType};
 
 #[cfg(feature = "upsd-context-activation")]
 use embedded_nal::Ipv4Addr;
@@ -155,16 +154,10 @@ where
 
         // At this point we WILL be registered on the network!
 
-        if let Some(sockets) = self.sockets.as_deref_mut() {
-            match DataService::try_new(apn_info, &mut self.network, sockets) {
-                Ok(service) => Ok(service),
-                Err(nb::Error::Other(e)) => Err(nb::Error::Other(e.into())),
-                Err(nb::Error::WouldBlock) => Err(nb::Error::WouldBlock),
-            }
-        } else {
-            Err(nb::Error::Other(DeviceError::DataService(
-                Error::SocketMemory,
-            )))
+        match DataService::try_new(apn_info, &mut self.network, self.sockets.as_deref_mut()) {
+            Ok(service) => Ok(service),
+            Err(nb::Error::Other(e)) => Err(nb::Error::Other(e.into())),
+            Err(nb::Error::WouldBlock) => Err(nb::Error::WouldBlock),
         }
     }
 }
@@ -182,7 +175,7 @@ where
     CLK: 'static + Clock,
 {
     network: &'a mut Network<C, CLK>,
-    pub(crate) sockets: &'a mut SocketSet<CLK, N, L>,
+    pub(crate) sockets: Option<&'a mut SocketSet<CLK, N, L>>,
 }
 
 impl<'a, C, CLK, const N: usize, const L: usize> DataService<'a, C, CLK, N, L>
@@ -193,7 +186,7 @@ where
     pub fn try_new(
         apn_info: &APNInfo,
         network: &'a mut Network<C, CLK>,
-        sockets: &'a mut SocketSet<CLK, N, L>,
+        sockets: Option<&'a mut SocketSet<CLK, N, L>>,
     ) -> nb::Result<Self, Error>
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
@@ -207,7 +200,9 @@ where
 
         // Attempt to ingress data from every open socket, into it's
         // internal rx buffer
-        data_service.socket_ingress_all()?;
+        if data_service.sockets.is_some() {
+            data_service.socket_ingress_all()?;
+        }
 
         Ok(data_service)
     }
@@ -497,128 +492,138 @@ where
         self.network.at_tx.handle_urc(f).map_err(Error::Network)
     }
 
-    pub(crate) fn socket_ingress_all(&mut self) -> Result<(), Error>
+    fn socket_ingress_all(&mut self) -> Result<(), Error>
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
-        let network = &mut self.network;
-        self.sockets
-            .iter_mut()
-            .map(|(handle, mut socket)| {
-                let available_data = socket.available_data();
+        if let Some(ref mut sockets) = self.sockets {
+            let network = &mut self.network;
+            sockets
+                .iter_mut()
+                .map(|(handle, mut socket)| {
+                    let available_data = socket.available_data();
 
-                if available_data == 0 {
-                    // Check for new socket data available at regular intervals, just in case a URC is missed
-                    if socket.should_update_available_data(
-                        network.status.timer.try_now().map_err(TimeError::from)?,
-                    ) {
-                        if let Ok(SocketData { length, .. }) = network.send_internal(
-                            &ReadSocketData {
-                                socket: handle,
-                                length: 0,
-                            },
-                            false,
+                    if available_data == 0 {
+                        // Check for new socket data available at regular intervals, just in case a URC is missed
+                        if socket.should_update_available_data(
+                            network.status.timer.try_now().map_err(TimeError::from)?,
                         ) {
-                            socket.set_available_data(length);
+                            if let Ok(SocketData { length, .. }) = network.send_internal(
+                                &ReadSocketData {
+                                    socket: handle,
+                                    length: 0,
+                                },
+                                false,
+                            ) {
+                                socket.set_available_data(length);
+                            }
                         }
+
+                        return Ok(());
                     }
 
-                    return Ok(());
-                }
-
-                if !socket.can_recv() {
-                    return Err(Error::BufferFull);
-                }
-
-                // Request [`IngressChunkSize`] if it is available, otherwise request
-                // maximum available data
-                let wanted_len = core::cmp::min(available_data, INGRESS_CHUNK_SIZE);
-                // Check if socket.buffer has room for wanted_len, and ingress the smallest of the two
-                let requested_len = core::cmp::min(wanted_len, socket.rx_window());
-
-                let (socket_handle, mut data, len) = match socket.get_type() {
-                    SocketType::Tcp => {
-                        // Allow room for 2x length (Hex), and command overhead
-                        let SocketData {
-                            socket,
-                            data,
-                            length,
-                        } = network.send_internal(
-                            &ReadSocketData {
-                                socket: handle,
-                                length: requested_len,
-                            },
-                            false,
-                        )?;
-
-                        (socket, data, length)
-                    }
-                    SocketType::Udp => {
-                        // Allow room for 2x length (Hex), and command overhead
-                        let UDPSocketData {
-                            socket,
-                            data,
-                            length,
-                            ..
-                        } = network.send_internal(
-                            &ReadUDPSocketData {
-                                socket: handle,
-                                length: requested_len,
-                            },
-                            false,
-                        )?;
-
-                        (socket, data, length)
-                    }
-                };
-
-                if socket_handle != handle {
-                    defmt::error!("WrongSocketType {} != {}", socket_handle, handle);
-                    return Err(Error::WrongSocketType);
-                }
-
-                if len == 0 {
-                    socket.set_available_data(0);
-                }
-
-                if let Some(ref mut data) = data {
-                    let hex_mode = true;
-                    // let hex_mode = self.config.hex_mode;
-                    let data_len = if hex_mode { data.len() / 2 } else { data.len() };
-                    if len > 0 && data_len != len {
-                        defmt::error!("BadLength {} != {}, {=str}", len, data_len, data.as_str());
-                        return Err(Error::BadLength);
+                    if !socket.can_recv() {
+                        return Err(Error::BufferFull);
                     }
 
-                    let demangled = if hex_mode {
-                        hex::from_hex(unsafe { data.as_bytes_mut() })
-                            .map_err(|_| Error::InvalidHex)?
-                    } else {
-                        data.as_bytes()
+                    // Request [`IngressChunkSize`] if it is available, otherwise request
+                    // maximum available data
+                    let wanted_len = core::cmp::min(available_data, INGRESS_CHUNK_SIZE);
+                    // Check if socket.buffer has room for wanted_len, and ingress the smallest of the two
+                    let requested_len = core::cmp::min(wanted_len, socket.rx_window());
+
+                    let (socket_handle, mut data, len) = match socket.get_type() {
+                        SocketType::Tcp => {
+                            // Allow room for 2x length (Hex), and command overhead
+                            let SocketData {
+                                socket,
+                                data,
+                                length,
+                            } = network.send_internal(
+                                &ReadSocketData {
+                                    socket: handle,
+                                    length: requested_len,
+                                },
+                                false,
+                            )?;
+
+                            (socket, data, length)
+                        }
+                        SocketType::Udp => {
+                            // Allow room for 2x length (Hex), and command overhead
+                            let UDPSocketData {
+                                socket,
+                                data,
+                                length,
+                                ..
+                            } = network.send_internal(
+                                &ReadUDPSocketData {
+                                    socket: handle,
+                                    length: requested_len,
+                                },
+                                false,
+                            )?;
+
+                            (socket, data, length)
+                        }
+                        _ => return Err(Error::WrongSocketType),
                     };
 
-                    let enqueued = socket.rx_enqueue_slice(demangled);
-                    if enqueued != demangled.len() {
-                        // This should never happen, due to the `requested_len` check above
-                        defmt::error!(
-                            "Failed to enqueue full slice of data! {} != {}",
-                            enqueued,
-                            demangled.len()
-                        );
+                    if socket_handle != handle {
+                        defmt::error!("WrongSocketType {} != {}", socket_handle, handle);
+                        return Err(Error::WrongSocketType);
                     }
-                } else {
-                    return Err(Error::Socket(SocketError::Exhausted));
-                }
 
-                Ok(())
-            })
-            .filter_map(Result::err)
-            .for_each(|_e| {
-                // defmt::error!(
-                //     "Failed to ingress data for socket! {:?}",
-                //     defmt::Debug2Format(&e)
-                // )
-            });
-        Ok(())
+                    if len == 0 {
+                        socket.set_available_data(0);
+                    }
+
+                    if let Some(ref mut data) = data {
+                        let hex_mode = true;
+                        // let hex_mode = self.config.hex_mode;
+                        let data_len = if hex_mode { data.len() / 2 } else { data.len() };
+                        if len > 0 && data_len != len {
+                            defmt::error!(
+                                "BadLength {} != {}, {=str}",
+                                len,
+                                data_len,
+                                data.as_str()
+                            );
+                            return Err(Error::BadLength);
+                        }
+
+                        let demangled = if hex_mode {
+                            hex::from_hex(unsafe { data.as_bytes_mut() })
+                                .map_err(|_| Error::InvalidHex)?
+                        } else {
+                            data.as_bytes()
+                        };
+
+                        let enqueued = socket.rx_enqueue_slice(demangled);
+                        if enqueued != demangled.len() {
+                            // This should never happen, due to the `requested_len` check above
+                            defmt::error!(
+                                "Failed to enqueue full slice of data! {} != {}",
+                                enqueued,
+                                demangled.len()
+                            );
+                        }
+                    } else {
+                        return Err(Error::Socket(SocketError::Exhausted));
+                    }
+
+                    Ok(())
+                })
+                .filter_map(Result::err)
+                .for_each(|_e| {
+                    // defmt::error!(
+                    //     "Failed to ingress data for socket! {:?}",
+                    //     defmt::Debug2Format(&e)
+                    // )
+                });
+            Ok(())
+        } else {
+            return Err(Error::SocketMemory);
+        }
     }
 }

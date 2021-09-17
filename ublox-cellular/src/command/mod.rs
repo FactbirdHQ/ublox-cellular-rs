@@ -67,7 +67,3 @@ pub enum Urc {
     #[at_urc("+UUHTTPCR")]
     HttpResponse(http::urc::HttpResponse),
 }
-
-impl atat::AtatLen for crate::services::data::socket::SocketHandle {
-    const LEN: usize = 1;
-}
