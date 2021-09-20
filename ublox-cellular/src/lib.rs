@@ -9,7 +9,7 @@ mod power;
 mod registration;
 mod services;
 
-pub use serde_bytes;
+pub use atat::serde_bytes;
 
 #[cfg(test)]
 mod test_helpers;
@@ -23,11 +23,6 @@ pub use services::data::DataService;
 
 // Re-export atat version in use
 pub use atat;
-
-#[cfg(any(feature = "socket-udp", feature = "socket-tcp"))]
-pub mod sockets {
-    pub use super::services::data::socket::*;
-}
 
 /// Prelude - Include traits
 pub mod prelude {

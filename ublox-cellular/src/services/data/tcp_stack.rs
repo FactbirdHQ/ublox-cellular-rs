@@ -2,10 +2,7 @@ use core::convert::TryInto;
 
 use super::ssl::SecurityProfileId;
 use super::DataService;
-use super::{
-    socket::{Error as SocketError, SocketHandle, TcpSocket, TcpState},
-    Error, EGRESS_CHUNK_SIZE,
-};
+use super::{Error, EGRESS_CHUNK_SIZE};
 use crate::command::ip_transport_layer::{
     types::{SocketProtocol, SslTlsStatus},
     CloseSocket, ConnectSocket, CreateSocket, PrepareWriteSocketDataBinary, SetSocketSslState,
@@ -16,6 +13,7 @@ use embedded_time::{
     duration::{Generic, Milliseconds},
     Clock,
 };
+use ublox_sockets::{Error as SocketError, SocketHandle, TcpSocket, TcpState};
 
 impl<'a, C, CLK, const N: usize, const L: usize> TcpClientStack for DataService<'a, C, CLK, N, L>
 where
@@ -31,28 +29,32 @@ where
 
     /// Open a new TCP socket to the given address and port. The socket starts in the unconnected state.
     fn socket(&mut self) -> Result<Self::TcpSocket, Self::Error> {
-        // Check if there are any unused sockets available
-        if self.sockets.len() >= self.sockets.capacity() {
-            if let Ok(ts) = self.network.status.timer.try_now() {
-                // Check if there are any sockets closed by remote, and close it
-                // if it has exceeded its timeout, in order to recycle it.
-                if !self.sockets.recycle(&ts) {
+        if let Some(ref mut sockets) = self.sockets {
+            // Check if there are any unused sockets available
+            if sockets.len() >= sockets.capacity() {
+                if let Ok(ts) = self.network.status.timer.try_now() {
+                    // Check if there are any sockets closed by remote, and close it
+                    // if it has exceeded its timeout, in order to recycle it.
+                    if !sockets.recycle(&ts) {
+                        return Err(Error::Socket(SocketError::SocketSetFull));
+                    }
+                } else {
                     return Err(Error::Socket(SocketError::SocketSetFull));
                 }
-            } else {
-                return Err(Error::Socket(SocketError::SocketSetFull));
             }
+
+            let socket_resp = self.network.send_internal(
+                &CreateSocket {
+                    protocol: SocketProtocol::TCP,
+                    local_port: None,
+                },
+                true,
+            )?;
+
+            Ok(sockets.add(TcpSocket::new(socket_resp.socket.0))?)
+        } else {
+            Err(Error::SocketMemory)
         }
-
-        let socket_resp = self.network.send_internal(
-            &CreateSocket {
-                protocol: SocketProtocol::TCP,
-                local_port: None,
-            },
-            true,
-        )?;
-
-        Ok(self.sockets.add(TcpSocket::new(socket_resp.socket.0))?)
     }
 
     /// Connect to the given remote host and port.
@@ -61,51 +63,55 @@ where
         socket: &mut Self::TcpSocket,
         remote: SocketAddr,
     ) -> nb::Result<(), Self::Error> {
-        let mut tcp = self
-            .sockets
-            .get::<TcpSocket<CLK, L>>(*socket)
-            .map_err(Self::Error::from)?;
-
-        if matches!(tcp.state(), TcpState::Created) {
-            self.network
-                .send_internal(
-                    &SetSocketSslState {
-                        socket: *socket,
-                        ssl_tls_status: SslTlsStatus::Enabled(SecurityProfileId(0)),
-                    },
-                    true,
-                )
+        if let Some(ref mut sockets) = self.sockets {
+            let mut tcp = sockets
+                .get::<TcpSocket<CLK, L>>(*socket)
                 .map_err(Self::Error::from)?;
 
-            self.network
-                .send_internal(
-                    &ConnectSocket {
-                        socket: *socket,
-                        remote_addr: remote.ip(),
-                        remote_port: remote.port(),
-                    },
-                    false,
-                )
-                .map_err(Self::Error::from)?;
+            if matches!(tcp.state(), TcpState::Created) {
+                self.network
+                    .send_internal(
+                        &SetSocketSslState {
+                            socket: *socket,
+                            ssl_tls_status: SslTlsStatus::Enabled(SecurityProfileId(0)),
+                        },
+                        true,
+                    )
+                    .map_err(Self::Error::from)?;
 
-            tcp.set_state(TcpState::Connected);
-            Ok(())
+                self.network
+                    .send_internal(
+                        &ConnectSocket {
+                            socket: *socket,
+                            remote_addr: remote.ip(),
+                            remote_port: remote.port(),
+                        },
+                        false,
+                    )
+                    .map_err(Self::Error::from)?;
+
+                tcp.set_state(TcpState::Connected(remote));
+                Ok(())
+            } else {
+                defmt::error!(
+                    "Cannot connect socket! Socket: {} is in state: {}",
+                    socket,
+                    tcp.state()
+                );
+                Err(Error::Socket(SocketError::Illegal).into())
+            }
         } else {
-            defmt::error!(
-                "Cannot connect socket! Socket: {} is in state: {}",
-                socket,
-                tcp.state()
-            );
-            Err(Error::Socket(SocketError::Illegal).into())
+            Err(Error::SocketMemory.into())
         }
     }
 
     /// Check if this socket is still connected
     fn is_connected(&mut self, socket: &Self::TcpSocket) -> Result<bool, Self::Error> {
-        Ok(self
-            .sockets
-            .get::<TcpSocket<CLK, L>>(*socket)?
-            .is_connected())
+        if let Some(ref mut sockets) = self.sockets {
+            Ok(sockets.get::<TcpSocket<CLK, L>>(*socket)?.is_connected())
+        } else {
+            Err(Error::SocketMemory.into())
+        }
     }
 
     /// Write to the stream. Returns the number of bytes written is returned
@@ -135,7 +141,7 @@ where
                 .network
                 .send_internal(
                     &WriteSocketDataBinary {
-                        data: serde_bytes::Bytes::new(chunk),
+                        data: atat::serde_bytes::Bytes::new(chunk),
                     },
                     false,
                 )
@@ -160,18 +166,25 @@ where
         socket: &mut Self::TcpSocket,
         buffer: &mut [u8],
     ) -> nb::Result<usize, Self::Error> {
-        let mut tcp = self
-            .sockets
-            .get::<TcpSocket<CLK, L>>(*socket)
-            .map_err(Self::Error::from)?;
+        if let Some(ref mut sockets) = self.sockets {
+            let mut tcp = sockets
+                .get::<TcpSocket<CLK, L>>(*socket)
+                .map_err(Self::Error::from)?;
 
-        Ok(tcp.recv_slice(buffer).map_err(Self::Error::from)?)
+            Ok(tcp.recv_slice(buffer).map_err(Self::Error::from)?)
+        } else {
+            Err(Error::SocketMemory.into())
+        }
     }
 
     /// Close an existing TCP socket.
     fn close(&mut self, socket: Self::TcpSocket) -> Result<(), Self::Error> {
-        self.network.send_internal(&CloseSocket { socket }, false)?;
-        self.sockets.remove(socket)?;
-        Ok(())
+        if let Some(ref mut sockets) = self.sockets {
+            self.network.send_internal(&CloseSocket { socket }, false)?;
+            sockets.remove(socket)?;
+            Ok(())
+        } else {
+            Err(Error::SocketMemory.into())
+        }
     }
 }

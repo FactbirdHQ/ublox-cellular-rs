@@ -1,8 +1,8 @@
 use embedded_time::TimeError;
 
-use super::socket::Error as SocketError;
 use crate::error::GenericError;
 use crate::network::Error as NetworkError;
+use ublox_sockets::Error as SocketError;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {

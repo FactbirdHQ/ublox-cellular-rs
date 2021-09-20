@@ -73,7 +73,7 @@ pub struct PrepareDownloadFile<'a> {
 )]
 pub struct DownloadFile<'a> {
     #[at_arg(position = 0, len = 2048)]
-    pub text: &'a serde_bytes::Bytes,
+    pub text: &'a atat::serde_bytes::Bytes,
 }
 
 /// 22.3 List files information +ULSTFILE
