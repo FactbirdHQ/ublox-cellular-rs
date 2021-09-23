@@ -5,8 +5,9 @@ use embedded_nal::{AddrType, Dns};
 use embedded_time::Clock;
 use heapless::String;
 
-use super::{DataService, Error};
+use super::DataService;
 use crate::command::dns::{self, types::ResolutionType};
+use ublox_sockets::Error;
 
 impl<'a, C, CLK, const N: usize, const L: usize> Dns for DataService<'a, C, CLK, N, L>
 where
@@ -28,7 +29,7 @@ where
                 },
                 true,
             )
-            .map_err(|_| Error::Dns)?;
+            .map_err(|_| Error::Unaddressable)?;
 
         Ok(String::from(resp.ip_domain_string.as_str()))
     }
@@ -39,7 +40,7 @@ where
         addr_type: AddrType,
     ) -> nb::Result<IpAddr, Self::Error> {
         if addr_type == AddrType::IPv6 {
-            return Err(nb::Error::Other(Error::Dns));
+            return Err(nb::Error::Other(Error::Illegal));
         }
 
         let resp = self
@@ -51,10 +52,10 @@ where
                 },
                 true,
             )
-            .map_err(|_| Error::Dns)?;
+            .map_err(|_| Error::Unaddressable)?;
 
         resp.ip_domain_string
             .parse()
-            .map_err(|_e| nb::Error::Other(Error::Dns))
+            .map_err(|_e| nb::Error::Other(Error::Illegal))
     }
 }
