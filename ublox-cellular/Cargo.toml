@@ -19,13 +19,13 @@ atat = { version = "0.13.1", features = ["derive", "defmt", "bytes"] }
 defmt = { version = "^0.2" }
 embedded-hal = "1.0.0-alpha.4"
 embedded-nal = "0.6.0"
-embedded-time = "0.11.0"
+fugit = "0.3"
 hash32 = "^0.2.1"
 hash32-derive = "^0.1.0"
 heapless = { version = "^0.7", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
-ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets" }
+ublox-sockets = { git = "https://github.com/andresv/ublox-sockets.git", branch = "replace-embedded-time-with-fugit" }
 
 # Enable `serde` feature of `no-std-net`
 no-std-net = { version = "^0.5", features = ["serde"] }
