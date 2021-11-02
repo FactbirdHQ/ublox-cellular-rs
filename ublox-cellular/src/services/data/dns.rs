@@ -2,16 +2,16 @@ use atat::AtatClient;
 use core::fmt::Write;
 use embedded_nal::IpAddr;
 use embedded_nal::{AddrType, Dns};
-use embedded_time::Clock;
 use heapless::String;
 
-use super::{DataService, Error};
+use super::{Clock, DataService, Error};
 use crate::command::dns::{self, types::ResolutionType};
 
-impl<'a, C, CLK, const N: usize, const L: usize> Dns for DataService<'a, C, CLK, N, L>
+impl<'a, C, CLK, const FREQ_HZ: u32, const N: usize, const L: usize> Dns
+    for DataService<'a, C, CLK, FREQ_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock,
+    CLK: Clock<FREQ_HZ>,
 {
     type Error = Error;
 

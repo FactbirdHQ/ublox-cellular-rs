@@ -1,7 +1,6 @@
 use atat::AtatClient;
-use core::convert::TryInto;
 use embedded_hal::digital::{InputPin, OutputPin};
-use embedded_time::{duration::*, Clock};
+use fugit::ExtU32;
 use ublox_sockets::SocketSet;
 
 use crate::{
@@ -26,6 +25,7 @@ use crate::{
     power::PowerState,
     registration::ConnectionState,
     services::data::ContextState,
+    Clock,
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
 use network_service::{types::NetworkRegistrationUrcConfig, SetNetworkRegistrationStatus};
@@ -41,29 +41,29 @@ pub enum State {
     On,
 }
 
-pub struct Device<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
+pub struct Device<C, CLK, RST, DTR, PWR, VINT, const FREQ_HZ: u32, const N: usize, const L: usize>
 where
     C: AtatClient,
-    CLK: 'static + Clock,
+    CLK: 'static + Clock<FREQ_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
 {
     pub(crate) config: Config<RST, DTR, PWR, VINT>,
-    pub(crate) network: Network<C, CLK>,
+    pub(crate) network: Network<C, CLK, FREQ_HZ>,
 
     pub(crate) state: State,
     pub(crate) power_state: PowerState,
     // Ublox devices can hold a maximum of 6 active sockets
-    pub(crate) sockets: Option<&'static mut SocketSet<CLK, N, L>>,
+    pub(crate) sockets: Option<&'static mut SocketSet<FREQ_HZ, N, L>>,
 }
 
-impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Drop
-    for Device<C, CLK, RST, DTR, PWR, VINT, N, L>
+impl<C, CLK, RST, DTR, PWR, VINT, const FREQ_HZ: u32, const N: usize, const L: usize> Drop
+    for Device<C, CLK, RST, DTR, PWR, VINT, FREQ_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock,
+    CLK: Clock<FREQ_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -77,11 +77,11 @@ where
     }
 }
 
-impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
-    Device<C, CLK, RST, DTR, PWR, VINT, N, L>
+impl<C, CLK, RST, DTR, PWR, VINT, const FREQ_HZ: u32, const N: usize, const L: usize>
+    Device<C, CLK, RST, DTR, PWR, VINT, FREQ_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock,
+    CLK: Clock<FREQ_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -109,12 +109,8 @@ where
                 _ => {}
             }
 
-            self.network
-                .status
-                .timer
-                .new_timer(1.seconds())
-                .start()?
-                .wait()?;
+            self.network.status.timer.start(1.secs())?;
+            self.network.status.timer.wait()?;
         }
 
         // There was an error initializing the SIM
@@ -138,19 +134,16 @@ where
         return Err(Error::Busy);
     }
 
-    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<CLK, N, L>) {
+    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<FREQ_HZ, N, L>) {
         socket_set.prune();
         self.sockets.replace(socket_set);
     }
 
-    pub fn take_socket_storage(&mut self) -> Option<&'static mut SocketSet<CLK, N, L>> {
+    pub fn take_socket_storage(&mut self) -> Option<&'static mut SocketSet<FREQ_HZ, N, L>> {
         self.sockets.take()
     }
 
-    pub fn initialize(&mut self) -> Result<(), Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
+    pub fn initialize(&mut self) -> Result<(), Error> {
         if self.power_state != PowerState::On {
             // Always re-configure the module when power has been off
             self.state = State::Off;
@@ -179,12 +172,8 @@ where
         }
 
         // Allow ATAT some time to clear the buffers
-        self.network
-            .status
-            .timer
-            .new_timer(300_u32.milliseconds())
-            .start()?
-            .wait()?;
+        self.network.status.timer.start(300.millis())?;
+        self.network.status.timer.wait()?;
 
         Ok(())
     }
@@ -401,17 +390,9 @@ where
         Ok(())
     }
 
-    fn handle_urc_internal(&mut self) -> Result<(), Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
+    fn handle_urc_internal(&mut self) -> Result<(), Error> {
         if let Some(ref mut sockets) = self.sockets.as_deref_mut() {
-            let ts = self
-                .network
-                .status
-                .timer
-                .try_now()
-                .map_err(|e| Error::Generic(GenericError::Time(e.into())))?;
+            let ts = self.network.status.timer.now();
             self.network
                 .at_tx
                 .handle_urc(|urc| {
@@ -451,10 +432,7 @@ where
         }
     }
 
-    pub(crate) fn process_events(&mut self) -> Result<(), Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
+    pub(crate) fn process_events(&mut self) -> Result<(), Error> {
         if self.power_state != PowerState::On {
             return Err(Error::Uninitialized);
         }
@@ -469,10 +447,7 @@ where
         }
     }
 
-    pub fn spin(&mut self) -> nb::Result<(), Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
+    pub fn spin(&mut self) -> nb::Result<(), Error> {
         let res = self.initialize();
 
         self.process_events().map_err(Error::from)?;
@@ -520,8 +495,9 @@ mod tests {
 
     const SOCKET_SIZE: usize = 128;
     const SOCKET_SET_LEN: usize = 2;
+    const FREQ_HZ: u32 = 1000;
 
-    static mut SOCKET_SET: Option<SocketSet<MockTimer, SOCKET_SET_LEN, SOCKET_SIZE>> = None;
+    static mut SOCKET_SET: Option<SocketSet<FREQ_HZ, SOCKET_SET_LEN, SOCKET_SIZE>> = None;
 
     #[test]
     #[ignore]
@@ -537,8 +513,9 @@ mod tests {
             })
         };
 
-        let mut device =
-            Device::<_, _, _, _, _, _, SOCKET_SET_LEN, SOCKET_SIZE>::new(client, timer, config);
+        let mut device = Device::<_, _, _, _, _, _, FREQ_HZ, SOCKET_SET_LEN, SOCKET_SIZE>::new(
+            client, timer, config,
+        );
         device.set_socket_storage(socket_set);
 
         // device.fsm.set_state(State::Connected);
@@ -558,7 +535,7 @@ mod tests {
             assert_eq!(sockets.len(), 1);
 
             let mut tcp = sockets
-                .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
+                .get::<TcpSocket<FREQ_HZ, SOCKET_SIZE>>(SocketHandle(0))
                 .expect("Failed to get socket");
 
             assert_eq!(tcp.rx_window(), SOCKET_SIZE);
@@ -591,7 +568,7 @@ mod tests {
             assert_eq!(sockets.len(), 1);
 
             let tcp = sockets
-                .get::<TcpSocket<_, SOCKET_SIZE>>(SocketHandle(0))
+                .get::<TcpSocket<FREQ_HZ, SOCKET_SIZE>>(SocketHandle(0))
                 .expect("Failed to get socket");
             assert_eq!(tcp.recv_queue(), 0);
         } else {

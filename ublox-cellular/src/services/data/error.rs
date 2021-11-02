@@ -1,7 +1,6 @@
-use embedded_time::TimeError;
-
 use crate::error::GenericError;
 use crate::network::Error as NetworkError;
+use crate::ClockError;
 use ublox_sockets::Error as SocketError;
 
 #[derive(Debug, PartialEq)]
@@ -39,8 +38,8 @@ impl From<SocketError> for Error {
     }
 }
 
-impl From<TimeError> for Error {
-    fn from(e: TimeError) -> Self {
-        Error::Generic(e.into())
+impl From<ClockError> for Error {
+    fn from(e: ClockError) -> Self {
+        Error::Generic(GenericError::Clock(e))
     }
 }

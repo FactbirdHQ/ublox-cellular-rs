@@ -36,16 +36,13 @@ use crate::{
     command::{psn::SetPacketSwitchedAction, Urc},
     error::Error as DeviceError,
     network::{ContextId, Network},
-    ProfileId,
+    Clock, ProfileId,
 };
 use apn::{APNInfo, Apn};
 use atat::AtatClient;
-use core::convert::TryInto;
 use embedded_hal::digital::{InputPin, OutputPin};
-use embedded_time::{
-    duration::{Extensions, Generic, Milliseconds},
-    Clock, TimeError,
-};
+use fugit::ExtU32;
+
 pub use error::Error;
 use psn::{
     types::{
@@ -68,11 +65,11 @@ const PROFILE_ID: ProfileId = ProfileId(1);
 #[cfg(not(feature = "upsd-context-activation"))]
 const CONTEXT_ID: ContextId = ContextId(1);
 
-impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
-    Device<C, CLK, RST, DTR, PWR, VINT, N, L>
+impl<C, CLK, RST, DTR, PWR, VINT, const FREQ_HZ: u32, const N: usize, const L: usize>
+    Device<C, CLK, RST, DTR, PWR, VINT, FREQ_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock,
+    CLK: Clock<FREQ_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -129,10 +126,7 @@ where
     pub fn data_service<'a>(
         &'a mut self,
         apn_info: &APNInfo,
-    ) -> nb::Result<DataService<'a, C, CLK, N, L>, DeviceError>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
+    ) -> nb::Result<DataService<'a, C, CLK, FREQ_HZ, N, L>, DeviceError> {
         // Spin [`Device`], handling [`Network`] related URC changes and propagting the FSM
         match self.spin() {
             // If we're not using AT+UPSD-based
@@ -169,28 +163,26 @@ pub enum ContextState {
     Active,
 }
 
-pub struct DataService<'a, C, CLK, const N: usize, const L: usize>
+pub struct DataService<'a, C, CLK, const FREQ_HZ: u32, const N: usize, const L: usize>
 where
     C: atat::AtatClient,
-    CLK: 'static + Clock,
+    CLK: 'static + Clock<FREQ_HZ>,
 {
-    network: &'a mut Network<C, CLK>,
-    pub(crate) sockets: Option<&'a mut SocketSet<CLK, N, L>>,
+    network: &'a mut Network<C, CLK, FREQ_HZ>,
+    pub(crate) sockets: Option<&'a mut SocketSet<FREQ_HZ, N, L>>,
 }
 
-impl<'a, C, CLK, const N: usize, const L: usize> DataService<'a, C, CLK, N, L>
+impl<'a, C, CLK, const FREQ_HZ: u32, const N: usize, const L: usize>
+    DataService<'a, C, CLK, FREQ_HZ, N, L>
 where
     C: atat::AtatClient,
-    CLK: 'static + Clock,
+    CLK: 'static + Clock<FREQ_HZ>,
 {
     pub fn try_new(
         apn_info: &APNInfo,
-        network: &'a mut Network<C, CLK>,
-        sockets: Option<&'a mut SocketSet<CLK, N, L>>,
-    ) -> nb::Result<Self, Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
+        network: &'a mut Network<C, CLK, FREQ_HZ>,
+        sockets: Option<&'a mut SocketSet<FREQ_HZ, N, L>>,
+    ) -> nb::Result<Self, Error> {
         let mut data_service = Self { network, sockets };
 
         // Check if context is active, and create if not
@@ -250,11 +242,9 @@ where
             self.network
                 .status
                 .timer
-                .new_timer(1_u32.seconds())
-                .start()
-                .map_err(Error::from)?
-                .wait()
+                .start(1.secs())
                 .map_err(Error::from)?;
+            self.network.status.timer.wait().map_err(Error::from)?;
         }
 
         // self.network
@@ -492,10 +482,7 @@ where
         self.network.at_tx.handle_urc(f).map_err(Error::Network)
     }
 
-    fn socket_ingress_all(&mut self) -> Result<(), Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
+    fn socket_ingress_all(&mut self) -> Result<(), Error> {
         if let Some(ref mut sockets) = self.sockets {
             let network = &mut self.network;
             sockets
@@ -505,9 +492,7 @@ where
 
                     if available_data == 0 {
                         // Check for new socket data available at regular intervals, just in case a URC is missed
-                        if socket.should_update_available_data(
-                            network.status.timer.try_now().map_err(TimeError::from)?,
-                        ) {
+                        if socket.should_update_available_data(network.status.timer.now()) {
                             if let Ok(SocketData { length, .. }) = network.send_internal(
                                 &ReadSocketData {
                                     socket: handle,

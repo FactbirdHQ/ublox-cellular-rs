@@ -1,4 +1,4 @@
-use embedded_time::TimeError;
+use super::ClockError;
 
 use crate::network::Error as NetworkError;
 use crate::services::data::Error as DataServiceError;
@@ -6,13 +6,13 @@ use crate::services::data::Error as DataServiceError;
 #[derive(Debug, PartialEq)]
 pub enum GenericError {
     Timeout,
-    Time(TimeError),
+    Clock(ClockError),
     Unsupported,
 }
 
-impl From<TimeError> for GenericError {
-    fn from(e: TimeError) -> Self {
-        GenericError::Time(e)
+impl From<ClockError> for GenericError {
+    fn from(e: ClockError) -> Self {
+        GenericError::Clock(e)
     }
 }
 
@@ -58,8 +58,8 @@ impl From<NetworkError> for Error {
     }
 }
 
-impl From<TimeError> for Error {
-    fn from(e: TimeError) -> Self {
-        Error::Generic(e.into())
+impl From<ClockError> for Error {
+    fn from(e: ClockError) -> Self {
+        Error::Generic(GenericError::Clock(e))
     }
 }

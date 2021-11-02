@@ -1,7 +1,6 @@
-use super::{DataService, Error};
+use super::{Clock, DataService, Error};
 use crate::command::device_data_security::{types::*, *};
 use atat::atat_derive::AtatLen;
-use embedded_time::Clock;
 use heapless::String;
 use serde::{Deserialize, Serialize};
 
@@ -35,10 +34,11 @@ pub trait SSL {
     ) -> Result<(), Error>;
 }
 
-impl<'a, C, CLK, const N: usize, const L: usize> SSL for DataService<'a, C, CLK, N, L>
+impl<'a, C, CLK, const FREQ_HZ: u32, const N: usize, const L: usize> SSL
+    for DataService<'a, C, CLK, FREQ_HZ, N, L>
 where
     C: atat::AtatClient,
-    CLK: Clock,
+    CLK: Clock<FREQ_HZ>,
 {
     fn import_certificate(
         &mut self,

@@ -1,5 +1,4 @@
-use core::convert::TryInto;
-
+use super::{Clock, Instant};
 use crate::command::{
     network_service::{
         responses::NetworkRegistrationStatus,
@@ -12,23 +11,17 @@ use crate::command::{
         urc::{EPSNetworkRegistration, GPRSNetworkRegistration},
     },
 };
-use embedded_time::{duration::*, Clock, Instant};
+use fugit::ExtU32;
 use heapless::String;
 
 #[derive(Debug, Clone, Default)]
-pub struct CellularRegistrationStatus<CLK>
-where
-    CLK: Clock,
-{
+pub struct CellularRegistrationStatus<const FREQ_HZ: u32> {
     status: Status,
-    updated: Option<Instant<CLK>>,
-    started: Option<Instant<CLK>>,
+    updated: Option<Instant<FREQ_HZ>>,
+    started: Option<Instant<FREQ_HZ>>,
 }
 
-impl<CLK> CellularRegistrationStatus<CLK>
-where
-    CLK: Clock,
-{
+impl<const FREQ_HZ: u32> CellularRegistrationStatus<FREQ_HZ> {
     pub fn new() -> Self {
         Self {
             status: Status::default(),
@@ -37,24 +30,19 @@ where
         }
     }
 
-    pub fn duration(&self, ts: Instant<CLK>) -> Milliseconds<u32>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
+    pub fn duration(&self, ts: Instant<FREQ_HZ>) -> fugit::TimerDurationU32<FREQ_HZ> {
         self.started
-            .as_ref()
             .and_then(|started| ts.checked_duration_since(started))
-            .and_then(|dur| dur.try_into().ok())
-            .unwrap_or_else(|| Milliseconds(0))
+            .unwrap_or_else(|| 0.millis())
     }
 
     #[allow(dead_code)]
-    pub fn started(&self) -> Option<Instant<CLK>> {
+    pub fn started(&self) -> Option<Instant<FREQ_HZ>> {
         self.started
     }
 
     #[allow(dead_code)]
-    pub fn updated(&self) -> Option<Instant<CLK>> {
+    pub fn updated(&self) -> Option<Instant<FREQ_HZ>> {
         self.updated
     }
 
@@ -71,7 +59,7 @@ where
     }
 
     #[allow(dead_code)]
-    pub fn set_status(&mut self, stat: Status, ts: Instant<CLK>) {
+    pub fn set_status(&mut self, stat: Status, ts: Instant<FREQ_HZ>) {
         if self.status != stat {
             self.status = stat;
             self.started = Some(ts);
@@ -203,22 +191,22 @@ pub struct CellularGlobalIdentity {
 }
 
 #[derive(Debug, Clone)]
-pub struct RegistrationState<CLK>
+pub struct RegistrationState<CLK, const FREQ_HZ: u32>
 where
-    CLK: Clock,
+    CLK: Clock<FREQ_HZ>,
 {
     pub(crate) timer: CLK,
 
-    pub(crate) reg_check_time: Option<Instant<CLK>>,
-    pub(crate) reg_start_time: Option<Instant<CLK>>,
+    pub(crate) reg_check_time: Option<Instant<FREQ_HZ>>,
+    pub(crate) reg_start_time: Option<Instant<FREQ_HZ>>,
 
     pub(crate) conn_state: ConnectionState,
     /// CSD (Circuit Switched Data) registration status (registered/searching/roaming etc.).
-    pub(crate) csd: CellularRegistrationStatus<CLK>,
+    pub(crate) csd: CellularRegistrationStatus<FREQ_HZ>,
     /// PSD (Packet Switched Data) registration status (registered/searching/roaming etc.).
-    pub(crate) psd: CellularRegistrationStatus<CLK>,
+    pub(crate) psd: CellularRegistrationStatus<FREQ_HZ>,
     /// EPS (Evolved Packet Switched) registration status (registered/searching/roaming etc.).
-    pub(crate) eps: CellularRegistrationStatus<CLK>,
+    pub(crate) eps: CellularRegistrationStatus<FREQ_HZ>,
 
     pub(crate) registration_interventions: u32,
     check_imsi: bool,
@@ -241,9 +229,9 @@ impl Default for ConnectionState {
     }
 }
 
-impl<CLK> RegistrationState<CLK>
+impl<CLK, const FREQ_HZ: u32> RegistrationState<CLK, FREQ_HZ>
 where
-    CLK: Clock,
+    CLK: Clock<FREQ_HZ>,
 {
     pub fn new(timer: CLK) -> Self {
         Self {
@@ -267,7 +255,7 @@ where
         self.csd.reset();
         self.psd.reset();
         self.eps.reset();
-        self.reg_start_time = self.timer.try_now().ok();
+        self.reg_start_time = Some(self.timer.now());
         self.reg_check_time = self.reg_start_time;
         self.registration_interventions = 1;
     }
@@ -281,7 +269,7 @@ where
         self.conn_state = state;
     }
 
-    pub fn compare_and_set(&mut self, new_params: RegistrationParams, ts: Instant<CLK>) {
+    pub fn compare_and_set(&mut self, new_params: RegistrationParams, ts: Instant<FREQ_HZ>) {
         match new_params.reg_type {
             RegType::Creg => {
                 let prev_reg_status = self.csd.registered();

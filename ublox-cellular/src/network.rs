@@ -1,3 +1,4 @@
+use super::Clock;
 use crate::{
     command::{
         error::UbloxError,
@@ -19,13 +20,12 @@ use crate::{
     services::data::ContextState,
 };
 use atat::{atat_derive::AtatLen, AtatClient};
-use core::convert::TryInto;
-use embedded_time::{duration::*, Clock, TimeError};
+use fugit::{ExtU32, MinutesDurationU32, SecsDurationU32};
 use hash32_derive::Hash32;
 use serde::{Deserialize, Serialize};
 
-const REGISTRATION_CHECK_INTERVAL: Seconds<u32> = Seconds::<u32>(15);
-const REGISTRATION_TIMEOUT: Minutes<u32> = Minutes::<u32>(5);
+const REGISTRATION_CHECK_INTERVAL: SecsDurationU32 = SecsDurationU32::secs(15);
+const REGISTRATION_TIMEOUT: MinutesDurationU32 = MinutesDurationU32::minutes(5);
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
@@ -35,12 +35,6 @@ pub enum Error {
     UnknownProfile,
     ActivationFailed,
     _Unknown,
-}
-
-impl From<TimeError> for Error {
-    fn from(e: TimeError) -> Self {
-        Error::Generic(e.into())
-    }
 }
 
 #[derive(
@@ -174,19 +168,19 @@ impl<C: AtatClient> AtTx<C> {
     }
 }
 
-pub struct Network<C, CLK>
+pub struct Network<C, CLK, const FREQ_HZ: u32>
 where
-    CLK: Clock,
+    CLK: Clock<FREQ_HZ>,
 {
-    pub(crate) status: RegistrationState<CLK>,
+    pub(crate) status: RegistrationState<CLK, FREQ_HZ>,
     pub(crate) context_state: ContextState,
     pub(crate) at_tx: AtTx<C>,
 }
 
-impl<C, CLK> Network<C, CLK>
+impl<C, CLK, const FREQ_HZ: u32> Network<C, CLK, FREQ_HZ>
 where
     C: AtatClient,
-    CLK: Clock,
+    CLK: Clock<FREQ_HZ>,
 {
     pub(crate) fn new(at_tx: AtTx<C>, timer: CLK) -> Self {
         Network {
@@ -201,17 +195,14 @@ where
     }
 
     pub fn reset_reg_time(&mut self) -> Result<(), Error> {
-        let now = self.status.timer.try_now().map_err(TimeError::from)?;
+        let now = self.status.timer.now();
 
         self.status.reg_start_time.replace(now);
         self.status.reg_check_time = self.status.reg_start_time;
         Ok(())
     }
 
-    pub fn process_events(&mut self) -> Result<(), Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
+    pub fn process_events(&mut self) -> Result<(), Error> {
         if self.at_tx.consecutive_timeouts > 10 {
             defmt::warn!("Resetting the modem due to consecutive AT timeouts");
             return Err(Error::Generic(GenericError::Timeout));
@@ -222,13 +213,12 @@ where
         self.intervene_registration()?;
         // self.check_running_imsi();
 
-        let now = self.status.timer.try_now().map_err(TimeError::from)?;
+        let now = self.status.timer.now();
         let should_check = self
             .status
             .reg_check_time
-            .and_then(|ref reg_check_time| {
+            .and_then(|reg_check_time| {
                 now.checked_duration_since(reg_check_time)
-                    .and_then(|dur| dur.try_into().ok())
                     .map(|dur| dur >= REGISTRATION_CHECK_INTERVAL)
             })
             .unwrap_or(true);
@@ -241,13 +231,12 @@ where
 
         self.update_registration()?;
 
-        let now = self.status.timer.try_now().map_err(TimeError::from)?;
+        let now = self.status.timer.now();
         let is_timeout = self
             .status
             .reg_start_time
-            .and_then(|ref reg_start_time| {
+            .and_then(|reg_start_time| {
                 now.checked_duration_since(reg_start_time)
-                    .and_then(|dur| dur.try_into().ok())
                     .map(|dur| dur >= REGISTRATION_TIMEOUT)
             })
             .unwrap_or(false);
@@ -282,26 +271,23 @@ where
         Ok(())
     }
 
-    pub fn intervene_registration(&mut self) -> Result<(), Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
+    pub fn intervene_registration(&mut self) -> Result<(), Error> {
         if self.status.conn_state != ConnectionState::Connecting {
             return Ok(());
         }
 
-        let now = self.status.timer.try_now().map_err(TimeError::from)?;
+        let now = self.status.timer.now();
 
         // If EPS has been sticky for longer than `timeout`
-        let timeout = Seconds(self.status.registration_interventions * 15);
+        let timeout: SecsDurationU32 = (self.status.registration_interventions * 15).secs();
         if self.status.eps.sticky() && self.status.eps.duration(now) >= timeout {
             // If (EPS + CSD) is not attempting registration
             if self.status.eps.get_status() == registration::Status::NotRegistering
                 && self.status.csd.get_status() == registration::Status::NotRegistering
             {
                 defmt::debug!(
-                    "Sticky not registering state for {} s, PLMN reselection",
-                    Seconds::<u32>::from(self.status.eps.duration(now)).integer()
+                    "Sticky not registering state for {}, PLMN reselection",
+                    self.status.eps.duration(now)
                 );
 
                 self.status.csd.reset();
@@ -323,8 +309,8 @@ where
                 && self.status.csd.get_status() == registration::Status::Denied
             {
                 defmt::debug!(
-                    "Sticky denied state for {} s, RF reset",
-                    Seconds::<u32>::from(self.status.eps.duration(now)).integer()
+                    "Sticky denied state for {}, RF reset",
+                    self.status.eps.duration(now)
                 );
                 self.status.csd.reset();
                 self.status.psd.reset();
@@ -356,8 +342,8 @@ where
             && self.status.psd.get_status() == registration::Status::Denied
         {
             defmt::debug!(
-                "Sticky CSD and PSD denied state for {} s, RF reset",
-                Seconds::<u32>::from(self.status.csd.duration(now)).integer()
+                "Sticky CSD and PSD denied state for {}, RF reset",
+                self.status.csd.duration(now)
             );
             self.status.csd.reset();
             self.status.psd.reset();
@@ -389,8 +375,8 @@ where
             && self.status.eps.get_status() == registration::Status::NotRegistering
         {
             defmt::debug!(
-                "Sticky not registering PSD state for {} s, force GPRS attach",
-                Seconds::<u32>::from(self.status.psd.duration(now)).integer()
+                "Sticky not registering PSD state for {}, force GPRS attach",
+                self.status.psd.duration(now)
             );
             self.status.psd.reset();
             self.status.registration_interventions += 1;
@@ -424,7 +410,7 @@ where
     }
 
     pub fn update_registration(&mut self) -> Result<(), Error> {
-        let ts = self.status.timer.try_now().map_err(TimeError::from)?;
+        let ts = self.status.timer.now();
 
         if let Ok(reg) = self.send_internal(&GetNetworkRegistrationStatus, false) {
             self.status.compare_and_set(reg.into(), ts);
@@ -502,7 +488,7 @@ where
         })?;
 
         if let Some(reg_params) = new_reg_params {
-            let ts = self.status.timer.try_now().map_err(TimeError::from)?;
+            let ts = self.status.timer.now();
             self.status.compare_and_set(reg_params, ts)
         }
 
@@ -531,44 +517,54 @@ where
 
 #[cfg(test)]
 mod tests {
-    use embedded_time::{duration::*, Instant};
-
+    use super::*;
     use crate::{
         registration::Status,
         test_helpers::{MockAtClient, MockTimer},
+        Instant,
     };
+    use fugit::MillisDurationU32;
 
-    use super::*;
+    const FREQ_HZ: u32 = 1000;
 
     #[test]
     #[ignore]
     fn intervene_registration() {
         // Setup
         let tx = AtTx::new(MockAtClient::new(0), 5);
-        let timer = MockTimer::new(Some(25_234));
+        let timer: MockTimer<FREQ_HZ> = MockTimer::new(Some(Instant::from_ticks(25_234)));
         let mut network = Network::new(tx, timer);
         network.status.conn_state = ConnectionState::Connecting;
         // Update both started & updated
         network
             .status
             .eps
-            .set_status(Status::NotRegistering, Instant::new(1234));
+            .set_status(Status::NotRegistering, Instant::from_ticks(1234));
         // Update only updated
         network
             .status
             .eps
-            .set_status(Status::NotRegistering, Instant::new(1534));
+            .set_status(Status::NotRegistering, Instant::from_ticks(1534));
         network
             .status
             .csd
-            .set_status(Status::NotRegistering, Instant::new(1534));
+            .set_status(Status::NotRegistering, Instant::from_ticks(1534));
 
-        assert_eq!(network.status.eps.updated(), Some(Instant::new(1534)));
-        assert_eq!(network.status.eps.started(), Some(Instant::new(1234)));
+        assert_eq!(
+            network.status.eps.updated(),
+            Some(Instant::from_ticks(1534))
+        );
+        assert_eq!(
+            network.status.eps.started(),
+            Some(Instant::from_ticks(1234))
+        );
         assert!(network.status.eps.sticky());
 
-        let ts = network.status.timer.try_now().unwrap();
-        assert_eq!(network.status.eps.duration(ts), Milliseconds(24_000_u32));
+        let ts = network.status.timer.now();
+        assert_eq!(
+            network.status.eps.duration(ts),
+            MillisDurationU32::millis(24_000)
+        );
 
         assert!(network.intervene_registration().is_ok());
 
@@ -578,19 +574,25 @@ mod tests {
     #[test]
     fn reset_reg_time() {
         let tx = AtTx::new(MockAtClient::new(0), 5);
-        let timer = MockTimer::new(Some(1234));
+        let timer: MockTimer<FREQ_HZ> = MockTimer::new(Some(Instant::from_ticks(1234)));
         let mut network = Network::new(tx, timer);
 
         assert!(network.reset_reg_time().is_ok());
 
-        assert_eq!(network.status.reg_start_time, Some(Instant::new(1234)));
-        assert_eq!(network.status.reg_check_time, Some(Instant::new(1234)));
+        assert_eq!(
+            network.status.reg_start_time,
+            Some(Instant::from_ticks(1234))
+        );
+        assert_eq!(
+            network.status.reg_check_time,
+            Some(Instant::from_ticks(1234))
+        );
     }
 
     #[test]
     fn check_registration_state() {
         let tx = AtTx::new(MockAtClient::new(0), 5);
-        let timer = MockTimer::new(Some(1234));
+        let timer: MockTimer<FREQ_HZ> = MockTimer::new(Some(Instant::from_ticks(1234)));
         let mut network = Network::new(tx, timer);
 
         // Check that `ConnectionState` will change from `Connected` to `Connecting`
@@ -600,17 +602,23 @@ mod tests {
         network
             .status
             .csd
-            .set_status(Status::Denied, Instant::new(1));
+            .set_status(Status::Denied, Instant::from_ticks(1));
         network
             .status
             .eps
-            .set_status(Status::NotRegistering, Instant::new(5));
+            .set_status(Status::NotRegistering, Instant::from_ticks(5));
 
         assert!(network.check_registration_state().is_ok());
 
         assert_eq!(network.status.conn_state, ConnectionState::Connecting);
-        assert_eq!(network.status.reg_start_time, Some(Instant::new(1234)));
-        assert_eq!(network.status.reg_check_time, Some(Instant::new(1234)));
+        assert_eq!(
+            network.status.reg_start_time,
+            Some(Instant::from_ticks(1234))
+        );
+        assert_eq!(
+            network.status.reg_check_time,
+            Some(Instant::from_ticks(1234))
+        );
         assert_eq!(network.status.csd.get_status(), Status::None);
         assert_eq!(network.status.csd.updated(), None);
         assert_eq!(network.status.csd.started(), None);
@@ -626,7 +634,7 @@ mod tests {
         network
             .status
             .eps
-            .set_status(Status::Roaming, Instant::new(5));
+            .set_status(Status::Roaming, Instant::from_ticks(5));
 
         assert!(network.check_registration_state().is_ok());
 
@@ -639,12 +647,15 @@ mod tests {
         network
             .status
             .eps
-            .set_status(Status::Denied, Instant::new(5));
+            .set_status(Status::Denied, Instant::from_ticks(5));
         network
             .status
             .csd
-            .set_status(Status::Roaming, Instant::new(5));
-        network.status.psd.set_status(Status::Home, Instant::new(5));
+            .set_status(Status::Roaming, Instant::from_ticks(5));
+        network
+            .status
+            .psd
+            .set_status(Status::Home, Instant::from_ticks(5));
 
         assert!(network.check_registration_state().is_ok());
 

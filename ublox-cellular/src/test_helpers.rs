@@ -1,8 +1,9 @@
 //! This module is required in order to satisfy the requirements of defmt, while running tests.
 //! Note that this will cause all log `defmt::` log statements to be thrown away.
+use super::Clock;
 use atat::AtatClient;
 use core::ptr::NonNull;
-use embedded_time::{rate::Fraction, Clock, Instant};
+use fugit::ExtU32;
 
 #[defmt::global_logger]
 struct Logger;
@@ -67,48 +68,67 @@ impl AtatClient for MockAtClient {
 }
 
 #[derive(Debug)]
-pub struct MockTimer {
-    forced_ms_time: Option<u32>,
-    start_time: std::time::SystemTime,
+pub struct MockTimer<const FREQ_HZ: u32> {
+    forced_ms_time: Option<fugit::TimerInstantU32<FREQ_HZ>>,
+    start: std::time::Instant,
+    millis: fugit::MillisDurationU32,
 }
 
-impl MockTimer {
-    pub fn new(forced_ms_time: Option<u32>) -> Self {
+impl<const FREQ_HZ: u32> MockTimer<FREQ_HZ> {
+    pub fn new(forced_ms_time: Option<fugit::TimerInstantU32<FREQ_HZ>>) -> Self {
         Self {
             forced_ms_time,
-            start_time: std::time::SystemTime::now(),
+            start: std::time::Instant::now(),
+            millis: fugit::MillisDurationU32::millis(0),
         }
     }
 }
 
-impl Clock for MockTimer {
-    type T = u32;
+impl<const FREQ_HZ: u32> Clock<FREQ_HZ> for MockTimer<FREQ_HZ> {
+    fn now(&mut self) -> fugit::TimerInstantU32<FREQ_HZ> {
+        match self.forced_ms_time {
+            Some(ts) => ts,
+            None => {
+                let millis = self.start.elapsed().as_millis();
+                fugit::TimerInstantU32::from_ticks(millis as u32)
+            }
+        }
+    }
 
-    const SCALING_FACTOR: Fraction = Fraction::new(1, 1000);
+    fn start<T>(&mut self, count: T) -> Result<(), super::ClockError>
+    where
+        T: Into<fugit::MillisDurationU32>,
+    {
+        self.start = std::time::Instant::now();
+        self.millis = count.into();
+        Ok(())
+    }
 
-    fn try_now(&self) -> Result<Instant<Self>, embedded_time::clock::Error> {
-        Ok(Instant::new(self.forced_ms_time.unwrap_or_else(|| {
-            self.start_time.elapsed().unwrap().as_millis() as u32
-        })))
+    fn wait(&mut self) -> Result<(), super::ClockError> {
+        loop {
+            if std::time::Instant::now() - self.start
+                > std::time::Duration::from_millis(self.millis.ticks() as u64)
+            {
+                break;
+            }
+        }
+        Ok(())
     }
 }
 
 mod tests {
     use super::*;
-    use embedded_time::duration::*;
+
+    const FREQ_HZ: u32 = 1000;
 
     #[test]
     fn mock_timer_works() {
-        let now = std::time::SystemTime::now();
+        let now = std::time::Instant::now();
 
-        let timer = MockTimer::new(None);
-        timer
-            .new_timer(1_u32.seconds())
-            .start()
-            .unwrap()
-            .wait()
-            .unwrap();
+        let mut timer: MockTimer<FREQ_HZ> = MockTimer::new(None);
+        timer.start(1.secs()).unwrap();
+        timer.wait().unwrap();
 
-        assert!(now.elapsed().unwrap().as_millis() >= 1_000);
+        assert!(now.elapsed().as_millis() >= 1_000);
     }
 }
