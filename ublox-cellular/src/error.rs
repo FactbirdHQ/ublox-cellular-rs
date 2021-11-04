@@ -1,19 +1,11 @@
-use super::ClockError;
-
 use crate::network::Error as NetworkError;
 use crate::services::data::Error as DataServiceError;
 
 #[derive(Debug, PartialEq)]
 pub enum GenericError {
     Timeout,
-    Clock(ClockError),
+    Clock,
     Unsupported,
-}
-
-impl From<ClockError> for GenericError {
-    fn from(e: ClockError) -> Self {
-        GenericError::Clock(e)
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -55,11 +47,5 @@ impl From<NetworkError> for Error {
             NetworkError::Generic(g) => Error::Generic(g),
             _ => Error::Network(e),
         }
-    }
-}
-
-impl From<ClockError> for Error {
-    fn from(e: ClockError) -> Self {
-        Error::Generic(GenericError::Clock(e))
     }
 }

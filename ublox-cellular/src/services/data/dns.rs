@@ -1,10 +1,10 @@
-use atat::AtatClient;
+use atat::{AtatClient, Clock};
 use core::fmt::Write;
 use embedded_nal::IpAddr;
 use embedded_nal::{AddrType, Dns};
 use heapless::String;
 
-use super::{Clock, DataService, Error};
+use super::{DataService, Error};
 use crate::command::dns::{self, types::ResolutionType};
 
 impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> Dns

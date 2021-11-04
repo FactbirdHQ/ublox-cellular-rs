@@ -1,9 +1,10 @@
 use super::DataService;
-use super::{Clock, Error, EGRESS_CHUNK_SIZE};
+use super::{Error, EGRESS_CHUNK_SIZE};
 use crate::command::ip_transport_layer::{
     types::SocketProtocol, CloseSocket, CreateSocket, PrepareUDPSendToDataBinary,
     UDPSendToDataBinary,
 };
+use atat::Clock;
 use embedded_nal::{SocketAddr, UdpClientStack};
 use ublox_sockets::{Error as SocketError, SocketHandle, UdpSocket};
 

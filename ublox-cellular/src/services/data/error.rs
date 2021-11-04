@@ -1,6 +1,5 @@
 use crate::error::GenericError;
 use crate::network::Error as NetworkError;
-use crate::ClockError;
 use ublox_sockets::Error as SocketError;
 
 #[derive(Debug, PartialEq)]
@@ -35,11 +34,5 @@ impl From<NetworkError> for Error {
 impl From<SocketError> for Error {
     fn from(e: SocketError) -> Self {
         Error::Socket(e)
-    }
-}
-
-impl From<ClockError> for Error {
-    fn from(e: ClockError) -> Self {
-        Error::Generic(GenericError::Clock(e))
     }
 }

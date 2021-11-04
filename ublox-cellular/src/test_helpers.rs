@@ -1,7 +1,6 @@
 //! This module is required in order to satisfy the requirements of defmt, while running tests.
 //! Note that this will cause all log `defmt::` log statements to be thrown away.
-use super::Clock;
-use atat::AtatClient;
+use atat::{AtatClient, Clock};
 use core::ptr::NonNull;
 use fugit::ExtU32;
 
@@ -71,7 +70,7 @@ impl AtatClient for MockAtClient {
 pub struct MockTimer<const TIMER_HZ: u32> {
     forced_ms_time: Option<fugit::TimerInstantU32<TIMER_HZ>>,
     start: std::time::Instant,
-    millis: fugit::MillisDurationU32,
+    duration: fugit::TimerDurationU32<TIMER_HZ>,
 }
 
 impl<const TIMER_HZ: u32> MockTimer<TIMER_HZ> {
@@ -79,12 +78,14 @@ impl<const TIMER_HZ: u32> MockTimer<TIMER_HZ> {
         Self {
             forced_ms_time,
             start: std::time::Instant::now(),
-            millis: fugit::MillisDurationU32::millis(0),
+            duration: fugit::TimerDurationU32::millis(0),
         }
     }
 }
 
 impl<const TIMER_HZ: u32> Clock<TIMER_HZ> for MockTimer<TIMER_HZ> {
+    type Error = std::convert::Infallible;
+
     fn now(&mut self) -> fugit::TimerInstantU32<TIMER_HZ> {
         match self.forced_ms_time {
             Some(ts) => ts,
@@ -95,19 +96,16 @@ impl<const TIMER_HZ: u32> Clock<TIMER_HZ> for MockTimer<TIMER_HZ> {
         }
     }
 
-    fn start<T>(&mut self, count: T) -> Result<(), super::ClockError>
-    where
-        T: Into<fugit::MillisDurationU32>,
-    {
+    fn start(&mut self, duration: fugit::TimerDurationU32<TIMER_HZ>) -> Result<(), Self::Error> {
         self.start = std::time::Instant::now();
-        self.millis = count.into();
+        self.duration = duration.convert();
         Ok(())
     }
 
-    fn wait(&mut self) -> Result<(), super::ClockError> {
+    fn wait(&mut self) -> Result<(), Self::Error> {
         loop {
             if std::time::Instant::now() - self.start
-                > std::time::Duration::from_millis(self.millis.ticks() as u64)
+                > std::time::Duration::from_millis(self.duration.ticks() as u64)
             {
                 break;
             }

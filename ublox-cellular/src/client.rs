@@ -1,4 +1,4 @@
-use atat::AtatClient;
+use atat::{AtatClient, Clock};
 use embedded_hal::digital::{InputPin, OutputPin};
 use fugit::ExtU32;
 use ublox_sockets::SocketSet;
@@ -25,7 +25,6 @@ use crate::{
     power::PowerState,
     registration::ConnectionState,
     services::data::ContextState,
-    Clock,
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
 use network_service::{types::NetworkRegistrationUrcConfig, SetNetworkRegistrationStatus};
@@ -109,8 +108,16 @@ where
                 _ => {}
             }
 
-            self.network.status.timer.start(1.secs())?;
-            self.network.status.timer.wait()?;
+            self.network
+                .status
+                .timer
+                .start(1.secs())
+                .map_err(|_e| Error::Generic(GenericError::Clock))?;
+            self.network
+                .status
+                .timer
+                .wait()
+                .map_err(|_e| Error::Generic(GenericError::Clock))?;
         }
 
         // There was an error initializing the SIM
@@ -172,8 +179,16 @@ where
         }
 
         // Allow ATAT some time to clear the buffers
-        self.network.status.timer.start(300.millis())?;
-        self.network.status.timer.wait()?;
+        self.network
+            .status
+            .timer
+            .start(300.millis())
+            .map_err(|_e| Error::Generic(GenericError::Clock))?;
+        self.network
+            .status
+            .timer
+            .wait()
+            .map_err(|_e| Error::Generic(GenericError::Clock))?;
 
         Ok(())
     }

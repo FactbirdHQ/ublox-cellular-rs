@@ -1,11 +1,12 @@
 use super::ssl::SecurityProfileId;
 use super::DataService;
-use super::{Clock, Error, EGRESS_CHUNK_SIZE};
+use super::{Error, EGRESS_CHUNK_SIZE};
 use crate::command::ip_transport_layer::{
     types::{SocketProtocol, SslTlsStatus},
     CloseSocket, ConnectSocket, CreateSocket, PrepareWriteSocketDataBinary, SetSocketSslState,
     WriteSocketDataBinary,
 };
+use atat::Clock;
 use embedded_nal::{SocketAddr, TcpClientStack};
 use ublox_sockets::{Error as SocketError, SocketHandle, TcpSocket, TcpState};
 

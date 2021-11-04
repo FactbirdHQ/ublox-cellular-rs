@@ -35,11 +35,12 @@ use crate::{
     },
     command::{psn::SetPacketSwitchedAction, Urc},
     error::Error as DeviceError,
+    error::GenericError,
     network::{ContextId, Network},
-    Clock, ProfileId,
+    ProfileId,
 };
 use apn::{APNInfo, Apn};
-use atat::AtatClient;
+use atat::{AtatClient, Clock};
 use embedded_hal::digital::{InputPin, OutputPin};
 use fugit::ExtU32;
 
@@ -243,8 +244,12 @@ where
                 .status
                 .timer
                 .start(1.secs())
-                .map_err(Error::from)?;
-            self.network.status.timer.wait().map_err(Error::from)?;
+                .map_err(|_e| Error::Generic(GenericError::Clock))?;
+            self.network
+                .status
+                .timer
+                .wait()
+                .map_err(|_e| Error::Generic(GenericError::Clock))?;
         }
 
         // self.network

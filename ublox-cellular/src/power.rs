@@ -1,4 +1,4 @@
-use atat::AtatClient;
+use atat::{AtatClient, Clock};
 use embedded_hal::digital::{InputPin, OutputPin};
 use fugit::{ExtU32, MillisDurationU32};
 
@@ -16,7 +16,6 @@ use crate::{
         AT,
     },
     error::{Error, GenericError},
-    Clock,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
@@ -93,7 +92,8 @@ where
             false,
         )?;
 
-        self.wait_power_state(PowerState::On, 30_000.millis())?;
+        self.wait_power_state(PowerState::On, 30_000.millis())
+            .map_err(|_e| Error::Generic(GenericError::Clock))?;
 
         Ok(())
     }
@@ -108,12 +108,28 @@ where
                 // Apply Low pulse on RESET_N for 50 milliseconds to reset
                 rst.try_set_low().ok();
 
-                self.network.status.timer.start(50.millis())?;
-                self.network.status.timer.wait()?;
+                self.network
+                    .status
+                    .timer
+                    .start(50.millis())
+                    .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                self.network
+                    .status
+                    .timer
+                    .wait()
+                    .map_err(|_e| Error::Generic(GenericError::Clock))?;
 
                 rst.try_set_high().ok();
-                self.network.status.timer.start(1.secs())?;
-                self.network.status.timer.wait()?;
+                self.network
+                    .status
+                    .timer
+                    .start(1.secs())
+                    .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                self.network
+                    .status
+                    .timer
+                    .wait()
+                    .map_err(|_e| Error::Generic(GenericError::Clock))?;
             }
             None => {}
         }
@@ -138,11 +154,27 @@ where
                 // Apply Low pulse on PWR_ON for 50 microseconds to power on
                 Some(ref mut pwr) => {
                     pwr.try_set_low().ok();
-                    self.network.status.timer.start(50.micros())?;
-                    self.network.status.timer.wait()?;
+                    self.network
+                        .status
+                        .timer
+                        .start(50.micros())
+                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                    self.network
+                        .status
+                        .timer
+                        .wait()
+                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
                     pwr.try_set_high().ok();
-                    self.network.status.timer.start(1.secs())?;
-                    self.network.status.timer.wait()?;
+                    self.network
+                        .status
+                        .timer
+                        .start(1.secs())
+                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                    self.network
+                        .status
+                        .timer
+                        .wait()
+                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
 
                     if let Err(e) = self.wait_power_state(PowerState::On, 5_000.millis()) {
                         defmt::error!("Failed to power on modem");
@@ -172,8 +204,16 @@ where
         self.power_state = PowerState::Off;
         defmt::trace!("Modem powered off");
 
-        self.network.status.timer.start(10.secs())?;
-        self.network.status.timer.wait()?;
+        self.network
+            .status
+            .timer
+            .start(10.secs())
+            .map_err(|_e| Error::Generic(GenericError::Clock))?;
+        self.network
+            .status
+            .timer
+            .wait()
+            .map_err(|_e| Error::Generic(GenericError::Clock))?;
 
         Ok(())
     }
@@ -186,15 +226,31 @@ where
                 Some(ref mut pwr) => {
                     // Apply Low pulse on PWR_ON >= 1 second to power off
                     pwr.try_set_low().ok();
-                    self.network.status.timer.start(1.secs())?;
-                    self.network.status.timer.wait()?;
+                    self.network
+                        .status
+                        .timer
+                        .start(1.secs())
+                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                    self.network
+                        .status
+                        .timer
+                        .wait()
+                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
                     pwr.try_set_high().ok();
 
                     self.power_state = PowerState::Off;
                     defmt::trace!("Modem powered off");
 
-                    self.network.status.timer.start(10.secs())?;
-                    self.network.status.timer.wait()?;
+                    self.network
+                        .status
+                        .timer
+                        .start(10.secs())
+                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                    self.network
+                        .status
+                        .timer
+                        .wait()
+                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
                 }
                 _ => {
                     return Err(Error::Generic(GenericError::Unsupported));
@@ -248,8 +304,16 @@ where
                 break;
             }
 
-            self.network.status.timer.start(5.millis())?;
-            self.network.status.timer.wait()?;
+            self.network
+                .status
+                .timer
+                .start(5.millis())
+                .map_err(|_e| Error::Generic(GenericError::Clock))?;
+            self.network
+                .status
+                .timer
+                .wait()
+                .map_err(|_e| Error::Generic(GenericError::Clock))?;
         }
 
         if res {

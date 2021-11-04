@@ -1,4 +1,3 @@
-use super::Clock;
 use crate::{
     command::{
         error::UbloxError,
@@ -19,7 +18,7 @@ use crate::{
     registration::{self, ConnectionState, RegistrationParams, RegistrationState},
     services::data::ContextState,
 };
-use atat::{atat_derive::AtatLen, AtatClient};
+use atat::{atat_derive::AtatLen, AtatClient, Clock};
 use fugit::{ExtU32, MinutesDurationU32, SecsDurationU32};
 use hash32_derive::Hash32;
 use serde::{Deserialize, Serialize};
@@ -521,9 +520,8 @@ mod tests {
     use crate::{
         registration::Status,
         test_helpers::{MockAtClient, MockTimer},
-        Instant,
     };
-    use fugit::MillisDurationU32;
+    use fugit::{MillisDurationU32, TimerInstantU32};
 
     const TIMER_HZ: u32 = 1000;
 
@@ -532,31 +530,31 @@ mod tests {
     fn intervene_registration() {
         // Setup
         let tx = AtTx::new(MockAtClient::new(0), 5);
-        let timer: MockTimer<TIMER_HZ> = MockTimer::new(Some(Instant::from_ticks(25_234)));
+        let timer: MockTimer<TIMER_HZ> = MockTimer::new(Some(TimerInstantU32::from_ticks(25_234)));
         let mut network = Network::new(tx, timer);
         network.status.conn_state = ConnectionState::Connecting;
         // Update both started & updated
         network
             .status
             .eps
-            .set_status(Status::NotRegistering, Instant::from_ticks(1234));
+            .set_status(Status::NotRegistering, TimerInstantU32::from_ticks(1234));
         // Update only updated
         network
             .status
             .eps
-            .set_status(Status::NotRegistering, Instant::from_ticks(1534));
+            .set_status(Status::NotRegistering, TimerInstantU32::from_ticks(1534));
         network
             .status
             .csd
-            .set_status(Status::NotRegistering, Instant::from_ticks(1534));
+            .set_status(Status::NotRegistering, TimerInstantU32::from_ticks(1534));
 
         assert_eq!(
             network.status.eps.updated(),
-            Some(Instant::from_ticks(1534))
+            Some(TimerInstantU32::from_ticks(1534))
         );
         assert_eq!(
             network.status.eps.started(),
-            Some(Instant::from_ticks(1234))
+            Some(TimerInstantU32::from_ticks(1234))
         );
         assert!(network.status.eps.sticky());
 
@@ -574,25 +572,25 @@ mod tests {
     #[test]
     fn reset_reg_time() {
         let tx = AtTx::new(MockAtClient::new(0), 5);
-        let timer: MockTimer<TIMER_HZ> = MockTimer::new(Some(Instant::from_ticks(1234)));
+        let timer: MockTimer<TIMER_HZ> = MockTimer::new(Some(TimerInstantU32::from_ticks(1234)));
         let mut network = Network::new(tx, timer);
 
         assert!(network.reset_reg_time().is_ok());
 
         assert_eq!(
             network.status.reg_start_time,
-            Some(Instant::from_ticks(1234))
+            Some(TimerInstantU32::from_ticks(1234))
         );
         assert_eq!(
             network.status.reg_check_time,
-            Some(Instant::from_ticks(1234))
+            Some(TimerInstantU32::from_ticks(1234))
         );
     }
 
     #[test]
     fn check_registration_state() {
         let tx = AtTx::new(MockAtClient::new(0), 5);
-        let timer: MockTimer<TIMER_HZ> = MockTimer::new(Some(Instant::from_ticks(1234)));
+        let timer: MockTimer<TIMER_HZ> = MockTimer::new(Some(TimerInstantU32::from_ticks(1234)));
         let mut network = Network::new(tx, timer);
 
         // Check that `ConnectionState` will change from `Connected` to `Connecting`
@@ -602,22 +600,22 @@ mod tests {
         network
             .status
             .csd
-            .set_status(Status::Denied, Instant::from_ticks(1));
+            .set_status(Status::Denied, TimerInstantU32::from_ticks(1));
         network
             .status
             .eps
-            .set_status(Status::NotRegistering, Instant::from_ticks(5));
+            .set_status(Status::NotRegistering, TimerInstantU32::from_ticks(5));
 
         assert!(network.check_registration_state().is_ok());
 
         assert_eq!(network.status.conn_state, ConnectionState::Connecting);
         assert_eq!(
             network.status.reg_start_time,
-            Some(Instant::from_ticks(1234))
+            Some(TimerInstantU32::from_ticks(1234))
         );
         assert_eq!(
             network.status.reg_check_time,
-            Some(Instant::from_ticks(1234))
+            Some(TimerInstantU32::from_ticks(1234))
         );
         assert_eq!(network.status.csd.get_status(), Status::None);
         assert_eq!(network.status.csd.updated(), None);
@@ -634,7 +632,7 @@ mod tests {
         network
             .status
             .eps
-            .set_status(Status::Roaming, Instant::from_ticks(5));
+            .set_status(Status::Roaming, TimerInstantU32::from_ticks(5));
 
         assert!(network.check_registration_state().is_ok());
 
@@ -647,15 +645,15 @@ mod tests {
         network
             .status
             .eps
-            .set_status(Status::Denied, Instant::from_ticks(5));
+            .set_status(Status::Denied, TimerInstantU32::from_ticks(5));
         network
             .status
             .csd
-            .set_status(Status::Roaming, Instant::from_ticks(5));
+            .set_status(Status::Roaming, TimerInstantU32::from_ticks(5));
         network
             .status
             .psd
-            .set_status(Status::Home, Instant::from_ticks(5));
+            .set_status(Status::Home, TimerInstantU32::from_ticks(5));
 
         assert!(network.check_registration_state().is_ok());
 
