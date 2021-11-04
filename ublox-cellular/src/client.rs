@@ -41,29 +41,29 @@ pub enum State {
     On,
 }
 
-pub struct Device<C, CLK, RST, DTR, PWR, VINT, const FREQ_HZ: u32, const N: usize, const L: usize>
+pub struct Device<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>
 where
     C: AtatClient,
-    CLK: 'static + Clock<FREQ_HZ>,
+    CLK: 'static + Clock<TIMER_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
     VINT: InputPin,
 {
     pub(crate) config: Config<RST, DTR, PWR, VINT>,
-    pub(crate) network: Network<C, CLK, FREQ_HZ>,
+    pub(crate) network: Network<C, CLK, TIMER_HZ>,
 
     pub(crate) state: State,
     pub(crate) power_state: PowerState,
     // Ublox devices can hold a maximum of 6 active sockets
-    pub(crate) sockets: Option<&'static mut SocketSet<FREQ_HZ, N, L>>,
+    pub(crate) sockets: Option<&'static mut SocketSet<TIMER_HZ, N, L>>,
 }
 
-impl<C, CLK, RST, DTR, PWR, VINT, const FREQ_HZ: u32, const N: usize, const L: usize> Drop
-    for Device<C, CLK, RST, DTR, PWR, VINT, FREQ_HZ, N, L>
+impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize> Drop
+    for Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock<FREQ_HZ>,
+    CLK: Clock<TIMER_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -77,11 +77,11 @@ where
     }
 }
 
-impl<C, CLK, RST, DTR, PWR, VINT, const FREQ_HZ: u32, const N: usize, const L: usize>
-    Device<C, CLK, RST, DTR, PWR, VINT, FREQ_HZ, N, L>
+impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>
+    Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock<FREQ_HZ>,
+    CLK: Clock<TIMER_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -134,12 +134,12 @@ where
         return Err(Error::Busy);
     }
 
-    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<FREQ_HZ, N, L>) {
+    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<TIMER_HZ, N, L>) {
         socket_set.prune();
         self.sockets.replace(socket_set);
     }
 
-    pub fn take_socket_storage(&mut self) -> Option<&'static mut SocketSet<FREQ_HZ, N, L>> {
+    pub fn take_socket_storage(&mut self) -> Option<&'static mut SocketSet<TIMER_HZ, N, L>> {
         self.sockets.take()
     }
 
@@ -495,9 +495,9 @@ mod tests {
 
     const SOCKET_SIZE: usize = 128;
     const SOCKET_SET_LEN: usize = 2;
-    const FREQ_HZ: u32 = 1000;
+    const TIMER_HZ: u32 = 1000;
 
-    static mut SOCKET_SET: Option<SocketSet<FREQ_HZ, SOCKET_SET_LEN, SOCKET_SIZE>> = None;
+    static mut SOCKET_SET: Option<SocketSet<TIMER_HZ, SOCKET_SET_LEN, SOCKET_SIZE>> = None;
 
     #[test]
     #[ignore]
@@ -513,7 +513,7 @@ mod tests {
             })
         };
 
-        let mut device = Device::<_, _, _, _, _, _, FREQ_HZ, SOCKET_SET_LEN, SOCKET_SIZE>::new(
+        let mut device = Device::<_, _, _, _, _, _, TIMER_HZ, SOCKET_SET_LEN, SOCKET_SIZE>::new(
             client, timer, config,
         );
         device.set_socket_storage(socket_set);
@@ -535,7 +535,7 @@ mod tests {
             assert_eq!(sockets.len(), 1);
 
             let mut tcp = sockets
-                .get::<TcpSocket<FREQ_HZ, SOCKET_SIZE>>(SocketHandle(0))
+                .get::<TcpSocket<TIMER_HZ, SOCKET_SIZE>>(SocketHandle(0))
                 .expect("Failed to get socket");
 
             assert_eq!(tcp.rx_window(), SOCKET_SIZE);
@@ -568,7 +568,7 @@ mod tests {
             assert_eq!(sockets.len(), 1);
 
             let tcp = sockets
-                .get::<TcpSocket<FREQ_HZ, SOCKET_SIZE>>(SocketHandle(0))
+                .get::<TcpSocket<TIMER_HZ, SOCKET_SIZE>>(SocketHandle(0))
                 .expect("Failed to get socket");
             assert_eq!(tcp.recv_queue(), 0);
         } else {

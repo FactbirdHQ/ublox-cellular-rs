@@ -7,11 +7,11 @@ use heapless::String;
 use super::{Clock, DataService, Error};
 use crate::command::dns::{self, types::ResolutionType};
 
-impl<'a, C, CLK, const FREQ_HZ: u32, const N: usize, const L: usize> Dns
-    for DataService<'a, C, CLK, FREQ_HZ, N, L>
+impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> Dns
+    for DataService<'a, C, CLK, TIMER_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock<FREQ_HZ>,
+    CLK: Clock<TIMER_HZ>,
 {
     type Error = Error;
 

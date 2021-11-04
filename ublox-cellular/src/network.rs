@@ -168,19 +168,19 @@ impl<C: AtatClient> AtTx<C> {
     }
 }
 
-pub struct Network<C, CLK, const FREQ_HZ: u32>
+pub struct Network<C, CLK, const TIMER_HZ: u32>
 where
-    CLK: Clock<FREQ_HZ>,
+    CLK: Clock<TIMER_HZ>,
 {
-    pub(crate) status: RegistrationState<CLK, FREQ_HZ>,
+    pub(crate) status: RegistrationState<CLK, TIMER_HZ>,
     pub(crate) context_state: ContextState,
     pub(crate) at_tx: AtTx<C>,
 }
 
-impl<C, CLK, const FREQ_HZ: u32> Network<C, CLK, FREQ_HZ>
+impl<C, CLK, const TIMER_HZ: u32> Network<C, CLK, TIMER_HZ>
 where
     C: AtatClient,
-    CLK: Clock<FREQ_HZ>,
+    CLK: Clock<TIMER_HZ>,
 {
     pub(crate) fn new(at_tx: AtTx<C>, timer: CLK) -> Self {
         Network {
@@ -525,14 +525,14 @@ mod tests {
     };
     use fugit::MillisDurationU32;
 
-    const FREQ_HZ: u32 = 1000;
+    const TIMER_HZ: u32 = 1000;
 
     #[test]
     #[ignore]
     fn intervene_registration() {
         // Setup
         let tx = AtTx::new(MockAtClient::new(0), 5);
-        let timer: MockTimer<FREQ_HZ> = MockTimer::new(Some(Instant::from_ticks(25_234)));
+        let timer: MockTimer<TIMER_HZ> = MockTimer::new(Some(Instant::from_ticks(25_234)));
         let mut network = Network::new(tx, timer);
         network.status.conn_state = ConnectionState::Connecting;
         // Update both started & updated
@@ -574,7 +574,7 @@ mod tests {
     #[test]
     fn reset_reg_time() {
         let tx = AtTx::new(MockAtClient::new(0), 5);
-        let timer: MockTimer<FREQ_HZ> = MockTimer::new(Some(Instant::from_ticks(1234)));
+        let timer: MockTimer<TIMER_HZ> = MockTimer::new(Some(Instant::from_ticks(1234)));
         let mut network = Network::new(tx, timer);
 
         assert!(network.reset_reg_time().is_ok());
@@ -592,7 +592,7 @@ mod tests {
     #[test]
     fn check_registration_state() {
         let tx = AtTx::new(MockAtClient::new(0), 5);
-        let timer: MockTimer<FREQ_HZ> = MockTimer::new(Some(Instant::from_ticks(1234)));
+        let timer: MockTimer<TIMER_HZ> = MockTimer::new(Some(Instant::from_ticks(1234)));
         let mut network = Network::new(tx, timer);
 
         // Check that `ConnectionState` will change from `Connected` to `Connecting`

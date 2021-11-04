@@ -68,14 +68,14 @@ impl AtatClient for MockAtClient {
 }
 
 #[derive(Debug)]
-pub struct MockTimer<const FREQ_HZ: u32> {
-    forced_ms_time: Option<fugit::TimerInstantU32<FREQ_HZ>>,
+pub struct MockTimer<const TIMER_HZ: u32> {
+    forced_ms_time: Option<fugit::TimerInstantU32<TIMER_HZ>>,
     start: std::time::Instant,
     millis: fugit::MillisDurationU32,
 }
 
-impl<const FREQ_HZ: u32> MockTimer<FREQ_HZ> {
-    pub fn new(forced_ms_time: Option<fugit::TimerInstantU32<FREQ_HZ>>) -> Self {
+impl<const TIMER_HZ: u32> MockTimer<TIMER_HZ> {
+    pub fn new(forced_ms_time: Option<fugit::TimerInstantU32<TIMER_HZ>>) -> Self {
         Self {
             forced_ms_time,
             start: std::time::Instant::now(),
@@ -84,8 +84,8 @@ impl<const FREQ_HZ: u32> MockTimer<FREQ_HZ> {
     }
 }
 
-impl<const FREQ_HZ: u32> Clock<FREQ_HZ> for MockTimer<FREQ_HZ> {
-    fn now(&mut self) -> fugit::TimerInstantU32<FREQ_HZ> {
+impl<const TIMER_HZ: u32> Clock<TIMER_HZ> for MockTimer<TIMER_HZ> {
+    fn now(&mut self) -> fugit::TimerInstantU32<TIMER_HZ> {
         match self.forced_ms_time {
             Some(ts) => ts,
             None => {
@@ -119,13 +119,13 @@ impl<const FREQ_HZ: u32> Clock<FREQ_HZ> for MockTimer<FREQ_HZ> {
 mod tests {
     use super::*;
 
-    const FREQ_HZ: u32 = 1000;
+    const TIMER_HZ: u32 = 1000;
 
     #[test]
     fn mock_timer_works() {
         let now = std::time::Instant::now();
 
-        let mut timer: MockTimer<FREQ_HZ> = MockTimer::new(None);
+        let mut timer: MockTimer<TIMER_HZ> = MockTimer::new(None);
         timer.start(1.secs()).unwrap();
         timer.wait().unwrap();
 

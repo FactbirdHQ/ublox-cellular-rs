@@ -25,11 +25,11 @@ pub enum PowerState {
     On,
 }
 
-impl<C, CLK, RST, DTR, PWR, VINT, const FREQ_HZ: u32, const N: usize, const L: usize>
-    Device<C, CLK, RST, DTR, PWR, VINT, FREQ_HZ, N, L>
+impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>
+    Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock<FREQ_HZ>,
+    CLK: Clock<TIMER_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,

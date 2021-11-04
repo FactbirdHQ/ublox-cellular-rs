@@ -65,11 +65,11 @@ const PROFILE_ID: ProfileId = ProfileId(1);
 #[cfg(not(feature = "upsd-context-activation"))]
 const CONTEXT_ID: ContextId = ContextId(1);
 
-impl<C, CLK, RST, DTR, PWR, VINT, const FREQ_HZ: u32, const N: usize, const L: usize>
-    Device<C, CLK, RST, DTR, PWR, VINT, FREQ_HZ, N, L>
+impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>
+    Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock<FREQ_HZ>,
+    CLK: Clock<TIMER_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -126,7 +126,7 @@ where
     pub fn data_service<'a>(
         &'a mut self,
         apn_info: &APNInfo,
-    ) -> nb::Result<DataService<'a, C, CLK, FREQ_HZ, N, L>, DeviceError> {
+    ) -> nb::Result<DataService<'a, C, CLK, TIMER_HZ, N, L>, DeviceError> {
         // Spin [`Device`], handling [`Network`] related URC changes and propagting the FSM
         match self.spin() {
             // If we're not using AT+UPSD-based
@@ -163,25 +163,25 @@ pub enum ContextState {
     Active,
 }
 
-pub struct DataService<'a, C, CLK, const FREQ_HZ: u32, const N: usize, const L: usize>
+pub struct DataService<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize>
 where
     C: atat::AtatClient,
-    CLK: 'static + Clock<FREQ_HZ>,
+    CLK: 'static + Clock<TIMER_HZ>,
 {
-    network: &'a mut Network<C, CLK, FREQ_HZ>,
-    pub(crate) sockets: Option<&'a mut SocketSet<FREQ_HZ, N, L>>,
+    network: &'a mut Network<C, CLK, TIMER_HZ>,
+    pub(crate) sockets: Option<&'a mut SocketSet<TIMER_HZ, N, L>>,
 }
 
-impl<'a, C, CLK, const FREQ_HZ: u32, const N: usize, const L: usize>
-    DataService<'a, C, CLK, FREQ_HZ, N, L>
+impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize>
+    DataService<'a, C, CLK, TIMER_HZ, N, L>
 where
     C: atat::AtatClient,
-    CLK: 'static + Clock<FREQ_HZ>,
+    CLK: 'static + Clock<TIMER_HZ>,
 {
     pub fn try_new(
         apn_info: &APNInfo,
-        network: &'a mut Network<C, CLK, FREQ_HZ>,
-        sockets: Option<&'a mut SocketSet<FREQ_HZ, N, L>>,
+        network: &'a mut Network<C, CLK, TIMER_HZ>,
+        sockets: Option<&'a mut SocketSet<TIMER_HZ, N, L>>,
     ) -> nb::Result<Self, Error> {
         let mut data_service = Self { network, sockets };
 

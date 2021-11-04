@@ -7,11 +7,11 @@ use crate::command::ip_transport_layer::{
 use embedded_nal::{SocketAddr, UdpClientStack};
 use ublox_sockets::{Error as SocketError, SocketHandle, UdpSocket};
 
-impl<'a, C, CLK, const FREQ_HZ: u32, const N: usize, const L: usize> UdpClientStack
-    for DataService<'a, C, CLK, FREQ_HZ, N, L>
+impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> UdpClientStack
+    for DataService<'a, C, CLK, TIMER_HZ, N, L>
 where
     C: atat::AtatClient,
-    CLK: Clock<FREQ_HZ>,
+    CLK: Clock<TIMER_HZ>,
 {
     type Error = Error;
 
@@ -53,7 +53,7 @@ where
     ) -> Result<(), Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
             let mut udp = sockets
-                .get::<UdpSocket<FREQ_HZ, L>>(*socket)
+                .get::<UdpSocket<TIMER_HZ, L>>(*socket)
                 .map_err(Self::Error::from)?;
             udp.bind(remote).map_err(Self::Error::from)?;
             Ok(())
@@ -66,7 +66,7 @@ where
     fn send(&mut self, socket: &mut Self::UdpSocket, buffer: &[u8]) -> nb::Result<(), Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
             let udp = sockets
-                .get::<UdpSocket<FREQ_HZ, L>>(*socket)
+                .get::<UdpSocket<TIMER_HZ, L>>(*socket)
                 .map_err(Self::Error::from)?;
 
             if !udp.is_open() {
@@ -122,7 +122,7 @@ where
     ) -> nb::Result<(usize, SocketAddr), Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
             let mut udp = sockets
-                .get::<UdpSocket<FREQ_HZ, L>>(*socket)
+                .get::<UdpSocket<TIMER_HZ, L>>(*socket)
                 .map_err(Self::Error::from)?;
 
             let bytes = udp.recv_slice(buffer).map_err(Self::Error::from)?;

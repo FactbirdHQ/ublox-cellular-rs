@@ -34,11 +34,11 @@ pub trait SSL {
     ) -> Result<(), Error>;
 }
 
-impl<'a, C, CLK, const FREQ_HZ: u32, const N: usize, const L: usize> SSL
-    for DataService<'a, C, CLK, FREQ_HZ, N, L>
+impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> SSL
+    for DataService<'a, C, CLK, TIMER_HZ, N, L>
 where
     C: atat::AtatClient,
-    CLK: Clock<FREQ_HZ>,
+    CLK: Clock<TIMER_HZ>,
 {
     fn import_certificate(
         &mut self,
