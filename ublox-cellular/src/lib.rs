@@ -10,6 +10,7 @@ mod registration;
 mod services;
 
 pub use atat::serde_bytes;
+pub use ublox_sockets as sockets;
 
 #[cfg(test)]
 mod test_helpers;

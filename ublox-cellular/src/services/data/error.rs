@@ -5,7 +5,6 @@ use ublox_sockets::Error as SocketError;
 #[derive(Debug, PartialEq)]
 pub enum Error {
     InvalidApn,
-    SocketClosed,
     SocketMemory,
     WrongSocketType,
     BadLength,

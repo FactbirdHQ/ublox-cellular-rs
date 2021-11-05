@@ -1,6 +1,6 @@
 use super::ssl::SecurityProfileId;
 use super::DataService;
-use super::{Error, EGRESS_CHUNK_SIZE};
+use super::EGRESS_CHUNK_SIZE;
 use crate::command::ip_transport_layer::{
     types::{SocketProtocol, SslTlsStatus},
     CloseSocket, ConnectSocket, CreateSocket, PrepareWriteSocketDataBinary, SetSocketSslState,
@@ -8,7 +8,7 @@ use crate::command::ip_transport_layer::{
 };
 use atat::Clock;
 use embedded_nal::{SocketAddr, TcpClientStack};
-use ublox_sockets::{Error as SocketError, SocketHandle, TcpSocket, TcpState};
+use ublox_sockets::{Error, SocketHandle, TcpSocket, TcpState};
 
 impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> TcpClientStack
     for DataService<'a, C, CLK, TIMER_HZ, N, L>
@@ -31,21 +31,24 @@ where
                 // Check if there are any sockets closed by remote, and close it
                 // if it has exceeded its timeout, in order to recycle it.
                 if !sockets.recycle(ts) {
-                    return Err(Error::Socket(SocketError::SocketSetFull));
+                    return Err(Error::SocketSetFull);
                 }
             }
 
-            let socket_resp = self.network.send_internal(
-                &CreateSocket {
-                    protocol: SocketProtocol::TCP,
-                    local_port: None,
-                },
-                true,
-            )?;
+            let socket_resp = self
+                .network
+                .send_internal(
+                    &CreateSocket {
+                        protocol: SocketProtocol::TCP,
+                        local_port: None,
+                    },
+                    true,
+                )
+                .map_err(|_| Error::Unaddressable)?;
 
             Ok(sockets.add(TcpSocket::new(socket_resp.socket.0))?)
         } else {
-            Err(Error::SocketMemory)
+            Err(Error::Illegal)
         }
     }
 
@@ -69,7 +72,7 @@ where
                         },
                         true,
                     )
-                    .map_err(Self::Error::from)?;
+                    .map_err(|_| nb::Error::Other(Error::Unaddressable))?;
 
                 self.network
                     .send_internal(
@@ -80,7 +83,7 @@ where
                         },
                         false,
                     )
-                    .map_err(Self::Error::from)?;
+                    .map_err(|_| nb::Error::Other(Error::Unaddressable))?;
 
                 tcp.set_state(TcpState::Connected(remote));
                 Ok(())
@@ -90,10 +93,10 @@ where
                     socket,
                     tcp.state()
                 );
-                Err(Error::Socket(SocketError::Illegal).into())
+                Err(Error::Illegal.into())
             }
         } else {
-            Err(Error::SocketMemory.into())
+            Err(Error::Illegal.into())
         }
     }
 
@@ -104,7 +107,7 @@ where
                 .get::<TcpSocket<TIMER_HZ, L>>(*socket)?
                 .is_connected())
         } else {
-            Err(Error::SocketMemory.into())
+            Err(Error::Illegal.into())
         }
     }
 
@@ -129,7 +132,7 @@ where
                     },
                     false,
                 )
-                .map_err(Self::Error::from)?;
+                .map_err(|_| nb::Error::Other(Error::Unaddressable))?;
 
             let response = self
                 .network
@@ -139,13 +142,13 @@ where
                     },
                     false,
                 )
-                .map_err(Self::Error::from)?;
+                .map_err(|_| nb::Error::Other(Error::Unaddressable))?;
 
             if response.length != chunk.len() {
                 return Err(Error::BadLength.into());
             }
             if &response.socket != socket {
-                return Err(Error::WrongSocketType.into());
+                return Err(Error::InvalidSocket.into());
             }
         }
 
@@ -167,18 +170,20 @@ where
 
             Ok(tcp.recv_slice(buffer).map_err(Self::Error::from)?)
         } else {
-            Err(Error::SocketMemory.into())
+            Err(Error::Illegal.into())
         }
     }
 
     /// Close an existing TCP socket.
     fn close(&mut self, socket: Self::TcpSocket) -> Result<(), Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
-            self.network.send_internal(&CloseSocket { socket }, false)?;
+            self.network
+                .send_internal(&CloseSocket { socket }, false)
+                .map_err(|_| Error::Unaddressable)?;
             sockets.remove(socket)?;
             Ok(())
         } else {
-            Err(Error::SocketMemory.into())
+            Err(Error::Illegal.into())
         }
     }
 }
