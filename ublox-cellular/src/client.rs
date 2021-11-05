@@ -20,7 +20,7 @@ use crate::{
         psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
     },
     config::Config,
-    error::{Error, GenericError},
+    error::{from_clock, Error, GenericError},
     network::{AtTx, Network},
     power::PowerState,
     registration::ConnectionState,
@@ -112,12 +112,8 @@ where
                 .status
                 .timer
                 .start(1.secs())
-                .map_err(|_e| Error::Generic(GenericError::Clock))?;
-            self.network
-                .status
-                .timer
-                .wait()
-                .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                .map_err(from_clock)?;
+            nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
         }
 
         // There was an error initializing the SIM
@@ -183,12 +179,8 @@ where
             .status
             .timer
             .start(300.millis())
-            .map_err(|_e| Error::Generic(GenericError::Clock))?;
-        self.network
-            .status
-            .timer
-            .wait()
-            .map_err(|_e| Error::Generic(GenericError::Clock))?;
+            .map_err(from_clock)?;
+        nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
         Ok(())
     }
