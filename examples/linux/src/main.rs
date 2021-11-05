@@ -7,6 +7,7 @@ use ublox_cellular::prelude::*;
 use ublox_cellular::APNInfo;
 //use ublox_cellular::sockets::{Ipv4Addr, Mode, SocketAddrV4, SocketSet, Socket};
 use atat::AtatClient;
+use ublox_cellular::sockets::SocketSet;
 use ublox_cellular::{error::Error as GSMError, Config, GsmClient};
 
 use atat::bbqueue::BBBuffer;
@@ -15,32 +16,14 @@ use heapless::{self, spsc::Queue};
 use common::{gpio::ExtPin, serial::Serial, timer::SysTimer};
 use std::time::Duration;
 
-// fn attach_gprs<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>(
-//     gsm: &GsmClient<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>,
-// ) -> Result<(), GSMError>
-// where
-//     C: AtatClient,
-//     CLK: Clock<TIMER_HZ>,
-//     RST: OutputPin,
-//     PWR: OutputPin,
-//     DTR: OutputPin,
-//     VINT: InputPin,
-// {
-//     gsm.initialize()?;
-//     gsm.begin().unwrap();
-//     gsm.attach_gprs().unwrap();
-//     Ok(())
-// }
-
 const RX_BUF_LEN: usize = 256;
 const RES_CAPACITY: usize = 5;
 const URC_CAPACITY: usize = 10;
 const TIMER_HZ: u32 = 1000;
-
 const MAX_SOCKET_COUNT: usize = 6;
-const SOCET_RING_BUFFER_LEN: usize = 1024;
+const SOCKET_RING_BUFFER_LEN: usize = 1024;
 
-//static mut SOCKET_SET: Option<SocketSet<consts::U6, consts::U2048>> = None;
+static mut SOCKET_SET: Option<SocketSet<TIMER_HZ, MAX_SOCKET_COUNT, SOCKET_RING_BUFFER_LEN>> = None;
 
 fn main() {
     env_logger::builder()
@@ -73,9 +56,9 @@ fn main() {
         )
         .build(queues);
 
-    // unsafe {
-    //     SOCKET_SET = Some(SocketSet::new());
-    // }
+    unsafe {
+        SOCKET_SET = Some(SocketSet::new());
+    }
 
     // let gsm = GsmClient::<_, Pin, Pin, _, _>::new(
     //     cell_client,
@@ -84,7 +67,7 @@ fn main() {
     // );
 
     //let gsm = GsmClient::<_, Pin, Pin, _, _>::new(cell_client, Config::new(APNInfo::new("em"), ""));
-    let mut gsm = GsmClient::<
+    let mut modem = GsmClient::<
         _,
         _,
         ExtPin,
@@ -93,12 +76,14 @@ fn main() {
         ExtPin,
         TIMER_HZ,
         MAX_SOCKET_COUNT,
-        SOCET_RING_BUFFER_LEN,
+        SOCKET_RING_BUFFER_LEN,
     >::new(
         cell_client,
         SysTimer::new(),
         Config::new("").with_apn_info(APNInfo::new("em")),
     );
+
+    modem.set_socket_storage(unsafe { SOCKET_SET.as_mut().unwrap() });
 
     // Launch reading thread
     thread::Builder::new()
@@ -121,8 +106,11 @@ fn main() {
         })
         .unwrap();
 
+
+    modem.initialize().unwrap();
+
     loop {
-        if let Err(e) = gsm.spin() {
+        if let Err(e) = modem.spin() {
             log::error!("gsm spin: {:?}", e);
         }
     }

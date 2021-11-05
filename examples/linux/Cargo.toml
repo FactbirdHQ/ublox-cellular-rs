@@ -12,8 +12,7 @@ edition = "2018"
 
 [dependencies]
 embedded-hal = "^1.0.0-alpha.4"
-atat = { git = "https://github.com/andresv/atat.git", branch = "use-fugit-for-timing", features = ["derive", "defmt", "bytes"] }
-
+atat = { git = "https://github.com/BlackbirdHQ/atat.git", features = ["derive", "defmt", "bytes"] }
 log = { version = "0.4", default-features = false }
 env_logger = "0.9"
 linux-embedded-hal = "0.3"
