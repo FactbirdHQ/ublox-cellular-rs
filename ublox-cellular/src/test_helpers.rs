@@ -102,15 +102,14 @@ impl<const TIMER_HZ: u32> Clock<TIMER_HZ> for MockTimer<TIMER_HZ> {
         Ok(())
     }
 
-    fn wait(&mut self) -> Result<(), Self::Error> {
-        loop {
-            if std::time::Instant::now() - self.start
-                > std::time::Duration::from_millis(self.duration.ticks() as u64)
-            {
-                break;
-            }
+    fn wait(&mut self) -> nb::Result<(), Self::Error> {
+        if std::time::Instant::now() - self.start
+            > std::time::Duration::from_millis(self.duration.ticks() as u64)
+        {
+            Ok(())
+        } else {
+            Err(nb::Error::WouldBlock)
         }
-        Ok(())
     }
 }
 
@@ -125,7 +124,7 @@ mod tests {
 
         let mut timer: MockTimer<TIMER_HZ> = MockTimer::new(None);
         timer.start(1.secs()).unwrap();
-        timer.wait().unwrap();
+        nb::block!(timer.wait()).unwrap();
 
         assert!(now.elapsed().as_millis() >= 1_000);
     }
