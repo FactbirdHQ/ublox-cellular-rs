@@ -49,3 +49,10 @@ impl From<NetworkError> for Error {
         }
     }
 }
+
+// `Clock` trait has associated `Error` type.
+// Therefore we cannot use `From` for error converion.
+// This is helper that can be used as `.map_err(from_clock)`
+pub fn from_clock<E>(_error: E) -> Error {
+    Error::Generic(GenericError::Clock)
+}
