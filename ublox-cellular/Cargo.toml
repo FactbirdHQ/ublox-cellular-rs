@@ -1,10 +1,10 @@
 [package]
 name = "ublox-cellular-rs"
-version = "0.4.1-alpha.0"
+version = "0.4.0"
 authors = ["Mathias Koch <mk@blackbird.online>"]
 description = "Driver crate for u-blox cellular devices, implementation follows 'UBX-13002752 - R65'"
 readme = "../README.md"
-keywords = ["arm", "cortex-m", "ublox", "cellular"]
+keywords = ["arm", "cortex-m", "ublox", "cellular", "embedded-hal-driver"]
 categories = ["embedded", "no-std"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/BlackbirdHQ/ublox-cellular-rs"
@@ -25,7 +25,8 @@ hash32-derive = "^0.1.0"
 heapless = { version = "^0.7", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
-ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets" }
+ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", rev = "f57d5f1" }
+# ublox-sockets = { path = "../../ublox-sockets" }
 
 # Enable `serde` feature of `no-std-net`
 no-std-net = { version = "^0.5", features = ["serde"] }
