@@ -1,16 +1,14 @@
-use serialport;
 use std::thread;
 use std::time::Duration;
 
+use atat::bbqueue::BBBuffer;
+use atat::heapless::spsc::Queue;
+use common::{gpio::ExtPin, serial::Serial, timer::SysTimer};
+use serialport;
+use structopt::StructOpt;
 use ublox_cellular::prelude::*;
 use ublox_cellular::sockets::{SocketHandle, SocketSet};
 use ublox_cellular::{APNInfo, Config, GsmClient};
-
-use atat::bbqueue::BBBuffer;
-use atat::heapless::spsc::Queue;
-use atat::{ClientBuilder, Queues};
-
-use common::{gpio::ExtPin, serial::Serial, timer::SysTimer};
 
 const RX_BUF_LEN: usize = 256;
 const RES_CAPACITY: usize = 5;
@@ -20,6 +18,17 @@ const MAX_SOCKET_COUNT: usize = 6;
 const SOCKET_RING_BUFFER_LEN: usize = 1024;
 
 static mut SOCKET_SET: Option<SocketSet<TIMER_HZ, MAX_SOCKET_COUNT, SOCKET_RING_BUFFER_LEN>> = None;
+
+#[derive(StructOpt, Debug)]
+struct Opt {
+    /// Serial port device
+    #[structopt(short, long, default_value = "/dev/ttyUSB0")]
+    port: String,
+
+    /// Serial port baudrate
+    #[structopt(short, long, default_value = "115200")]
+    baud: u32,
+}
 
 #[derive(Debug)]
 enum NetworkError {
@@ -60,11 +69,13 @@ fn is_connected<N: TcpClientStack<TcpSocket = SocketHandle> + ?Sized>(
 }
 
 fn main() {
+    let opt = Opt::from_args();
+
     env_logger::builder()
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    let serial_tx = serialport::new("/dev/ttyUSB0", 115_200)
+    let serial_tx = serialport::new(opt.port, opt.baud)
         .timeout(Duration::from_millis(5000))
         .open()
         .expect("Could not open serial port");
@@ -75,14 +86,14 @@ fn main() {
     static mut URC_QUEUE: BBBuffer<URC_CAPACITY> = BBBuffer::new();
     static mut COM_QUEUE: atat::ComQueue = Queue::new();
 
-    let queues = Queues {
+    let queues = atat::Queues {
         res_queue: unsafe { RES_QUEUE.try_split_framed().unwrap() },
         urc_queue: unsafe { URC_QUEUE.try_split_framed().unwrap() },
         com_queue: unsafe { COM_QUEUE.split() },
     };
 
     let (cell_client, mut ingress) =
-        ClientBuilder::<_, _, _, _, TIMER_HZ, RX_BUF_LEN, RES_CAPACITY, URC_CAPACITY>::new(
+        atat::ClientBuilder::<_, _, _, _, TIMER_HZ, RX_BUF_LEN, RES_CAPACITY, URC_CAPACITY>::new(
             Serial(serial_tx),
             SysTimer::new(),
             atat::Config::new(atat::Mode::Timeout),
@@ -118,6 +129,7 @@ fn main() {
             match serial_rx.read(&mut buffer[..]) {
                 Ok(0) => {}
                 Ok(bytes_read) => {
+                    //log::info!("rx: {:?}", &buffer[0..bytes_read].iter().map(|b| *b as char).collect::<Vec<_>>());
                     ingress.write(&buffer[0..bytes_read]);
                     ingress.digest();
                     ingress.digest();
