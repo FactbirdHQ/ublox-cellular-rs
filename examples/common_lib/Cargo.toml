@@ -19,5 +19,4 @@ serialport = "4"
 embedded-hal = "^1.0.0-alpha.4"
 linux-embedded-hal = "0.3"
 nb = "1"
-fugit = "0.3"
 ublox-cellular-rs = { path = "../../ublox-cellular" }

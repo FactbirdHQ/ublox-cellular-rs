@@ -22,8 +22,9 @@ pub use services::data::apn::{APNInfo, Apn};
 pub use services::data::ssl::SecurityProfileId;
 pub use services::data::DataService;
 
-// Re-export atat version in use
+// Re-export atat and fugit
 pub use atat;
+pub use fugit;
 
 /// Prelude - Include traits
 pub mod prelude {

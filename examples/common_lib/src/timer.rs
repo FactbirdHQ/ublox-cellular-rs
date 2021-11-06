@@ -1,3 +1,4 @@
+use ublox_cellular::fugit;
 use ublox_cellular::prelude::*;
 
 pub struct SysTimer<const TIMER_HZ: u32> {
