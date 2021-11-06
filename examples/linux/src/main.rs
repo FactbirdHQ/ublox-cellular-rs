@@ -1,20 +1,16 @@
-use atat::{ClientBuilder, ComQueue, Queues};
 use serialport;
-use std::io;
 use std::thread;
+use std::time::Duration;
 
 use ublox_cellular::prelude::*;
-use ublox_cellular::APNInfo;
-//use ublox_cellular::sockets::{Ipv4Addr, Mode, SocketAddrV4, SocketSet, Socket};
-use atat::AtatClient;
-use ublox_cellular::sockets::SocketSet;
-use ublox_cellular::{error::Error as GSMError, Config, GsmClient};
+use ublox_cellular::sockets::{SocketHandle, SocketSet};
+use ublox_cellular::{APNInfo, Config, GsmClient};
 
 use atat::bbqueue::BBBuffer;
-use heapless::{self, spsc::Queue};
+use atat::heapless::spsc::Queue;
+use atat::{ClientBuilder, Queues};
 
 use common::{gpio::ExtPin, serial::Serial, timer::SysTimer};
-use std::time::Duration;
 
 const RX_BUF_LEN: usize = 256;
 const RES_CAPACITY: usize = 5;
@@ -25,12 +21,49 @@ const SOCKET_RING_BUFFER_LEN: usize = 1024;
 
 static mut SOCKET_SET: Option<SocketSet<TIMER_HZ, MAX_SOCKET_COUNT, SOCKET_RING_BUFFER_LEN>> = None;
 
+#[derive(Debug)]
+enum NetworkError {
+    SocketOpen,
+    SocketConnect,
+    SocketClosed,
+}
+
+fn connect<N: TcpClientStack<TcpSocket = SocketHandle> + ?Sized>(
+    socket: &mut Option<SocketHandle>,
+    network: &mut N,
+    socket_addr: SocketAddr,
+) -> Result<(), NetworkError> {
+    let sock = match socket.as_mut() {
+        None => {
+            let sock = network.socket().map_err(|_e| NetworkError::SocketOpen)?;
+            socket.get_or_insert(sock)
+        }
+        Some(sock) => sock,
+    };
+
+    nb::block!(network.connect(sock, socket_addr)).map_err(|_| {
+        socket.take();
+        NetworkError::SocketConnect
+    })
+}
+
+fn is_connected<N: TcpClientStack<TcpSocket = SocketHandle> + ?Sized>(
+    socket: &Option<SocketHandle>,
+    network: &mut N,
+) -> Result<bool, NetworkError> {
+    match socket {
+        Some(ref socket) => network
+            .is_connected(socket)
+            .map_err(|_e| NetworkError::SocketClosed),
+        None => Err(NetworkError::SocketClosed),
+    }
+}
+
 fn main() {
     env_logger::builder()
         .filter_level(log::LevelFilter::Trace)
         .init();
 
-    // Open serial
     let serial_tx = serialport::new("/dev/ttyUSB0", 115_200)
         .timeout(Duration::from_millis(5000))
         .open()
@@ -60,14 +93,7 @@ fn main() {
         SOCKET_SET = Some(SocketSet::new());
     }
 
-    // let gsm = GsmClient::<_, Pin, Pin, _, _>::new(
-    //     cell_client,
-    //     unsafe { SOCKET_SET.as_mut().unwrap() },
-    //     Config::new(APNInfo::new("em"), ""),
-    // );
-
-    //let gsm = GsmClient::<_, Pin, Pin, _, _>::new(cell_client, Config::new(APNInfo::new("em"), ""));
-    let mut modem = GsmClient::<
+    let mut cell_client = GsmClient::<
         _,
         _,
         ExtPin,
@@ -83,9 +109,9 @@ fn main() {
         Config::new("").with_apn_info(APNInfo::new("em")),
     );
 
-    modem.set_socket_storage(unsafe { SOCKET_SET.as_mut().unwrap() });
+    cell_client.set_socket_storage(unsafe { SOCKET_SET.as_mut().unwrap() });
 
-    // Launch reading thread
+    // spawn serial reading thread
     thread::Builder::new()
         .spawn(move || loop {
             let mut buffer = [0; 32];
@@ -97,7 +123,7 @@ fn main() {
                     ingress.digest();
                 }
                 Err(e) => match e.kind() {
-                    io::ErrorKind::Interrupted => {}
+                    std::io::ErrorKind::Interrupted => {}
                     _ => {
                         log::error!("Serial reading thread error while reading: {}", e);
                     }
@@ -106,51 +132,63 @@ fn main() {
         })
         .unwrap();
 
+    let mut socket: Option<SocketHandle> = None;
+    let mut count = 0;
 
-    modem.initialize().unwrap();
-
+    // notice that `.data_service` must be called continuously to tick modem state machine
     loop {
-        if let Err(e) = modem.spin() {
-            log::error!("gsm spin: {:?}", e);
-        }
+        cell_client
+            .data_service(&APNInfo::new("em"))
+            .and_then(|mut service| {
+                match is_connected(&socket, &mut service) {
+                    Ok(false) => {
+                        // socket is present, but not connected
+                        // usually this implies that the socket is closed for writes
+                        // close and recycle the socket
+                        let sock = socket.take().unwrap();
+                        TcpClientStack::close(&mut service, sock).expect("cannot close socket");
+                    }
+                    Err(_) => {
+                        // socket not available, try to create and connect
+                        if let Err(e) = connect(
+                            &mut socket,
+                            &mut service,
+                            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(195, 34, 89, 241)), 7),
+                        ) {
+                            log::error!("cannot connect {:?}", e);
+                        }
+                    }
+                    Ok(true) => {
+                        // socket is available, and connected.
+                    }
+                }
+
+                // socket can be used if connected
+                socket.as_mut().and_then(|sock| {
+                    if let Err(e) = nb::block!(TcpClientStack::send(
+                        &mut service,
+                        sock,
+                        format!("Whatup {}", count).as_bytes()
+                    )) {
+                        log::error!("cannot send {:?}", e);
+                    }
+
+                    let mut buf = [0; 32];
+                    match nb::block!(TcpClientStack::receive(&mut service, sock, &mut buf)) {
+                        Ok(count) => {
+                            log::info!("received {} bytes: {:?}", count, &buf[..count]);
+                        }
+                        Err(e) => {
+                            log::error!("cannot receive {:?}", e);
+                        }
+                    }
+                    Some(())
+                });
+
+                Ok(())
+            })
+            .ok();
+
+        count += 1;
     }
-
-    //if attach_gprs(&gsm).is_ok() {
-    // let mut socket = {
-    //     let soc = <GsmClient<_, _, _, _, _> as TcpStack>::open(&gsm, Mode::Blocking)
-    //         .expect("Cannot open socket!");
-
-    //     gsm.connect(
-    //         soc,
-    //         // Connect to echo.u-blox.com:7
-    //         SocketAddrV4::new(Ipv4Addr::new(195, 34, 89, 241), 7).into(),
-    //     )
-    //     .expect("Failed to connect to remote!")
-    // };
-
-    // let mut cnt = 1;
-    // loop {
-    //     thread::sleep(Duration::from_millis(5000));
-    //     let mut buf = [0u8; 256];
-    //     let read = <GsmClient<_, _, _, _, _> as TcpStack>::read(&gsm, &mut socket, &mut buf)
-    //         .expect("Failed to read from socket!");
-    //     if read > 0 {
-    //         log::info!("Read {:?} bytes from socket layer!  - {:?}", read, unsafe {
-    //             core::str::from_utf8_unchecked(&buf[..read])
-    //         });
-    //     }
-    //     let _wrote = <GsmClient<_, _, _, _, _> as TcpStack>::write(
-    //         &gsm,
-    //         &mut socket,
-    //         format!("Whatup {}", cnt).as_bytes(),
-    //     )
-    //     .expect("Failed to write to socket!");
-    //     log::info!(
-    //         "Writing {:?} bytes to socket layer! - {:?}",
-    //         _wrote,
-    //         format!("Whatup {}", cnt)
-    //     );
-    //     cnt += 1;
-    // }
-    //}
 }
