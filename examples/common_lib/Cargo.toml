@@ -17,6 +17,8 @@ doctest = false
 [dependencies]
 serialport = "4"
 embedded-hal = "^1.0.0-alpha.4"
-linux-embedded-hal = "0.3"
 nb = "1"
 ublox-cellular-rs = { path = "../../ublox-cellular" }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+linux-embedded-hal = "0.3"

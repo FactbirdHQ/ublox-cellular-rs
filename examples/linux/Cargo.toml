@@ -15,7 +15,6 @@ embedded-hal = "^1.0.0-alpha.4"
 atat = { git = "https://github.com/BlackbirdHQ/atat.git", features = ["derive", "defmt", "bytes"] }
 log = { version = "0.4", default-features = false }
 env_logger = "0.9"
-linux-embedded-hal = "0.3"
 serialport = "4"
 nb = "1"
 
