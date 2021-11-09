@@ -15,7 +15,7 @@ use crate::{
         },
         AT,
     },
-    error::{Error, GenericError},
+    error::{from_clock, Error, GenericError},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
@@ -93,7 +93,7 @@ where
         )?;
 
         self.wait_power_state(PowerState::On, 30_000.millis())
-            .map_err(|_e| Error::Generic(GenericError::Clock))?;
+            .map_err(from_clock)?;
 
         Ok(())
     }
@@ -112,24 +112,16 @@ where
                     .status
                     .timer
                     .start(50.millis())
-                    .map_err(|_e| Error::Generic(GenericError::Clock))?;
-                self.network
-                    .status
-                    .timer
-                    .wait()
-                    .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                    .map_err(from_clock)?;
+                nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
                 rst.try_set_high().ok();
                 self.network
                     .status
                     .timer
                     .start(1.secs())
-                    .map_err(|_e| Error::Generic(GenericError::Clock))?;
-                self.network
-                    .status
-                    .timer
-                    .wait()
-                    .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                    .map_err(from_clock)?;
+                nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
             }
             None => {}
         }
@@ -158,23 +150,16 @@ where
                         .status
                         .timer
                         .start(50.micros())
-                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
-                    self.network
-                        .status
-                        .timer
-                        .wait()
-                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                        .map_err(from_clock)?;
+                    nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
+
                     pwr.try_set_high().ok();
                     self.network
                         .status
                         .timer
                         .start(1.secs())
-                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
-                    self.network
-                        .status
-                        .timer
-                        .wait()
-                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                        .map_err(from_clock)?;
+                    nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
                     if let Err(e) = self.wait_power_state(PowerState::On, 5_000.millis()) {
                         defmt::error!("Failed to power on modem");
@@ -208,12 +193,8 @@ where
             .status
             .timer
             .start(10.secs())
-            .map_err(|_e| Error::Generic(GenericError::Clock))?;
-        self.network
-            .status
-            .timer
-            .wait()
-            .map_err(|_e| Error::Generic(GenericError::Clock))?;
+            .map_err(from_clock)?;
+        nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
         Ok(())
     }
@@ -230,14 +211,10 @@ where
                         .status
                         .timer
                         .start(1.secs())
-                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
-                    self.network
-                        .status
-                        .timer
-                        .wait()
-                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
-                    pwr.try_set_high().ok();
+                        .map_err(from_clock)?;
+                    nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
+                    pwr.try_set_high().ok();
                     self.power_state = PowerState::Off;
                     defmt::trace!("Modem powered off");
 
@@ -245,12 +222,8 @@ where
                         .status
                         .timer
                         .start(10.secs())
-                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
-                    self.network
-                        .status
-                        .timer
-                        .wait()
-                        .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                        .map_err(from_clock)?;
+                    nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
                 }
                 _ => {
                     return Err(Error::Generic(GenericError::Unsupported));
@@ -308,12 +281,8 @@ where
                 .status
                 .timer
                 .start(5.millis())
-                .map_err(|_e| Error::Generic(GenericError::Clock))?;
-            self.network
-                .status
-                .timer
-                .wait()
-                .map_err(|_e| Error::Generic(GenericError::Clock))?;
+                .map_err(from_clock)?;
+            nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
         }
 
         if res {
