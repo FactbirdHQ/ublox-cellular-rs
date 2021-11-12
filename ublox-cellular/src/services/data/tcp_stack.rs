@@ -88,8 +88,8 @@ where
                 tcp.set_state(TcpState::Connected(remote));
                 Ok(())
             } else {
-                defmt::error!(
-                    "Cannot connect socket! Socket: {} is in state: {}",
+                error!(
+                    "Cannot connect socket! Socket: {:?} is in state: {:?}",
                     socket,
                     tcp.state()
                 );
@@ -123,7 +123,7 @@ where
         }
 
         for chunk in buffer.chunks(EGRESS_CHUNK_SIZE) {
-            defmt::trace!("Sending: {} bytes", chunk.len());
+            trace!("Sending: {} bytes", chunk.len());
             self.network
                 .send_internal(
                     &PrepareWriteSocketDataBinary {

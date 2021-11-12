@@ -1,28 +1,32 @@
-//! This module is required in order to satisfy the requirements of defmt, while running tests.
-//! Note that this will cause all log `defmt::` log statements to be thrown away.
 use atat::{AtatClient, Clock};
-use core::ptr::NonNull;
 use fugit::ExtU32;
 
-#[defmt::global_logger]
-struct Logger;
-impl defmt::Write for Logger {
-    fn write(&mut self, _bytes: &[u8]) {}
-}
+#[cfg(feature = "defmt")]
+mod needed_for_tests_using_defmt {
+    // This module required in order to satisfy the requirements of defmt, while running tests.
+    // Note that this will cause all log `defmt::` log statements to be thrown away.
+    use core::ptr::NonNull;
 
-unsafe impl defmt::Logger for Logger {
-    fn acquire() -> Option<NonNull<dyn defmt::Write>> {
-        Some(NonNull::from(&Logger as &dyn defmt::Write))
+    #[defmt::global_logger]
+    struct Logger;
+    impl defmt::Write for Logger {
+        fn write(&mut self, _bytes: &[u8]) {}
     }
 
-    unsafe fn release(_: NonNull<dyn defmt::Write>) {}
-}
+    unsafe impl defmt::Logger for Logger {
+        fn acquire() -> Option<NonNull<dyn defmt::Write>> {
+            Some(NonNull::from(&Logger as &dyn defmt::Write))
+        }
 
-defmt::timestamp!("");
+        unsafe fn release(_: NonNull<dyn defmt::Write>) {}
+    }
 
-#[export_name = "_defmt_panic"]
-fn panic() -> ! {
-    panic!()
+    defmt::timestamp!("");
+
+    #[export_name = "_defmt_panic"]
+    fn panic() -> ! {
+        panic!()
+    }
 }
 
 #[derive(Debug)]

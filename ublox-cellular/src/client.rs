@@ -34,7 +34,8 @@ use psn::{
 };
 use sms::{types::MessageWaitingMode, SetMessageWaitingIndication};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum State {
     Off,
     On,
@@ -367,7 +368,7 @@ where
             )
             .is_err()
         {
-            defmt::warn!("Packet domain event reporting set failed");
+            warn!("Packet domain event reporting set failed");
         }
 
         // CREG URC
@@ -405,7 +406,7 @@ where
                 .handle_urc(|urc| {
                     match urc {
                         Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
-                            defmt::info!("[URC] SocketClosed {=u8}", socket.0);
+                            info!("[URC] SocketClosed {}", socket.0);
                             if let Some((_, mut sock)) =
                                 sockets.iter_mut().find(|(handle, _)| *handle == socket)
                             {
@@ -418,11 +419,7 @@ where
                         | Urc::SocketDataAvailableUDP(
                             ip_transport_layer::urc::SocketDataAvailable { socket, length },
                         ) => {
-                            defmt::trace!(
-                                "[Socket({=u8})] {=u16} bytes available",
-                                socket.0,
-                                length as u16
-                            );
+                            trace!("[Socket({})] {} bytes available", socket.0, length as u16);
                             if let Some((_, mut sock)) =
                                 sockets.iter_mut().find(|(handle, _)| *handle == socket)
                             {
@@ -480,7 +477,7 @@ where
         // At any point after init state, we should be able to fully send AT
         // commands.
         if self.state != State::On {
-            defmt::error!("Still not initialized!");
+            error!("Still not initialized!");
             return Err(Error::Uninitialized);
         }
 

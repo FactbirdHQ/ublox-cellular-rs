@@ -18,7 +18,8 @@ use crate::{
     error::{from_clock, Error, GenericError},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PowerState {
     Off,
     On,
@@ -62,7 +63,7 @@ where
             false,
         )?;
 
-        defmt::info!("Successfully factory reset modem!");
+        info!("Successfully factory reset modem!");
 
         if self.soft_reset(true).is_err() {
             self.hard_reset()?;
@@ -73,7 +74,7 @@ where
 
     /// Reset the module by sending AT CFUN command
     pub(crate) fn soft_reset(&mut self, sim_reset: bool) -> Result<(), Error> {
-        defmt::trace!(
+        trace!(
             "Attempting to soft reset of the modem with sim reset: {}.",
             sim_reset
         );
@@ -102,7 +103,7 @@ where
     ///
     /// **NOTE** This function will reset NVM settings!
     pub fn hard_reset(&mut self) -> Result<(), Error> {
-        defmt::trace!("Attempting to hard reset of the modem.");
+        trace!("Attempting to hard reset of the modem.");
         match self.config.rst_pin {
             Some(ref mut rst) => {
                 // Apply Low pulse on RESET_N for 50 milliseconds to reset
@@ -134,14 +135,14 @@ where
     }
 
     pub fn power_on(&mut self) -> Result<(), Error> {
-        defmt::info!(
-            "Attempting to power on the modem with PWR_ON pin: {=bool} and VInt pin: {=bool}.",
+        info!(
+            "Attempting to power on the modem with PWR_ON pin: {} and VInt pin: {}.",
             self.config.pwr_pin.is_some(),
             self.config.vint_pin.is_some(),
         );
 
         if self.power_state()? != PowerState::On {
-            defmt::trace!("Powering modem on.");
+            trace!("Powering modem on.");
             match self.config.pwr_pin {
                 // Apply Low pulse on PWR_ON for 50 microseconds to power on
                 Some(ref mut pwr) => {
@@ -162,10 +163,10 @@ where
                     nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
                     if let Err(e) = self.wait_power_state(PowerState::On, 5_000.millis()) {
-                        defmt::error!("Failed to power on modem");
+                        error!("Failed to power on modem");
                         return Err(e);
                     } else {
-                        defmt::trace!("Modem powered on");
+                        trace!("Modem powered on");
                     }
                 }
                 _ => {
@@ -176,18 +177,18 @@ where
                 }
             }
         } else {
-            defmt::debug!("module is already on");
+            debug!("module is already on");
         }
         Ok(())
     }
 
     pub fn soft_power_off(&mut self) -> Result<(), Error> {
-        defmt::trace!("Attempting to soft power off the modem.");
+        trace!("Attempting to soft power off the modem.");
 
         self.network.send_internal(&ModuleSwitchOff, false)?;
 
         self.power_state = PowerState::Off;
-        defmt::trace!("Modem powered off");
+        trace!("Modem powered off");
 
         self.network
             .status
@@ -200,7 +201,7 @@ where
     }
 
     pub fn hard_power_off(&mut self) -> Result<(), Error> {
-        defmt::trace!("Attempting to hard power off the modem.");
+        trace!("Attempting to hard power off the modem.");
 
         if self.power_state()? == PowerState::On {
             match self.config.pwr_pin {
@@ -216,7 +217,7 @@ where
 
                     pwr.try_set_high().ok();
                     self.power_state = PowerState::Off;
-                    defmt::trace!("Modem powered off");
+                    trace!("Modem powered off");
 
                     self.network
                         .status
@@ -262,7 +263,7 @@ where
 
         let mut res = false;
 
-        defmt::trace!("Waiting for the modem to reach {}.", expected);
+        trace!("Waiting for the modem to reach {:?}.", expected);
         while self
             .network
             .status
@@ -286,10 +287,10 @@ where
         }
 
         if res {
-            defmt::trace!("Success.");
+            trace!("Success.");
             Ok(())
         } else {
-            defmt::error!("Modem never reach {}.", expected);
+            error!("Modem never reach {:?}.", expected);
             Err(Error::Generic(GenericError::Timeout))
         }
     }

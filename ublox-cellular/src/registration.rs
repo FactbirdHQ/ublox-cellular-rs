@@ -92,7 +92,8 @@ impl From<u8> for Status {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Status {
     None,
     NotRegistering,
@@ -142,7 +143,8 @@ pub struct RegistrationParams {
     // periodic_tau: Option<u16>,
 }
 
-#[derive(Debug, Clone, Copy, defmt::Format)]
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RegType {
     Creg,
     Cgreg,
@@ -216,7 +218,8 @@ where
     // pub(crate) act: RatAct,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ConnectionState {
     Disconnected,
     Connecting,
@@ -265,7 +268,7 @@ where
             return;
         }
 
-        defmt::trace!("Connection state changed to \"{}\"", state);
+        trace!("Connection state changed to \"{:?}\"", state);
         self.conn_state = state;
     }
 
@@ -297,7 +300,7 @@ where
                 }
             }
             RegType::Unknown => {
-                defmt::error!("unknown reg type");
+                error!("unknown reg type");
                 return;
             }
         }
@@ -394,7 +397,8 @@ impl From<EPSNetworkRegistrationStatus> for RegistrationParams {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RadioAccessNetwork {
     UnknownUnused = 0,
     Geran = 1,

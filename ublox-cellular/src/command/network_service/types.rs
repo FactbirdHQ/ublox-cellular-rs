@@ -5,7 +5,8 @@ use heapless::String;
 /// Is used to chose whether the network selection is automatically done by the
 /// MT or is forced by this command to the operator <oper> given in the format
 /// <format>
-#[derive(Debug, Clone, PartialEq, AtatEnum, defmt::Format)]
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum OperatorSelectionMode {
     /// • 0 (default value and factory-programmed value): automatic (<oper> field is ignored)
     Automatic = 0,
@@ -29,7 +30,8 @@ pub enum OperatorSelectionMode {
     Unknown,
 }
 /// Indicates the radio access technology
-#[derive(Debug, Clone, Copy, PartialEq, AtatEnum, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RatAct {
     /// • 0: GSM
     Gsm = 0,
@@ -66,7 +68,8 @@ pub enum NetworkRegistrationUrcConfig {
     UrcVerbose = 2,
 }
 
-#[derive(Debug, Clone, PartialEq, AtatEnum, defmt::Format)]
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum NetworkRegistrationStat {
     /// • 0: not registered, the MT is not currently searching a new operator to register to
     NotRegistered = 0,
@@ -95,7 +98,8 @@ pub enum NetworkRegistrationStat {
 }
 
 /// Indicates the preferred access technology
-#[derive(Debug, Clone, PartialEq, AtatEnum, defmt::Format)]
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RatPreferred {
     /// • 0: GSM / GPRS / eGPRS
     GsmGprsEgprs = 0,
@@ -106,7 +110,8 @@ pub enum RatPreferred {
 }
 
 /// Indicates the radio access technology
-#[derive(Debug, Clone, PartialEq, AtatEnum, defmt::Format)]
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RadioAccessTechnologySelected {
     /// • 0: GSM / GPRS / eGPRS (single mode)
     #[at_arg(value = 0)]

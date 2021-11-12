@@ -157,7 +157,8 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ContextState {
     Setup,
     Activating,
@@ -560,7 +561,7 @@ where
                     };
 
                     if socket_handle != handle {
-                        defmt::error!("WrongSocketType {} != {}", socket_handle, handle);
+                        error!("WrongSocketType {:?} != {:?}", socket_handle, handle);
                         return Err(Error::WrongSocketType);
                     }
 
@@ -573,12 +574,7 @@ where
                         // let hex_mode = self.config.hex_mode;
                         let data_len = if hex_mode { data.len() / 2 } else { data.len() };
                         if len > 0 && data_len != len {
-                            defmt::error!(
-                                "BadLength {} != {}, {=str}",
-                                len,
-                                data_len,
-                                data.as_str()
-                            );
+                            error!("BadLength {} != {}, {}", len, data_len, data.as_str());
                             return Err(Error::BadLength);
                         }
 
@@ -592,7 +588,7 @@ where
                         let enqueued = socket.rx_enqueue_slice(demangled);
                         if enqueued != demangled.len() {
                             // This should never happen, due to the `requested_len` check above
-                            defmt::error!(
+                            error!(
                                 "Failed to enqueue full slice of data! {} != {}",
                                 enqueued,
                                 demangled.len()
@@ -606,9 +602,9 @@ where
                 })
                 .filter_map(Result::err)
                 .for_each(|_e| {
-                    // defmt::error!(
+                    // error!(
                     //     "Failed to ingress data for socket! {:?}",
-                    //     defmt::Debug2Format(&e)
+                    //     Debug2Format(&e)
                     // )
                 });
             Ok(())

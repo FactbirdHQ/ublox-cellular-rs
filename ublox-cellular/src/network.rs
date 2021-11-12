@@ -36,12 +36,12 @@ pub enum Error {
     _Unknown,
 }
 
-#[derive(
-    Debug, Clone, Copy, Eq, PartialEq, Hash32, Serialize, Deserialize, AtatLen, defmt::Format,
-)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash32, Serialize, Deserialize, AtatLen)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ProfileId(pub u8);
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, AtatLen, defmt::Format)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, AtatLen)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ContextId(pub u8);
 
 pub struct AtTx<C> {
@@ -62,6 +62,7 @@ impl<C: AtatClient> AtTx<C> {
     }
 
     pub fn reset(&mut self) -> Result<(), Error> {
+        warn!("atat reset");
         self.client.reset();
         Ok(())
     }
@@ -81,7 +82,7 @@ impl<C: AtatClient> AtTx<C> {
                     // let request = req.as_bytes();
 
                     if !matches!(ate, atat::Error::Timeout) {
-                        // defmt::error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
+                        // error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
                     }
 
                     match ate {
@@ -119,7 +120,7 @@ impl<C: AtatClient> AtTx<C> {
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
                     // let request = req.as_bytes();
-                    // defmt::error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
+                    // error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
 
                     match ate {
                         atat::Error::Error(ubx) => {
@@ -156,7 +157,7 @@ impl<C: AtatClient> AtTx<C> {
                     a += 1;
                     return false;
                     // } else {
-                    // defmt::warn!("Dropping stale URC! {}", defmt::Debug2Format(&urc));
+                    // warn!("Dropping stale URC! {}", Debug2Format(&urc));
                 }
             }
             a = 0;
@@ -203,7 +204,7 @@ where
 
     pub fn process_events(&mut self) -> Result<(), Error> {
         if self.at_tx.consecutive_timeouts > 10 {
-            defmt::warn!("Resetting the modem due to consecutive AT timeouts");
+            warn!("Resetting the modem due to consecutive AT timeouts");
             return Err(Error::Generic(GenericError::Timeout));
         }
 
@@ -241,7 +242,7 @@ where
             .unwrap_or(false);
 
         if self.status.conn_state == ConnectionState::Connecting && is_timeout {
-            defmt::warn!("Resetting the modem due to the network registration timeout");
+            warn!("Resetting the modem due to the network registration timeout");
 
             return Err(Error::Generic(GenericError::Timeout));
         }
@@ -284,7 +285,7 @@ where
             if self.status.eps.get_status() == registration::Status::NotRegistering
                 && self.status.csd.get_status() == registration::Status::NotRegistering
             {
-                defmt::debug!(
+                debug!(
                     "Sticky not registering state for {}, PLMN reselection",
                     self.status.eps.duration(now)
                 );
@@ -307,7 +308,7 @@ where
             } else if self.status.eps.get_status() == registration::Status::Denied
                 && self.status.csd.get_status() == registration::Status::Denied
             {
-                defmt::debug!(
+                debug!(
                     "Sticky denied state for {}, RF reset",
                     self.status.eps.duration(now)
                 );
@@ -340,7 +341,7 @@ where
             && self.status.csd.get_status() == registration::Status::Denied
             && self.status.psd.get_status() == registration::Status::Denied
         {
-            defmt::debug!(
+            debug!(
                 "Sticky CSD and PSD denied state for {}, RF reset",
                 self.status.csd.duration(now)
             );
@@ -373,7 +374,7 @@ where
             && self.status.psd.get_status() == registration::Status::NotRegistering
             && self.status.eps.get_status() == registration::Status::NotRegistering
         {
-            defmt::debug!(
+            debug!(
                 "Sticky not registering PSD state for {}, force GPRS attach",
                 self.status.psd.duration(now)
             );
@@ -394,7 +395,7 @@ where
                 self.status.csd.reset();
                 self.status.psd.reset();
                 self.status.eps.reset();
-                defmt::warn!("GPRS attach failed, try PLMN reselection");
+                warn!("GPRS attach failed, try PLMN reselection");
                 self.send_internal(
                     &SetOperatorSelection {
                         mode: OperatorSelectionMode::Automatic,
@@ -434,27 +435,27 @@ where
         self.at_tx.handle_urc(|urc| {
             match urc {
                 Urc::NetworkDetach => {
-                    defmt::warn!("Network Detach URC!");
+                    warn!("Network Detach URC!");
                 }
                 Urc::MobileStationDetach => {
-                    defmt::warn!("ME Detach URC!");
+                    warn!("ME Detach URC!");
                 }
                 Urc::NetworkDeactivate => {
-                    defmt::warn!("Network Deactivate URC!");
+                    warn!("Network Deactivate URC!");
                 }
                 Urc::MobileStationDeactivate => {
-                    defmt::warn!("ME Deactivate URC!");
+                    warn!("ME Deactivate URC!");
                 }
                 Urc::NetworkPDNDeactivate => {
-                    defmt::warn!("Network PDN Deactivate URC!");
+                    warn!("Network PDN Deactivate URC!");
                 }
                 Urc::MobileStationPDNDeactivate => {
-                    defmt::warn!("ME PDN Deactivate URC!");
+                    warn!("ME PDN Deactivate URC!");
                 }
                 Urc::ExtendedPSNetworkRegistration(psn::urc::ExtendedPSNetworkRegistration {
                     state,
                 }) => {
-                    defmt::info!("[URC] ExtendedPSNetworkRegistration {}", state);
+                    info!("[URC] ExtendedPSNetworkRegistration {:?}", state);
                 }
                 Urc::GPRSNetworkRegistration(reg_params) => {
                     new_reg_params.replace(reg_params.into());
@@ -469,17 +470,17 @@ where
                     result,
                     ip_addr: _,
                 }) => {
-                    defmt::info!("[URC] DataConnectionActivated {=u8}", result);
+                    info!("[URC] DataConnectionActivated {}", result);
                     ctx_state = ContextState::Active;
                 }
                 Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
                     profile_id,
                 }) => {
-                    defmt::info!("[URC] DataConnectionDeactivated {}", profile_id);
+                    info!("[URC] DataConnectionDeactivated {:?}", profile_id);
                     ctx_state = ContextState::Activating;
                 }
                 Urc::MessageWaitingIndication(_) => {
-                    defmt::info!("[URC] MessageWaitingIndication");
+                    info!("[URC] MessageWaitingIndication");
                 }
                 _ => return false,
             };
@@ -506,7 +507,7 @@ where
     {
         if check_urc {
             if let Err(e) = self.handle_urc() {
-                defmt::error!("Failed handle URC  {}", defmt::Debug2Format(&e));
+                error!("Failed handle URC {:?}", &e);
             }
         }
 

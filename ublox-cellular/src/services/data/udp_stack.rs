@@ -78,7 +78,7 @@ where
             }
 
             for chunk in buffer.chunks(EGRESS_CHUNK_SIZE) {
-                defmt::trace!("Sending: {} bytes", chunk.len());
+                trace!("Sending: {} bytes", chunk.len());
                 let endpoint = udp.endpoint().ok_or(Error::SocketClosed)?;
                 self.network
                     .send_internal(
