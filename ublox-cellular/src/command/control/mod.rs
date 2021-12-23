@@ -4,9 +4,11 @@
 //! (depending on the +CMEE AT command setting).
 // pub mod responses;
 pub mod types;
+pub mod responses;
 
-use atat::atat_derive::AtatCmd;
+use atat::{atat_derive::AtatCmd};
 use types::*;
+use responses::*;
 
 use super::NoResponse;
 
@@ -81,6 +83,14 @@ pub struct SetDataRate {
     pub rate: BaudRate,
 }
 
+/// 15.9 UART data rate configuration +IPR
+///
+/// Returns the data rate at which the DCE accepts commands on the UART
+/// interface.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+IPR?", DataRate)]
+pub struct GetDataRate;
+
 /// 15.25 Set to factory defined configuration &F
 ///
 /// Resets the current profile to factory-programmed setting. Other NVM
@@ -92,3 +102,14 @@ pub struct SetDataRate {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("&F", NoResponse)]
 pub struct FactoryResetConfig;
+
+/// 15.26.1 Description
+/// 
+/// Stores into one of the two RAM profile mirrors the current AT configuration of the DCE interface in which the
+/// command is issued. The profile is selected according to the AT command parameter value. 
+#[derive(Clone, AtatCmd)]
+#[at_cmd("&W", NoResponse, value_sep = false)]
+pub struct StoreCurrentConfig{
+    #[at_arg(position = 0)]
+    pub profile: u8,
+}

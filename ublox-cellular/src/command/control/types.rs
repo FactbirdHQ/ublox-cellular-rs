@@ -51,7 +51,7 @@ pub enum SoftwareFlowControl {
     Circuit105_106 = 3,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, AtatEnum, Debug, Copy)]
 #[at_enum(u32)]
 pub enum BaudRate {
     #[cfg(any(
@@ -133,4 +133,95 @@ pub enum BaudRate {
     B6000000 = 6_000_000,
     #[cfg(any(feature = "toby-r2", feature = "lara-r2",))]
     B6500000 = 6_500_000,
+}
+
+impl core::convert::TryFrom<u32> for BaudRate {
+    type Error = ();
+
+    // TODO: replace this impl with https://github.com/BlackbirdHQ/atat/pull/111/files
+    fn try_from(value: u32) -> Result<Self, Self::Error> {
+        let res = match value {
+            #[cfg(any(
+                feature = "toby-l2",
+                feature = "mpci-l2",
+                feature = "sara-u2",
+                feature = "toby-r2",
+                feature = "lara-r2",
+                feature = "toby-l4",
+                feature = "leon-g1",
+                feature = "sara-g3",
+                feature = "sara-g4"
+            ))]
+            0 => Self::B0,
+            #[cfg(any(feature = "lisa-u1", feature = "lisa-u2", feature = "sara-u2",))]
+            1200 => Self::B1200,
+            #[cfg(any(
+                feature = "lisa-u1",
+                feature = "lisa-u2",
+                feature = "sara-u2",
+                feature = "leon-g1",
+                feature = "sara-g3",
+                feature = "sara-g4"
+            ))]
+            2400 => Self::B2400,
+            #[cfg(any(
+                feature = "lisa-u1",
+                feature = "lisa-u2",
+                feature = "sara-u2",
+                feature = "leon-g1",
+                feature = "sara-g3",
+                feature = "sara-g4"
+            ))]
+            4800 => Self::B4800,
+            9600 => Self::B9600,
+            19200 => Self::B19200,
+            38400 => Self::B38400,
+            57600 => Self::B57600,
+            115200 => Self::B115200,
+            #[cfg(any(
+                feature = "toby-l2",
+                feature = "mpci-l2",
+                feature = "lisa-u1",
+                feature = "lisa-u2",
+                feature = "sara-u2",
+                feature = "toby-r2",
+                feature = "lara-r2",
+                feature = "toby-l4",
+            ))]
+            230400 => Self::B230400,
+            #[cfg(any(
+                feature = "toby-l2",
+                feature = "mpci-l2",
+                feature = "lisa-u1",
+                feature = "lisa-u2",
+                feature = "sara-u2",
+                feature = "toby-r2",
+                feature = "lara-r2",
+                feature = "toby-l4",
+            ))]
+            460800 => Self::B460800,
+            #[cfg(any(
+                feature = "toby-l2",
+                feature = "mpci-l2",
+                feature = "lisa-u1",
+                feature = "lisa-u2",
+                feature = "sara-u2",
+                feature = "toby-r2",
+                feature = "lara-r2",
+                feature = "toby-l4",
+            ))]
+            921600 => Self::B921600,
+            #[cfg(any(feature = "toby-r2", feature = "lara-r2",))]
+            3000000 => Self::B3000000,
+            #[cfg(any(feature = "toby-r2", feature = "lara-r2",))]
+            3250000 => Self::B3250000,
+            #[cfg(any(feature = "toby-r2", feature = "lara-r2",))]
+            6000000 => Self::B6000000,
+            #[cfg(any(feature = "toby-r2", feature = "lara-r2",))]
+            6500000 => Self::B6500000,
+            _ => return Err(()),
+        };
+
+        Ok(res)
+    }
 }

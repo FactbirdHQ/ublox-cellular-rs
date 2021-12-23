@@ -1,4 +1,4 @@
-use crate::APNInfo;
+use crate::{APNInfo};
 use embedded_hal::digital::{InputPin, OutputPin};
 use heapless::String;
 

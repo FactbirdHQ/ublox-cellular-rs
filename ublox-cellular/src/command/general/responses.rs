@@ -26,6 +26,12 @@ pub struct FirmwareVersion {
     pub version: CharVec<10>,
 }
 
+impl defmt::Format for FirmwareVersion {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "{}", self.version.to_string().as_str());
+    }
+}
+
 /// 4.7 IMEI identification +CGSN
 ///
 /// Returns the product serial number, the International Mobile Equipment
@@ -43,6 +49,12 @@ pub struct IMEI {
 #[derive(Clone, Debug, AtatResp)]
 pub struct IdentificationInformationResponse {
     pub app_ver: CharVec<32>,
+}
+
+impl defmt::Format for IdentificationInformationResponse {
+    fn format(&self, fmt: defmt::Formatter) {
+        defmt::write!(fmt, "{}", self.app_ver.to_string().as_str());
+    }
 }
 
 /// 4.11 International mobile subscriber identification +CIM

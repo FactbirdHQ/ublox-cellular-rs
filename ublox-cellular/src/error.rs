@@ -1,5 +1,6 @@
 use embedded_time::TimeError;
 
+use crate::command::control::types::BaudRate;
 use crate::network::Error as NetworkError;
 use crate::services::data::Error as DataServiceError;
 
@@ -24,6 +25,10 @@ pub enum Error {
     Busy,
     Uninitialized,
     StateTimeout,
+
+    /// The device was reconfigured for a new baud rate.
+    /// Caller should reconfigure it's UART interface to this rate.
+    NeedsBaudReconnect(BaudRate),
 
     // Network errors
     Network(NetworkError),

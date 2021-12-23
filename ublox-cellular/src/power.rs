@@ -129,7 +129,7 @@ where
                 self.network
                     .status
                     .timer
-                    .new_timer(1.seconds())
+                    .new_timer(5.seconds())
                     .start()?
                     .wait()?;
             }
@@ -173,7 +173,7 @@ where
                         .start()?
                         .wait()?;
 
-                    if let Err(e) = self.wait_power_state(PowerState::On, 5_000u32.milliseconds()) {
+                    if let Err(e) = self.wait_power_state(PowerState::On, 25_000u32.milliseconds()) {
                         defmt::error!("Failed to power on modem");
                         return Err(e);
                     } else {
@@ -251,12 +251,15 @@ where
     pub fn power_state(&mut self) -> Result<PowerState, Error> {
         match self.config.vint_pin {
             Some(ref mut vint) => {
+                defmt::debug!("pin was set, trying to read vint");
                 if vint
                     .try_is_high()
                     .map_err(|_| Error::Generic(GenericError::Unsupported))?
                 {
+                    defmt::trace!("vint: high");
                     Ok(PowerState::On)
                 } else {
+                    defmt::trace!("vint: low");
                     Ok(PowerState::Off)
                 }
             }

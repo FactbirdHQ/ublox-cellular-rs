@@ -18,7 +18,7 @@ use crate::{
             responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
             SetOperatorSelection,
         },
-        psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
+        psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting}, general::GetFirmwareVersion,
     },
     config::Config,
     error::{Error, GenericError},
@@ -59,29 +59,30 @@ where
     pub(crate) sockets: Option<&'static mut SocketSet<CLK, N, L>>,
 }
 
-impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Drop
-    for Device<C, CLK, RST, DTR, PWR, VINT, N, L>
-where
-    C: AtatClient,
-    CLK: Clock,
-    RST: OutputPin,
-    PWR: OutputPin,
-    DTR: OutputPin,
-    VINT: InputPin,
-{
-    fn drop(&mut self) {
-        if self.state != State::Off {
-            self.state = State::Off;
-            self.hard_power_off().ok();
-        }
-    }
-}
+// impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize> Drop
+//     for Device<C, CLK, RST, DTR, PWR, VINT, N, L>
+// where
+//     C: AtatClient,
+//     CLK: Clock,
+//     RST: OutputPin,
+//     PWR: OutputPin,
+//     DTR: OutputPin,
+//     VINT: InputPin,
+// {
+//     fn drop(&mut self) {
+//         if self.state != State::Off {
+//             self.state = State::Off;
+//             self.hard_power_off().ok();
+//         }
+//     }
+// }
 
 impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
     Device<C, CLK, RST, DTR, PWR, VINT, N, L>
 where
     C: AtatClient,
     CLK: Clock,
+    Generic<CLK::T>: TryInto<Milliseconds>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -135,7 +136,7 @@ where
             true,
         )?;
 
-        return Err(Error::Busy);
+        Err(Error::Busy)
     }
 
     pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<CLK, N, L>) {
@@ -151,7 +152,7 @@ where
     where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
-        if self.power_state != PowerState::On {
+        if !matches!(self.power_state, PowerState::On) {
             // Always re-configure the module when power has been off
             self.state = State::Off;
 
@@ -162,12 +163,24 @@ where
                 self.hard_reset()?;
             }
 
-            self.is_alive(10)?;
-
             self.power_state = PowerState::On;
+        } else if matches!(self.state, State::On) {
+            return Ok(());
         }
 
+        // At this point, if is_alive fails, the configured Baud rate is probably wrong
+        self.is_alive(20).map_err(|_| Error::BaudDetection)?;
+
         self.configure()?;
+
+        // let firmware = self.network.send_internal(
+        //     &general::IdentificationInformation {
+        //         n: 9
+        //     },
+        //     false,
+        // )?;
+
+        // defmt::info!("Current firmware version: {}", firmware);
 
         Ok(())
     }
@@ -190,38 +203,61 @@ where
     }
 
     pub(crate) fn configure(&mut self) -> Result<(), Error> {
-        if matches!(self.state, State::On) {
-            return Ok(());
-        }
-
         // Always re-configure the PDP contexts if we reconfigure the module
         self.network.context_state = ContextState::Setup;
 
-        self.is_alive(2)?;
-
         self.clear_buffers()?;
 
-        if self.config.baud_rate > 230_400_u32 {
-            // Needs a way to reconfigure uart baud rate temporarily
-            // Relevant issue: https://github.com/rust-embedded/embedded-hal/issues/79
-            return Err(Error::_Unknown);
+        let current_device_baud_rate = self.network.send_internal(&GetDataRate, false)?;
+        defmt::info!(
+            "Device is configured for baud rate: {}",
+            current_device_baud_rate.data_rate
+        );
 
-            // self.network.send_internal(
-            //     &SetDataRate {
-            //         rate: BaudRate::B115200,
-            //     },
-            //     true,
-            // )?;
+        // Check if we need to reconfigure the baud rate
+        if self.config.baud_rate != current_device_baud_rate.data_rate {
+            defmt::info!(
+                "Reconfiguring ublox baud rate to: {}",
+                self.config.baud_rate
+            );
+            let new_rate = self
+                .config
+                .baud_rate
+                .try_into()
+                .map_err(|_| Error::_Unknown)?;
+            self.network
+                .send_internal(&SetDataRate { rate: new_rate }, false)?;
 
             // NOTE: On the UART AT interface, after the reception of the "OK" result code for the +IPR command, the DTE
             // shall wait for at least 100 ms before issuing a new AT command; this is to guarantee a proper baud rate
             // reconfiguration.
+            self.network
+                .status
+                .timer
+                .new_timer(200_u32.milliseconds())
+                .start()?
+                .wait()?;
 
-            // UART end
-            // delay(100);
-            // UART begin(self.config.baud_rate)
+            // After reconfigurating the baud rate we need to tell the caller that they to reconnect to the device
+            // with a new Baud rate.
+            return Err(Error::NeedsBaudReconnect(new_rate));
+        } else {
+            // TODO: This should only be done the first time we switch baud rate
 
-            // self.is_alive()?;
+            defmt::info!("Baudrate seems to be correct. Persisting current settings.");
+            self.network
+                .send_internal(&StoreCurrentConfig { profile: 0 }, false)?;
+
+            self.network.send_internal(&ModuleSwitchOff, false)?;
+
+            self.network
+                .status
+                .timer
+                .new_timer(1_u32.seconds())
+                .start()?
+                .wait()?;
+
+            self.power_on()?;
         }
 
         self.select_sim_card()?;

@@ -213,6 +213,7 @@ where
         Generic<CLK::T>: TryInto<Milliseconds>,
     {
         if self.at_tx.consecutive_timeouts > 10 {
+            self.at_tx.consecutive_timeouts = 0;
             defmt::warn!("Resetting the modem due to consecutive AT timeouts");
             return Err(Error::Generic(GenericError::Timeout));
         }
@@ -520,8 +521,8 @@ where
         A::Error: Into<UbloxError>,
     {
         if check_urc {
-            if let Err(e) = self.handle_urc() {
-                defmt::error!("Failed handle URC  {}", defmt::Debug2Format(&e));
+            if let Err(_) = self.handle_urc() {
+                defmt::error!("Failed handle URC");
             }
         }
 
