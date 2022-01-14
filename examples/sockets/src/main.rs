@@ -6,13 +6,15 @@ use atat::heapless::spsc::Queue;
 use common::{gpio::ExtPin, serial::Serial, timer::SysTimer};
 use serialport;
 use structopt::StructOpt;
+use ublox_cellular::atat;
 use ublox_cellular::prelude::*;
 use ublox_cellular::sockets::{SocketHandle, SocketSet};
 use ublox_cellular::{APNInfo, Config, GsmClient};
 
+// TODO: better naming and explanations
 const RX_BUF_LEN: usize = 256;
-const RES_CAPACITY: usize = 5;
-const URC_CAPACITY: usize = 10;
+const RES_CAPACITY: usize = 256;
+const URC_CAPACITY: usize = 256;
 const TIMER_HZ: u32 = 1000;
 const MAX_SOCKET_COUNT: usize = 6;
 const SOCKET_RING_BUFFER_LEN: usize = 1024;
@@ -71,12 +73,15 @@ fn is_connected<N: TcpClientStack<TcpSocket = SocketHandle> + ?Sized>(
 fn main() {
     let opt = Opt::from_args();
 
-    env_logger::builder()
-        .filter_level(log::LevelFilter::Trace)
-        .init();
+    // different log levels can be set using RUST_LOG env variable
+    // this sets common_lib to info and all others to debug:
+    // RUST_LOG=common=info,debug ./target/debug/sockets --port /dev/tty.usbserial-01028661
+    // use comma separate list to add specific log levels to other modules:
+    // RUST_LOG=common=info,atat=info,debug ./target/debug/sockets --port /dev/tty.usbserial-01028661
+    env_logger::builder().format_timestamp_millis().init();
 
     let serial_tx = serialport::new(opt.port, opt.baud)
-        .timeout(Duration::from_millis(5000))
+        .timeout(Duration::from_millis(10))
         .open()
         .expect("Could not open serial port");
 
@@ -95,7 +100,7 @@ fn main() {
     let (cell_client, mut ingress) =
         atat::ClientBuilder::<_, _, _, _, TIMER_HZ, RX_BUF_LEN, RES_CAPACITY, URC_CAPACITY>::new(
             Serial(serial_tx),
-            SysTimer::new(),
+            SysTimer::new("RX"),
             atat::Config::new(atat::Mode::Timeout),
         )
         .build(queues);
@@ -116,8 +121,8 @@ fn main() {
         SOCKET_RING_BUFFER_LEN,
     >::new(
         cell_client,
-        SysTimer::new(),
-        Config::new("").with_apn_info(APNInfo::new("em")),
+        SysTimer::new("CELL"),
+        Config::new("").with_apn_info(APNInfo::new("internet.tele2.ee")),
     );
 
     cell_client.set_socket_storage(unsafe { SOCKET_SET.as_mut().unwrap() });
@@ -125,22 +130,28 @@ fn main() {
     // spawn serial reading thread
     thread::Builder::new()
         .spawn(move || loop {
+            ingress.digest();
+
             let mut buffer = [0; 32];
             match serial_rx.read(&mut buffer[..]) {
                 Ok(0) => {}
                 Ok(bytes_read) => {
-                    //log::info!("rx: {:?}", &buffer[0..bytes_read].iter().map(|b| *b as char).collect::<Vec<_>>());
+                    //ingress.digest();
+                    // log::info!(
+                    //     "rx: {:?}",
+                    //     std::str::from_utf8(&buffer[..bytes_read]).unwrap()
+                    // );
                     ingress.write(&buffer[0..bytes_read]);
-                    ingress.digest();
                     ingress.digest();
                 }
                 Err(e) => match e.kind() {
                     std::io::ErrorKind::Interrupted => {}
                     _ => {
-                        log::error!("Serial reading thread error while reading: {}", e);
+                        //log::error!("Serial reading thread error while reading: {}", e);
                     }
                 },
             }
+            //ingress.digest();
         })
         .unwrap();
 
