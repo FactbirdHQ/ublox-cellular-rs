@@ -7,3 +7,4 @@ target/
 **/*secrets*
 
 Cargo.lock
+.DS_Store
