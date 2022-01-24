@@ -1,4 +1,4 @@
-use embedded_hal::digital::{InputPin, OutputPin};
+use embedded_hal::digital::blocking::{InputPin, OutputPin};
 
 #[cfg(target_os = "linux")]
 mod linux {
@@ -12,7 +12,7 @@ mod linux {
     impl OutputPin for ExtPin {
         type Error = sysfs_gpio::Error;
 
-        fn try_set_low(&mut self) -> Result<(), Self::Error> {
+        fn set_low(&mut self) -> Result<(), Self::Error> {
             if self.0.get_active_low()? {
                 self.0.set_value(1)
             } else {
@@ -20,7 +20,7 @@ mod linux {
             }
         }
 
-        fn try_set_high(&mut self) -> Result<(), Self::Error> {
+        fn set_high(&mut self) -> Result<(), Self::Error> {
             if self.0.get_active_low()? {
                 self.0.set_value(0)
             } else {
@@ -32,7 +32,7 @@ mod linux {
     impl InputPin for ExtPin {
         type Error = sysfs_gpio::Error;
 
-        fn try_is_high(&self) -> Result<bool, Self::Error> {
+        fn is_high(&self) -> Result<bool, Self::Error> {
             if !self.0.get_active_low()? {
                 self.0.get_value().map(|val| val != 0)
             } else {
@@ -40,8 +40,8 @@ mod linux {
             }
         }
 
-        fn try_is_low(&self) -> Result<bool, Self::Error> {
-            self.try_is_high().map(|val| !val)
+        fn is_low(&self) -> Result<bool, Self::Error> {
+            self.is_high().map(|val| !val)
         }
     }
 }
@@ -55,11 +55,11 @@ mod other {
     impl OutputPin for ExtPin {
         type Error = std::convert::Infallible;
 
-        fn try_set_low(&mut self) -> Result<(), Self::Error> {
+        fn set_low(&mut self) -> Result<(), Self::Error> {
             Ok(())
         }
 
-        fn try_set_high(&mut self) -> Result<(), Self::Error> {
+        fn set_high(&mut self) -> Result<(), Self::Error> {
             Ok(())
         }
     }
@@ -67,12 +67,12 @@ mod other {
     impl InputPin for ExtPin {
         type Error = std::convert::Infallible;
 
-        fn try_is_high(&self) -> Result<bool, Self::Error> {
+        fn is_high(&self) -> Result<bool, Self::Error> {
             Ok(true)
         }
 
-        fn try_is_low(&self) -> Result<bool, Self::Error> {
-            self.try_is_high().map(|val| !val)
+        fn is_low(&self) -> Result<bool, Self::Error> {
+            self.is_high().map(|val| !val)
         }
     }
 }

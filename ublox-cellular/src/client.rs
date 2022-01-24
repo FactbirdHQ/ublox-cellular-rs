@@ -1,5 +1,5 @@
 use atat::{AtatClient, Clock};
-use embedded_hal::digital::{InputPin, OutputPin};
+use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use fugit::ExtU32;
 use ublox_sockets::SocketSet;
 

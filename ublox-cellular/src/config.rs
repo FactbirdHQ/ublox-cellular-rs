@@ -1,5 +1,5 @@
 use crate::APNInfo;
-use embedded_hal::digital::{InputPin, OutputPin};
+use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use heapless::String;
 
 pub struct NoPin;
@@ -7,11 +7,11 @@ pub struct NoPin;
 impl InputPin for NoPin {
     type Error = ();
 
-    fn try_is_high(&self) -> Result<bool, Self::Error> {
+    fn is_high(&self) -> Result<bool, Self::Error> {
         Err(())
     }
 
-    fn try_is_low(&self) -> Result<bool, Self::Error> {
+    fn is_low(&self) -> Result<bool, Self::Error> {
         Err(())
     }
 }
@@ -19,11 +19,11 @@ impl InputPin for NoPin {
 impl OutputPin for NoPin {
     type Error = core::convert::Infallible;
 
-    fn try_set_low(&mut self) -> Result<(), Self::Error> {
+    fn set_low(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
 
-    fn try_set_high(&mut self) -> Result<(), Self::Error> {
+    fn set_high(&mut self) -> Result<(), Self::Error> {
         Ok(())
     }
 }

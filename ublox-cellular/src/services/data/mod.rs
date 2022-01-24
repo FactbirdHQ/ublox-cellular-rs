@@ -41,7 +41,7 @@ use crate::{
 };
 use apn::{APNInfo, Apn};
 use atat::{AtatClient, Clock};
-use embedded_hal::digital::{InputPin, OutputPin};
+use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use fugit::ExtU32;
 
 pub use error::Error;

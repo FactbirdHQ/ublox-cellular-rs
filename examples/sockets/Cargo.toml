@@ -11,7 +11,6 @@ repository = "https://github.com/BlackbirdHQ/ublox-cellular-rs"
 edition = "2018"
 
 [dependencies]
-embedded-hal = "^1.0.0-alpha.4"
 log = { version = "0.4", default-features = false }
 env_logger = "0.9"
 serialport = "4"
