@@ -15,8 +15,8 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.14", features = ["derive", "defmt", "bytes"] }
-embedded-hal = "1.0.0-alpha.4"
+atat = { version = "0.15", features = ["derive", "defmt", "bytes"] }
+embedded-hal = "1.0.0-alpha.6"
 embedded-nal = "0.6.0"
 fugit = { version = "0.3", features = ["defmt"] }
 hash32 = "^0.2.1"
@@ -24,12 +24,11 @@ hash32-derive = "^0.1.0"
 heapless = { version = "^0.7", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
-ublox-sockets = { version = "0.1"}
-# ublox-sockets = { path = "../../ublox-sockets" }
+ublox-sockets = { version = "0.2"}
 no-std-net = { version = "^0.5", features = ["serde"] }
 
 log = { version = "^0.4", default-features = false, optional = true }
-defmt = { version = "^0.2", optional = true }
+defmt = { version = "^0.3", optional = true }
 
 [features]
 default = ["toby-r2", "socket-udp", "socket-tcp"]

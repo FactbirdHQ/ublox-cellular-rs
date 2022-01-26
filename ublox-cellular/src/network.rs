@@ -51,7 +51,10 @@ pub struct AtTx<C> {
     client: C,
 }
 
-impl<C: AtatClient> AtTx<C> {
+impl<C> AtTx<C> 
+where
+    C: AtatClient
+{
     pub fn new(client: C, max_urc_attempts: u8) -> Self {
         Self {
             urc_attempts: 0,
@@ -59,6 +62,10 @@ impl<C: AtatClient> AtTx<C> {
             max_urc_attempts,
             client,
         }
+    }
+
+    pub fn client(&mut self) -> &mut C {
+        &mut self.client
     }
 
     pub fn reset(&mut self) -> Result<(), Error> {

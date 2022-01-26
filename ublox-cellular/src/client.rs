@@ -1,5 +1,7 @@
+use core::convert::TryFrom;
+
 use atat::{AtatClient, Clock};
-use embedded_hal::digital::{InputPin, OutputPin};
+use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use fugit::ExtU32;
 use ublox_sockets::SocketSet;
 
@@ -44,7 +46,7 @@ pub enum State {
 pub struct Device<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>
 where
     C: AtatClient,
-    CLK: 'static + Clock<TIMER_HZ>,
+    CLK: Clock<TIMER_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -199,26 +201,31 @@ where
         self.clear_buffers()?;
 
         if self.config.baud_rate > 230_400_u32 {
-            // Needs a way to reconfigure uart baud rate temporarily
-            // Relevant issue: https://github.com/rust-embedded/embedded-hal/issues/79
-            return Err(Error::_Unknown);
-
-            // self.network.send_internal(
-            //     &SetDataRate {
-            //         rate: BaudRate::B115200,
-            //     },
-            //     true,
-            // )?;
+            self.network.send_internal(
+                &SetDataRate {
+                    rate: BaudRate::try_from(self.config.baud_rate)
+                        .map_err(|_| Error::BaudConfiguration)?,
+                },
+                true,
+            )?;
 
             // NOTE: On the UART AT interface, after the reception of the "OK" result code for the +IPR command, the DTE
             // shall wait for at least 100 ms before issuing a new AT command; this is to guarantee a proper baud rate
             // reconfiguration.
 
-            // UART end
-            // delay(100);
-            // UART begin(self.config.baud_rate)
+            self.network
+                .status
+                .timer
+                .start(100.millis())
+                .map_err(from_clock)?;
 
-            // self.is_alive()?;
+            // self.network
+            //     .at_tx
+            //     .client()
+            //     .set_baudrate(self.config.baud_rate)
+            //     .map_err(|_| Error::BaudConfiguration)?;
+
+            self.is_alive(5)?;
         }
 
         self.select_sim_card()?;

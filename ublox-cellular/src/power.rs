@@ -1,5 +1,5 @@
 use atat::{AtatClient, Clock};
-use embedded_hal::digital::{InputPin, OutputPin};
+use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use fugit::{ExtU32, MillisDurationU32};
 
 use crate::{
@@ -107,7 +107,7 @@ where
         match self.config.rst_pin {
             Some(ref mut rst) => {
                 // Apply Low pulse on RESET_N for 50 milliseconds to reset
-                rst.try_set_low().ok();
+                rst.set_low().ok();
 
                 self.network
                     .status
@@ -116,7 +116,7 @@ where
                     .map_err(from_clock)?;
                 nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
-                rst.try_set_high().ok();
+                rst.set_high().ok();
                 self.network
                     .status
                     .timer
@@ -146,7 +146,7 @@ where
             match self.config.pwr_pin {
                 // Apply Low pulse on PWR_ON for 50 microseconds to power on
                 Some(ref mut pwr) => {
-                    pwr.try_set_low().ok();
+                    pwr.set_low().ok();
                     self.network
                         .status
                         .timer
@@ -154,7 +154,7 @@ where
                         .map_err(from_clock)?;
                     nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
-                    pwr.try_set_high().ok();
+                    pwr.set_high().ok();
                     self.network
                         .status
                         .timer
@@ -207,7 +207,7 @@ where
             match self.config.pwr_pin {
                 Some(ref mut pwr) => {
                     // Apply Low pulse on PWR_ON >= 1 second to power off
-                    pwr.try_set_low().ok();
+                    pwr.set_low().ok();
                     self.network
                         .status
                         .timer
@@ -215,7 +215,7 @@ where
                         .map_err(from_clock)?;
                     nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
-                    pwr.try_set_high().ok();
+                    pwr.set_high().ok();
                     self.power_state = PowerState::Off;
                     trace!("Modem powered off");
 
@@ -241,7 +241,7 @@ where
         match self.config.vint_pin {
             Some(ref mut vint) => {
                 if vint
-                    .try_is_high()
+                    .is_high()
                     .map_err(|_| Error::Generic(GenericError::Unsupported))?
                 {
                     Ok(PowerState::On)

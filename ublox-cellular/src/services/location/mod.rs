@@ -3,7 +3,7 @@ use core::convert::TryInto;
 use crate::services::data::socket::Socket;
 use crate::{client::Device, error::Error as DeviceError};
 use atat::AtatClient;
-use embedded_hal::digital::{InputPin, OutputPin};
+use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use embedded_time::{Clock, duration::{Generic, Milliseconds}};
 use heapless::{ArrayLength, Bucket, Pos};
 

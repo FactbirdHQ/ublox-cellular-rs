@@ -41,7 +41,7 @@ use crate::{
 };
 use apn::{APNInfo, Apn};
 use atat::{AtatClient, Clock};
-use embedded_hal::digital::{InputPin, OutputPin};
+use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use fugit::ExtU32;
 
 pub use error::Error;
@@ -168,7 +168,7 @@ pub enum ContextState {
 pub struct DataService<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize>
 where
     C: atat::AtatClient,
-    CLK: 'static + Clock<TIMER_HZ>,
+    CLK: Clock<TIMER_HZ>,
 {
     network: &'a mut Network<C, CLK, TIMER_HZ>,
     pub(crate) sockets: Option<&'a mut SocketSet<TIMER_HZ, N, L>>,
@@ -178,7 +178,7 @@ impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize>
     DataService<'a, C, CLK, TIMER_HZ, N, L>
 where
     C: atat::AtatClient,
-    CLK: 'static + Clock<TIMER_HZ>,
+    CLK: Clock<TIMER_HZ>,
 {
     pub fn try_new(
         apn_info: &APNInfo,
