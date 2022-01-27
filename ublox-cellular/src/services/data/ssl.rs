@@ -31,6 +31,7 @@ pub trait SSL {
         &mut self,
         profile_id: SecurityProfileId,
         server_hostname: &str,
+        use_sni: bool,
     ) -> Result<(), Error>;
 }
 
@@ -161,6 +162,7 @@ where
         &mut self,
         profile_id: SecurityProfileId,
         server_hostname: &str,
+        use_sni: bool,
     ) -> Result<(), Error> {
         self.network.send_internal(
             &SecurityProfileManager {
@@ -189,6 +191,26 @@ where
             },
             true,
         )?;
+
+        if use_sni {
+            self.network.send_internal(
+                &SecurityProfileManager {
+                    profile_id,
+                    operation: Some(SecurityProfileOperation::ServerNameIndication(
+                        String::from(server_hostname),
+                    )),
+                },
+                true,
+            )?;
+        } else {
+            self.network.send_internal(
+                &SecurityProfileManager {
+                    profile_id,
+                    operation: Some(SecurityProfileOperation::ServerNameIndication(String::new())),
+                },
+                true,
+            )?;
+        }
 
         Ok(())
     }
