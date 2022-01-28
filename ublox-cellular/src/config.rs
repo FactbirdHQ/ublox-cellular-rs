@@ -1,4 +1,3 @@
-use crate::APNInfo;
 use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use heapless::String;
 
@@ -37,7 +36,6 @@ pub struct Config<RST, DTR, PWR, VINT> {
     pub(crate) baud_rate: u32,
     pub(crate) hex_mode: bool,
     pub(crate) flow_control: bool,
-    pub(crate) apn_info: APNInfo,
     pub(crate) pin: String<4>,
 }
 
@@ -51,7 +49,6 @@ impl Default for Config<NoPin, NoPin, NoPin, NoPin> {
             baud_rate: 115_200_u32,
             hex_mode: true,
             flow_control: false,
-            apn_info: APNInfo::default(),
             pin: String::new(),
         }
     }
@@ -73,7 +70,6 @@ where
             baud_rate: 115_200_u32,
             hex_mode: true,
             flow_control: false,
-            apn_info: APNInfo::default(),
             pin: String::from(pin),
         }
     }
@@ -120,10 +116,6 @@ where
             flow_control: true,
             ..self
         }
-    }
-
-    pub fn with_apn_info(self, apn_info: APNInfo) -> Self {
-        Config { apn_info, ..self }
     }
 
     pub fn pin(&self) -> &str {

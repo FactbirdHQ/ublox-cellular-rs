@@ -2,6 +2,7 @@ use crate::network::Error as NetworkError;
 use crate::services::data::Error as DataServiceError;
 
 #[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum GenericError {
     Timeout,
     Clock,

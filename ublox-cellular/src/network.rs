@@ -27,6 +27,7 @@ const REGISTRATION_CHECK_INTERVAL: SecsDurationU32 = SecsDurationU32::secs(15);
 const REGISTRATION_TIMEOUT: MinutesDurationU32 = MinutesDurationU32::minutes(5);
 
 #[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     Generic(GenericError),
     AT(atat::Error<UbloxError>),
