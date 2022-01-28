@@ -1,18 +1,18 @@
-use atat::AtatClient;
+use atat::{AtatClient, Clock};
 use core::fmt::Write;
 use embedded_nal::IpAddr;
 use embedded_nal::{AddrType, Dns};
-use embedded_time::Clock;
 use heapless::String;
 
 use super::DataService;
 use crate::command::dns::{self, types::ResolutionType};
 use ublox_sockets::Error;
 
-impl<'a, C, CLK, const N: usize, const L: usize> Dns for DataService<'a, C, CLK, N, L>
+impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> Dns
+    for DataService<'a, C, CLK, TIMER_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock,
+    CLK: Clock<TIMER_HZ>,
 {
     type Error = Error;
 

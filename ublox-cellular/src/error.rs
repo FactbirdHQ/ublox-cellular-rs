@@ -1,19 +1,12 @@
-use embedded_time::TimeError;
-
 use crate::network::Error as NetworkError;
 use crate::services::data::Error as DataServiceError;
 
 #[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum GenericError {
     Timeout,
-    Time(TimeError),
+    Clock,
     Unsupported,
-}
-
-impl From<TimeError> for GenericError {
-    fn from(e: TimeError) -> Self {
-        GenericError::Time(e)
-    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -58,8 +51,9 @@ impl From<NetworkError> for Error {
     }
 }
 
-impl From<TimeError> for Error {
-    fn from(e: TimeError) -> Self {
-        Error::Generic(e.into())
-    }
+// `Clock` trait has associated `Error` type.
+// Therefore we cannot use `From` for error converion.
+// This is helper that can be used as `.map_err(from_clock)`
+pub fn from_clock<E>(_error: E) -> Error {
+    Error::Generic(GenericError::Clock)
 }

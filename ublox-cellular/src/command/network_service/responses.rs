@@ -4,7 +4,8 @@ use atat::atat_derive::AtatResp;
 use heapless::String;
 
 /// 7.3 Signal quality +CSQ
-#[derive(Clone, AtatResp, defmt::Format)]
+#[derive(Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SignalQuality {
     #[at_arg(position = 0)]
     pub signal_power: u8,

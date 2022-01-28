@@ -3,7 +3,8 @@ use atat::atat_derive::AtatResp;
 use ublox_sockets::SocketHandle;
 
 /// +UUSORD/+UUSORF
-#[derive(Debug, Clone, AtatResp, defmt::Format)]
+#[derive(Debug, Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SocketDataAvailable {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,
@@ -12,7 +13,8 @@ pub struct SocketDataAvailable {
 }
 
 /// +UUSOCL
-#[derive(Debug, Clone, AtatResp, defmt::Format)]
+#[derive(Debug, Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SocketClosed {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,

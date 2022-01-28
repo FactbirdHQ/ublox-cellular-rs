@@ -1,5 +1,3 @@
-use core::convert::TryInto;
-
 use super::ssl::SecurityProfileId;
 use super::DataService;
 use super::EGRESS_CHUNK_SIZE;
@@ -8,18 +6,15 @@ use crate::command::ip_transport_layer::{
     CloseSocket, ConnectSocket, CreateSocket, PrepareWriteSocketDataBinary, SetSocketSslState,
     WriteSocketDataBinary,
 };
+use atat::Clock;
 use embedded_nal::{SocketAddr, TcpClientStack};
-use embedded_time::{
-    duration::{Generic, Milliseconds},
-    Clock,
-};
 use ublox_sockets::{Error, SocketHandle, TcpSocket, TcpState};
 
-impl<'a, C, CLK, const N: usize, const L: usize> TcpClientStack for DataService<'a, C, CLK, N, L>
+impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> TcpClientStack
+    for DataService<'a, C, CLK, TIMER_HZ, N, L>
 where
     C: atat::AtatClient,
-    CLK: Clock,
-    Generic<CLK::T>: TryInto<Milliseconds>,
+    CLK: Clock<TIMER_HZ>,
 {
     type Error = Error;
 
@@ -32,13 +27,10 @@ where
         if let Some(ref mut sockets) = self.sockets {
             // Check if there are any unused sockets available
             if sockets.len() >= sockets.capacity() {
-                if let Ok(ts) = self.network.status.timer.try_now() {
-                    // Check if there are any sockets closed by remote, and close it
-                    // if it has exceeded its timeout, in order to recycle it.
-                    if !sockets.recycle(&ts) {
-                        return Err(Error::SocketSetFull);
-                    }
-                } else {
+                let ts = self.network.status.timer.now();
+                // Check if there are any sockets closed by remote, and close it
+                // if it has exceeded its timeout, in order to recycle it.
+                if !sockets.recycle(ts) {
                     return Err(Error::SocketSetFull);
                 }
             }
@@ -68,7 +60,7 @@ where
     ) -> nb::Result<(), Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
             let mut tcp = sockets
-                .get::<TcpSocket<CLK, L>>(*socket)
+                .get::<TcpSocket<TIMER_HZ, L>>(*socket)
                 .map_err(Self::Error::from)?;
 
             if matches!(tcp.state(), TcpState::Created) {
@@ -96,8 +88,8 @@ where
                 tcp.set_state(TcpState::Connected(remote));
                 Ok(())
             } else {
-                defmt::error!(
-                    "Cannot connect socket! Socket: {} is in state: {}",
+                error!(
+                    "Cannot connect socket! Socket: {:?} is in state: {:?}",
                     socket,
                     tcp.state()
                 );
@@ -111,7 +103,9 @@ where
     /// Check if this socket is still connected
     fn is_connected(&mut self, socket: &Self::TcpSocket) -> Result<bool, Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
-            Ok(sockets.get::<TcpSocket<CLK, L>>(*socket)?.is_connected())
+            Ok(sockets
+                .get::<TcpSocket<TIMER_HZ, L>>(*socket)?
+                .is_connected())
         } else {
             Err(Error::Illegal.into())
         }
@@ -129,7 +123,7 @@ where
         }
 
         for chunk in buffer.chunks(EGRESS_CHUNK_SIZE) {
-            defmt::trace!("Sending: {} bytes", chunk.len());
+            trace!("Sending: {} bytes", chunk.len());
             self.network
                 .send_internal(
                     &PrepareWriteSocketDataBinary {
@@ -171,7 +165,7 @@ where
     ) -> nb::Result<usize, Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
             let mut tcp = sockets
-                .get::<TcpSocket<CLK, L>>(*socket)
+                .get::<TcpSocket<TIMER_HZ, L>>(*socket)
                 .map_err(Self::Error::from)?;
 
             Ok(tcp.recv_slice(buffer).map_err(Self::Error::from)?)

@@ -1,13 +1,13 @@
 //! Responses for General Commands
 use atat::atat_derive::AtatResp;
-use atat::serde_at::CharVec;
+use atat::heapless_bytes::Bytes;
 
 /// 4.1 Manufacturer identification
 /// Text string identifying the manufacturer.
 #[derive(Clone, Debug, AtatResp)]
 pub struct ManufacturerId {
     #[at_arg(position = 0)]
-    pub manufacturer: CharVec<10>,
+    pub manufacturer: Bytes<10>,
 }
 
 /// 4.3 Model identification
@@ -15,7 +15,7 @@ pub struct ManufacturerId {
 #[derive(Clone, Debug, AtatResp)]
 pub struct ModelId {
     #[at_arg(position = 0)]
-    pub model: CharVec<16>,
+    pub model: Bytes<16>,
 }
 
 /// 4.5 Firmware version identification
@@ -23,7 +23,7 @@ pub struct ModelId {
 #[derive(Clone, Debug, AtatResp)]
 pub struct FirmwareVersion {
     #[at_arg(position = 0)]
-    pub version: CharVec<10>,
+    pub version: Bytes<10>,
 }
 
 /// 4.7 IMEI identification +CGSN
@@ -42,7 +42,7 @@ pub struct IMEI {
 /// about the firmware version.
 #[derive(Clone, Debug, AtatResp)]
 pub struct IdentificationInformationResponse {
-    pub app_ver: CharVec<32>,
+    pub app_ver: Bytes<32>,
 }
 
 /// 4.11 International mobile subscriber identification +CIM

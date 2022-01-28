@@ -1,6 +1,7 @@
 use core::str::FromStr;
 
-#[derive(Debug, PartialEq, defmt::Format)]
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum UbloxError {
     Generic,
     Cme(CmeError),
@@ -29,7 +30,8 @@ impl FromStr for UbloxError {
 }
 
 /// Message service error result codes +CMS ERROR
-#[derive(Debug, PartialEq, defmt::Format)]
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CmsError {
     Empty,
     Unknown,
@@ -47,7 +49,8 @@ impl FromStr for CmsError {
 }
 
 /// Mobile termination error result codes +CME ERROR
-#[derive(Debug, PartialEq, defmt::Format)]
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum CmeError {
     PhoneFailure,
     NoConnectionToPhone,

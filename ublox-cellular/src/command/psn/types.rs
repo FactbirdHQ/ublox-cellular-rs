@@ -509,7 +509,8 @@ pub enum PacketSwitchedNetworkDataParam {
     QoS3GTransferDelay = 24,
 }
 
-#[derive(Debug, Clone, PartialEq, AtatEnum, defmt::Format)]
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum GPRSAttachedState {
     /// • 0: Detached
     Detached = 0,
@@ -543,7 +544,8 @@ pub enum PSEventReportingMode {
     BufferUrcs = 2,
 }
 
-#[derive(Debug, Clone, PartialEq, AtatEnum, defmt::Format)]
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum GPRSNetworkRegistrationStat {
     /// • 0: not registered, the MT is not currently searching an operator to
     /// register to
@@ -573,7 +575,8 @@ pub enum ExtendedPSNetworkRegistrationUrcConfig {
     UrcEnabled = 1,
 }
 
-#[derive(Debug, Clone, PartialEq, AtatEnum, defmt::Format)]
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ExtendedPSNetworkRegistrationState {
     /// • 0: not registered for PS service
     NotRegistered = 0,
@@ -620,7 +623,8 @@ pub enum EPSNetworkRegistrationUrcConfig {
 }
 
 /// EPS registration status
-#[derive(Debug, Clone, PartialEq, AtatEnum, defmt::Format)]
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EPSNetworkRegistrationStat {
     /// • 0: not registered
     NotRegistered = 0,

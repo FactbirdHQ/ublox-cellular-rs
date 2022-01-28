@@ -1,5 +1,3 @@
-use embedded_time::TimeError;
-
 use crate::error::GenericError;
 use crate::network::Error as NetworkError;
 use ublox_sockets::Error as SocketError;
@@ -35,11 +33,5 @@ impl From<NetworkError> for Error {
 impl From<SocketError> for Error {
     fn from(e: SocketError) -> Self {
         Error::Socket(e)
-    }
-}
-
-impl From<TimeError> for Error {
-    fn from(e: TimeError) -> Self {
-        Error::Generic(e.into())
     }
 }

@@ -1,8 +1,6 @@
-use core::convert::TryInto;
-
-use atat::AtatClient;
-use embedded_hal::digital::{InputPin, OutputPin};
-use embedded_time::{duration::*, Clock};
+use atat::{AtatClient, Clock};
+use embedded_hal::digital::blocking::{InputPin, OutputPin};
+use fugit::{ExtU32, MillisDurationU32};
 
 use crate::{
     client::Device,
@@ -17,20 +15,21 @@ use crate::{
         },
         AT,
     },
-    error::{Error, GenericError},
+    error::{from_clock, Error, GenericError},
 };
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, defmt::Format)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PowerState {
     Off,
     On,
 }
 
-impl<C, CLK, RST, DTR, PWR, VINT, const N: usize, const L: usize>
-    Device<C, CLK, RST, DTR, PWR, VINT, N, L>
+impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>
+    Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock,
+    CLK: Clock<TIMER_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -55,10 +54,7 @@ where
     }
 
     /// Perform at full factory reset of the module, clearing all NVM sectors in the process
-    pub fn factory_reset(&mut self) -> Result<(), Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
+    pub fn factory_reset(&mut self) -> Result<(), Error> {
         self.network.send_internal(
             &SetFactoryConfiguration {
                 fs_op: FSFactoryRestoreType::AllFiles,
@@ -67,7 +63,7 @@ where
             false,
         )?;
 
-        defmt::info!("Successfully factory reset modem!");
+        info!("Successfully factory reset modem!");
 
         if self.soft_reset(true).is_err() {
             self.hard_reset()?;
@@ -77,11 +73,8 @@ where
     }
 
     /// Reset the module by sending AT CFUN command
-    pub(crate) fn soft_reset(&mut self, sim_reset: bool) -> Result<(), Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
-        defmt::trace!(
+    pub(crate) fn soft_reset(&mut self, sim_reset: bool) -> Result<(), Error> {
+        trace!(
             "Attempting to soft reset of the modem with sim reset: {}.",
             sim_reset
         );
@@ -100,7 +93,8 @@ where
             false,
         )?;
 
-        self.wait_power_state(PowerState::On, 30_000u32.milliseconds())?;
+        self.wait_power_state(PowerState::On, 30_000.millis())
+            .map_err(from_clock)?;
 
         Ok(())
     }
@@ -108,30 +102,27 @@ where
     /// Reset the module by driving it's RESET_N pin low for 50 ms
     ///
     /// **NOTE** This function will reset NVM settings!
-    pub fn hard_reset(&mut self) -> Result<(), Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
-        defmt::trace!("Attempting to hard reset of the modem.");
+    pub fn hard_reset(&mut self) -> Result<(), Error> {
+        trace!("Attempting to hard reset of the modem.");
         match self.config.rst_pin {
             Some(ref mut rst) => {
                 // Apply Low pulse on RESET_N for 50 milliseconds to reset
-                rst.try_set_low().ok();
+                rst.set_low().ok();
 
                 self.network
                     .status
                     .timer
-                    .new_timer(50.milliseconds())
-                    .start()?
-                    .wait()?;
+                    .start(50.millis())
+                    .map_err(from_clock)?;
+                nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
-                rst.try_set_high().ok();
+                rst.set_high().ok();
                 self.network
                     .status
                     .timer
-                    .new_timer(1.seconds())
-                    .start()?
-                    .wait()?;
+                    .start(1.secs())
+                    .map_err(from_clock)?;
+                nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
             }
             None => {}
         }
@@ -143,41 +134,39 @@ where
         Ok(())
     }
 
-    pub fn power_on(&mut self) -> Result<(), Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
-        defmt::info!(
-            "Attempting to power on the modem with PWR_ON pin: {=bool} and VInt pin: {=bool}.",
+    pub fn power_on(&mut self) -> Result<(), Error> {
+        info!(
+            "Attempting to power on the modem with PWR_ON pin: {} and VInt pin: {}.",
             self.config.pwr_pin.is_some(),
             self.config.vint_pin.is_some(),
         );
 
         if self.power_state()? != PowerState::On {
-            defmt::trace!("Powering modem on.");
+            trace!("Powering modem on.");
             match self.config.pwr_pin {
                 // Apply Low pulse on PWR_ON for 50 microseconds to power on
                 Some(ref mut pwr) => {
-                    pwr.try_set_low().ok();
+                    pwr.set_low().ok();
                     self.network
                         .status
                         .timer
-                        .new_timer(50.microseconds())
-                        .start()?
-                        .wait()?;
-                    pwr.try_set_high().ok();
-                    self.network
-                        .status
-                        .timer
-                        .new_timer(1.seconds())
-                        .start()?
-                        .wait()?;
+                        .start(50.micros())
+                        .map_err(from_clock)?;
+                    nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
-                    if let Err(e) = self.wait_power_state(PowerState::On, 5_000u32.milliseconds()) {
-                        defmt::error!("Failed to power on modem");
+                    pwr.set_high().ok();
+                    self.network
+                        .status
+                        .timer
+                        .start(1.secs())
+                        .map_err(from_clock)?;
+                    nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
+
+                    if let Err(e) = self.wait_power_state(PowerState::On, 5_000.millis()) {
+                        error!("Failed to power on modem");
                         return Err(e);
                     } else {
-                        defmt::trace!("Modem powered on");
+                        trace!("Modem powered on");
                     }
                 }
                 _ => {
@@ -188,54 +177,54 @@ where
                 }
             }
         } else {
-            defmt::debug!("module is already on");
+            debug!("module is already on");
         }
         Ok(())
     }
 
     pub fn soft_power_off(&mut self) -> Result<(), Error> {
-        defmt::trace!("Attempting to soft power off the modem.");
+        trace!("Attempting to soft power off the modem.");
 
         self.network.send_internal(&ModuleSwitchOff, false)?;
 
         self.power_state = PowerState::Off;
-        defmt::trace!("Modem powered off");
+        trace!("Modem powered off");
 
         self.network
             .status
             .timer
-            .new_timer(10.seconds())
-            .start()?
-            .wait()?;
+            .start(10.secs())
+            .map_err(from_clock)?;
+        nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
         Ok(())
     }
 
     pub fn hard_power_off(&mut self) -> Result<(), Error> {
-        defmt::trace!("Attempting to hard power off the modem.");
+        trace!("Attempting to hard power off the modem.");
 
         if self.power_state()? == PowerState::On {
             match self.config.pwr_pin {
                 Some(ref mut pwr) => {
                     // Apply Low pulse on PWR_ON >= 1 second to power off
-                    pwr.try_set_low().ok();
+                    pwr.set_low().ok();
                     self.network
                         .status
                         .timer
-                        .new_timer(1.seconds())
-                        .start()?
-                        .wait()?;
-                    pwr.try_set_high().ok();
+                        .start(1.secs())
+                        .map_err(from_clock)?;
+                    nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
+                    pwr.set_high().ok();
                     self.power_state = PowerState::Off;
-                    defmt::trace!("Modem powered off");
+                    trace!("Modem powered off");
 
                     self.network
                         .status
                         .timer
-                        .new_timer(10.seconds())
-                        .start()?
-                        .wait()?;
+                        .start(10.secs())
+                        .map_err(from_clock)?;
+                    nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
                 }
                 _ => {
                     return Err(Error::Generic(GenericError::Unsupported));
@@ -252,7 +241,7 @@ where
         match self.config.vint_pin {
             Some(ref mut vint) => {
                 if vint
-                    .try_is_high()
+                    .is_high()
                     .map_err(|_| Error::Generic(GenericError::Unsupported))?
                 {
                     Ok(PowerState::On)
@@ -268,26 +257,21 @@ where
     fn wait_power_state(
         &mut self,
         expected: PowerState,
-        timeout: Milliseconds<u32>,
-    ) -> Result<(), Error>
-    where
-        Generic<CLK::T>: TryInto<Milliseconds>,
-    {
-        let now = self.network.status.timer.try_now().unwrap();
+        timeout: MillisDurationU32,
+    ) -> Result<(), Error> {
+        let start = self.network.status.timer.now();
 
         let mut res = false;
 
-        defmt::trace!("Waiting for the modem to reach {}.", expected);
+        trace!("Waiting for the modem to reach {:?}.", expected);
         while self
             .network
             .status
             .timer
-            .try_now()
-            .ok()
-            .and_then(|ms| ms.checked_duration_since(&now))
-            .and_then(|dur| dur.try_into().ok())
-            .unwrap()
-            < timeout
+            .now()
+            .checked_duration_since(start)
+            .and_then(|dur| Some(dur < timeout))
+            .unwrap_or(false)
         {
             if self.power_state()? == expected {
                 res = true;
@@ -297,16 +281,16 @@ where
             self.network
                 .status
                 .timer
-                .new_timer(5.milliseconds())
-                .start()?
-                .wait()?;
+                .start(5.millis())
+                .map_err(from_clock)?;
+            nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
         }
 
         if res {
-            defmt::trace!("Success.");
+            trace!("Success.");
             Ok(())
         } else {
-            defmt::error!("Modem never reach {}.", expected);
+            error!("Modem never reach {:?}.", expected);
             Err(Error::Generic(GenericError::Timeout))
         }
     }
