@@ -17,7 +17,7 @@ pub struct GetManufacturerId;
 ///
 /// Text string identifying the model identification.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CGMI", ModelId)]
+#[at_cmd("+CGMM", ModelId)]
 pub struct GetModelId;
 
 /// 4.5 Firmware version identification +CGMR
