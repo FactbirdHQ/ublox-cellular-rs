@@ -65,7 +65,7 @@ pub struct SetSocketSslState {
 /// flag, the final result code is sent immediately. The following +UUSOCL URC
 /// will indicate the closure of the specified socket.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+USOCL", NoResponse)]
+#[at_cmd("+USOCL", NoResponse, timeout_ms = 120000)]
 pub struct CloseSocket {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,
