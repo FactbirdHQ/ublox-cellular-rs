@@ -1,4 +1,4 @@
-use atat::{AtatClient, Clock};
+use atat::{clock::Clock, AtatClient};
 use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use fugit::ExtU32;
 use ublox_sockets::SocketSet;
@@ -12,7 +12,6 @@ use crate::{
         *,
     },
     command::{
-        error::UbloxError,
         network_service::{
             responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
             SetOperatorSelection,
@@ -187,14 +186,8 @@ where
     }
 
     pub(crate) fn configure(&mut self) -> Result<(), Error> {
-        if matches!(self.state, State::On) {
-            return Ok(());
-        }
-
         // Always re-configure the PDP contexts if we reconfigure the module
         self.network.context_state = ContextState::Setup;
-
-        self.is_alive(2)?;
 
         self.clear_buffers()?;
 
@@ -219,6 +212,8 @@ where
             // UART begin(self.config.baud_rate)
 
             // self.is_alive()?;
+        } else {
+            self.power_on()?;
         }
 
         self.select_sim_card()?;
@@ -472,7 +467,6 @@ where
     pub fn send_at<A, const LEN: usize>(&mut self, cmd: &A) -> Result<A::Response, Error>
     where
         A: atat::AtatCmd<LEN>,
-        A::Error: Into<UbloxError>,
     {
         // At any point after init state, we should be able to fully send AT
         // commands.

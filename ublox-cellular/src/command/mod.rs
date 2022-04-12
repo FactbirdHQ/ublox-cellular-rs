@@ -1,8 +1,6 @@
 //! AT Commands for u-blox cellular module family\
 //! Following the [u-blox cellular modules AT commands manual](https://www.u-blox.com/sites/default/files/u-blox-CEL_ATCommands_%28UBX-13002752%29.pdf)
 
-pub mod error;
-
 pub mod control;
 pub mod device_data_security;
 pub mod device_lock;

@@ -1,4 +1,4 @@
-use atat::{AtatClient, Clock};
+use atat::{clock::Clock, AtatClient};
 use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use fugit::{ExtU32, MillisDurationU32};
 
@@ -120,7 +120,7 @@ where
                 self.network
                     .status
                     .timer
-                    .start(1.secs())
+                    .start(5.secs())
                     .map_err(from_clock)?;
                 nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
             }
@@ -162,7 +162,7 @@ where
                         .map_err(from_clock)?;
                     nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
-                    if let Err(e) = self.wait_power_state(PowerState::On, 5_000.millis()) {
+                    if let Err(e) = self.wait_power_state(PowerState::On, 25.secs()) {
                         error!("Failed to power on modem");
                         return Err(e);
                     } else {

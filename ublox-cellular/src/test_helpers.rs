@@ -1,4 +1,4 @@
-use atat::{AtatClient, Clock};
+use atat::{clock::Clock, AtatClient};
 use fugit::ExtU32;
 
 #[derive(Debug)]
@@ -16,7 +16,7 @@ impl AtatClient for MockAtClient {
     fn send<A: atat::AtatCmd<LEN>, const LEN: usize>(
         &mut self,
         _cmd: &A,
-    ) -> nb::Result<A::Response, atat::Error<A::Error>> {
+    ) -> nb::Result<A::Response, atat::Error> {
         todo!()
     }
 
@@ -31,7 +31,7 @@ impl AtatClient for MockAtClient {
     fn check_response<A: atat::AtatCmd<LEN>, const LEN: usize>(
         &mut self,
         _cmd: &A,
-    ) -> nb::Result<A::Response, atat::Error<A::Error>> {
+    ) -> nb::Result<A::Response, atat::Error> {
         todo!()
     }
 

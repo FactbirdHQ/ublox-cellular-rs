@@ -65,7 +65,7 @@ pub struct SetSocketSslState {
 /// flag, the final result code is sent immediately. The following +UUSOCL URC
 /// will indicate the closure of the specified socket.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+USOCL", NoResponse, timeout_ms = 120000)]
+#[at_cmd("+USOCL", NoResponse, attempts = 1, timeout_ms = 120000)]
 pub struct CloseSocket {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,
@@ -90,7 +90,7 @@ pub struct GetSocketError;
 /// note because if <socket> refers to a UDP socket, errors will not be reported
 /// prior to an attempt to write or read data on the socket.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+USOCO", NoResponse, timeout_ms = 120000)]
+#[at_cmd("+USOCO", NoResponse, attempts = 1, timeout_ms = 120000)]
 pub struct ConnectSocket {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,

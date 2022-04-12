@@ -49,7 +49,7 @@ use types::*;
 ///   the user sets a DNS for a profile, and a different profile is activated,
 ///   the user DNS has no action and the network DNS is used if available).
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+UDNSRN", ResolveNameIpResponse, timeout_ms = 120000)]
+#[at_cmd("+UDNSRN", ResolveNameIpResponse, attempts = 1, timeout_ms = 120000)]
 pub struct ResolveNameIp<'a> {
     #[at_arg(position = 0)]
     pub resolution_type: ResolutionType,

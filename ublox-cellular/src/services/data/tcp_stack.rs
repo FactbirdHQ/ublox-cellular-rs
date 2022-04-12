@@ -6,7 +6,7 @@ use crate::command::ip_transport_layer::{
     CloseSocket, ConnectSocket, CreateSocket, PrepareWriteSocketDataBinary, SetSocketSslState,
     WriteSocketDataBinary,
 };
-use atat::Clock;
+use atat::clock::Clock;
 use embedded_nal::{SocketAddr, TcpClientStack};
 use ublox_sockets::{Error, SocketHandle, TcpSocket, TcpState};
 
