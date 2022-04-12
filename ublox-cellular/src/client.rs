@@ -158,10 +158,13 @@ where
                 self.hard_reset()?;
             }
 
-            self.is_alive(10)?;
-
             self.power_state = PowerState::On;
+        } else if matches!(self.state, State::On) {
+            return Ok(());
         }
+
+        // At this point, if is_alive fails, the configured Baud rate is probably wrong
+        self.is_alive(20).map_err(|_| Error::BaudDetection)?;
 
         self.configure()?;
 
