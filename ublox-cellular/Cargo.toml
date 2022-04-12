@@ -8,7 +8,7 @@ keywords = ["arm", "cortex-m", "ublox", "cellular", "embedded-hal-driver"]
 categories = ["embedded", "no-std"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/BlackbirdHQ/ublox-cellular-rs"
-edition = "2018"
+edition = "2021"
 
 [lib]
 name = "ublox_cellular"
