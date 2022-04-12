@@ -161,7 +161,14 @@ mod test {
         );
 
         assert_eq!(
-            from_str("+CPIN: SIM PIN"),
+            from_str("+CPIN: READY\r\n"),
+            Ok(PinStatus {
+                code: PinStatusCode::Ready
+            })
+        );
+
+        assert_eq!(
+            from_str("+CPIN: SIM PIN\r\n"),
             Ok(PinStatus {
                 code: PinStatusCode::SimPin
             })

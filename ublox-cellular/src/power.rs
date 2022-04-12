@@ -1,4 +1,4 @@
-use atat::{AtatClient, Clock};
+use atat::{clock::Clock, AtatClient};
 use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use fugit::{ExtU32, MillisDurationU32};
 

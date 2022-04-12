@@ -1,6 +1,6 @@
 use super::{DataService, Error};
 use crate::command::device_data_security::{types::*, *};
-use atat::{atat_derive::AtatLen, Clock};
+use atat::{atat_derive::AtatLen, clock::Clock};
 use heapless::String;
 use serde::{Deserialize, Serialize};
 

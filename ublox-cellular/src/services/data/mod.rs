@@ -21,7 +21,6 @@ use crate::{
     command::psn::SetPDPContextState,
     command::psn::SetPacketSwitchedConfig,
     command::{
-        error::UbloxError,
         ip_transport_layer::{
             responses::{SocketData, UDPSocketData},
             ReadSocketData, ReadUDPSocketData,
@@ -40,7 +39,7 @@ use crate::{
     ProfileId,
 };
 use apn::{APNInfo, Apn};
-use atat::{AtatClient, Clock};
+use atat::{clock::Clock, AtatClient};
 use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use fugit::ExtU32;
 
@@ -479,7 +478,6 @@ where
     pub fn send_at<A, const LEN: usize>(&mut self, cmd: &A) -> Result<A::Response, Error>
     where
         A: atat::AtatCmd<LEN>,
-        A::Error: Into<UbloxError>,
     {
         Ok(self.network.send_internal(cmd, true)?)
     }
@@ -499,14 +497,15 @@ where
                     if available_data == 0 {
                         // Check for new socket data available at regular intervals, just in case a URC is missed
                         if socket.should_update_available_data(network.status.timer.now()) {
-                            if let Ok(SocketData { length, .. }) = network.send_internal(
+                            match network.send_internal(
                                 &ReadSocketData {
                                     socket: handle,
                                     length: 0,
                                 },
                                 false,
                             ) {
-                                socket.set_available_data(length);
+                                Ok(SocketData { length, .. }) => socket.set_available_data(length),
+                                Err(_) => socket.closed_by_remote(network.status.timer.now()),
                             }
                         }
 

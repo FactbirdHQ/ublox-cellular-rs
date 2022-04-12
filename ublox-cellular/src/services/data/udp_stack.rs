@@ -4,7 +4,7 @@ use crate::command::ip_transport_layer::{
     types::SocketProtocol, CloseSocket, CreateSocket, PrepareUDPSendToDataBinary,
     UDPSendToDataBinary,
 };
-use atat::Clock;
+use atat::clock::Clock;
 use embedded_nal::{SocketAddr, UdpClientStack};
 use ublox_sockets::{Error, SocketHandle, UdpSocket};
 

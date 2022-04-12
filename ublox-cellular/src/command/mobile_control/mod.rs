@@ -20,14 +20,14 @@ use super::NoResponse;
 ///   electrical details of the module power-off sequence via the +CPWROFF
 ///   command.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CPWROFF", NoResponse, timeout_ms = 40000)]
+#[at_cmd("+CPWROFF", NoResponse, attempts = 1, timeout_ms = 40000)]
 pub struct ModuleSwitchOff;
 
 /// 5.3 Set module functionality +CFUN
 ///
 /// Selects the level of functionality <fun> in the MT.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CFUN", NoResponse, timeout_ms = 180000)]
+#[at_cmd("+CFUN", NoResponse, attempts = 1, timeout_ms = 180000)]
 pub struct SetModuleFunctionality {
     #[at_arg(position = 0)]
     pub fun: Functionality,
@@ -39,7 +39,7 @@ pub struct SetModuleFunctionality {
 ///
 /// Selects the level of functionality <fun> in the MT.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CFUN?", ModuleFunctionality, timeout_ms = 8000)]
+#[at_cmd("+CFUN?", ModuleFunctionality, attempts = 1, timeout_ms = 8000)]
 pub struct GetModuleFunctionality;
 
 /// 5.4 Indicator control +CIND

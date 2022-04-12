@@ -130,7 +130,13 @@ pub struct GetPacketSwitchedConfig {
 /// (e.g. due to roaming) or a user required detach (e.g. triggered by
 /// AT+COPS=2).
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+UPSDA", NoResponse, timeout_ms = 180000, abortable = true)]
+#[at_cmd(
+    "+UPSDA",
+    NoResponse,
+    attempts = 1,
+    timeout_ms = 180000,
+    abortable = true
+)]
 pub struct SetPacketSwitchedAction {
     #[at_arg(position = 0)]
     pub profile_id: ProfileId,
@@ -163,7 +169,13 @@ pub struct GetPacketSwitchedNetworkData {
 /// context will be automatically deactivated when the GPRS registration state
 /// changes to detached.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CGATT", NoResponse, timeout_ms = 180000, abortable = true)]
+#[at_cmd(
+    "+CGATT",
+    NoResponse,
+    attempts = 1,
+    timeout_ms = 180000,
+    abortable = true
+)]
 pub struct SetGPRSAttached {
     #[at_arg(position = 0)]
     pub state: GPRSAttachedState,
@@ -171,7 +183,13 @@ pub struct SetGPRSAttached {
 
 /// 18.14 Read GPRS attach or detach +CGATT
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CGATT?", GPRSAttached, timeout_ms = 10000, abortable = true)]
+#[at_cmd(
+    "+CGATT?",
+    GPRSAttached,
+    attempts = 1,
+    timeout_ms = 10000,
+    abortable = true
+)]
 pub struct GetGPRSAttached;
 
 /// 18.16 PDP context activate or deactivate +CGACT
@@ -220,7 +238,13 @@ pub struct GetGPRSAttached;
 ///   the maximum number of attempts has been reached. In these cases, the
 ///   command might become available again after a while.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CGACT", NoResponse, timeout_ms = 150000, abortable = true)]
+#[at_cmd(
+    "+CGACT",
+    NoResponse,
+    attempts = 1,
+    timeout_ms = 150000,
+    abortable = true
+)]
 pub struct SetPDPContextState {
     #[at_arg(position = 0)]
     pub status: PDPContextStatus,
@@ -230,7 +254,7 @@ pub struct SetPDPContextState {
 
 /// 18.14 Read PDP context state +CGACT
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CGACT?", heapless::Vec<PDPContextState, 7>, timeout_ms = 150000, abortable = true)]
+#[at_cmd("+CGACT?", heapless::Vec<PDPContextState, 7>, attempts = 1, timeout_ms = 150000, abortable = true)]
 pub struct GetPDPContextState;
 
 /// 18.26 Packet switched event reporting +CGEREP

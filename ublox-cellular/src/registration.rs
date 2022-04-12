@@ -10,7 +10,7 @@ use crate::command::{
         urc::{EPSNetworkRegistration, GPRSNetworkRegistration},
     },
 };
-use atat::Clock;
+use atat::clock::Clock;
 use fugit::{ExtU32, TimerInstantU32};
 use heapless::String;
 

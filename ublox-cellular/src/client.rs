@@ -1,4 +1,4 @@
-use atat::{AtatClient, Clock};
+use atat::{clock::Clock, AtatClient};
 use embedded_hal::digital::blocking::{InputPin, OutputPin};
 use fugit::ExtU32;
 use ublox_sockets::SocketSet;
@@ -12,7 +12,6 @@ use crate::{
         *,
     },
     command::{
-        error::UbloxError,
         network_service::{
             responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
             SetOperatorSelection,
@@ -472,7 +471,6 @@ where
     pub fn send_at<A, const LEN: usize>(&mut self, cmd: &A) -> Result<A::Response, Error>
     where
         A: atat::AtatCmd<LEN>,
-        A::Error: Into<UbloxError>,
     {
         // At any point after init state, we should be able to fully send AT
         // commands.

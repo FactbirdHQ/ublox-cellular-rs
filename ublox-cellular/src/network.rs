@@ -1,6 +1,5 @@
 use crate::{
     command::{
-        error::UbloxError,
         mobile_control::{
             types::{Functionality, ResetMode},
             SetModuleFunctionality,
@@ -18,7 +17,7 @@ use crate::{
     registration::{self, ConnectionState, RegistrationParams, RegistrationState},
     services::data::ContextState,
 };
-use atat::{atat_derive::AtatLen, AtatClient, Clock};
+use atat::{atat_derive::AtatLen, clock::Clock, AtatClient};
 use fugit::{ExtU32, MinutesDurationU32, SecsDurationU32};
 use hash32_derive::Hash32;
 use serde::{Deserialize, Serialize};
@@ -30,7 +29,7 @@ const REGISTRATION_TIMEOUT: MinutesDurationU32 = MinutesDurationU32::minutes(5);
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     Generic(GenericError),
-    AT(atat::Error<UbloxError>),
+    AT(atat::Error),
     RegistrationDenied,
     UnknownProfile,
     ActivationFailed,
@@ -74,10 +73,9 @@ impl<C: AtatClient> AtTx<C> {
     ) -> Result<A::Response, Error>
     where
         A: atat::AtatCmd<LEN>,
-        A::Error: Into<UbloxError>,
     {
         self.client
-            .send(req)
+            .send_retry(req)
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
                     // let request = req.as_bytes();
@@ -87,12 +85,8 @@ impl<C: AtatClient> AtTx<C> {
                     }
 
                     match ate {
-                        atat::Error::Error(ubx) => {
-                            let u: UbloxError = ubx.into();
-                            Error::AT(atat::Error::Error(u))
-                        }
                         atat::Error::Timeout => {
-                            self.consecutive_timeouts += 1;
+                            self.consecutive_timeouts += A::ATTEMPTS;
                             Error::AT(atat::Error::Timeout)
                         }
                         atat::Error::Read => Error::AT(atat::Error::Read),
@@ -101,6 +95,7 @@ impl<C: AtatClient> AtTx<C> {
                         atat::Error::Aborted => Error::AT(atat::Error::Aborted),
                         atat::Error::Overflow => Error::AT(atat::Error::Overflow),
                         atat::Error::Parse => Error::AT(atat::Error::Parse),
+                        _ => Error::AT(atat::Error::Error),
                     }
                 }
                 nb::Error::WouldBlock => Error::_Unknown,
@@ -114,22 +109,17 @@ impl<C: AtatClient> AtTx<C> {
     pub fn send<A, const LEN: usize>(&mut self, req: &A) -> Result<A::Response, Error>
     where
         A: atat::AtatCmd<LEN>,
-        A::Error: Into<UbloxError>,
     {
         self.client
-            .send(req)
+            .send_retry(req)
             .map_err(|e| match e {
                 nb::Error::Other(ate) => {
                     // let request = req.as_bytes();
                     // error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
 
                     match ate {
-                        atat::Error::Error(ubx) => {
-                            let u: UbloxError = ubx.into();
-                            Error::AT(atat::Error::Error(u))
-                        }
                         atat::Error::Timeout => {
-                            self.consecutive_timeouts += 1;
+                            self.consecutive_timeouts += A::ATTEMPTS;
                             Error::AT(atat::Error::Timeout)
                         }
                         atat::Error::Read => Error::AT(atat::Error::Read),
@@ -138,6 +128,7 @@ impl<C: AtatClient> AtTx<C> {
                         atat::Error::Aborted => Error::AT(atat::Error::Aborted),
                         atat::Error::Overflow => Error::AT(atat::Error::Overflow),
                         atat::Error::Parse => Error::AT(atat::Error::Parse),
+                        _ => Error::AT(atat::Error::Error),
                     }
                 }
                 nb::Error::WouldBlock => Error::_Unknown,
@@ -504,7 +495,6 @@ where
     ) -> Result<A::Response, Error>
     where
         A: atat::AtatCmd<LEN>,
-        A::Error: Into<UbloxError>,
     {
         if check_urc {
             if let Err(e) = self.handle_urc() {

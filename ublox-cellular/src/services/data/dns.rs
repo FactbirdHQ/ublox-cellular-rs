@@ -1,4 +1,4 @@
-use atat::{AtatClient, Clock};
+use atat::{clock::Clock, AtatClient};
 use core::fmt::Write;
 use embedded_nal::IpAddr;
 use embedded_nal::{AddrType, Dns};
