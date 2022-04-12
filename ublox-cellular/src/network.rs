@@ -196,6 +196,7 @@ where
 
     pub fn process_events(&mut self) -> Result<(), Error> {
         if self.at_tx.consecutive_timeouts > 10 {
+            self.at_tx.consecutive_timeouts = 0;
             warn!("Resetting the modem due to consecutive AT timeouts");
             return Err(Error::Generic(GenericError::Timeout));
         }

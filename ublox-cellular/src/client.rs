@@ -186,14 +186,8 @@ where
     }
 
     pub(crate) fn configure(&mut self) -> Result<(), Error> {
-        if matches!(self.state, State::On) {
-            return Ok(());
-        }
-
         // Always re-configure the PDP contexts if we reconfigure the module
         self.network.context_state = ContextState::Setup;
-
-        self.is_alive(2)?;
 
         self.clear_buffers()?;
 
@@ -218,6 +212,8 @@ where
             // UART begin(self.config.baud_rate)
 
             // self.is_alive()?;
+        } else {
+            self.power_on()?;
         }
 
         self.select_sim_card()?;
