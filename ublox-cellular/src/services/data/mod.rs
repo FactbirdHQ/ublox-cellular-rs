@@ -245,10 +245,7 @@ where
                 .timer
                 .start(1.secs())
                 .map_err(|_e| Error::Generic(GenericError::Clock))?;
-            self.network
-                .status
-                .timer
-                .wait()
+            nb::block!(self.network.status.timer.wait())
                 .map_err(|_e| Error::Generic(GenericError::Clock))?;
         }
 
