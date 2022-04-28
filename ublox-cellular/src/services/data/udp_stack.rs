@@ -143,7 +143,7 @@ where
         if let Some(ref mut sockets) = self.sockets {
             self.network
                 .send_internal(&CloseSocket { socket }, false)
-                .map_err(|_| Error::Unaddressable)?;
+                .ok();
             sockets.remove(socket)?;
             Ok(())
         } else {

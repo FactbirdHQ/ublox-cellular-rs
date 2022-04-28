@@ -464,7 +464,11 @@ where
                     ip_addr: _,
                 }) => {
                     info!("[URC] DataConnectionActivated {}", result);
-                    ctx_state = ContextState::Active;
+                    if result == 0 {
+                        ctx_state = ContextState::Active;
+                    } else {
+                        ctx_state = ContextState::Setup;
+                    }
                 }
                 Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
                     profile_id,
