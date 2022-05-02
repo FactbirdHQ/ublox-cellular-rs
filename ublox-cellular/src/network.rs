@@ -5,7 +5,8 @@ use crate::{
             SetModuleFunctionality,
         },
         network_service::{
-            types::OperatorSelectionMode, GetNetworkRegistrationStatus, SetOperatorSelection,
+            responses::OperatorSelection, types::OperatorSelectionMode,
+            GetNetworkRegistrationStatus, GetOperatorSelection, SetOperatorSelection,
         },
         psn::{
             self, types::PDPContextStatus, GetEPSNetworkRegistrationStatus,
@@ -287,14 +288,19 @@ where
                 self.status.psd.reset();
                 self.status.eps.reset();
                 self.status.registration_interventions += 1;
-                self.send_internal(
-                    &SetOperatorSelection {
-                        mode: OperatorSelectionMode::Automatic,
-                        format: Some(2),
-                    },
-                    false,
-                )
-                .ok();
+                let OperatorSelection { mode, .. } =
+                    self.send_internal(&GetOperatorSelection, true)?;
+
+                // Only run AT+COPS=0 if currently de-registered, to avoid PLMN reselection
+                if !matches!(mode, OperatorSelectionMode::Automatic) {
+                    self.send_internal(
+                        &SetOperatorSelection {
+                            mode: OperatorSelectionMode::Automatic,
+                            format: Some(2),
+                        },
+                        true,
+                    )?;
+                }
                 return Ok(());
 
             // If (EPS + CSD) is denied registration
