@@ -444,7 +444,10 @@ where
         match self.network.process_events() {
             // Catch "Resetting the modem due to the network registration timeout"
             // as well as consecutive AT timeouts and do a hard reset.
-            Err(crate::network::Error::Generic(GenericError::Timeout)) => self.hard_reset(),
+            Err(crate::network::Error::Generic(GenericError::Timeout)) => {
+                self.hard_reset()?;
+                Err(Error::Generic(GenericError::Timeout))
+            }
             result => result.map_err(Error::from),
         }
     }
