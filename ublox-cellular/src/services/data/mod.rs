@@ -60,7 +60,7 @@ use embedded_nal::Ipv4Addr;
 pub const INGRESS_CHUNK_SIZE: usize = 256;
 pub const EGRESS_CHUNK_SIZE: usize = 1024;
 
-const PROFILE_ID: ProfileId = ProfileId(1);
+pub const PROFILE_ID: ProfileId = ProfileId(1);
 
 #[cfg(not(feature = "upsd-context-activation"))]
 const CONTEXT_ID: ContextId = ContextId(1);

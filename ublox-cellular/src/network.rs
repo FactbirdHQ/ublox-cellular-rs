@@ -17,7 +17,7 @@ use crate::{
     },
     error::GenericError,
     registration::{self, ConnectionState, RegistrationParams, RegistrationState},
-    services::data::ContextState,
+    services::data::{ContextState, PROFILE_ID},
 };
 use atat::{atat_derive::AtatLen, clock::Clock, AtatClient};
 use fugit::{ExtU32, MinutesDurationU32, SecsDurationU32};
@@ -520,7 +520,9 @@ where
                     profile_id,
                 }) => {
                     info!("[URC] DataConnectionDeactivated {:?}", profile_id);
-                    ctx_state = ContextState::Activating;
+                    if profile_id == PROFILE_ID {
+                        ctx_state = ContextState::Activating;
+                    }
                 }
                 Urc::MessageWaitingIndication(_) => {
                     info!("[URC] MessageWaitingIndication");
