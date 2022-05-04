@@ -127,11 +127,11 @@ where
         &'a mut self,
         apn_info: &APNInfo,
     ) -> nb::Result<DataService<'a, C, CLK, TIMER_HZ, N, L>, DeviceError> {
-        // Spin [`Device`], handling [`Network`] related URC changes and propagting the FSM
+        // Spin [`Device`], handling [`Network`] related URC changes and
+        // propagting the FSM
         match self.spin() {
-            // If we're not using AT+UPSD-based
-            // context activation, set the context using
-            // AT+CGDCONT and the authentication mode
+            // If we're not using AT+UPSD-based context activation, set the
+            // context using AT+CGDCONT and the authentication mode
             Err(nb::Error::WouldBlock) => {
                 #[cfg(not(feature = "upsd-context-activation"))]
                 self.define_context(CONTEXT_ID, apn_info)
@@ -189,10 +189,11 @@ where
         // Check if context is active, and create if not
         data_service.connect(apn_info)?;
 
-        // At this point [`data_service`] will always have a valid and active data context!
+        // At this point [`data_service`] will always have a valid and active
+        // data context!
 
-        // Attempt to ingress data from every open socket, into it's
-        // internal rx buffer
+        // Attempt to ingress data from every open socket, into it's internal rx
+        // buffer
         if data_service.sockets.is_some() {
             data_service.socket_ingress_all()?;
         }
@@ -206,16 +207,14 @@ where
             ContextState::Active => return Ok(()),
             ContextState::Setup | ContextState::Activating => {}
         }
-        // This step _shouldn't_ be necessary.  However,
-        // for reasons I don't understand, SARA-R4 can be
-        // registered but not attached (i.e. AT+CGATT
-        // returns 0) on both RATs (unh?).  Phil Ware, who
-        // knows about these things, always goes through
-        // (a) register, (b) wait for AT+CGATT to return 1
-        // and then (c) check that a context is active
-        // with AT+CGACT or using AT+UPSD (even for EUTRAN).
-        // Since this sequence works for both RANs, it is
-        // best to be consistent.
+
+        // This step _shouldn't_ be necessary.  However, for reasons I don't
+        // understand, SARA-R4 can be registered but not attached (i.e. AT+CGATT
+        // returns 0) on both RATs (unh?).  Phil Ware, who knows about these
+        // things, always goes through (a) register, (b) wait for AT+CGATT to
+        // return 1 and then (c) check that a context is active with AT+CGACT or
+        // using AT+UPSD (even for EUTRAN). Since this sequence works for both
+        // RANs, it is best to be consistent.
         self.attach_network()?;
 
         // Activate the context
@@ -245,24 +244,19 @@ where
                 .timer
                 .start(1.secs())
                 .map_err(|_e| Error::Generic(GenericError::Clock))?;
+
             nb::block!(self.network.status.timer.wait())
                 .map_err(|_e| Error::Generic(GenericError::Clock))?;
         }
 
-        // self.network
-        //     .send_internal(
-        //         &SetGPRSAttached {
-        //             state: GPRSAttachedState::Attached,
-        //         },
-        //         true,
-        //     )
-        //     .map_err(Error::from)?;
+        // self.network .send_internal( &SetGPRSAttached { state:
+        //     GPRSAttachedState::Attached, }, true, ) .map_err(Error::from)?;
 
         Err(nb::Error::WouldBlock)
     }
 
-    /// Activate context using AT+UPSD commands, required
-    /// for SARA-G3 and SARA-U2 modules.
+    /// Activate context using AT+UPSD commands, required for SARA-G3 and
+    /// SARA-U2 modules.
     #[cfg(feature = "upsd-context-activation")]
     fn activate_context_upsd(
         &mut self,
@@ -288,8 +282,8 @@ where
         if param_tag == 0 {
             self.network.context_state = ContextState::Activating;
 
-            // SARA-U2 pattern: everything is done through AT+UPSD
-            // Set up the APN
+            // SARA-U2 pattern: everything is done through AT+UPSD Set up the
+            // APN
             if let Apn::Given(apn) = apn_info.clone().apn {
                 self.network
                     .send_internal(
@@ -365,8 +359,8 @@ where
         Ok(())
     }
 
-    /// Activate context using 3GPP commands, required
-    /// for SARA-R4/R5 and TOBY modules.
+    /// Activate context using 3GPP commands, required for SARA-R4/R5 and TOBY
+    /// modules.
     #[cfg(not(feature = "upsd-context-activation"))]
     fn activate_context(&mut self, cid: ContextId, profile_id: ProfileId) -> nb::Result<(), Error> {
         if self.network.context_state == ContextState::Active {
@@ -390,8 +384,8 @@ where
             .unwrap_or(false);
 
         if activated {
-            // Note: SARA-R4 only supports a single context at any
-            // one time and so doesn't require/support AT+UPSD.
+            // Note: SARA-R4 only supports a single context at any one time and
+            // so doesn't require/support AT+UPSD.
             #[cfg(feature = "sara_r4")]
             return Ok(());
 
@@ -492,7 +486,8 @@ where
                     let available_data = socket.available_data();
 
                     if available_data == 0 {
-                        // Check for new socket data available at regular intervals, just in case a URC is missed
+                        // Check for new socket data available at regular
+                        // intervals, just in case a URC is missed
                         if socket.should_update_available_data(network.status.timer.now()) {
                             match network.send_internal(
                                 &ReadSocketData {
@@ -513,15 +508,17 @@ where
                         return Err(Error::BufferFull);
                     }
 
-                    // Request [`IngressChunkSize`] if it is available, otherwise request
-                    // maximum available data
+                    // Request [`IngressChunkSize`] if it is available,
+                    // otherwise request maximum available data
                     let wanted_len = core::cmp::min(available_data, INGRESS_CHUNK_SIZE);
-                    // Check if socket.buffer has room for wanted_len, and ingress the smallest of the two
+                    // Check if socket.buffer has room for wanted_len, and
+                    // ingress the smallest of the two
                     let requested_len = core::cmp::min(wanted_len, socket.rx_window());
 
                     let (socket_handle, mut data, len) = match socket.get_type() {
                         SocketType::Tcp => {
-                            // Allow room for 2x length (Hex), and command overhead
+                            // Allow room for 2x length (Hex), and command
+                            // overhead
                             let SocketData {
                                 socket,
                                 data,
@@ -537,7 +534,8 @@ where
                             (socket, data, length)
                         }
                         SocketType::Udp => {
-                            // Allow room for 2x length (Hex), and command overhead
+                            // Allow room for 2x length (Hex), and command
+                            // overhead
                             let UDPSocketData {
                                 socket,
                                 data,
@@ -583,7 +581,8 @@ where
 
                         let enqueued = socket.rx_enqueue_slice(demangled);
                         if enqueued != demangled.len() {
-                            // This should never happen, due to the `requested_len` check above
+                            // This should never happen, due to the
+                            // `requested_len` check above
                             error!(
                                 "Failed to enqueue full slice of data! {} != {}",
                                 enqueued,
@@ -598,10 +597,8 @@ where
                 })
                 .filter_map(Result::err)
                 .for_each(|_e| {
-                    // error!(
-                    //     "Failed to ingress data for socket! {:?}",
-                    //     Debug2Format(&e)
-                    // )
+                    // error!( "Failed to ingress data for socket! {:?}",
+                    //     Debug2Format(&e) )
                 });
             Ok(())
         } else {

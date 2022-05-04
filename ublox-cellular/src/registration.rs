@@ -36,29 +36,24 @@ impl<const TIMER_HZ: u32> CellularRegistrationStatus<TIMER_HZ> {
             .unwrap_or_else(|| 0.millis())
     }
 
-    #[allow(dead_code)]
     pub fn started(&self) -> Option<TimerInstantU32<TIMER_HZ>> {
         self.started
     }
 
-    #[allow(dead_code)]
     pub fn updated(&self) -> Option<TimerInstantU32<TIMER_HZ>> {
         self.updated
     }
 
-    #[allow(dead_code)]
     pub fn reset(&mut self) {
         self.status = Status::None;
         self.updated = None;
         self.started = None;
     }
 
-    #[allow(dead_code)]
     pub fn get_status(&self) -> Status {
         self.status
     }
 
-    #[allow(dead_code)]
     pub fn set_status(&mut self, stat: Status, ts: TimerInstantU32<TIMER_HZ>) {
         if self.status != stat {
             self.status = stat;
@@ -67,12 +62,10 @@ impl<const TIMER_HZ: u32> CellularRegistrationStatus<TIMER_HZ> {
         self.updated = Some(ts);
     }
 
-    #[allow(dead_code)]
     pub fn registered(&self) -> bool {
         matches!(self.status, Status::Home | Status::Roaming)
     }
 
-    #[allow(dead_code)]
     pub fn sticky(&self) -> bool {
         self.updated.is_some() && self.updated != self.started
     }
@@ -201,6 +194,7 @@ where
 
     pub(crate) reg_check_time: Option<TimerInstantU32<TIMER_HZ>>,
     pub(crate) reg_start_time: Option<TimerInstantU32<TIMER_HZ>>,
+    pub(crate) imsi_check_time: Option<TimerInstantU32<TIMER_HZ>>,
 
     pub(crate) conn_state: ConnectionState,
     /// CSD (Circuit Switched Data) registration status (registered/searching/roaming etc.).
@@ -241,6 +235,7 @@ where
             timer,
             reg_check_time: None,
             reg_start_time: None,
+            imsi_check_time: None,
 
             conn_state: ConnectionState::Disconnected,
             csd: CellularRegistrationStatus::new(),
@@ -260,6 +255,7 @@ where
         self.eps.reset();
         self.reg_start_time = Some(self.timer.now());
         self.reg_check_time = self.reg_start_time;
+        self.imsi_check_time = None;
         self.registration_interventions = 1;
     }
 
