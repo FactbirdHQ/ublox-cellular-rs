@@ -106,3 +106,34 @@ pub struct ReportMobileTerminationError {
     #[at_arg(position = 0)]
     pub status: ReportMobileTerminationErrorStatus,
 }
+
+/// 5.20 Extended error report +CEER
+///
+/// Causes the MT to return one or more lines of the information text response
+/// which offer an extended report of the reason for:
+/// - the failure in the last unsuccessful call setup or in-call modification,
+/// - the last call release,
+/// - the last unsuccessful GPRS attach / EPS bearer establishment or
+///   unsuccessful PDP context activation,
+/// - the last GPRS / EPS bearer detach or PDP context deactivation.
+///
+/// **NOTES:**
+///
+/// - TOBY-L4 / TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 /
+/// LISA-U1 / SARA-G3 / LEON-G1 The total number of characters in the
+/// information text response shall not exceed 2041 characters (including line
+/// terminators). The textual report is the failure cause according to 3GPP TS
+/// 24.008 [69].
+/// - SARA-G4 / SARA-G3 The command also provides an extended report about the
+/// reason for the last SM STATUS message sent to the network. When <type>="SM
+/// STATUS msg sent" is reported, it is suggested to reset the PS data
+/// connection.
+#[derive(Clone, AtatResp)]
+pub struct ExtendedErrorReport {
+    #[at_arg(position = 0)]
+    pub r#type: heapless::String<32>,
+    #[at_arg(position = 1)]
+    pub cause: u32,
+    #[at_arg(position = 2)]
+    pub description: heapless::String<64>,
+}

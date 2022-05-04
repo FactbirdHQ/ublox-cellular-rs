@@ -20,18 +20,19 @@ where
         let mut ip_str = String::<256>::new();
         write!(&mut ip_str, "{}", ip_addr).map_err(|_| Error::BadLength)?;
 
-        let resp = self
-            .network
-            .send_internal(
-                &dns::ResolveNameIp {
-                    resolution_type: ResolutionType::IpToDomainName,
-                    ip_domain_string: &ip_str,
-                },
-                true,
-            )
-            .map_err(|_| Error::Unaddressable)?;
-
-        Ok(String::from(resp.ip_domain_string.as_str()))
+        match self.network.send_internal(
+            &dns::ResolveNameIp {
+                resolution_type: ResolutionType::IpToDomainName,
+                ip_domain_string: &ip_str,
+            },
+            true,
+        ) {
+            Ok(resp) => Ok(String::from(resp.ip_domain_string.as_str())),
+            Err(e) => {
+                error!("get_host_by_address failed: {:?}", e);
+                Err(nb::Error::Other(Error::Unaddressable))
+            }
+        }
     }
 
     fn get_host_by_name(
@@ -43,19 +44,21 @@ where
             return Err(nb::Error::Other(Error::Illegal));
         }
 
-        let resp = self
-            .network
-            .send_internal(
-                &dns::ResolveNameIp {
-                    resolution_type: ResolutionType::DomainNameToIp,
-                    ip_domain_string: hostname,
-                },
-                true,
-            )
-            .map_err(|_| Error::Unaddressable)?;
-
-        resp.ip_domain_string
-            .parse()
-            .map_err(|_e| nb::Error::Other(Error::Illegal))
+        match self.network.send_internal(
+            &dns::ResolveNameIp {
+                resolution_type: ResolutionType::DomainNameToIp,
+                ip_domain_string: hostname,
+            },
+            true,
+        ) {
+            Ok(resp) => resp
+                .ip_domain_string
+                .parse()
+                .map_err(|_e| nb::Error::Other(Error::Illegal)),
+            Err(e) => {
+                error!("get_host_by_name failed: {:?}", e);
+                Err(nb::Error::Other(Error::Unaddressable))
+            }
+        }
     }
 }

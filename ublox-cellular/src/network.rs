@@ -1,8 +1,9 @@
 use crate::{
     command::{
+        general::GetCIMI,
         mobile_control::{
             types::{Functionality, ResetMode},
-            SetModuleFunctionality,
+            GetExtendedErrorReport, SetModuleFunctionality,
         },
         network_service::{
             responses::OperatorSelection, types::OperatorSelectionMode,
@@ -12,7 +13,7 @@ use crate::{
             self, types::PDPContextStatus, GetEPSNetworkRegistrationStatus,
             GetGPRSNetworkRegistrationStatus, GetPDPContextState, SetPDPContextState,
         },
-        Urc,
+        Urc, AT,
     },
     error::GenericError,
     registration::{self, ConnectionState, RegistrationParams, RegistrationState},
@@ -24,7 +25,8 @@ use hash32_derive::Hash32;
 use serde::{Deserialize, Serialize};
 
 const REGISTRATION_CHECK_INTERVAL: SecsDurationU32 = SecsDurationU32::secs(15);
-const REGISTRATION_TIMEOUT: MinutesDurationU32 = MinutesDurationU32::minutes(5);
+const REGISTRATION_TIMEOUT: MinutesDurationU32 = MinutesDurationU32::minutes(3);
+const CHECK_IMSI_TIMEOUT: MinutesDurationU32 = MinutesDurationU32::minutes(1);
 
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -202,10 +204,10 @@ where
             return Err(Error::Generic(GenericError::Timeout));
         }
 
-        self.handle_urc()?;
-        self.check_registration_state()?;
+        self.handle_urc().ok(); // Ignore errors
+        self.check_registration_state();
         self.intervene_registration()?;
-        // self.check_running_imsi();
+        self.check_running_imsi();
 
         let now = self.status.timer.now();
         let should_check = self
@@ -217,7 +219,7 @@ where
             })
             .unwrap_or(true);
 
-        if self.status.conn_state != ConnectionState::Connecting || !should_check {
+        if !should_check {
             return Ok(());
         }
 
@@ -243,10 +245,45 @@ where
         Ok(())
     }
 
-    pub fn check_registration_state(&mut self) -> Result<(), Error> {
+    pub fn check_running_imsi(&mut self) -> Result<(), Error> {
+        // Check current IMSI if registered successfully in which case
+        // imsi_check_time will be `None`, else if not registered, check after
+        // CHECK_IMSI_TIMEOUT is expired
+        let now = self.status.timer.now();
+        let check_imsi = self
+            .status
+            .imsi_check_time
+            .and_then(|imsi_check_time| {
+                now.checked_duration_since(imsi_check_time)
+                    .map(|dur| dur >= CHECK_IMSI_TIMEOUT)
+            })
+            .unwrap_or(true);
+
+        if check_imsi {
+            // NOTE: The CIMI command has been known to not have an immediate response on u-blox modems
+            // and currently has a 10 second timeout.  This command is also only for
+            // logging purposes to monitor the currently selected IMSI on EtherSIM
+            // during registration.  For these reasons we are intentionally not
+            // registering a parserError_ when this command does not return
+            // AtResponse::OK.  Instead, in the case of a non-OK response, we will
+            // follow up the command with an AT/OK check and subsequent
+            // checkParser() call to catch/address any modem parsing issues.
+            match self.send_internal(&GetCIMI, false) {
+                Ok(_) => {}
+                Err(_) => {
+                    self.send_internal(&AT, false)?;
+                }
+            }
+
+            self.status.imsi_check_time.replace(now);
+        }
+        Ok(())
+    }
+
+    pub fn check_registration_state(&mut self) {
         // Don't do anything if we are actually disconnected by choice
         if self.status.conn_state == ConnectionState::Disconnected {
-            return Ok(());
+            return;
         }
 
         // If both (CSD + PSD) is registered, or EPS is registered, we are connected!
@@ -261,8 +298,6 @@ where
             self.status
                 .set_connection_state(ConnectionState::Connecting);
         }
-
-        Ok(())
     }
 
     pub fn intervene_registration(&mut self) -> Result<(), Error> {
@@ -337,7 +372,10 @@ where
         // and (CSD + PSD) is denied registration.
         if self.status.csd.sticky()
             && self.status.csd.duration(now) >= timeout
-            && self.status.csd.get_status() == registration::Status::Denied
+            && matches!(
+                self.status.csd.get_status(),
+                registration::Status::Denied | registration::Status::Roaming
+            )
             && self.status.psd.get_status() == registration::Status::Denied
         {
             debug!(
@@ -410,6 +448,8 @@ where
 
     pub fn update_registration(&mut self) -> Result<(), Error> {
         let ts = self.status.timer.now();
+
+        self.send_internal(&GetExtendedErrorReport, false).ok();
 
         if let Ok(reg) = self.send_internal(&GetNetworkRegistrationStatus, false) {
             self.status.compare_and_set(reg.into(), ts);
@@ -609,7 +649,7 @@ mod tests {
             .eps
             .set_status(Status::NotRegistering, TimerInstantU32::from_ticks(5));
 
-        assert!(network.check_registration_state().is_ok());
+        network.check_registration_state();
 
         assert_eq!(network.status.conn_state, ConnectionState::Connecting);
         assert_eq!(
@@ -637,7 +677,7 @@ mod tests {
             .eps
             .set_status(Status::Roaming, TimerInstantU32::from_ticks(5));
 
-        assert!(network.check_registration_state().is_ok());
+        network.check_registration_state();
 
         assert_eq!(network.status.conn_state, ConnectionState::Connected);
 
@@ -658,7 +698,7 @@ mod tests {
             .psd
             .set_status(Status::Home, TimerInstantU32::from_ticks(5));
 
-        assert!(network.check_registration_state().is_ok());
+        network.check_registration_state();
 
         assert_eq!(network.status.conn_state, ConnectionState::Connected);
     }
