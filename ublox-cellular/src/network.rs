@@ -323,19 +323,15 @@ where
                 self.status.psd.reset();
                 self.status.eps.reset();
                 self.status.registration_interventions += 1;
-                let OperatorSelection { mode, .. } =
-                    self.send_internal(&GetOperatorSelection, true)?;
 
-                // Only run AT+COPS=0 if currently de-registered, to avoid PLMN reselection
-                if !matches!(mode, OperatorSelectionMode::Automatic) {
-                    self.send_internal(
-                        &SetOperatorSelection {
-                            mode: OperatorSelectionMode::Automatic,
-                            format: Some(2),
-                        },
-                        true,
-                    )?;
-                }
+                self.send_internal(
+                    &SetOperatorSelection {
+                        mode: OperatorSelectionMode::Automatic,
+                        format: Some(2),
+                    },
+                    false,
+                )
+                .ok(); // Ignore result
                 return Ok(());
 
             // If (EPS + CSD) is denied registration
