@@ -154,6 +154,7 @@ where
             // Catch states where we have no vint sense, and the module is already in powered mode,
             // but for some reason doesn't answer to AT commands.
             // This usually happens on programming after modem power on.
+            self.network.at_tx.reset()?;
             if self.power_on().is_err() {
                 self.hard_reset()?;
             }
@@ -216,6 +217,8 @@ where
 
             // self.is_alive()?;
         } else {
+            // Make sure AT commands parser is in clean state.
+            self.network.at_tx.reset()?;
             self.power_on()?;
         }
 
