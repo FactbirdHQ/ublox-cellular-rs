@@ -462,6 +462,9 @@ where
 
         res?;
 
+        // The below comment mentions data connection lost, but it also checks `state`.
+        // Could the two come out of sync so that we reach the `else` thereby reseting context state unnecessarily?
+        // Maybe it is better to rely on only network.is_connected()?
         if self.network.is_connected().map_err(Error::from)? && self.state == State::On {
             Ok(())
         } else {

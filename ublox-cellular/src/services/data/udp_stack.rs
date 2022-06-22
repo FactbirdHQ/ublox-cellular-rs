@@ -143,6 +143,7 @@ where
         if let Some(ref mut sockets) = self.sockets {
             self.network
                 .send_internal(&CloseSocket { socket }, false)
+                // Why do we ignore error here?
                 .ok();
             sockets.remove(socket)?;
             Ok(())

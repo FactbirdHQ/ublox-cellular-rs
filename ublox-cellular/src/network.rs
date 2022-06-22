@@ -70,6 +70,8 @@ impl<C: AtatClient> AtTx<C> {
         Ok(())
     }
 
+    // Besides the weird match on timeout that does nothgin, this method is identical to `send`.
+    // Is that a bug? I guess yes, since they are named differently
     pub fn send_ignore_timeout<A, const LEN: usize>(
         &mut self,
         req: &A,
@@ -134,6 +136,8 @@ impl<C: AtatClient> AtTx<C> {
                         _ => Error::AT(atat::Error::Error),
                     }
                 }
+                // Why do we map `WouldBlock` to `_Unknown`?
+                // Currently `send` is blocking by not returning `nb::Result`, so shouldn't we use `block!(self.client.send_retry)`?
                 nb::Error::WouldBlock => Error::_Unknown,
             })
             .map(|res| {
@@ -185,10 +189,12 @@ where
         }
     }
 
+    // I guess we can make this just return bool? It seems infallible
     pub fn is_connected(&self) -> Result<bool, Error> {
         Ok(matches!(self.status.conn_state, ConnectionState::Connected))
     }
 
+    // Why is this returning `Result` instead of `()`?
     pub fn reset_reg_time(&mut self) -> Result<(), Error> {
         let now = self.status.timer.now();
 
@@ -204,6 +210,7 @@ where
             return Err(Error::Generic(GenericError::Timeout));
         }
 
+        // Why are we ignoring errors here?
         self.handle_urc().ok(); // Ignore errors
         self.check_registration_state();
         self.intervene_registration()?;
@@ -331,6 +338,7 @@ where
                     },
                     false,
                 )
+                // Why are we ignoring this?
                 .ok(); // Ignore result
                 return Ok(());
 
@@ -445,6 +453,7 @@ where
     pub fn update_registration(&mut self) -> Result<(), Error> {
         let ts = self.status.timer.now();
 
+        // Why are we discarding error here?
         self.send_internal(&GetExtendedErrorReport, false).ok();
 
         if let Ok(reg) = self.send_internal(&GetNetworkRegistrationStatus, false) {
@@ -468,6 +477,7 @@ where
         let mut new_reg_params: Option<RegistrationParams> = None;
 
         self.at_tx.handle_urc(|urc| {
+            // Shouldn't we propagate these cases to the user so they can handle it accordingly?
             match urc {
                 Urc::NetworkDetach => {
                     warn!("Network Detach URC!");
@@ -547,6 +557,7 @@ where
     {
         if check_urc {
             if let Err(e) = self.handle_urc() {
+                // Why don't we propagate the error?
                 error!("Failed handle URC {:?}", &e);
             }
         }

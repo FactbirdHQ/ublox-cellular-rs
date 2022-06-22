@@ -462,6 +462,7 @@ where
                 )
                 .map_err(Error::from)?;
 
+            // How come we are returning WouldBlock here? I thought we already succeeded?
             Err(nb::Error::WouldBlock)
         }
     }
@@ -588,6 +589,7 @@ where
                                 enqueued,
                                 demangled.len()
                             );
+                            // Return err or panic instead? I guess returning error is better
                         }
                     } else {
                         return Err(Error::Socket(SocketError::Exhausted));
@@ -597,6 +599,9 @@ where
                 })
                 .filter_map(Result::err)
                 .for_each(|_e| {
+                    // We currently ignore all errors.
+                    // Would be better to return the first error or something
+
                     // error!( "Failed to ingress data for socket! {:?}",
                     //     Debug2Format(&e) )
                 });

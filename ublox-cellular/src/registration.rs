@@ -297,6 +297,8 @@ where
             }
             RegType::Unknown => {
                 error!("unknown reg type");
+                // Idea: return Error here instead of ().
+                // If the Unknown case happens we do actually make the caller handle the error instead of silently failing
                 return;
             }
         }
