@@ -112,7 +112,8 @@ pub struct PrepareSecurityDataImport<'a> {
     value_sep = false,
     cmd_prefix = "",
     termination = "",
-    force_receive_state = true
+    force_receive_state = true,
+    timeout_ms = 3000
 )]
 pub struct SendSecurityDataImport<'a> {
     #[at_arg(position = 0, len = 2048)]
