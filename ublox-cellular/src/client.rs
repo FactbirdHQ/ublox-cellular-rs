@@ -122,6 +122,10 @@ where
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Minimum,
+                // SARA-R5 This parameter can be used only when <fun> is 1, 4 or 19
+                #[cfg(feature = "sara-r5")]
+                rst: None,
+                #[cfg(not(feature = "sara-r5"))]
                 rst: Some(ResetMode::DontReset),
             },
             true,
@@ -292,6 +296,8 @@ where
         }
 
         // Disable Message Waiting URCs (UMWI)
+        // SARA-R5 does not support it
+        #[cfg(not(feature = "sara-r5"))]
         self.network.send_internal(
             &SetMessageWaitingIndication {
                 mode: MessageWaitingMode::Disabled,
