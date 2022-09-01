@@ -16,7 +16,7 @@ doctest = false
 
 [dependencies]
 atat = { version = "0.16", features = ["derive", "bytes"] }
-embedded-hal = "1.0.0-alpha.6"
+embedded-hal = "1.0.0-alpha.8"
 embedded-nal = "0.6.0"
 fugit = { version = "0.3" }
 hash32 = "^0.2.1"
