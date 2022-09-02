@@ -45,6 +45,7 @@ The samples can be built using `cargo build -p linux_example --target x86_64-unk
   - `topy_l4`
   - `mpci_l2`
   - `lisa_u2`
+  - `sara_r5`
   - `sara_g3`
   - `sara_g4`
   - `sara_u2`
@@ -55,12 +56,10 @@ The samples can be built using `cargo build -p linux_example --target x86_64-unk
   - `leon_g1`
 - `socket-tcp`: Enabled by default. Adds TCP socket capabilities, and implements [`TcpStack`] trait.
 - `socket-udp`: Enabled by default. Adds UDP socket capabilities, and implements [`UdpStack`] trait.
-- `defmt-default`: Disabled by default. Add log statements on trace (dev) or info (release) log levels to aid debugging.
-- `defmt-trace`: Disabled by default. Add log statements on trace log levels to aid debugging.
-- `defmt-debug`: Disabled by default. Add log statements on debug log levels to aid debugging.
-- `defmt-info`: Disabled by default. Add log statements on info log levels to aid debugging.
-- `defmt-warn`: Disabled by default. Add log statements on warn log levels to aid debugging.
-- `defmt-error`: Disabled by default. Add log statements on error log levels to aid debugging.
+- `logger-defmt `: Use `defmt` based logging. Typically used in no_std platforms.
+  - Different log levels can be used like this: `DEFMT_LOG=info cargo run myapp`
+- `logger-log`: Use `log` based logging. Used in std platforms.
+  - Different log levels can be used like this: `RUST_LOG=error cargo run myapp`
 
 
 ## License
