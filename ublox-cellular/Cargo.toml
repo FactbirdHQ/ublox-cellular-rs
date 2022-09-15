@@ -15,7 +15,7 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { git = "https://github.com/BlackbirdHQ/atat.git", branch = "chore/embedded-hal-alpha.8", features = ["derive", "bytes"] }
+atat = { version = "0.17", features = ["derive", "bytes"] }
 embedded-hal = "1.0.0-alpha.8"
 embedded-nal = "0.6.0"
 fugit = { version = "0.3" }
@@ -24,7 +24,7 @@ hash32-derive = "^0.1.0"
 heapless = { version = "^0.7", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
-ublox-sockets = { git = "https://github.com/andresv/ublox-sockets.git", branch = "embedded-hal-1.0.0-alpha.8" }
+ublox-sockets = { version = "0.4" }
 
 # Enable `serde` feature of `no-std-net`
 no-std-net = { version = "^0.5", features = ["serde"] }
