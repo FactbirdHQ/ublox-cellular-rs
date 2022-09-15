@@ -28,7 +28,7 @@ use crate::{
         psn::{
             self,
             responses::{GPRSAttached, PacketSwitchedConfig, PacketSwitchedNetworkData},
-            types::PacketSwitchedParamReq,
+            types::{PacketSwitchedParamReq, ProtocolType},
             GetPDPContextState, GetPacketSwitchedConfig, GetPacketSwitchedNetworkData,
         },
     },
@@ -85,6 +85,10 @@ where
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Minimum,
+                // SARA-R5: this parameter can be used only when <fun> is 1, 4 or 19
+                #[cfg(feature = "sara-r5")]
+                rst: None,
+                #[cfg(not(feature = "sara-r5"))]
                 rst: Some(ResetMode::DontReset),
             },
             true,
@@ -147,7 +151,6 @@ where
         }
 
         // At this point we WILL be registered on the network!
-
         match DataService::try_new(apn_info, &mut self.network, self.sockets.as_deref_mut()) {
             Ok(service) => Ok(service),
             Err(nb::Error::Other(e)) => Err(nb::Error::Other(e.into())),
@@ -255,8 +258,8 @@ where
         Err(nb::Error::WouldBlock)
     }
 
-    /// Activate context using AT+UPSD commands, required for SARA-G3 and
-    /// SARA-U2 modules.
+    /// Activate context using AT+UPSD commands
+    /// Required for SARA-G3, SARA-U2 SARA-R5 modules.
     #[cfg(feature = "upsd-context-activation")]
     fn activate_context_upsd(
         &mut self,
@@ -267,7 +270,7 @@ where
             return Ok(());
         }
 
-        // Check the if the PSD profile is activated (param_tag = 1)
+        // Check if the PSD profile is activated (param_tag = 1)
         let PacketSwitchedNetworkData { param_tag, .. } = self
             .network
             .send_internal(
@@ -282,8 +285,8 @@ where
         if param_tag == 0 {
             self.network.context_state = ContextState::Activating;
 
-            // SARA-U2 pattern: everything is done through AT+UPSD Set up the
-            // APN
+            // SARA-U2 pattern: everything is done through AT+UPSD
+            // Set up the APN
             if let Apn::Given(apn) = apn_info.clone().apn {
                 self.network
                     .send_internal(
@@ -323,6 +326,7 @@ where
             }
 
             // Set up the dynamic IP address assignment.
+            #[cfg(not(feature = "sara-r5"))]
             self.network
                 .send_internal(
                     &SetPacketSwitchedConfig {
@@ -334,11 +338,45 @@ where
                 .map_err(Error::from)?;
 
             // Automatic authentication protocol selection
+            #[cfg(not(feature = "sara-r5"))]
             self.network
                 .send_internal(
                     &SetPacketSwitchedConfig {
                         profile_id,
                         param: PacketSwitchedParam::Authentication(AuthenticationType::Auto),
+                    },
+                    true,
+                )
+                .map_err(Error::from)?;
+
+            #[cfg(not(feature = "sara-r5"))]
+            self.network
+                .send_internal(
+                    &SetPacketSwitchedConfig {
+                        profile_id,
+                        param: PacketSwitchedParam::IPAddress(Ipv4Addr::unspecified().into()),
+                    },
+                    true,
+                )
+                .map_err(Error::from)?;
+
+            #[cfg(feature = "sara-r5")]
+            self.network
+                .send_internal(
+                    &SetPacketSwitchedConfig {
+                        profile_id,
+                        param: PacketSwitchedParam::ProtocolType(ProtocolType::IPv4),
+                    },
+                    true,
+                )
+                .map_err(Error::from)?;
+
+            #[cfg(feature = "sara-r5")]
+            self.network
+                .send_internal(
+                    &SetPacketSwitchedConfig {
+                        profile_id,
+                        param: PacketSwitchedParam::MapProfile(ContextId(1)),
                     },
                     true,
                 )
@@ -359,8 +397,8 @@ where
         Ok(())
     }
 
-    /// Activate context using 3GPP commands, required for SARA-R4/R5 and TOBY
-    /// modules.
+    /// Activate context using 3GPP commands
+    /// Required for SARA-R4 and TOBY modules.
     #[cfg(not(feature = "upsd-context-activation"))]
     fn activate_context(&mut self, cid: ContextId, profile_id: ProfileId) -> nb::Result<(), Error> {
         if self.network.context_state == ContextState::Active {
@@ -384,9 +422,9 @@ where
             .unwrap_or(false);
 
         if activated {
-            // Note: SARA-R4 only supports a single context at any one time and
-            // so doesn't require/support AT+UPSD.
-            #[cfg(feature = "sara_r4")]
+            // Note: SARA-R4 only supports a single context at any
+            // one time and so doesn't require/support AT+UPSD.
+            #[cfg(feature = "sara-r4")]
             return Ok(());
 
             if let PacketSwitchedConfig {

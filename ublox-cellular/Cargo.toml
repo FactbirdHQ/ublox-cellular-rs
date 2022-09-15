@@ -15,8 +15,8 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.16", features = ["derive", "bytes"] }
-embedded-hal = "1.0.0-alpha.6"
+atat = { version = "0.17", features = ["derive", "bytes"] }
+embedded-hal = "1.0.0-alpha.8"
 embedded-nal = "0.6.0"
 fugit = { version = "0.3" }
 hash32 = "^0.2.1"
@@ -24,7 +24,7 @@ hash32-derive = "^0.1.0"
 heapless = { version = "^0.7", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
-ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", rev = "30c6550" }
+ublox-sockets = "0.4"
 
 # Enable `serde` feature of `no-std-net`
 no-std-net = { version = "^0.5", features = ["serde"] }
@@ -35,7 +35,10 @@ defmt = { version = "^0.3", optional = true }
 [features]
 default = ["toby-r2", "socket-udp", "socket-tcp"]
 
+# Use `defmt-impl to enable defmt based logging
 defmt-impl = ["defmt", "ublox-sockets/defmt", "fugit/defmt", "atat/defmt", "heapless/defmt-impl"]
+# Use `log-impl` to enable log based logging
+log-impl = ["log", "ublox-sockets/log", "atat/log"]
 
 lara-r2 = []
 leon-g1 = []
@@ -43,6 +46,7 @@ lisa-u2 = []
 mpci-l2 = []
 sara-g3 = []
 sara-g4 = []
+sara-r5 = ["upsd-context-activation"]
 sara-u1 = []
 sara-u2 = ["upsd-context-activation"]
 toby-l2 = []

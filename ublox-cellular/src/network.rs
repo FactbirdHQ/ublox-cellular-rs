@@ -349,6 +349,10 @@ where
                 self.send_internal(
                     &SetModuleFunctionality {
                         fun: Functionality::Minimum,
+                        // SARA-R5 This parameter can be used only when <fun> is 1, 4 or 19
+                        #[cfg(feature = "sara-r5")]
+                        rst: None,
+                        #[cfg(not(feature = "sara-r5"))]
                         rst: Some(ResetMode::DontReset),
                     },
                     false,
@@ -385,6 +389,10 @@ where
             self.send_internal(
                 &SetModuleFunctionality {
                     fun: Functionality::Minimum,
+                    // SARA-R5 This parameter can be used only when <fun> is 1, 4 or 19
+                    #[cfg(feature = "sara-r5")]
+                    rst: None,
+                    #[cfg(not(feature = "sara-r5"))]
                     rst: Some(ResetMode::DontReset),
                 },
                 false,
