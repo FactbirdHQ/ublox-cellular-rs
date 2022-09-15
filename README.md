@@ -56,9 +56,9 @@ The samples can be built using `cargo build -p linux_example --target x86_64-unk
   - `leon_g1`
 - `socket-tcp`: Enabled by default. Adds TCP socket capabilities, and implements [`TcpStack`] trait.
 - `socket-udp`: Enabled by default. Adds UDP socket capabilities, and implements [`UdpStack`] trait.
-- `logger-defmt `: Use `defmt` based logging. Typically used in no_std platforms.
+- `defmt-impl `: Use `defmt` based logging. Typically used in no_std platforms.
   - Different log levels can be used like this: `DEFMT_LOG=info cargo run myapp`
-- `logger-log`: Use `log` based logging. Used in std platforms.
+- `log-impl`: Use `log` based logging. Used in std platforms.
   - Different log levels can be used like this: `RUST_LOG=error cargo run myapp`
 
 
