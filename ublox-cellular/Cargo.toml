@@ -24,7 +24,7 @@ hash32-derive = "^0.1.0"
 heapless = { version = "^0.7", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
-ublox-sockets = { version = "0.4" }
+ublox-sockets = "0.4"
 
 # Enable `serde` feature of `no-std-net`
 no-std-net = { version = "^0.5", features = ["serde"] }
