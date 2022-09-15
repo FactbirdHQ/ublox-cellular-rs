@@ -35,9 +35,9 @@ defmt = { version = "^0.3", optional = true }
 [features]
 default = ["toby-r2", "socket-udp", "socket-tcp"]
 
-# Use `logger-defmt` to enable defmt based logging
+# Use `defmt-impl to enable defmt based logging
 defmt-impl = ["defmt", "ublox-sockets/defmt", "fugit/defmt", "atat/defmt", "heapless/defmt-impl"]
-# Use `logger-log` to enable log based logging
+# Use `log-impl` to enable log based logging
 log-impl = ["log", "ublox-sockets/log", "atat/log"]
 
 lara-r2 = []
