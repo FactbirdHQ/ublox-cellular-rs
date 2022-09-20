@@ -36,8 +36,12 @@ use sms::{types::MessageWaitingMode, SetMessageWaitingIndication};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum State {
+    /// Device is off
     Off,
-    On,
+    /// Device is able to respond to AT commands
+    AtInitialized,
+    /// Device is fully initialized
+    FullyInitialized,
 }
 
 pub struct Device<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>
@@ -86,6 +90,56 @@ where
     DTR: OutputPin,
     VINT: InputPin,
 {
+    /// Create new u-blox device
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use bbqueue::BBBuffer;
+    /// use ublox_cellular::prelude::*;
+    /// use ublox_cellular::atat;
+    /// use ublox_cellular::{Config, GsmClient};
+    ///
+    /// const RX_BUF_LEN: usize = 256;
+    /// const RES_CAPACITY: usize = 256;
+    /// const URC_CAPACITY: usize = 256;
+    /// const MAX_SOCKET_COUNT: usize = 1;
+    /// static mut RES_QUEUE: BBBuffer<RES_CAPACITY> = BBBuffer::new();
+    /// static mut URC_QUEUE: BBBuffer<URC_CAPACITY> = BBBuffer::new();
+    ///
+    /// type UbloxResetPin = gpio::Gpio26<gpio::Output>;
+    ///
+    /// let queues = atat::Queues {
+    ///     res_queue: unsafe { RES_QUEUE.try_split_framed().unwrap() },
+    ///     urc_queue: unsafe { URC_QUEUE.try_split_framed().unwrap() },
+    /// };
+    ///
+    /// let (atat_client, mut ingress) =
+    ///     atat::ClientBuilder::<_, _, _, TIMER_HZ, RX_BUF_LEN, RES_CAPACITY, URC_CAPACITY>::new(
+    ///         tx,
+    ///         timer::SysTimer::new(),
+    ///         atat::AtDigester::<Urc>::new(),
+    ///         atat::Config::new(atat::Mode::Timeout),
+    ///     )
+    ///     .build(queues);
+    ///
+    ///
+    /// let mut modem = GsmClient::<
+    ///     _,
+    ///     _,
+    ///     UbloxResetPin,
+    ///     gpio::Gpio0<gpio::Output>,
+    ///     gpio::Gpio0<gpio::Output>,
+    ///     gpio::Gpio0<gpio::Input>,
+    ///     TIMER_HZ,
+    ///     MAX_SOCKET_COUNT,
+    ///     SOCKET_RING_BUFFER_LEN,
+    /// >::new(
+    ///     atat_client,
+    ///     timer::SysTimer::new(),
+    ///     Config::new("").with_flow_control().with_rst(reset),
+    /// );
+    /// ```
     pub fn new(client: C, timer: CLK, config: Config<RST, DTR, PWR, VINT>) -> Self {
         let mut device = Device {
             config,
@@ -99,48 +153,25 @@ where
         device
     }
 
-    pub fn select_sim_card(&mut self) -> Result<(), Error> {
-        for _ in 0..2 {
-            match self.network.send_internal(&GetPinStatus, true) {
-                Ok(PinStatus { code }) if code == PinStatusCode::Ready => {
-                    return Ok(());
-                }
-                _ => {}
-            }
-
-            self.network
-                .status
-                .timer
-                .start(1.secs())
-                .map_err(from_clock)?;
-            nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
-        }
-
-        // There was an error initializing the SIM
-        // We've seen issues on uBlox-based devices, as a precation, we'll cycle
-        // the modem here through minimal/full functional state.
-        self.network.send_internal(
-            &SetModuleFunctionality {
-                fun: Functionality::Minimum,
-                // SARA-R5 This parameter can be used only when <fun> is 1, 4 or 19
-                #[cfg(feature = "sara-r5")]
-                rst: None,
-                #[cfg(not(feature = "sara-r5"))]
-                rst: Some(ResetMode::DontReset),
-            },
-            true,
-        )?;
-        self.network.send_internal(
-            &SetModuleFunctionality {
-                fun: Functionality::Full,
-                rst: Some(ResetMode::DontReset),
-            },
-            true,
-        )?;
-
-        return Err(Error::Busy);
-    }
-
+    /// Set storage for TCP/UDP sockets
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use ublox_cellular::sockets::SocketSet;
+    ///
+    /// const TIMER_HZ: u32 = 1000;
+    /// const MAX_SOCKET_COUNT: usize = 1;
+    /// const SOCKET_RING_BUFFER_LEN: usize = 1024;
+    ///
+    /// static mut SOCKET_SET: Option<SocketSet<TIMER_HZ, MAX_SOCKET_COUNT, SOCKET_RING_BUFFER_LEN>> = None;
+    ///
+    /// unsafe {
+    ///     SOCKET_SET = Some(SocketSet::new());
+    /// }
+    ///
+    /// modem.set_socket_storage(unsafe { SOCKET_SET.as_mut().unwrap() });
+    /// ```
     pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<TIMER_HZ, N, L>) {
         socket_set.prune();
         self.sockets.replace(socket_set);
@@ -150,50 +181,37 @@ where
         self.sockets.take()
     }
 
-    pub fn initialize(&mut self) -> Result<(), Error> {
-        if self.power_state != PowerState::On {
-            // Always re-configure the module when power has been off
-            self.state = State::Off;
+    /// Run modem state machine
+    ///
+    /// For typical use case only this is needed to manage modem automatically.
+    /// It does everything from turning on the modem, configuring it and managing network connection.
+    /// This must be called periodically in a loop.
+    pub fn spin(&mut self) -> nb::Result<(), Error> {
+        let res = self.initialize();
 
-            // Catch states where we have no vint sense, and the module is already in powered mode,
-            // but for some reason doesn't answer to AT commands.
-            // This usually happens on programming after modem power on.
-            self.network.at_tx.reset()?;
-            if self.power_on().is_err() {
-                self.hard_reset()?;
+        self.process_events().map_err(Error::from)?;
+
+        res?;
+
+        if self.network.is_connected().map_err(Error::from)?
+            && self.state == State::FullyInitialized
+        {
+            Ok(())
+        } else {
+            // Reset context state if data connection is lost (This will act as a safeguard if a URC is missed)
+            if self.network.context_state == ContextState::Active {
+                self.network.context_state = ContextState::Activating;
             }
-
-            self.power_state = PowerState::On;
-        } else if matches!(self.state, State::On) {
-            return Ok(());
+            Err(nb::Error::WouldBlock)
         }
-
-        // At this point, if is_alive fails, the configured Baud rate is probably wrong
-        self.is_alive(20).map_err(|_| Error::BaudDetection)?;
-
-        self.configure()?;
-
-        Ok(())
     }
 
-    pub(crate) fn clear_buffers(&mut self) -> Result<(), Error> {
-        self.network.at_tx.reset()?;
-        if let Some(ref mut sockets) = self.sockets.as_deref_mut() {
-            sockets.prune();
-        }
-
-        // Allow ATAT some time to clear the buffers
-        self.network
-            .status
-            .timer
-            .start(300.millis())
-            .map_err(from_clock)?;
-        nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
-
-        Ok(())
-    }
-
-    pub(crate) fn configure(&mut self) -> Result<(), Error> {
+    /// Setup only essential settings to use AT commands
+    ///
+    /// Nornally this is not used and AT interface is setup in [`initialize`](Device::initialize).
+    /// However it is useful if you want to send some AT commands before modem is fully initialized.
+    /// After this [`send_at`](Device::send_at) can be used.
+    pub fn setup_at_commands(&mut self) -> Result<(), Error> {
         // Always re-configure the PDP contexts if we reconfigure the module
         self.network.context_state = ContextState::Setup;
 
@@ -225,8 +243,6 @@ where
             self.network.at_tx.reset()?;
             self.power_on()?;
         }
-
-        self.select_sim_card()?;
 
         // Extended errors on
         self.network.send_internal(
@@ -295,6 +311,116 @@ where
             )?;
         }
 
+        self.state = State::AtInitialized;
+        Ok(())
+    }
+
+    /// Send AT commands and wait responses from modem
+    ///
+    /// Modem must be initialized before this works.
+    /// For example use [`setup_at_commands`](Device::setup_at_commands) to only initialize AT commands support and nothing else.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// use ublox_cellular::command::device_data_security::{types::SecurityDataType, RetrieveSecurityMd5};
+    ///
+    /// modem.setup_at_commands()?;
+    /// modem.send_at(&RetrieveSecurityMd5 {
+    ///     data_type: SecurityDataType::TrustedRootCA,
+    ///     internal_name: "ca_cert",
+    /// })?;
+    /// info!("md5: {:}", resp.md5_string);
+    /// ```
+    pub fn send_at<A, const LEN: usize>(&mut self, cmd: &A) -> Result<A::Response, Error>
+    where
+        A: atat::AtatCmd<LEN>,
+    {
+        match self.state {
+            State::Off => {
+                error!("Device not initialized!");
+                return Err(Error::Uninitialized);
+            }
+            State::AtInitialized | State::FullyInitialized => {}
+        }
+
+        Ok(self.network.send_internal(cmd, true)?)
+    }
+
+    fn select_sim_card(&mut self) -> Result<(), Error> {
+        for _ in 0..2 {
+            match self.network.send_internal(&GetPinStatus, true) {
+                Ok(PinStatus { code }) if code == PinStatusCode::Ready => {
+                    return Ok(());
+                }
+                _ => {}
+            }
+
+            self.network
+                .status
+                .timer
+                .start(1.secs())
+                .map_err(from_clock)?;
+            nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
+        }
+
+        // There was an error initializing the SIM
+        // We've seen issues on uBlox-based devices, as a precation, we'll cycle
+        // the modem here through minimal/full functional state.
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun: Functionality::Minimum,
+                // SARA-R5 This parameter can be used only when <fun> is 1, 4 or 19
+                #[cfg(feature = "sara-r5")]
+                rst: None,
+                #[cfg(not(feature = "sara-r5"))]
+                rst: Some(ResetMode::DontReset),
+            },
+            true,
+        )?;
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun: Functionality::Full,
+                rst: Some(ResetMode::DontReset),
+            },
+            true,
+        )?;
+
+        return Err(Error::Busy);
+    }
+
+    /// Initialize modem fully
+    ///
+    /// Turns modem on if it is off, configures it and starts registering to network.
+    ///
+    /// In typical situations user should not use it directly.
+    /// This should be used only if you would like to handle connections manually.
+    ///
+    /// For typical use case use [`spin`][Device::spin] which handles everything automatically.
+    pub fn initialize(&mut self) -> Result<(), Error> {
+        if self.power_state != PowerState::On {
+            // Always re-configure the module when power has been off
+            self.state = State::Off;
+
+            // Catch states where we have no vint sense, and the module is already in powered mode,
+            // but for some reason doesn't answer to AT commands.
+            // This usually happens on programming after modem power on.
+            self.network.at_tx.reset()?;
+            if self.power_on().is_err() {
+                self.hard_reset()?;
+            }
+
+            self.power_state = PowerState::On;
+        } else if matches!(self.state, State::FullyInitialized) {
+            return Ok(());
+        }
+
+        // At this point, if is_alive fails, the configured Baud rate is probably wrong
+        self.is_alive(20).map_err(|_| Error::BaudDetection)?;
+
+        self.setup_at_commands()?;
+        self.select_sim_card()?;
+
         // Disable Message Waiting URCs (UMWI)
         // SARA-R5 does not support it
         #[cfg(not(feature = "sara-r5"))]
@@ -356,7 +482,24 @@ where
 
         self.network.reset_reg_time()?;
 
-        self.state = State::On;
+        self.state = State::FullyInitialized;
+        Ok(())
+    }
+
+    pub(crate) fn clear_buffers(&mut self) -> Result<(), Error> {
+        self.network.at_tx.reset()?;
+        if let Some(ref mut sockets) = self.sockets.as_deref_mut() {
+            sockets.prune();
+        }
+
+        // Allow ATAT some time to clear the buffers
+        self.network
+            .status
+            .timer
+            .start(300.millis())
+            .map_err(from_clock)?;
+        nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
+
         Ok(())
     }
 
@@ -461,38 +604,6 @@ where
         }
     }
 
-    pub fn spin(&mut self) -> nb::Result<(), Error> {
-        let res = self.initialize();
-
-        self.process_events().map_err(Error::from)?;
-
-        res?;
-
-        if self.network.is_connected().map_err(Error::from)? && self.state == State::On {
-            Ok(())
-        } else {
-            // Reset context state if data connection is lost (This will act as a safeguard if a URC is missed)
-            if self.network.context_state == ContextState::Active {
-                self.network.context_state = ContextState::Activating;
-            }
-            Err(nb::Error::WouldBlock)
-        }
-    }
-
-    pub fn send_at<A, const LEN: usize>(&mut self, cmd: &A) -> Result<A::Response, Error>
-    where
-        A: atat::AtatCmd<LEN>,
-    {
-        // At any point after init state, we should be able to fully send AT
-        // commands.
-        if self.state != State::On {
-            error!("Still not initialized!");
-            return Err(Error::Uninitialized);
-        }
-
-        Ok(self.network.send_internal(cmd, true)?)
-    }
-
     pub fn handle_urc<F: FnOnce(Urc) -> bool>(&mut self, f: F) -> Result<(), Error> {
         self.network.at_tx.handle_urc(f).map_err(Error::Network)
     }
@@ -533,7 +644,7 @@ mod tests {
 
         // device.fsm.set_state(State::Connected);
         // assert_eq!(device.fsm.get_state(), State::Connected);
-        device.state = State::On;
+        device.state = State::FullyInitialized;
         device.power_state = PowerState::On;
         // assert_eq!(device.spin(), Ok(()));
 
