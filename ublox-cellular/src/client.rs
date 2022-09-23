@@ -92,6 +92,8 @@ where
 {
     /// Create new u-blox device
     ///
+    /// Look for [`data_service`](Device::data_service) how to handle data connection automatically.
+    ///
     /// # Examples
     ///
     /// ```ignore
@@ -183,8 +185,10 @@ where
 
     /// Run modem state machine
     ///
-    /// For typical use case only this is needed to manage modem automatically.
-    /// It does everything from turning on the modem, configuring it and managing network connection.
+    /// Turns on modem if needed and processes URCs.
+    /// Typically it is not needed to use it directly. However it can be useful for manually handling network connections.
+    /// For fully automatic data connection handling use [`data_service`](Device::data_service).
+    ///
     /// This must be called periodically in a loop.
     pub fn spin(&mut self) -> nb::Result<(), Error> {
         let res = self.initialize();
