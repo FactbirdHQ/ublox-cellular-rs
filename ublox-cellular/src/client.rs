@@ -244,6 +244,9 @@ where
             self.power_on()?;
         }
 
+        // At this point, if is_alive fails, the configured Baud rate is probably wrong
+        self.is_alive(20).map_err(|_| Error::BaudDetection)?;
+
         // Extended errors on
         self.network.send_internal(
             &SetReportMobileTerminationError {
