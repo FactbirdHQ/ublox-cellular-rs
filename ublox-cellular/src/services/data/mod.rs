@@ -127,6 +127,24 @@ where
         Ok(())
     }
 
+    /// Handle modem data connection
+    ///
+    /// For typical use case only this is needed to manage modem automatically.
+    /// It does everything from turning on the modem, configuring it and managing network connection.
+    /// This must be called periodically in a loop.
+    ///
+    /// # Examples
+    ///
+    /// ```ignore
+    /// loop {
+    ///     modem.data_service(&APNInfo::new("myapn")).and_then(|mut data_service| {
+    ///         // at this point modem is registered to network and data connection is active
+    ///         //  `data_service` can be use to send / receive data
+    ///
+    ///         Ok(())
+    ///     });
+    /// }
+    /// ```
     pub fn data_service<'a>(
         &'a mut self,
         apn_info: &APNInfo,
