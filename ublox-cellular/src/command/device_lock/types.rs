@@ -1,6 +1,7 @@
 //! Argument and parameter types used by Device lock Commands and Responses
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PinStatusCode {
     /// • READY: MT is not pending for any password
     Ready,

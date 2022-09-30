@@ -136,6 +136,42 @@ pub enum RadioAccessTechnologySelected {
     UmtsLte(RatPreferred),
 }
 
+/// Indicates the radio access technology
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(feature = "lara-r6")]
+pub enum FirstRadioAccessTechnology {
+    /// • 0: GSM / GPRS / eGPRS (single mode)
+    #[at_arg(value = 0)]
+    GsmGprsEGprs,
+    /// • 2: UMTS (single mode)
+    #[at_arg(value = 2)]
+    Umts,
+    /// • 3: LTE (single mode)
+    #[at_arg(value = 3)]
+    Lte,
+}
+
+/// Indicates the radio access technology
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(feature = "lara-r6")]
+pub enum SecondRadioAccessTechnology {
+    /// • 2: UMTS (single mode)
+    #[at_arg(value = 2)]
+    Umts,
+}
+
+/// Indicates the radio access technology
+#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[cfg(feature = "lara-r6")]
+pub enum ThirdRadioAccessTechnology {
+    /// • 0: GSM / GPRS / eGPRS (single mode)
+    #[at_arg(value = 0)]
+    GsmGprsEGprs,
+}
+
 #[derive(Debug, Clone, PartialEq, AtatEnum)]
 pub enum OperatorNameFormat {
     #[at_arg(value = 0)]

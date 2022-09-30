@@ -12,9 +12,16 @@ use crate::{
         *,
     },
     command::{
+        general::{GetCCID, GetFirmwareVersion, GetModelId, IdentificationInformation},
+        gpio::{
+            types::{GpioMode, GpioOutValue},
+            SetGpioConfiguration,
+        },
+        mobile_control::responses::ModuleFunctionality,
         network_service::{
-            responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
-            SetOperatorSelection,
+            responses::OperatorSelection,
+            types::{OperatorSelectionMode, RatPreferred},
+            GetOperatorSelection, SetOperatorSelection, SetRadioAccessTechnology,
         },
         psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
     },
@@ -244,7 +251,7 @@ where
             // self.is_alive()?;
         } else {
             // Make sure AT commands parser is in clean state.
-            self.network.at_tx.reset()?;
+            // self.network.at_tx.reset()?;
             self.power_on()?;
         }
 
@@ -258,6 +265,29 @@ where
             },
             false,
         )?;
+
+        self.network.send_internal(
+            &SetGpioConfiguration {
+                gpio_id: 25,
+                gpio_mode: GpioMode::Output(GpioOutValue::High),
+            },
+            false,
+        )?;
+
+        self.network.send_internal(&GetModelId, false)?;
+
+        // self.network.send_internal(
+        //     &IdentificationInformation {
+        //         n: 9
+        //     },
+        //     false,
+        // )?;
+
+        self.network.send_internal(&GetFirmwareVersion, false)?;
+
+        self.select_sim_card()?;
+
+        self.network.send_internal(&GetCCID, false)?;
 
         // DCD circuit (109) changes in accordance with the carrier
         self.network.send_internal(
@@ -429,8 +459,7 @@ where
         self.select_sim_card()?;
 
         // Disable Message Waiting URCs (UMWI)
-        // SARA-R5 does not support it
-        #[cfg(not(feature = "sara-r5"))]
+        #[cfg(any(feature = "toby-r2"))]
         self.network.send_internal(
             &SetMessageWaitingIndication {
                 mode: MessageWaitingMode::Disabled,
@@ -445,27 +474,39 @@ where
             false,
         )?;
 
-        self.network.send_internal(
-            &SetModuleFunctionality {
-                fun: Functionality::Full,
-                rst: Some(ResetMode::DontReset),
-            },
-            true,
-        )?;
-
         // self.network.send_internal(
         //     &SetRadioAccessTechnology {
-        //         selected_act: RadioAccessTechnologySelected::GsmUmtsLte(RatPreferred::Lte, RatPreferred::Utran),
+        //         first_act: network_service::types::FirstRadioAccessTechnology::Lte,
+        //         second_act: Some(network_service::types::SecondRadioAccessTechnology::Umts),
+        //         third_act: None,
         //     },
         //     false,
         // )?;
+
+        let fun: ModuleFunctionality = self.network.send_internal(&GetModuleFunctionality, true)?;
+
+        // if fun.power_mode == PowerMode::TestMode {
+        //     self.network.send_internal(
+        //         &heapless::String::<256>::from("AT+UTEST=0\r\n"),
+        //         false,
+        //     )?;
+
+        // }
+
+        self.network.send_internal(
+            &SetModuleFunctionality {
+                fun: Functionality::Full,
+                rst: None,
+            },
+            true,
+        )?;
 
         self.network.status.reset();
         self.network
             .status
             .set_connection_state(ConnectionState::Connecting);
 
-        self.enable_registration_urcs()?;
+        // self.enable_registration_urcs()?;
 
         // Set automatic operator selection, if not already set
         let OperatorSelection { mode, .. } =

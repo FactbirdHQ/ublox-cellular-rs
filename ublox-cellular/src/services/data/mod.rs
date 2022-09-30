@@ -105,15 +105,15 @@ where
             )?;
         }
 
-        self.network.send_internal(
-            &SetAuthParameters {
-                cid,
-                auth_type: AuthenticationType::Auto,
-                username: &apn_info.clone().user_name.unwrap_or_default(),
-                password: &apn_info.clone().password.unwrap_or_default(),
-            },
-            true,
-        )?;
+        // self.network.send_internal(
+        //     &SetAuthParameters {
+        //         cid,
+        //         auth_type: AuthenticationType::Auto,
+        //         username: &apn_info.clone().user_name.unwrap_or_default(),
+        //         password: &apn_info.clone().password.unwrap_or_default(),
+        //     },
+        //     true,
+        // )?;
 
         self.network.send_internal(
             &SetModuleFunctionality {
@@ -440,69 +440,69 @@ where
             .unwrap_or(false);
 
         if activated {
-            // Note: SARA-R4 only supports a single context at any
-            // one time and so doesn't require/support AT+UPSD.
-            #[cfg(feature = "sara-r4")]
-            return Ok(());
-
-            if let PacketSwitchedConfig {
-                param: PacketSwitchedParam::MapProfile(context),
-                ..
-            } = self
-                .network
-                .send_internal(
-                    &GetPacketSwitchedConfig {
-                        profile_id,
-                        param: PacketSwitchedParamReq::MapProfile,
-                    },
-                    true,
-                )
-                .map_err(Error::from)?
+            // Note: SARA-R4 only supports a single context at any one time and
+            // so doesn't require/support AT+UPSD.
+            #[cfg(not(any(feature = "sara-r4", feature = "lara-r6")))]
             {
-                if context != cid {
-                    self.network
-                        .send_internal(
-                            &SetPacketSwitchedConfig {
-                                profile_id,
-                                param: PacketSwitchedParam::MapProfile(cid),
-                            },
-                            true,
-                        )
-                        .map_err(Error::from)?;
+                if let PacketSwitchedConfig {
+                    param: PacketSwitchedParam::MapProfile(context),
+                    ..
+                } = self
+                    .network
+                    .send_internal(
+                        &GetPacketSwitchedConfig {
+                            profile_id,
+                            param: PacketSwitchedParamReq::MapProfile,
+                        },
+                        true,
+                    )
+                    .map_err(Error::from)?
+                {
+                    if context != cid {
+                        self.network
+                            .send_internal(
+                                &SetPacketSwitchedConfig {
+                                    profile_id,
+                                    param: PacketSwitchedParam::MapProfile(cid),
+                                },
+                                true,
+                            )
+                            .map_err(Error::from)?;
 
+                        self.network
+                            .send_internal(
+                                &GetPacketSwitchedNetworkData {
+                                    profile_id,
+                                    param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+                                },
+                                true,
+                            )
+                            .map_err(Error::from)?;
+                    }
+                }
+
+                let PacketSwitchedNetworkData { param_tag, .. } = self
+                    .network
+                    .send_internal(
+                        &GetPacketSwitchedNetworkData {
+                            profile_id,
+                            param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+                        },
+                        true,
+                    )
+                    .map_err(Error::from)?;
+
+                if param_tag == 0 {
                     self.network
                         .send_internal(
-                            &GetPacketSwitchedNetworkData {
+                            &SetPacketSwitchedAction {
                                 profile_id,
-                                param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+                                action: PacketSwitchedAction::Activate,
                             },
                             true,
                         )
                         .map_err(Error::from)?;
                 }
-            }
-
-            let PacketSwitchedNetworkData { param_tag, .. } = self
-                .network
-                .send_internal(
-                    &GetPacketSwitchedNetworkData {
-                        profile_id,
-                        param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
-                    },
-                    true,
-                )
-                .map_err(Error::from)?;
-
-            if param_tag == 0 {
-                self.network
-                    .send_internal(
-                        &SetPacketSwitchedAction {
-                            profile_id,
-                            action: PacketSwitchedAction::Activate,
-                        },
-                        true,
-                    )
-                    .map_err(Error::from)?;
             }
 
             self.network.context_state = ContextState::Active;

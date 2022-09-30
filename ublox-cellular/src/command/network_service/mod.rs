@@ -85,9 +85,20 @@ pub struct GetOperatorSelection;
 ///   means of updating RAT related SIM files, can force RAT usage (see Notes).
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+URAT", NoResponse)]
+#[cfg(not(feature = "lara-r6"))]
 pub struct SetRadioAccessTechnology {
     #[at_arg(position = 0)]
     pub selected_act: RadioAccessTechnologySelected,
+}
+
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+URAT", NoResponse)]
+#[cfg(feature = "lara-r6")]
+pub struct SetRadioAccessTechnology {
+    #[at_arg(position = 0)]
+    pub first_act: FirstRadioAccessTechnology,
+    pub second_act: Option<SecondRadioAccessTechnology>,
+    pub third_act: Option<ThirdRadioAccessTechnology>,
 }
 
 #[derive(Clone, AtatCmd)]

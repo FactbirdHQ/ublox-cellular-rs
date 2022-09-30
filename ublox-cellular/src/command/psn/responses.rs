@@ -41,6 +41,7 @@ pub struct PacketSwitchedNetworkData {
 /// during the command execution. Any active PDP context will be automatically
 /// deactivated when the GPRS registration state changes to detached.
 #[derive(AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct GPRSAttached {
     #[at_arg(position = 0)]
     pub state: GPRSAttachedState,
@@ -48,6 +49,7 @@ pub struct GPRSAttached {
 
 /// 18.16 PDP context activate or deactivate +CGACT
 #[derive(Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PDPContextState {
     #[at_arg(position = 0)]
     pub cid: ContextId,
