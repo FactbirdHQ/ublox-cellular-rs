@@ -4,7 +4,7 @@ use atat::atat_derive::AtatResp;
 use heapless::String;
 
 /// 26.1.2 SSL/TLS certificates and private keys manager
-#[derive(Clone, PartialEq, AtatResp)]
+#[derive(Clone, PartialEq, Eq, AtatResp)]
 pub struct SecurityDataImport {
     /// Type of operation
     #[at_arg(position = 0)]
@@ -25,7 +25,7 @@ pub struct SecurityDataImport {
     pub md5_string: String<32>,
 }
 
-#[derive(Clone, PartialEq, AtatResp)]
+#[derive(Clone, PartialEq, Eq, AtatResp)]
 pub struct SecurityData {
     /// Type of the security data in verbose format:
     /// • "CA": trusted root CA (certificate authority) certificate

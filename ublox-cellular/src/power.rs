@@ -274,7 +274,7 @@ where
             .timer
             .now()
             .checked_duration_since(start)
-            .and_then(|dur| Some(dur < timeout))
+            .map(|dur| dur < timeout)
             .unwrap_or(false)
         {
             if self.power_state()? == expected {

@@ -423,7 +423,7 @@ where
             true,
         )?;
 
-        return Err(Error::Busy);
+        Err(Error::Busy)
     }
 
     /// Initialize modem fully

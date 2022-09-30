@@ -1,7 +1,7 @@
 //! Argument and parameter types used by Mobile equipment control and status Commands and Responses
 use atat::atat_derive::AtatEnum;
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum Functionality {
     /// 0: Sets the MT to minimum functionality (disable both transmit and receive RF
     /// circuits by deactivating both CS and PS services)
@@ -158,7 +158,7 @@ pub enum Functionality {
 }
 
 /// Reset mode. This parameter can be used only when <fun> (ModuleFunctionality) is 1, 4 or 19
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum ResetMode {
     /// Do not reset the MT before setting it to the selected <fun>
     DontReset = 0,
@@ -168,7 +168,7 @@ pub enum ResetMode {
 }
 
 /// Automatic time zone update
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum AutomaticTimezone {
     /// 0: automatic time zone via NITZ disabled
     Disabled = 0,
@@ -182,7 +182,7 @@ pub enum AutomaticTimezone {
     EnabledGMT = 2,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum TerminationErrorMode {
     /// 0: +CME ERROR: <err> result code disabled and ERROR used
     Disabled = 0,
@@ -192,7 +192,7 @@ pub enum TerminationErrorMode {
     Verbose = 2,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum PowerMode {
     ///MT is switched on with minimum functionality
     Minimum = 0,
@@ -206,7 +206,7 @@ pub enum PowerMode {
     MinimumWithoutSim = 19,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum STKMode {
     ///the SIM-toolkit interface in dedicated mode and fetching of proactive commands by SIM-APPL from the SIM-card are enabled
     DedicatedMode = 6,
@@ -216,7 +216,7 @@ pub enum STKMode {
     RawMode = 9,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum ReportMobileTerminationErrorStatus {
     ///+CME ERROR: <err> result code disabled and ERROR used
     DisabledERRORused = 0,

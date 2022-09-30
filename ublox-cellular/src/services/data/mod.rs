@@ -28,7 +28,7 @@ use crate::{
         psn::{
             self,
             responses::{GPRSAttached, PacketSwitchedConfig, PacketSwitchedNetworkData},
-            types::{PacketSwitchedParamReq, ProtocolType},
+            types::PacketSwitchedParamReq,
             GetPDPContextState, GetPacketSwitchedConfig, GetPacketSwitchedNetworkData,
         },
     },
@@ -658,7 +658,7 @@ where
                 });
             Ok(())
         } else {
-            return Err(Error::SocketMemory);
+            Err(Error::SocketMemory)
         }
     }
 }

@@ -5,7 +5,7 @@ use heapless::String;
 /// Is used to chose whether the network selection is automatically done by the
 /// MT or is forced by this command to the operator <oper> given in the format
 /// <format>
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum OperatorSelectionMode {
     /// • 0 (default value and factory-programmed value): automatic (<oper> field is ignored)
@@ -30,7 +30,7 @@ pub enum OperatorSelectionMode {
     Unknown,
 }
 /// Indicates the radio access technology
-#[derive(Debug, Clone, Copy, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RatAct {
     /// • 0: GSM
@@ -57,7 +57,7 @@ pub enum RatAct {
     Unknown = 10,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum NetworkRegistrationUrcConfig {
     /// • 0 (default value and factory-programmed value): network registration URC disabled
     UrcDisabled = 0,
@@ -68,7 +68,7 @@ pub enum NetworkRegistrationUrcConfig {
     UrcVerbose = 2,
 }
 
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum NetworkRegistrationStat {
     /// • 0: not registered, the MT is not currently searching a new operator to register to
@@ -98,7 +98,7 @@ pub enum NetworkRegistrationStat {
 }
 
 /// Indicates the preferred access technology
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RatPreferred {
     /// • 0: GSM / GPRS / eGPRS
@@ -110,7 +110,7 @@ pub enum RatPreferred {
 }
 
 /// Indicates the radio access technology
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum RadioAccessTechnologySelected {
     /// • 0: GSM / GPRS / eGPRS (single mode)
@@ -136,6 +136,7 @@ pub enum RadioAccessTechnologySelected {
     UmtsLte(RatPreferred),
 }
 
+<<<<<<< HEAD
 /// Indicates the radio access technology
 #[derive(Debug, Clone, PartialEq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -172,7 +173,7 @@ pub enum ThirdRadioAccessTechnology {
     GsmGprsEGprs,
 }
 
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 pub enum OperatorNameFormat {
     #[at_arg(value = 0)]
     Long(String<24>),

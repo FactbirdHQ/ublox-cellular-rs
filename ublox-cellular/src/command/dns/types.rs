@@ -2,7 +2,7 @@
 use atat::atat_derive::AtatEnum;
 
 /// Type of resolution operation:
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum ResolutionType {
     /// - 0: domain name to IP address
     DomainNameToIp = 0,

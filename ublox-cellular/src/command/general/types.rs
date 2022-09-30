@@ -1,7 +1,7 @@
 //! Argument and parameter types used by General Commands and Responses
 
 use atat::atat_derive::AtatEnum;
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum Snt {
     /// (default value): International Mobile station Equipment Identity (IMEI)
     IMEI = 0,
