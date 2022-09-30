@@ -136,7 +136,6 @@ pub enum RadioAccessTechnologySelected {
     UmtsLte(RatPreferred),
 }
 
-<<<<<<< HEAD
 /// Indicates the radio access technology
 #[derive(Debug, Clone, PartialEq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
