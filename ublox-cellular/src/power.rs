@@ -88,6 +88,10 @@ where
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun,
+                // SARA-R5 This parameter can be used only when <fun> is 1, 4 or 19
+                #[cfg(feature = "sara-r5")]
+                rst: None,
+                #[cfg(not(feature = "sara-r5"))]
                 rst: Some(ResetMode::DontReset),
             },
             false,

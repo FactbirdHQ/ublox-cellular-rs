@@ -112,7 +112,8 @@ pub struct PrepareSecurityDataImport<'a> {
     value_sep = false,
     cmd_prefix = "",
     termination = "",
-    force_receive_state = true
+    force_receive_state = true,
+    timeout_ms = 3000
 )]
 pub struct SendSecurityDataImport<'a> {
     #[at_arg(position = 0, len = 2048)]
@@ -122,6 +123,22 @@ pub struct SendSecurityDataImport<'a> {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USECMNG=3", Vec<SecurityData, 3> , value_sep = false)]
 pub struct ListSecurityData;
+
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+USECMNG=4,", SecurityDataImport, value_sep = false)]
+pub struct RetrieveSecurityMd5<'a> {
+    /// Type of the security data
+    #[at_arg(position = 0)]
+    pub data_type: SecurityDataType,
+    /// Unique identifier of an imported certificate or private key. If an
+    /// existing name is used the data will be overridden.
+    ///
+    /// **TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 / SARA-G4 /
+    /// SARA-G3:**
+    /// - The maximum length is 200 characters
+    #[at_arg(position = 1, len = 200)]
+    pub internal_name: &'a str,
+}
 
 /// 26.1.3 SSL/TLS security layer profile manager +USECPRF
 ///
