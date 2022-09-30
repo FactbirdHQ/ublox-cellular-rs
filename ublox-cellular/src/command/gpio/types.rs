@@ -3,14 +3,14 @@
 use atat::atat_derive::AtatEnum;
 
 /// GPIO output value (for output function <gpio_mode>=0 only):
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum GpioOutValue {
     Low = 0,
     High = 1,
 }
 
 /// GPIO input value (for input function <gpio_mode>=1 only):
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum GpioInPull {
     /// (default value): no resistor activated
     NoPull = 0,
@@ -27,7 +27,7 @@ pub enum GpioInPull {
 
 // }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum GpioMode {
     /// • 0: output
     #[at_arg(value = 0)]

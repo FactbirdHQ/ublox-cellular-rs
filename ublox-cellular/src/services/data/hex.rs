@@ -1,4 +1,4 @@
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FromHexError {
     /// An invalid character was found. Valid ones are: `0...9`, `a...f`
     /// or `A...F`.

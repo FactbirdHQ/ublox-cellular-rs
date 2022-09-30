@@ -28,7 +28,7 @@ use crate::{
         psn::{
             self,
             responses::{GPRSAttached, PacketSwitchedConfig, PacketSwitchedNetworkData},
-            types::{PacketSwitchedParamReq, ProtocolType},
+            types::PacketSwitchedParamReq,
             GetPDPContextState, GetPacketSwitchedConfig, GetPacketSwitchedNetworkData,
         },
     },
@@ -40,7 +40,7 @@ use crate::{
 };
 use apn::{APNInfo, Apn};
 use atat::{clock::Clock, AtatClient};
-use embedded_hal::digital::blocking::{InputPin, OutputPin};
+use embedded_hal::digital::{InputPin, OutputPin};
 use fugit::ExtU32;
 
 pub use error::Error;
@@ -658,7 +658,7 @@ where
                 });
             Ok(())
         } else {
-            return Err(Error::SocketMemory);
+            Err(Error::SocketMemory)
         }
     }
 }

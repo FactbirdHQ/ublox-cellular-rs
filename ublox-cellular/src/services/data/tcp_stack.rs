@@ -107,7 +107,7 @@ where
                 .get::<TcpSocket<TIMER_HZ, L>>(*socket)?
                 .is_connected())
         } else {
-            Err(Error::Illegal.into())
+            Err(Error::Illegal)
         }
     }
 
@@ -118,7 +118,7 @@ where
         socket: &mut Self::TcpSocket,
         buffer: &[u8],
     ) -> nb::Result<usize, Self::Error> {
-        if !self.is_connected(&socket)? {
+        if !self.is_connected(socket)? {
             return Err(Error::SocketClosed.into());
         }
 
@@ -183,7 +183,7 @@ where
             sockets.remove(socket)?;
             Ok(())
         } else {
-            Err(Error::Illegal.into())
+            Err(Error::Illegal)
         }
     }
 }

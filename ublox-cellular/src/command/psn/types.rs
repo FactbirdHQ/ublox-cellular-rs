@@ -4,7 +4,7 @@ use embedded_nal::IpAddr;
 use heapless::String;
 
 /// Indicates the state of PDP context activation
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum PDPContextStatus {
     /// 0: deactivated
     Deactivated = 0,
@@ -12,7 +12,7 @@ pub enum PDPContextStatus {
     Activated = 1,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 #[at_arg(u8)]
 pub enum PacketSwitchedParam {
     /// • 0: Protocol type; the allowed values of <param_val> parameter are
@@ -197,7 +197,7 @@ pub enum PacketSwitchedParam {
     MapProfile(ContextId),
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum PacketSwitchedParamReq {
     /// • 0: Protocol type; the allowed values of <param_val> parameter are
     ProtocolType = 0,
@@ -366,7 +366,7 @@ pub enum PacketSwitchedParamReq {
     MapProfile = 100,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum ProtocolType {
     /// (factory-programmed value): IPv4
     IPv4 = 0,
@@ -378,7 +378,7 @@ pub enum ProtocolType {
     IPv4v6PreferV6Internal = 3,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum AuthenticationType {
     /// (factory-programmed value): none
     None = 0,
@@ -390,7 +390,7 @@ pub enum AuthenticationType {
     Auto = 3,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum DataCompression {
     /// (factory-programmed value): off
     Off = 0,
@@ -400,7 +400,7 @@ pub enum DataCompression {
     V42Bits = 2,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum HeaderCompression {
     /// (factory-programmed value): off
     Off = 0,
@@ -414,7 +414,7 @@ pub enum HeaderCompression {
     RFC3095 = 4,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum QoSPrecedence {
     /// (factory-programmed value): subscribed
     Subscribed = 0,
@@ -426,7 +426,7 @@ pub enum QoSPrecedence {
     Low = 3,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum QoSDelay {
     /// (factory-programmed value): subscribed
     Subscribed = 0,
@@ -440,7 +440,7 @@ pub enum QoSDelay {
     BestEffort = 4,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum QoSReliability {
     /// (factory-programmed value): subscribed
     Subscribed = 0,
@@ -458,7 +458,7 @@ pub enum QoSReliability {
     Class6 = 6,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum PacketSwitchedAction {
     /// • 0: It clears the specified profile resetting all the parameters to their
     /// factory programmed values
@@ -474,7 +474,7 @@ pub enum PacketSwitchedAction {
     Deactivate = 4,
 }
 
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 pub enum PacketSwitchedNetworkDataParam {
     /// • 0: IP address: dynamic IP address assigned during PDP context
     /// activation;
@@ -509,7 +509,7 @@ pub enum PacketSwitchedNetworkDataParam {
     QoS3GTransferDelay = 24,
 }
 
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum GPRSAttachedState {
     /// • 0: Detached
@@ -518,7 +518,7 @@ pub enum GPRSAttachedState {
     Attached = 1,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum GPRSNetworkRegistrationUrcConfig {
     /// • 0 (default value and factory-programmed value): network registration
     /// URC disabled
@@ -530,7 +530,7 @@ pub enum GPRSNetworkRegistrationUrcConfig {
 }
 
 /// Controls the processing of URCs specified within this command.
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum PSEventReportingMode {
     /// • 0 (default value): buffer URCs in the MT; if the buffer is full the
     /// oldest ones will be discarded
@@ -544,7 +544,7 @@ pub enum PSEventReportingMode {
     BufferUrcs = 2,
 }
 
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum GPRSNetworkRegistrationStat {
     /// • 0: not registered, the MT is not currently searching an operator to
@@ -567,7 +567,7 @@ pub enum GPRSNetworkRegistrationStat {
     /// when <AcT> indicates 2,4,5,6)
     AttachedEmergencyOnly = 8,
 }
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum ExtendedPSNetworkRegistrationUrcConfig {
     /// • 0: network registration attach status URC disabled
     UrcDisabled = 0,
@@ -575,7 +575,7 @@ pub enum ExtendedPSNetworkRegistrationUrcConfig {
     UrcEnabled = 1,
 }
 
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ExtendedPSNetworkRegistrationState {
     /// • 0: not registered for PS service
@@ -601,7 +601,7 @@ pub enum ExtendedPSNetworkRegistrationState {
 }
 
 /// Mode configuration
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum EPSNetworkRegistrationUrcConfig {
     /// • 0: network registration URC disabled
     UrcDisabled = 0,
@@ -623,7 +623,7 @@ pub enum EPSNetworkRegistrationUrcConfig {
 }
 
 /// EPS registration status
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EPSNetworkRegistrationStat {
     /// • 0: not registered

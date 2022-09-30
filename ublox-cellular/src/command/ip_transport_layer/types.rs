@@ -2,13 +2,13 @@
 use crate::services::data::ssl::SecurityProfileId;
 use atat::atat_derive::AtatEnum;
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum SocketProtocol {
     TCP = 6,
     UDP = 17,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 #[at_enum(u8)]
 pub enum SslTlsStatus {
     /// 0 (default value): disable the SSL/TLS on the socket
@@ -22,7 +22,7 @@ pub enum SslTlsStatus {
 
 /// Enables/disables the HEX mode for +USOWR, +USOST, +USORD and +USORF AT
 /// commands.
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum HexMode {
     /// 0 (factory-programmed value): HEX mode disabled
     Disabled = 0,
@@ -31,7 +31,7 @@ pub enum HexMode {
 }
 
 /// Control request identifier
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum SocketControlParam {
     /// 0: query for socket type
     SocketType = 0,

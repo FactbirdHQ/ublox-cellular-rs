@@ -1,7 +1,4 @@
-use embedded_hal::digital::{
-    blocking::{InputPin, OutputPin},
-    ErrorType,
-};
+use embedded_hal::digital::{ErrorType, InputPin, OutputPin};
 use heapless::String;
 
 pub struct NoPin;

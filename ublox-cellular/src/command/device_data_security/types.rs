@@ -4,7 +4,7 @@ use atat::atat_derive::AtatEnum;
 use heapless::String;
 
 /// Type of operation
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum SecurityOperation {
     /// 0: import a certificate or a private key (data provided by the stream of byte)
     ImportStream = 0,
@@ -19,7 +19,7 @@ pub enum SecurityOperation {
 }
 
 /// Type of the security data
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum SecurityDataType {
     /// 0: trusted root CA (certificate authority) certificate
     TrustedRootCA = 0,
@@ -36,7 +36,7 @@ pub enum SecurityDataType {
 }
 
 /// Type of the security data
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum PinningLevel {
     /// * level 0: pinning based on information comparison of received and configured
     ///   certificate public key
@@ -50,7 +50,7 @@ pub enum PinningLevel {
 }
 
 /// certificate validation level
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum CertificateValidationLevel {
     /// * 0 (factory-programmed value): level 0 - No validation; the server
     ///   certificate will not be checked or verified. The server in this case
@@ -72,7 +72,7 @@ pub enum CertificateValidationLevel {
     RootCertValidationWithValidityDate = 3,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum SecurityProfileOperation {
     /// - 0: certificate validation level;
     #[at_arg(value = 0)]

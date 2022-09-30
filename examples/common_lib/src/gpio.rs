@@ -1,4 +1,4 @@
-use embedded_hal::digital::blocking::{InputPin, OutputPin};
+use embedded_hal::digital::{InputPin, OutputPin};
 
 #[cfg(target_os = "linux")]
 mod linux {

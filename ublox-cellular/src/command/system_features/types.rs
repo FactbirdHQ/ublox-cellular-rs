@@ -2,7 +2,7 @@
 use atat::atat_derive::{AtatEnum, AtatLen};
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum PowerSavingMode {
     /// Disabled: (default and factory-programmed value)
     Disabled = 0,
@@ -33,11 +33,11 @@ pub enum PowerSavingMode {
     CtrlByDtr = 3,
 }
 
-#[derive(Clone, PartialEq, AtatLen, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, AtatLen, Serialize, Deserialize)]
 pub struct Seconds(pub u32);
 
 /// FS factory restore type
-#[derive(Clone, Copy, PartialEq, AtatEnum)]
+#[derive(Clone, Copy, PartialEq, Eq, AtatEnum)]
 pub enum FSFactoryRestoreType {
     /// • 0 (factory-programmed value): no factory restore
     NoRestore = 0,
@@ -48,7 +48,7 @@ pub enum FSFactoryRestoreType {
 }
 
 /// NVM factory restore type:
-#[derive(Clone, Copy, PartialEq, AtatEnum)]
+#[derive(Clone, Copy, PartialEq, Eq, AtatEnum)]
 pub enum NVMFactoryRestoreType {
     /// • 0 (factory-programmed value): no factory restore
     NoRestore = 0,

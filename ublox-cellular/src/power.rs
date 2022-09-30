@@ -1,5 +1,5 @@
 use atat::{clock::Clock, AtatClient};
-use embedded_hal::digital::blocking::{InputPin, OutputPin};
+use embedded_hal::digital::{InputPin, OutputPin};
 use fugit::{ExtU32, MillisDurationU32};
 
 use crate::{
@@ -274,7 +274,7 @@ where
             .timer
             .now()
             .checked_duration_since(start)
-            .and_then(|dur| Some(dur < timeout))
+            .map(|dur| dur < timeout)
             .unwrap_or(false)
         {
             if self.power_state()? == expected {
