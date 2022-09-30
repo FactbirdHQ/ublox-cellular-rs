@@ -16,7 +16,8 @@ doctest = false
 
 [dependencies]
 serialport = "4"
-embedded-hal = "^1.0.0-alpha.6"
+embedded-hal = "=1.0.0-alpha.9"
+embedded-hal-nb = "=1.0.0-alpha.1"
 nb = "1"
 log = { version = "0.4", default-features = false }
 ublox-cellular-rs = { path = "../../ublox-cellular" }
