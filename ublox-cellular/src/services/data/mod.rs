@@ -28,7 +28,7 @@ use crate::{
         psn::{
             self,
             responses::{GPRSAttached, PacketSwitchedConfig, PacketSwitchedNetworkData},
-            types::{PacketSwitchedParamReq},
+            types::PacketSwitchedParamReq,
             GetPDPContextState, GetPacketSwitchedConfig, GetPacketSwitchedNetworkData,
         },
     },

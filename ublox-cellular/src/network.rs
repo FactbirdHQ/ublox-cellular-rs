@@ -6,8 +6,7 @@ use crate::{
             GetExtendedErrorReport, SetModuleFunctionality,
         },
         network_service::{
-            types::OperatorSelectionMode,
-            GetNetworkRegistrationStatus, SetOperatorSelection,
+            types::OperatorSelectionMode, GetNetworkRegistrationStatus, SetOperatorSelection,
         },
         psn::{
             self, types::PDPContextStatus, GetEPSNetworkRegistrationStatus,
