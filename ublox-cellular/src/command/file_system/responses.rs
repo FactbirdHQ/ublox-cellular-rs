@@ -4,7 +4,7 @@ use atat::heapless_bytes::Bytes;
 use heapless::String;
 
 /// 22.4 Read file +URDFILE
-#[derive(Debug, PartialEq, AtatResp)]
+#[derive(Debug, PartialEq, Eq, AtatResp)]
 pub struct ReadFileResponse {
     #[at_arg(position = 0)]
     pub filename: String<248>,
@@ -16,7 +16,7 @@ pub struct ReadFileResponse {
 }
 
 /// 22.5 Partial read file +URDBLOCK
-#[derive(Clone, Debug, PartialEq, AtatResp)]
+#[derive(Clone, Debug, PartialEq, Eq, AtatResp)]
 pub struct ReadBlockResponse {
     #[at_arg(position = 0)]
     pub filename: String<248>,

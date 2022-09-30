@@ -6,8 +6,8 @@ use crate::{
             GetExtendedErrorReport, SetModuleFunctionality,
         },
         network_service::{
-            responses::OperatorSelection, types::OperatorSelectionMode,
-            GetNetworkRegistrationStatus, GetOperatorSelection, SetOperatorSelection,
+            types::OperatorSelectionMode,
+            GetNetworkRegistrationStatus, SetOperatorSelection,
         },
         psn::{
             self, types::PDPContextStatus, GetEPSNetworkRegistrationStatus,
@@ -147,13 +147,11 @@ impl<C: AtatClient> AtTx<C> {
         let max = self.max_urc_attempts;
 
         self.client.peek_urc_with::<Urc, _>(|urc| {
-            if !f(urc.clone()) {
-                if a < max {
-                    a += 1;
-                    return false;
-                    // } else {
-                    // warn!("Dropping stale URC! {}", Debug2Format(&urc));
-                }
+            if !f(urc) && a < max {
+                a += 1;
+                return false;
+                // } else {
+                // warn!("Dropping stale URC! {}", Debug2Format(&urc));
             }
             a = 0;
             true

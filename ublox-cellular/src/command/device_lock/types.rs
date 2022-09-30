@@ -1,6 +1,6 @@
 //! Argument and parameter types used by Device lock Commands and Responses
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PinStatusCode {
     /// • READY: MT is not pending for any password
     Ready,

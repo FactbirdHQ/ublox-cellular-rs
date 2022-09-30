@@ -3,7 +3,7 @@
 use atat::atat_derive::AtatEnum;
 
 /// Indicates the behavior of circuit 109
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum Circuit109Behaviour {
     /// 0: DCE always presents ON condition on circuit 109
     AlwaysPresent = 0,
@@ -14,7 +14,7 @@ pub enum Circuit109Behaviour {
 }
 
 /// Indicates the behavior of circuit 108
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum Circuit108Behaviour {
     /// 0: the DCE ignores circuit 108/2
     Ignore = 0,
@@ -28,7 +28,7 @@ pub enum Circuit108Behaviour {
     OrderlyCleardown = 2,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum FlowControl {
     /// - 0: disable DTE flow control
     Disabled = 0,
@@ -41,7 +41,7 @@ pub enum FlowControl {
     XonXoff = 4,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum SoftwareFlowControl {
     /// - 0: Software flow control off
     None = 0,
@@ -51,7 +51,7 @@ pub enum SoftwareFlowControl {
     Circuit105_106 = 3,
 }
 
-#[derive(Clone, PartialEq, AtatEnum)]
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
 #[at_enum(u32)]
 pub enum BaudRate {
     #[cfg(any(
