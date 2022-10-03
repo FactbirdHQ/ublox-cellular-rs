@@ -453,7 +453,7 @@ where
         }
 
         // At this point, if is_alive fails, the configured Baud rate is probably wrong
-        self.is_alive(20).map_err(|_| Error::BaudDetection)?;
+        // self.is_alive(20).map_err(|_| Error::BaudDetection)?;
 
         self.setup_at_commands()?;
         self.select_sim_card()?;

@@ -42,18 +42,19 @@ The samples can be built using `cargo build -p linux_example --target x86_64-unk
 ## Features
 
 - device selection (must select one, and only one!):
-  - `topy_l4`
-  - `mpci_l2`
-  - `lisa_u2`
-  - `sara_r5`
-  - `sara_g3`
-  - `sara_g4`
-  - `sara_u2`
-  - `sara_u1`
-  - `toby_l2`
-  - `toby_r2`
-  - `lara_r2`
-  - `leon_g1`
+  - `toby-l4`
+  - `mpci-l2`
+  - `lisa-u2`
+  - `sara-r5`
+  - `sara-g3`
+  - `sara-g4`
+  - `sara-u2`
+  - `sara-u1`
+  - `toby-l2`
+  - `toby-r2`
+  - `lara-r2`
+  - `lara-r6`
+  - `leon-g1`
 - `socket-tcp`: Enabled by default. Adds TCP socket capabilities, and implements [`TcpStack`] trait.
 - `socket-udp`: Enabled by default. Adds UDP socket capabilities, and implements [`UdpStack`] trait.
 - `defmt-impl `: Use `defmt` based logging. Typically used in no_std platforms.

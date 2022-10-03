@@ -33,7 +33,7 @@ log = { version = "^0.4", default-features = false, optional = true }
 defmt = { version = "^0.3", optional = true }
 
 [features]
-default = ["lara-r6", "socket-udp", "socket-tcp"]
+default = ["socket-udp", "socket-tcp"]
 
 # Use `defmt-impl to enable defmt based logging
 defmt-impl = ["defmt", "ublox-sockets/defmt", "fugit/defmt", "atat/defmt", "heapless/defmt-impl"]
@@ -52,7 +52,7 @@ sara-u1 = []
 sara-u2 = ["upsd-context-activation"]
 toby-l2 = []
 toby-r2 = []
-topy-l4 = []
+toby-l4 = []
 
 upsd-context-activation = []
 
