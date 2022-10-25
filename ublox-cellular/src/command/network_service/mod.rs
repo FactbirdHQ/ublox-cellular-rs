@@ -10,25 +10,20 @@ use atat::atat_derive::AtatCmd;
 use responses::*;
 use types::*;
 
-/// 7.3 Signal quality +CSQ
+/// 7.4 Extended signal quality +CESQ
 ///
-/// Returns the radio signal strength <signal_power> and <qual> from the MT.
+/// Returns the received signal quality and level:
+/// - If the current serving cell is not a GERAN cell, the <rxlev> and <ber> parameters are set to value 99
+/// - If the current serving cell is not a UTRA FDD cell, the <rscp> and the <ecn0> parameters are set to 255
+/// - If the current serving cell is not an E-UTRA cell, the <rsrq> and <rsrp> parameters are set to 255.
 ///
-/// **NOTES:**
-/// - **TOBY-L4 / LARA-R2 / TOBY-R2** - The +CSQ utilization is deprecated. It
-///   is warmly recommended to use the command +CESQ to obtain the same
-///   information more accurately.
-/// - **TOBY-L4 / TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 /
-///   LISA-U1 / SARA-G4 / SARA-G3 / LEON-G1** - The radio signal strength
-///   <signal_power> will be also used to build and display the indicator
-///   "signal" i.e. signal quality in the information text response of +CIND and
-///   in the +CIEV URC (see the +CMER command description).
-///
-/// In dedicated mode, during the radio channel reconfiguration (e.g. handover),
-/// invalid measurements may be returned for a short transitory because the MT
-/// must compute them on the newly assigned channel.
+/// The Reference Signal Received Power (RSRP) is a LTE specific measure that averages the power received
+/// on the subcarriers carrying the reference signal. The RSRP measurement bandwidth is equivalent to a
+/// single LTE subcarrier: its value is therefore much lower than the total received power usually referred
+/// to as RSSI. In LTE the RSSI depends on the currently allocated bandwidth, which is not pre-determined.
+/// Therefore the RSSI is not useful to describe the signal level in the cell.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CSQ", SignalQuality)]
+#[at_cmd("+CESQ", SignalQuality)]
 pub struct GetSignalQuality;
 
 /// 7.5 Operator selection +COPS
