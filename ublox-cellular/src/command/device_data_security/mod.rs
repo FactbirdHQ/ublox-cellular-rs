@@ -121,6 +121,21 @@ pub struct SendSecurityDataImport<'a> {
 }
 
 #[derive(Clone, AtatCmd)]
+#[at_cmd("+USECMNG=2,", NoResponse, value_sep = false)]
+pub struct DeleteSecurityData<'a> {
+    /// Type of the security data
+    #[at_arg(position = 0)]
+    pub data_type: SecurityDataType,
+    /// Unique identifier of an imported certificate or private key.
+    ///
+    /// **TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 / SARA-G4 /
+    /// SARA-G3:**
+    /// - The maximum length is 200 characters
+    #[at_arg(position = 1, len = 200)]
+    pub internal_name: &'a str,
+}
+
+#[derive(Clone, AtatCmd)]
 #[at_cmd("+USECMNG=3", Vec<SecurityData, 3> , value_sep = false)]
 pub struct ListSecurityData;
 
