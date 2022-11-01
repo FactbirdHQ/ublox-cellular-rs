@@ -256,7 +256,7 @@ where
         }
 
         // At this point, if is_alive fails, the configured Baud rate is probably wrong
-        self.is_alive(20).map_err(|_| Error::BaudDetection)?;
+        self.is_alive(10).map_err(|_| Error::BaudDetection)?;
 
         // Extended errors on
         self.network.send_internal(
@@ -266,6 +266,7 @@ where
             false,
         )?;
 
+        // Select SIM
         self.network.send_internal(
             &SetGpioConfiguration {
                 gpio_id: 25,
@@ -452,9 +453,6 @@ where
             return Ok(());
         }
 
-        // At this point, if is_alive fails, the configured Baud rate is probably wrong
-        // self.is_alive(20).map_err(|_| Error::BaudDetection)?;
-
         self.setup_at_commands()?;
         self.select_sim_card()?;
 
@@ -474,25 +472,6 @@ where
             false,
         )?;
 
-        // self.network.send_internal(
-        //     &SetRadioAccessTechnology {
-        //         first_act: network_service::types::FirstRadioAccessTechnology::Lte,
-        //         second_act: Some(network_service::types::SecondRadioAccessTechnology::Umts),
-        //         third_act: None,
-        //     },
-        //     false,
-        // )?;
-
-        let fun: ModuleFunctionality = self.network.send_internal(&GetModuleFunctionality, true)?;
-
-        // if fun.power_mode == PowerMode::TestMode {
-        //     self.network.send_internal(
-        //         &heapless::String::<256>::from("AT+UTEST=0\r\n"),
-        //         false,
-        //     )?;
-
-        // }
-
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Full,
@@ -506,7 +485,7 @@ where
             .status
             .set_connection_state(ConnectionState::Connecting);
 
-        // self.enable_registration_urcs()?;
+        self.enable_registration_urcs()?;
 
         // Set automatic operator selection, if not already set
         let OperatorSelection { mode, .. } =

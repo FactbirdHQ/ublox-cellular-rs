@@ -16,6 +16,7 @@ use crate::{
         AT,
     },
     error::{from_clock, Error, GenericError},
+    module_timing::{pwr_off_time, pwr_on_time, reset_time},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -110,13 +111,12 @@ where
         trace!("Attempting to hard reset of the modem.");
         match self.config.rst_pin {
             Some(ref mut rst) => {
-                // Apply Low pulse on RESET_N for 50 milliseconds to reset
                 rst.set_low().ok();
 
                 self.network
                     .status
                     .timer
-                    .start(50.millis())
+                    .start(reset_time::<TIMER_HZ>())
                     .map_err(from_clock)?;
                 nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
@@ -154,7 +154,7 @@ where
                     self.network
                         .status
                         .timer
-                        .start(50.micros())
+                        .start(pwr_on_time::<TIMER_HZ>())
                         .map_err(from_clock)?;
                     nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
@@ -166,7 +166,7 @@ where
                         .map_err(from_clock)?;
                     nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
-                    if let Err(e) = self.wait_power_state(PowerState::On, 25.secs()) {
+                    if let Err(e) = self.wait_power_state(PowerState::On, 10.secs()) {
                         error!("Failed to power on modem");
                         return Err(e);
                     } else {
@@ -215,20 +215,13 @@ where
                     self.network
                         .status
                         .timer
-                        .start(1.secs())
+                        .start(pwr_off_time::<TIMER_HZ>())
                         .map_err(from_clock)?;
                     nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
                     pwr.set_high().ok();
                     self.power_state = PowerState::Off;
                     trace!("Modem powered off");
-
-                    self.network
-                        .status
-                        .timer
-                        .start(10.secs())
-                        .map_err(from_clock)?;
-                    nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
                 }
                 _ => {
                     return Err(Error::Generic(GenericError::Unsupported));
