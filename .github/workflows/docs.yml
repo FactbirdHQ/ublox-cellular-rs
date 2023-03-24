@@ -26,7 +26,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: doc
-          args: --verbose --no-deps --features "log"
+          args: --verbose --no-deps --features "log,lara-r6"
 
       # - name: Finalize documentation
       #   run: |

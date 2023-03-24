@@ -6,7 +6,7 @@ pub mod urc;
 
 use super::NoResponse;
 use atat::atat_derive::AtatCmd;
-use types::*;
+use types::MessageWaitingMode;
 
 /// 11.29 Message waiting indication +UMWI
 ///

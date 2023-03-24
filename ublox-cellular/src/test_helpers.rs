@@ -89,8 +89,7 @@ impl<const TIMER_HZ: u32> Clock<TIMER_HZ> for MockTimer<TIMER_HZ> {
 
     fn wait(&mut self) -> nb::Result<(), Self::Error> {
         if let Some(start) = self.start {
-            if std::time::Instant::now() - start
-                > std::time::Duration::from_millis(self.duration.ticks() as u64)
+            if start.elapsed() > std::time::Duration::from_millis(u64::from(self.duration.ticks()))
             {
                 Ok(())
             } else {

@@ -3,7 +3,6 @@
 > no_std driver crate for interfacing with the ublox cellular family over serial
 
 ![Test][test]
-[![Code coverage][codecov-badge]][codecov]
 ![No Std][no-std-badge]
 [![Crates.io Version][crates-io-badge]][crates-io]
 [![Crates.io Downloads][crates-io-download-badge]][crates-io-download]
@@ -42,18 +41,19 @@ The samples can be built using `cargo build -p linux_example --target x86_64-unk
 ## Features
 
 - device selection (must select one, and only one!):
-  - `topy_l4`
-  - `mpci_l2`
-  - `lisa_u2`
-  - `sara_r5`
-  - `sara_g3`
-  - `sara_g4`
-  - `sara_u2`
-  - `sara_u1`
-  - `toby_l2`
-  - `toby_r2`
-  - `lara_r2`
-  - `leon_g1`
+  - `toby-l4`
+  - `mpci-l2`
+  - `lisa-u2`
+  - `sara-r5`
+  - `sara-g3`
+  - `sara-g4`
+  - `sara-u2`
+  - `sara-u1`
+  - `toby-l2`
+  - `toby-r2`
+  - `lara-r2`
+  - `lara-r6`
+  - `leon-g1`
 - `socket-tcp`: Enabled by default. Adds TCP socket capabilities, and implements [`TcpStack`] trait.
 - `socket-udp`: Enabled by default. Adds UDP socket capabilities, and implements [`UdpStack`] trait.
 - `defmt-impl `: Use `defmt` based logging. Typically used in no_std platforms.
@@ -82,8 +82,6 @@ dual licensed as above, without any additional terms or conditions.
 <!-- Badges -->
 [test]: https://github.com/BlackbirdHQ/ublox-cellular-rs/workflows/Test/badge.svg
 [no-std-badge]: https://img.shields.io/badge/no__std-yes-blue
-[codecov-badge]: https://codecov.io/gh/BlackbirdHQ/ublox-cellular-rs/branch/master/graph/badge.svg
-[codecov]: https://codecov.io/gh/BlackbirdHQ/ublox-cellular-rs
 [crates-io]: https://crates.io/crates/ublox-cellular-rs
 [crates-io-badge]: https://img.shields.io/crates/v/ublox-cellular-rs.svg?maxAge=3600
 [crates-io-download]: https://crates.io/crates/ublox-cellular-rs

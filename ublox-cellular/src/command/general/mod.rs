@@ -3,8 +3,10 @@ pub mod responses;
 pub mod types;
 
 use atat::atat_derive::AtatCmd;
-use responses::*;
-use types::*;
+use responses::{
+    FirmwareVersion, IdentificationInformationResponse, ManufacturerId, ModelId, CCID, CIMI, IMEI,
+};
+use types::Snt;
 
 /// 4.1 Manufacturer identification +CGMI
 ///

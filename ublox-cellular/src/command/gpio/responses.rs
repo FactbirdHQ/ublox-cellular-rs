@@ -1,5 +1,5 @@
 //! Responses for GPIO Commands
-use super::types::*;
+use super::types::GpioMode;
 use atat::atat_derive::AtatResp;
 
 /// 20.2 GPIO select configuration command +UGPIOC

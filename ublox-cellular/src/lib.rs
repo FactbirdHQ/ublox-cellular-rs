@@ -82,6 +82,7 @@ mod client;
 pub mod command;
 mod config;
 pub mod error;
+mod module_timing;
 mod network;
 mod power;
 mod registration;

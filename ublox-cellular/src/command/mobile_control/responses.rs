@@ -1,5 +1,5 @@
 //! Responses for Mobile equipment control and status Commands
-use super::types::*;
+use super::types::{PowerMode, ReportMobileTerminationErrorStatus, STKMode};
 use atat::atat_derive::AtatResp;
 
 /// 5.3 Set module functionality +CFUN
@@ -9,7 +9,7 @@ pub struct ModuleFunctionality {
     #[at_arg(position = 0)]
     pub power_mode: PowerMode,
     #[at_arg(position = 1)]
-    pub stk_mode: STKMode,
+    pub stk_mode: Option<STKMode>,
 }
 
 /// 5.4 Indicator control +CIND

@@ -16,23 +16,16 @@ use crate::{
     command::mobile_control::types::{Functionality, ResetMode},
     command::mobile_control::SetModuleFunctionality,
     command::psn::types::PDPContextStatus,
-    command::psn::types::PacketSwitchedParam,
     command::psn::SetPDPContextDefinition,
     command::psn::SetPDPContextState,
-    command::psn::SetPacketSwitchedConfig,
+    command::Urc,
     command::{
         ip_transport_layer::{
             responses::{SocketData, UDPSocketData},
             ReadSocketData, ReadUDPSocketData,
         },
-        psn::{
-            self,
-            responses::{GPRSAttached, PacketSwitchedConfig, PacketSwitchedNetworkData},
-            types::PacketSwitchedParamReq,
-            GetPDPContextState, GetPacketSwitchedConfig, GetPacketSwitchedNetworkData,
-        },
+        psn::{self, responses::GPRSAttached, GetPDPContextState},
     },
-    command::{psn::SetPacketSwitchedAction, Urc},
     error::Error as DeviceError,
     error::GenericError,
     network::{ContextId, Network},
@@ -44,12 +37,7 @@ use embedded_hal::digital::{InputPin, OutputPin};
 use fugit::ExtU32;
 
 pub use error::Error;
-use psn::{
-    types::{
-        AuthenticationType, GPRSAttachedState, PacketSwitchedAction, PacketSwitchedNetworkDataParam,
-    },
-    GetGPRSAttached, SetAuthParameters,
-};
+use psn::{types::GPRSAttachedState, GetGPRSAttached};
 use ublox_sockets::{Error as SocketError, SocketSet, SocketType};
 
 #[cfg(feature = "upsd-context-activation")]
@@ -105,15 +93,15 @@ where
             )?;
         }
 
-        self.network.send_internal(
-            &SetAuthParameters {
-                cid,
-                auth_type: AuthenticationType::Auto,
-                username: &apn_info.clone().user_name.unwrap_or_default(),
-                password: &apn_info.clone().password.unwrap_or_default(),
-            },
-            true,
-        )?;
+        // self.network.send_internal(
+        //     &SetAuthParameters {
+        //         cid,
+        //         auth_type: AuthenticationType::Auto,
+        //         username: &apn_info.clone().user_name.unwrap_or_default(),
+        //         password: &apn_info.clone().password.unwrap_or_default(),
+        //     },
+        //     true,
+        // )?;
 
         self.network.send_internal(
             &SetModuleFunctionality {
@@ -418,7 +406,11 @@ where
     /// Activate context using 3GPP commands
     /// Required for SARA-R4 and TOBY modules.
     #[cfg(not(feature = "upsd-context-activation"))]
-    fn activate_context(&mut self, cid: ContextId, profile_id: ProfileId) -> nb::Result<(), Error> {
+    fn activate_context(
+        &mut self,
+        cid: ContextId,
+        _profile_id: ProfileId,
+    ) -> nb::Result<(), Error> {
         if self.network.context_state == ContextState::Active {
             return Ok(());
         }
@@ -440,69 +432,69 @@ where
             .unwrap_or(false);
 
         if activated {
-            // Note: SARA-R4 only supports a single context at any
-            // one time and so doesn't require/support AT+UPSD.
-            #[cfg(feature = "sara-r4")]
-            return Ok(());
-
-            if let PacketSwitchedConfig {
-                param: PacketSwitchedParam::MapProfile(context),
-                ..
-            } = self
-                .network
-                .send_internal(
-                    &GetPacketSwitchedConfig {
-                        profile_id,
-                        param: PacketSwitchedParamReq::MapProfile,
-                    },
-                    true,
-                )
-                .map_err(Error::from)?
+            // Note: SARA-R4 only supports a single context at any one time and
+            // so doesn't require/support AT+UPSD.
+            #[cfg(not(any(feature = "sara-r4", feature = "lara-r6")))]
             {
-                if context != cid {
-                    self.network
-                        .send_internal(
-                            &SetPacketSwitchedConfig {
-                                profile_id,
-                                param: PacketSwitchedParam::MapProfile(cid),
-                            },
-                            true,
-                        )
-                        .map_err(Error::from)?;
+                if let PacketSwitchedConfig {
+                    param: PacketSwitchedParam::MapProfile(context),
+                    ..
+                } = self
+                    .network
+                    .send_internal(
+                        &GetPacketSwitchedConfig {
+                            profile_id,
+                            param: PacketSwitchedParamReq::MapProfile,
+                        },
+                        true,
+                    )
+                    .map_err(Error::from)?
+                {
+                    if context != cid {
+                        self.network
+                            .send_internal(
+                                &SetPacketSwitchedConfig {
+                                    profile_id,
+                                    param: PacketSwitchedParam::MapProfile(cid),
+                                },
+                                true,
+                            )
+                            .map_err(Error::from)?;
 
+                        self.network
+                            .send_internal(
+                                &GetPacketSwitchedNetworkData {
+                                    profile_id,
+                                    param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+                                },
+                                true,
+                            )
+                            .map_err(Error::from)?;
+                    }
+                }
+
+                let PacketSwitchedNetworkData { param_tag, .. } = self
+                    .network
+                    .send_internal(
+                        &GetPacketSwitchedNetworkData {
+                            profile_id,
+                            param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+                        },
+                        true,
+                    )
+                    .map_err(Error::from)?;
+
+                if param_tag == 0 {
                     self.network
                         .send_internal(
-                            &GetPacketSwitchedNetworkData {
+                            &SetPacketSwitchedAction {
                                 profile_id,
-                                param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+                                action: PacketSwitchedAction::Activate,
                             },
                             true,
                         )
                         .map_err(Error::from)?;
                 }
-            }
-
-            let PacketSwitchedNetworkData { param_tag, .. } = self
-                .network
-                .send_internal(
-                    &GetPacketSwitchedNetworkData {
-                        profile_id,
-                        param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
-                    },
-                    true,
-                )
-                .map_err(Error::from)?;
-
-            if param_tag == 0 {
-                self.network
-                    .send_internal(
-                        &SetPacketSwitchedAction {
-                            profile_id,
-                            action: PacketSwitchedAction::Activate,
-                        },
-                        true,
-                    )
-                    .map_err(Error::from)?;
             }
 
             self.network.context_state = ContextState::Active;

@@ -175,7 +175,7 @@ where
     CLK: Clock<TIMER_HZ>,
 {
     pub(crate) fn new(at_tx: AtTx<C>, timer: CLK) -> Self {
-        Network {
+        Self {
             status: RegistrationState::new(timer),
             context_state: ContextState::Setup,
             at_tx,
@@ -204,7 +204,7 @@ where
         self.handle_urc().ok(); // Ignore errors
         self.check_registration_state();
         self.intervene_registration()?;
-        self.check_running_imsi();
+        self.check_running_imsi().ok(); // Ignore errors
 
         let now = self.status.timer.now();
         let should_check = self
@@ -222,7 +222,7 @@ where
 
         self.status.reg_check_time.replace(now);
 
-        self.update_registration()?;
+        // self.update_registration()?;
 
         let now = self.status.timer.now();
         let is_timeout = self

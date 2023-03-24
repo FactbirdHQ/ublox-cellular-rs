@@ -1,5 +1,7 @@
 //! Unsolicited responses for Packet Switched Data Services Commands
-use super::types::*;
+use super::types::{
+    EPSNetworkRegistrationStat, ExtendedPSNetworkRegistrationState, GPRSNetworkRegistrationStat,
+};
 use crate::{command::network_service::types::RatAct, network::ProfileId};
 use atat::atat_derive::AtatResp;
 use embedded_nal::IpAddr;

@@ -24,14 +24,14 @@ pub enum Error {
 impl From<NetworkError> for Error {
     fn from(e: NetworkError) -> Self {
         match e {
-            NetworkError::Generic(g) => Error::Generic(g),
-            _ => Error::Network(e),
+            NetworkError::Generic(g) => Self::Generic(g),
+            _ => Self::Network(e),
         }
     }
 }
 
 impl From<SocketError> for Error {
     fn from(e: SocketError) -> Self {
-        Error::Socket(e)
+        Self::Socket(e)
     }
 }

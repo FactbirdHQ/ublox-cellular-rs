@@ -5,6 +5,7 @@ use heapless::String;
 
 /// Indicates the state of PDP context activation
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum PDPContextStatus {
     /// 0: deactivated
     Deactivated = 0,

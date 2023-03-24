@@ -13,6 +13,7 @@ pub enum Functionality {
         feature = "sara-u2",
         feature = "toby-r2",
         feature = "lara-r2",
+        feature = "lara-r6",
         feature = "toby-l4",
         feature = "leon-g1",
         feature = "sara-g3",
@@ -30,6 +31,7 @@ pub enum Functionality {
         feature = "sara-u2",
         feature = "toby-r2",
         feature = "lara-r2",
+        feature = "lara-r6",
         feature = "toby-l4",
         feature = "leon-g1",
         feature = "sara-g3",
@@ -48,6 +50,7 @@ pub enum Functionality {
         feature = "sara-u2",
         feature = "toby-r2",
         feature = "lara-r2",
+        feature = "lara-r6",
         feature = "toby-l4"
     ))]
     AirplaneMode = 4,
@@ -62,6 +65,7 @@ pub enum Functionality {
         feature = "sara-u2",
         feature = "toby-r2",
         feature = "lara-r2",
+        feature = "lara-r6",
         feature = "toby-l4",
         feature = "leon-g1",
         feature = "sara-g3",
@@ -117,6 +121,7 @@ pub enum Functionality {
         feature = "sara-u2",
         feature = "toby-r2",
         feature = "lara-r2",
+        feature = "lara-r6",
         feature = "toby-l4",
         feature = "leon-g1",
         feature = "sara-g3",
@@ -132,6 +137,7 @@ pub enum Functionality {
         feature = "sara-u2",
         feature = "toby-r2",
         feature = "lara-r2",
+        feature = "lara-r6",
         feature = "toby-l4",
         feature = "leon-g1",
         feature = "sara-g3",
@@ -151,7 +157,7 @@ pub enum Functionality {
     Halt = 127,
 }
 
-/// Reset mode. This parameter can be used only when <fun> (ModuleFunctionality) is 1, 4 or 19
+/// Reset mode. This parameter can be used only when <fun> (`ModuleFunctionality`) is 1, 4 or 19
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum ResetMode {
     /// Do not reset the MT before setting it to the selected <fun>
@@ -194,6 +200,8 @@ pub enum PowerMode {
     On = 1,
     ///MT is in "airplane mode"
     AirplaneMode = 4,
+    ///MT is in "test mode"
+    TestMode = 5,
     ///MT is in minimum functionality with SIM deactivated
     MinimumWithoutSim = 19,
 }

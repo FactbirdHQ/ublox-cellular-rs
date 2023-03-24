@@ -10,23 +10,32 @@
 //! context activated e.g. via dial-up). The Traffic Flow Filters for such
 //! secondary contexts shall be specified according to 3GPP TS 23.060
 //!
-//! The typical usage of the secondary PDP contexts is in VoIP calls, where RTP
+//! The typical usage of the secondary PDP contexts is in `VoIP` calls, where RTP
 //! (speech) packets are conveyed on one PDP context (e.g. the primary one) with
-//! a given QoS (e.g. low reliability) whereas SIP signalling is routed on a
+//! a given `QoS` (e.g. low reliability) whereas SIP signalling is routed on a
 //! different PDP context (e.g. the secondary one, with the same IP address but
-//! different port numbers) with a more reliable QoS.
+//! different port numbers) with a more reliable `QoS`.
 //!
 //! A Traffic Flow Template (i.e. a filter based on port number, specifying
 //! relative flow precedence) shall be configured for the secondary context to
-//! instruct the GGSN to route down-link packets onto different QoS flows
+//! instruct the GGSN to route down-link packets onto different `QoS` flows
 //! towards the TE.
 
 pub mod responses;
 pub mod types;
 pub mod urc;
 use atat::atat_derive::AtatCmd;
-use responses::*;
-use types::*;
+use responses::{
+    EPSNetworkRegistrationStatus, ExtendedPSNetworkRegistrationStatus, GPRSAttached,
+    GPRSNetworkRegistrationStatus, PDPContextState, PacketSwitchedConfig,
+    PacketSwitchedNetworkData,
+};
+use types::{
+    AuthenticationType, EPSNetworkRegistrationUrcConfig, ExtendedPSNetworkRegistrationUrcConfig,
+    GPRSAttachedState, GPRSNetworkRegistrationUrcConfig, PDPContextStatus, PSEventReportingMode,
+    PacketSwitchedAction, PacketSwitchedNetworkDataParam, PacketSwitchedParam,
+    PacketSwitchedParamReq,
+};
 
 use super::NoResponse;
 use crate::network::{ContextId, ProfileId};
@@ -53,9 +62,9 @@ use crate::network::{ContextId, ProfileId};
 ///
 /// The information text response to the read command provides the configuration
 /// of all the PDP context / EPS bearers that have already been defined. The
-/// test command returns a different row for each <PDP_type> value supported by
+/// test command returns a different row for each <`PDP_type`> value supported by
 /// the module.
-///"IPtial default bearer. Since dial-up supports only IPv4
+///"`IPtial` default bearer. Since dial-up supports only IPv4
 ///   connectivity, the defined IPv6 EPS bearers / PDP contexts will not be
 ///   used.
 /// - **TOBY-L4 / TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2** - After the PDP
@@ -350,26 +359,26 @@ pub struct GetExtendedPSNetworkRegistrationStatus;
 /// - +CEREG: <stat>[,[<tac>],[<ci>],[<AcT>][,<cause_type>,<reject_cause>]] when
 ///   <n>=3 and the value of <stat> changes
 /// - +CEREG:
-///   <stat>[,[<tac>],[<ci>],[<AcT>][,,[,[<Assigned_Active_Time>,[<Assigned_Periodic_TAU>]]]]]
+///   <stat>[,[<tac>],[<ci>],[<AcT>][,,[,[<`Assigned_Active_Time`>,[<`Assigned_Periodic_TAU`>]]]]]
 ///   when <n>=4 if there is a change of the network cell in E-UTRAN
 /// - +CEREG:
-///   <stat>[,[<tac>],[<ci>],[<AcT>][,[<cause_type>],[<reject_cause>][,[<Assigned_Active_Time>,
-///   [<Assigned_Periodic_TAU>]]]]] when <n>=5 and the value of <stat> changes
+///   <stat>[,[<tac>],[<ci>],[<AcT>][,[<`cause_type`>],[<`reject_cause`>][,[<`Assigned_Active_Time`>,
+///   [<`Assigned_Periodic_TAU`>]]]]] when <n>=5 and the value of <stat> changes
 ///
-/// The parameters <AcT>, <tac>, <rac_or_mme>, <ci>, <cause_type>,
-/// <reject_cause>, <Assigned_Active_Time> and <Assigned_Periodic_TAU> are
+/// The parameters <AcT>, <tac>, <`rac_or_mme`>, <ci>, <`cause_type`>,
+/// <`reject_cause`>, <`Assigned_Active_Time`> and <`Assigned_Periodic_TAU`> are
 /// provided only if available.
 ///
 /// The read command returns always at least the mode configuration (<n>), the
 /// EPS registration status (<stat>). The location parameters <tac>,
-/// <rac_or_mme>, <ci> and <AcT>, if available, are returned only when <n>=2,
+/// <`rac_or_mme`>, <ci> and <AcT>, if available, are returned only when <n>=2,
 /// <n>=3, <n>=4 or <n>=5 and the MT is registered with the network. The
-/// parameters <cause_type>, <reject_ cause>, if available, are returned when
-/// <n>=3 or <n>=5. The PSM related parameter <Assigned_Active_ Time> is
+/// parameters <`cause_type`>, <reject_ cause>, if available, are returned when
+/// <n>=3 or <n>=5. The PSM related parameter <`Assigned_Active`_ Time> is
 /// returned only when <n>=4 or <n>=5, the MT is registered with the network and
-/// PSM is granted by the network. The <Assigned_Periodic_TAU> parameter is
+/// PSM is granted by the network. The <`Assigned_Periodic_TAU`> parameter is
 /// returned only if when <n>=4 or <n>=5, the MT is registered with the network,
-/// PSM is granted by the network and an extended periodic TAU value (T3412_ext)
+/// PSM is granted by the network and an extended periodic TAU value (`T3412_ext`)
 /// is assigned.
 ///
 /// **NOTES:**
@@ -395,7 +404,7 @@ pub struct GetEPSNetworkRegistrationStatus;
 /// as a protocol configuration options (PCO) information element.
 ///
 /// **NOTES:**
-/// - **LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 / SARA-G3** - When <auth_type>=3
+/// - **LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 / SARA-G3** - When <`auth_type>=3`
 ///   is set, AT+CGACT=1,<cid> may trigger at most 3 PDP context activation
 ///   requests for <cid> to the protocol stack. The first request for <cid> is
 ///   done with no authentication. If the PDP context activation fails, a second

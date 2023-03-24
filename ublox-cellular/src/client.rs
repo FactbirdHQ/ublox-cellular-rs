@@ -6,12 +6,25 @@ use ublox_sockets::SocketSet;
 use crate::{
     command::device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
     command::{
-        control::{types::*, *},
-        mobile_control::{types::*, *},
-        system_features::{types::*, *},
-        *,
+        control::{
+            types::{Circuit108Behaviour, Circuit109Behaviour, FlowControl},
+            SetCircuit108Behaviour, SetCircuit109Behaviour, SetFlowControl,
+        },
+        ip_transport_layer,
+        mobile_control::{
+            types::{AutomaticTimezone, Functionality, ResetMode, TerminationErrorMode},
+            SetAutomaticTimezoneUpdate, SetModuleFunctionality, SetReportMobileTerminationError,
+        },
+        network_service, psn,
+        system_features::{types::PowerSavingMode, SetPowerSavingControl},
+        Urc,
     },
     command::{
+        general::{GetCCID, GetFirmwareVersion, GetModelId},
+        gpio::{
+            types::{GpioMode, GpioOutValue},
+            SetGpioConfiguration,
+        },
         network_service::{
             responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
             SetOperatorSelection,
@@ -31,7 +44,6 @@ use psn::{
     types::{EPSNetworkRegistrationUrcConfig, GPRSNetworkRegistrationUrcConfig},
     SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
 };
-use sms::{types::MessageWaitingMode, SetMessageWaitingIndication};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -143,7 +155,7 @@ where
     /// );
     /// ```
     pub fn new(client: C, timer: CLK, config: Config<RST, DTR, PWR, VINT>) -> Self {
-        let mut device = Device {
+        let mut device = Self {
             config,
             state: State::Off,
             power_state: PowerState::Off,
@@ -244,12 +256,12 @@ where
             // self.is_alive()?;
         } else {
             // Make sure AT commands parser is in clean state.
-            self.network.at_tx.reset()?;
+            // self.network.at_tx.reset()?;
             self.power_on()?;
         }
 
         // At this point, if is_alive fails, the configured Baud rate is probably wrong
-        self.is_alive(20).map_err(|_| Error::BaudDetection)?;
+        self.is_alive(10).map_err(|_| Error::BaudDetection)?;
 
         // Extended errors on
         self.network.send_internal(
@@ -258,6 +270,30 @@ where
             },
             false,
         )?;
+
+        // Select SIM
+        self.network.send_internal(
+            &SetGpioConfiguration {
+                gpio_id: 25,
+                gpio_mode: GpioMode::Output(GpioOutValue::High),
+            },
+            false,
+        )?;
+
+        self.network.send_internal(&GetModelId, false)?;
+
+        // self.network.send_internal(
+        //     &IdentificationInformation {
+        //         n: 9
+        //     },
+        //     false,
+        // )?;
+
+        self.network.send_internal(&GetFirmwareVersion, false)?;
+
+        self.select_sim_card()?;
+
+        self.network.send_internal(&GetCCID, false)?;
 
         // DCD circuit (109) changes in accordance with the carrier
         self.network.send_internal(
@@ -422,15 +458,11 @@ where
             return Ok(());
         }
 
-        // At this point, if is_alive fails, the configured Baud rate is probably wrong
-        self.is_alive(20).map_err(|_| Error::BaudDetection)?;
-
         self.setup_at_commands()?;
         self.select_sim_card()?;
 
         // Disable Message Waiting URCs (UMWI)
-        // SARA-R5 does not support it
-        #[cfg(not(feature = "sara-r5"))]
+        #[cfg(any(feature = "toby-r2"))]
         self.network.send_internal(
             &SetMessageWaitingIndication {
                 mode: MessageWaitingMode::Disabled,
@@ -448,17 +480,10 @@ where
         self.network.send_internal(
             &SetModuleFunctionality {
                 fun: Functionality::Full,
-                rst: Some(ResetMode::DontReset),
+                rst: None,
             },
             true,
         )?;
-
-        // self.network.send_internal(
-        //     &SetRadioAccessTechnology {
-        //         selected_act: RadioAccessTechnologySelected::GsmUmtsLte(RatPreferred::Lte, RatPreferred::Utran),
-        //     },
-        //     false,
-        // )?;
 
         self.network.status.reset();
         self.network

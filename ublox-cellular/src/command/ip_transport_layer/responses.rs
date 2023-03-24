@@ -1,5 +1,5 @@
 //! Responses for Internet protocol transport layer Commands
-use super::types::*;
+use super::types::SocketControlParam;
 use crate::services::data::INGRESS_CHUNK_SIZE;
 use atat::atat_derive::AtatResp;
 use embedded_nal::IpAddr;

@@ -34,9 +34,9 @@ impl From<DataServiceError> for Error {
     fn from(e: DataServiceError) -> Self {
         // Unwrap generic and network errors
         match e {
-            DataServiceError::Generic(g) => Error::Generic(g),
-            DataServiceError::Network(g) => Error::Network(g),
-            _ => Error::DataService(e),
+            DataServiceError::Generic(g) => Self::Generic(g),
+            DataServiceError::Network(g) => Self::Network(g),
+            _ => Self::DataService(e),
         }
     }
 }
@@ -45,8 +45,8 @@ impl From<NetworkError> for Error {
     fn from(e: NetworkError) -> Self {
         // Unwrap generic errors
         match e {
-            NetworkError::Generic(g) => Error::Generic(g),
-            _ => Error::Network(e),
+            NetworkError::Generic(g) => Self::Generic(g),
+            _ => Self::Network(e),
         }
     }
 }

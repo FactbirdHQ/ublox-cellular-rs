@@ -7,11 +7,31 @@ pub mod urc;
 
 use super::NoResponse;
 use atat::atat_derive::AtatCmd;
-use responses::*;
-use types::*;
+use responses::{
+    NetworkRegistrationStatus, OperatorSelection, RadioAccessTechnology, SignalQuality,
+};
+use types::{
+    FirstRadioAccessTechnology, NetworkRegistrationStat, NetworkRegistrationUrcConfig,
+    OperatorSelectionMode, SecondRadioAccessTechnology, ThirdRadioAccessTechnology,
+};
 
 /// 7.4 Extended signal quality +CESQ
 ///
+/// Returns the radio signal strength <`signal_power`> and <qual> from the MT.
+///
+/// **NOTES:**
+/// - **TOBY-L4 / LARA-R2 / TOBY-R2** - The +CSQ utilization is deprecated. It
+///   is warmly recommended to use the command +CESQ to obtain the same
+///   information more accurately.
+/// - **TOBY-L4 / TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 /
+///   LISA-U1 / SARA-G4 / SARA-G3 / LEON-G1** - The radio signal strength
+///   <`signal_power`> will be also used to build and display the indicator
+///   "signal" i.e. signal quality in the information text response of +CIND and
+///   in the +CIEV URC (see the +CMER command description).
+///
+/// In dedicated mode, during the radio channel reconfiguration (e.g. handover),
+/// invalid measurements may be returned for a short transitory because the MT
+/// must compute them on the newly assigned channel.
 /// Returns the received signal quality and level:
 /// - If the current serving cell is not a GERAN cell, the <rxlev> and <ber> parameters are set to value 99
 /// - If the current serving cell is not a UTRA FDD cell, the <rscp> and the <ecn0> parameters are set to 255
@@ -80,9 +100,20 @@ pub struct GetOperatorSelection;
 ///   means of updating RAT related SIM files, can force RAT usage (see Notes).
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+URAT", NoResponse)]
+#[cfg(not(feature = "lara-r6"))]
 pub struct SetRadioAccessTechnology {
     #[at_arg(position = 0)]
     pub selected_act: RadioAccessTechnologySelected,
+}
+
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+URAT", NoResponse)]
+#[cfg(feature = "lara-r6")]
+pub struct SetRadioAccessTechnology {
+    #[at_arg(position = 0)]
+    pub first_act: FirstRadioAccessTechnology,
+    pub second_act: Option<SecondRadioAccessTechnology>,
+    pub third_act: Option<ThirdRadioAccessTechnology>,
 }
 
 #[derive(Clone, AtatCmd)]
