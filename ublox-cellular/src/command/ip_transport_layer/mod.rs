@@ -7,8 +7,8 @@ pub mod urc;
 
 use atat::atat_derive::AtatCmd;
 use embedded_nal::IpAddr;
-use responses::*;
-use types::*;
+use responses::{CreateSocketResponse, SocketControlResponse, SocketData, SocketErrorResponse, UDPSendToDataResponse, UDPSocketData, WriteSocketDataResponse};
+use types::{HexMode, SocketControlParam, SocketProtocol, SslTlsStatus};
 
 use super::NoResponse;
 use ublox_sockets::SocketHandle;
@@ -36,7 +36,7 @@ pub struct CreateSocket {
 ///
 /// Enables or disables the use of SSL/TLS connection on a TCP socket. The
 /// configuration of the SSL/TLS properties is provided with an SSL/TLS profile
-/// managed by USECMNG. The <usecmng_profile_id> parameter is listed in the
+/// managed by USECMNG. The <`usecmng_profile_id`> parameter is listed in the
 /// information text response to the read command only if the SSL/TLS is enabled
 /// on the interested socket.
 ///
@@ -61,7 +61,7 @@ pub struct SetSocketSslState {
 /// Closes the specified socket, like the BSD close routine. In case of remote
 /// socket closure the user is notified via the URC. \
 /// By default the command blocks the AT command interface until the the
-/// completion of the socket close operation. By enabling the <async_close>
+/// completion of the socket close operation. By enabling the <`async_close`>
 /// flag, the final result code is sent immediately. The following +UUSOCL URC
 /// will indicate the closure of the specified socket.
 #[derive(Clone, AtatCmd)]
@@ -172,7 +172,7 @@ pub struct WriteSocketDataBinary<'a> {
     pub data: &'a atat::serde_bytes::Bytes,
 }
 
-///25.11 SendTo command (UDP only) +USOST
+///25.11 `SendTo` command (UDP only) +USOST
 ///
 /// Writes the specified amount of data to the remote address,
 /// like the BSD sendto routine, and returns the number of bytes

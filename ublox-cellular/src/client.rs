@@ -6,22 +6,21 @@ use ublox_sockets::SocketSet;
 use crate::{
     command::device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
     command::{
-        control::{types::*, *},
-        mobile_control::{types::*, *},
-        system_features::{types::*, *},
-        *,
+        control::{types::{Circuit108Behaviour, Circuit109Behaviour, FlowControl}, SetCircuit108Behaviour, SetCircuit109Behaviour, SetFlowControl},
+        mobile_control::{types::{AutomaticTimezone, Functionality, ResetMode, TerminationErrorMode}, SetAutomaticTimezoneUpdate, SetModuleFunctionality, SetReportMobileTerminationError},
+        system_features::{types::PowerSavingMode, SetPowerSavingControl},
+        Urc, ip_transport_layer, network_service, psn,
     },
     command::{
-        general::{GetCCID, GetFirmwareVersion, GetModelId, IdentificationInformation},
+        general::{GetCCID, GetFirmwareVersion, GetModelId},
         gpio::{
             types::{GpioMode, GpioOutValue},
             SetGpioConfiguration,
         },
-        mobile_control::responses::ModuleFunctionality,
         network_service::{
             responses::OperatorSelection,
-            types::{OperatorSelectionMode, RatPreferred},
-            GetOperatorSelection, SetOperatorSelection, SetRadioAccessTechnology,
+            types::{OperatorSelectionMode},
+            GetOperatorSelection, SetOperatorSelection,
         },
         psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
     },
@@ -38,7 +37,7 @@ use psn::{
     types::{EPSNetworkRegistrationUrcConfig, GPRSNetworkRegistrationUrcConfig},
     SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
 };
-use sms::{types::MessageWaitingMode, SetMessageWaitingIndication};
+
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -150,7 +149,7 @@ where
     /// );
     /// ```
     pub fn new(client: C, timer: CLK, config: Config<RST, DTR, PWR, VINT>) -> Self {
-        let mut device = Device {
+        let mut device = Self {
             config,
             state: State::Off,
             power_state: PowerState::Off,

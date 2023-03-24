@@ -157,7 +157,7 @@ pub enum Functionality {
     Halt = 127,
 }
 
-/// Reset mode. This parameter can be used only when <fun> (ModuleFunctionality) is 1, 4 or 19
+/// Reset mode. This parameter can be used only when <fun> (`ModuleFunctionality`) is 1, 4 or 19
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum ResetMode {
     /// Do not reset the MT before setting it to the selected <fun>

@@ -16,7 +16,7 @@
 //!
 //! - **LISA-U200-00S / LISA-U200-01S / LISA-U200-02S / LISA-U200-52S /
 //!   LISA-U200-62S / LISA-U230 / LISA-U260 / LISA-U270 / LISA-U1 / LEON-G1* -
-//!   If using CellLocate® and HTTP commands HTTP profiles in the range 1-3 must
+//!   If using `CellLocate`® and HTTP commands HTTP profiles in the range 1-3 must
 //!   be used.
 
 pub mod urc;

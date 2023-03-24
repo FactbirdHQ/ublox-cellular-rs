@@ -7,8 +7,8 @@
 pub mod responses;
 pub mod types;
 use atat::atat_derive::AtatCmd;
-use responses::*;
-use types::*;
+use responses::{FactoryConfiguration, PowerSavingControl};
+use types::{FSFactoryRestoreType, NVMFactoryRestoreType, PowerSavingMode, Seconds};
 
 use super::NoResponse;
 

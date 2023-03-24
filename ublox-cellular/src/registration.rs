@@ -154,10 +154,10 @@ impl Default for RegType {
 impl From<RadioAccessNetwork> for RegType {
     fn from(ran: RadioAccessNetwork) -> Self {
         match ran {
-            RadioAccessNetwork::UnknownUnused => RegType::Unknown,
-            RadioAccessNetwork::Geran => RegType::Creg,
-            RadioAccessNetwork::Utran => RegType::Cgreg,
-            RadioAccessNetwork::Eutran => RegType::Cereg,
+            RadioAccessNetwork::UnknownUnused => Self::Unknown,
+            RadioAccessNetwork::Geran => Self::Creg,
+            RadioAccessNetwork::Utran => Self::Cgreg,
+            RadioAccessNetwork::Eutran => Self::Cereg,
         }
     }
 }
@@ -165,10 +165,10 @@ impl From<RadioAccessNetwork> for RegType {
 impl From<RegType> for RadioAccessNetwork {
     fn from(regtype: RegType) -> Self {
         match regtype {
-            RegType::Unknown => RadioAccessNetwork::UnknownUnused,
-            RegType::Creg => RadioAccessNetwork::Geran,
-            RegType::Cgreg => RadioAccessNetwork::Utran,
-            RegType::Cereg => RadioAccessNetwork::Eutran,
+            RegType::Unknown => Self::UnknownUnused,
+            RegType::Creg => Self::Geran,
+            RegType::Cgreg => Self::Utran,
+            RegType::Cereg => Self::Eutran,
         }
     }
 }

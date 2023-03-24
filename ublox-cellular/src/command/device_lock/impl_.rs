@@ -1,4 +1,4 @@
-use super::types::*;
+use super::types::PinStatusCode;
 use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
 
 impl Serialize for PinStatusCode {
@@ -7,16 +7,16 @@ impl Serialize for PinStatusCode {
         S: Serializer,
     {
         match *self {
-            PinStatusCode::Ready => Serializer::serialize_bytes(serializer, b"READY"),
-            PinStatusCode::SimPin => Serializer::serialize_bytes(serializer, b"SIM PIN"),
-            PinStatusCode::SimPuk => Serializer::serialize_bytes(serializer, b"SIM PUK"),
-            PinStatusCode::SimPin2 => Serializer::serialize_bytes(serializer, b"SIM PIN2"),
-            PinStatusCode::SimPuk2 => Serializer::serialize_bytes(serializer, b"SIM PUK2"),
-            PinStatusCode::PhNetPin => Serializer::serialize_bytes(serializer, b"PH-NET PIN"),
-            PinStatusCode::PhNetSubPin => Serializer::serialize_bytes(serializer, b"PH-NETSUB PIN"),
-            PinStatusCode::PhSpPin => Serializer::serialize_bytes(serializer, b"PH-SP PIN"),
-            PinStatusCode::PhCorpPin => Serializer::serialize_bytes(serializer, b"PH-CORP PIN"),
-            PinStatusCode::PhSimPin => Serializer::serialize_bytes(serializer, b"PH-SIM PIN"),
+            Self::Ready => Serializer::serialize_bytes(serializer, b"READY"),
+            Self::SimPin => Serializer::serialize_bytes(serializer, b"SIM PIN"),
+            Self::SimPuk => Serializer::serialize_bytes(serializer, b"SIM PUK"),
+            Self::SimPin2 => Serializer::serialize_bytes(serializer, b"SIM PIN2"),
+            Self::SimPuk2 => Serializer::serialize_bytes(serializer, b"SIM PUK2"),
+            Self::PhNetPin => Serializer::serialize_bytes(serializer, b"PH-NET PIN"),
+            Self::PhNetSubPin => Serializer::serialize_bytes(serializer, b"PH-NETSUB PIN"),
+            Self::PhSpPin => Serializer::serialize_bytes(serializer, b"PH-SP PIN"),
+            Self::PhCorpPin => Serializer::serialize_bytes(serializer, b"PH-CORP PIN"),
+            Self::PhSimPin => Serializer::serialize_bytes(serializer, b"PH-SIM PIN"),
         }
     }
 }
@@ -125,7 +125,7 @@ impl<'de> Deserialize<'de> for PinStatusCode {
             "PinStatusCode",
             VARIANTS,
             Visitor {
-                marker: core::marker::PhantomData::<PinStatusCode>,
+                marker: core::marker::PhantomData::<Self>,
                 lifetime: core::marker::PhantomData,
             },
         )

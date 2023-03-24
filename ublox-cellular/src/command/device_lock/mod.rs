@@ -5,7 +5,7 @@ pub mod responses;
 pub mod types;
 
 use atat::atat_derive::AtatCmd;
-use responses::*;
+use responses::PinStatus;
 
 use super::NoResponse;
 

@@ -4,8 +4,8 @@
 pub mod responses;
 pub mod types;
 use atat::atat_derive::AtatCmd;
-use responses::*;
-use types::*;
+use responses::{DateTime, ExtendedErrorReport, IndicatorControl, ModuleFunctionality, ReportMobileTerminationError};
+use types::{AutomaticTimezone, Functionality, ResetMode, TerminationErrorMode};
 
 use super::NoResponse;
 

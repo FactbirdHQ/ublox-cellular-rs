@@ -6,7 +6,7 @@
 pub mod types;
 
 use atat::atat_derive::AtatCmd;
-use types::*;
+use types::{BaudRate, Circuit108Behaviour, Circuit109Behaviour, FlowControl, SoftwareFlowControl};
 
 use super::NoResponse;
 

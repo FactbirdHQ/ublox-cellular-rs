@@ -104,7 +104,7 @@ where
         Ok(())
     }
 
-    /// Reset the module by driving it's RESET_N pin low for 50 ms
+    /// Reset the module by driving it's `RESET_N` pin low for 50 ms
     ///
     /// **NOTE** This function will reset NVM settings!
     pub fn hard_reset(&mut self) -> Result<(), Error> {
@@ -267,8 +267,7 @@ where
             .timer
             .now()
             .checked_duration_since(start)
-            .map(|dur| dur < timeout)
-            .unwrap_or(false)
+            .map_or(false, |dur| dur < timeout)
         {
             if self.power_state()? == expected {
                 res = true;

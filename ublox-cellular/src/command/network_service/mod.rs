@@ -7,12 +7,12 @@ pub mod urc;
 
 use super::NoResponse;
 use atat::atat_derive::AtatCmd;
-use responses::*;
-use types::*;
+use responses::{NetworkRegistrationStatus, OperatorSelection, RadioAccessTechnology, SignalQuality};
+use types::{FirstRadioAccessTechnology, NetworkRegistrationStat, NetworkRegistrationUrcConfig, OperatorSelectionMode, SecondRadioAccessTechnology, ThirdRadioAccessTechnology};
 
 /// 7.3 Signal quality +CSQ
 ///
-/// Returns the radio signal strength <signal_power> and <qual> from the MT.
+/// Returns the radio signal strength <`signal_power`> and <qual> from the MT.
 ///
 /// **NOTES:**
 /// - **TOBY-L4 / LARA-R2 / TOBY-R2** - The +CSQ utilization is deprecated. It
@@ -20,7 +20,7 @@ use types::*;
 ///   information more accurately.
 /// - **TOBY-L4 / TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 /
 ///   LISA-U1 / SARA-G4 / SARA-G3 / LEON-G1** - The radio signal strength
-///   <signal_power> will be also used to build and display the indicator
+///   <`signal_power`> will be also used to build and display the indicator
 ///   "signal" i.e. signal quality in the information text response of +CIND and
 ///   in the +CIEV URC (see the +CMER command description).
 ///

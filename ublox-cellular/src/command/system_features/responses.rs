@@ -1,5 +1,5 @@
 //! Responses for System features Commands
-use super::types::*;
+use super::types::{FSFactoryRestoreType, NVMFactoryRestoreType, PowerSavingMode, Seconds};
 use atat::atat_derive::AtatResp;
 
 /// 19.8 Power saving control (Power Saving) +UPSV

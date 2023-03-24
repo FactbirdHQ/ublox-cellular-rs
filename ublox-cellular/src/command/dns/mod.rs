@@ -17,8 +17,8 @@ pub mod responses;
 pub mod types;
 
 use atat::atat_derive::AtatCmd;
-use responses::*;
-use types::*;
+use responses::ResolveNameIpResponse;
+use types::ResolutionType;
 
 /// 24.1 Resolve name / IP number through DNS +UDNSRN
 ///

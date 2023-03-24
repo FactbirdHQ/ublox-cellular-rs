@@ -175,7 +175,7 @@ where
     CLK: Clock<TIMER_HZ>,
 {
     pub(crate) fn new(at_tx: AtTx<C>, timer: CLK) -> Self {
-        Network {
+        Self {
             status: RegistrationState::new(timer),
             context_state: ContextState::Setup,
             at_tx,

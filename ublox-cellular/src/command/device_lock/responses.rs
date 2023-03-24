@@ -1,5 +1,5 @@
 //! Responses for Device lock Commands
-use super::types::*;
+use super::types::PinStatusCode;
 use atat::atat_derive::AtatResp;
 
 /// 9.1 Enter PIN +CPIN

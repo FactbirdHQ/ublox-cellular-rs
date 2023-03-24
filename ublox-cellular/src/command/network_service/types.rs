@@ -137,7 +137,7 @@ pub enum RadioAccessTechnologySelected {
 }
 
 /// Indicates the radio access technology
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(feature = "lara-r6")]
 pub enum FirstRadioAccessTechnology {
@@ -153,7 +153,7 @@ pub enum FirstRadioAccessTechnology {
 }
 
 /// Indicates the radio access technology
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(feature = "lara-r6")]
 pub enum SecondRadioAccessTechnology {
@@ -163,7 +163,7 @@ pub enum SecondRadioAccessTechnology {
 }
 
 /// Indicates the radio access technology
-#[derive(Debug, Clone, PartialEq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[cfg(feature = "lara-r6")]
 pub enum ThirdRadioAccessTechnology {

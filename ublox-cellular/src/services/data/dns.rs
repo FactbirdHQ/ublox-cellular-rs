@@ -18,7 +18,7 @@ where
 
     fn get_host_by_address(&mut self, ip_addr: IpAddr) -> nb::Result<String<256>, Self::Error> {
         let mut ip_str = String::<256>::new();
-        write!(&mut ip_str, "{}", ip_addr).map_err(|_| Error::BadLength)?;
+        write!(&mut ip_str, "{ip_addr}").map_err(|_| Error::BadLength)?;
 
         match self.network.send_internal(
             &dns::ResolveNameIp {

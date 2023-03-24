@@ -8,7 +8,7 @@ pub enum Apn {
 
 impl Default for Apn {
     fn default() -> Self {
-        Apn::Automatic
+        Self::Automatic
     }
 }
 
@@ -20,8 +20,8 @@ pub struct APNInfo {
 }
 
 impl APNInfo {
-    pub fn new(apn: &str) -> Self {
-        APNInfo {
+    #[must_use] pub fn new(apn: &str) -> Self {
+        Self {
             apn: Apn::Given(String::from(apn)),
             user_name: None,
             password: None,

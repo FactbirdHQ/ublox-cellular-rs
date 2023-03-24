@@ -41,7 +41,7 @@ pub struct Config<RST, DTR, PWR, VINT> {
 
 impl Default for Config<NoPin, NoPin, NoPin, NoPin> {
     fn default() -> Self {
-        Config {
+        Self {
             rst_pin: None,
             dtr_pin: None,
             pwr_pin: None,
@@ -61,8 +61,8 @@ where
     DTR: OutputPin,
     VINT: InputPin,
 {
-    pub fn new(pin: &str) -> Self {
-        Config {
+    #[must_use] pub fn new(pin: &str) -> Self {
+        Self {
             rst_pin: None,
             dtr_pin: None,
             pwr_pin: None,
@@ -75,28 +75,28 @@ where
     }
 
     pub fn with_rst(self, rst_pin: RST) -> Self {
-        Config {
+        Self {
             rst_pin: Some(rst_pin),
             ..self
         }
     }
 
     pub fn with_pwr(self, pwr_pin: PWR) -> Self {
-        Config {
+        Self {
             pwr_pin: Some(pwr_pin),
             ..self
         }
     }
 
     pub fn with_dtr(self, dtr_pin: DTR) -> Self {
-        Config {
+        Self {
             dtr_pin: Some(dtr_pin),
             ..self
         }
     }
 
     pub fn with_vint(self, vint_pin: VINT) -> Self {
-        Config {
+        Self {
             vint_pin: Some(vint_pin),
             ..self
         }
@@ -105,14 +105,14 @@ where
     pub fn baud_rate<B: Into<u32>>(self, baud_rate: B) -> Self {
         // FIXME: Validate baudrates
 
-        Config {
+        Self {
             baud_rate: baud_rate.into(),
             ..self
         }
     }
 
     pub fn with_flow_control(self) -> Self {
-        Config {
+        Self {
             flow_control: true,
             ..self
         }

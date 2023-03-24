@@ -7,7 +7,7 @@ pub mod responses;
 
 use atat::atat_derive::AtatCmd;
 use heapless::{String, Vec};
-use responses::*;
+use responses::{ReadBlockResponse, ReadFileResponse};
 
 use super::NoResponse;
 
@@ -45,7 +45,7 @@ use super::NoResponse;
 ///   connection, the DTE will send the binary data over the TCP connection to
 ///   the DCE. The DTE monitors the TCP data port for the binary data transfer
 ///   (for more details on the TCP/IP port configuration, see the
-///   <tcp_data_port> parameter of the +UIFCONF AT command). After the
+///   <`tcp_data_port`> parameter of the +UIFCONF AT command). After the
 ///   establishment of the TCP connection from the DTE to the specific port, the
 ///   DTE will start the file transfer. The '>' prompt is not provided to the
 ///   user on the AT interface over an IP connection. The DCE will close the
@@ -79,7 +79,7 @@ pub struct DownloadFile<'a> {
 /// 22.3 List files information +ULSTFILE
 ///
 /// Retrieves some information about the FS. Depending on the specified
-/// <op_code>, it can print:
+/// <`op_code`>, it can print:
 /// - List of files stored into the FS
 /// - Remaining free FS space expressed in bytes
 /// - Size of the specified file expressed in bytes
@@ -101,7 +101,7 @@ pub struct ListFiles;
 ///   on the AT interface over an IP connection, the DCE will send the binary
 ///   data over the TCP connection to the DTE. The DTE monitors the TCP data
 ///   port for the binary data transfer (for more details on the TCP/IP port
-///   configuration, see the <tcp_data_port> parameter of the +UIFCONF AT
+///   configuration, see the <`tcp_data_port`> parameter of the +UIFCONF AT
 ///   command). After the establishment of the TCP connection from the DTE to
 ///   the specific port, the DCE starts the file transfer. The '>' prompt is not
 ///   provided to the user on the AT interface over an IP connection. The DCE

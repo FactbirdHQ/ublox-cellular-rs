@@ -17,7 +17,7 @@
 //! protocol with these AT commands:
 //! - `AT+USECMNG`: import, removal, list and information retrieval of
 //!   certificates or private keys;
-//! - `AT+USECPRF`: configuration of USECMNG (u-blox SECurity MaNaGement)
+//! - `AT+USECPRF`: configuration of USECMNG (u-blox `SECurity` `MaNaGement`)
 //!   profiles used for an SSL/TLS connection.
 //!
 //! The USECMNG provides a default SSL/TLS profile which cannot be modified. The
@@ -44,8 +44,8 @@ pub mod types;
 
 use atat::atat_derive::AtatCmd;
 use heapless::Vec;
-use responses::*;
-use types::*;
+use responses::{SecurityData, SecurityDataImport};
+use types::{SecurityDataType, SecurityProfileOperation};
 
 use super::NoResponse;
 use crate::services::data::ssl::SecurityProfileId;
@@ -150,7 +150,7 @@ pub struct RetrieveSecurityMd5<'a> {
 ///   <operation> needs to be issued (e.g. certificate validation level, minimum
 ///   SSL/TLS version, ...).
 /// - To reset (set to factory-programmed value) all the parameters of a
-///   specific security profile, issue the AT+USECPRF=<profile_id> command
+///   specific security profile, issue the `AT+USECPRF=<profile_id`> command
 ///   (operation: None).
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USECPRF", NoResponse)]

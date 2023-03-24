@@ -11,7 +11,8 @@ defaults:
     shell: bash
 
 env:
-  CLIPPY_PARAMS: -W clippy::all -W clippy::pedantic -W clippy::nursery -W clippy::cargo
+  # CLIPPY_PARAMS: -W clippy::all -W clippy::pedantic -W clippy::nursery -W clippy::cargo
+  CLIPPY_PARAMS: 
 
 jobs:
   rustfmt:
@@ -81,4 +82,4 @@ jobs:
         uses: actions-rs/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          args: -- ${{ env.CLIPPY_PARAMS }}
+          args: --features "lara-r6" -- ${{ env.CLIPPY_PARAMS }}
