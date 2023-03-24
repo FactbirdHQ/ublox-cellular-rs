@@ -20,7 +20,8 @@ pub struct APNInfo {
 }
 
 impl APNInfo {
-    #[must_use] pub fn new(apn: &str) -> Self {
+    #[must_use]
+    pub fn new(apn: &str) -> Self {
         Self {
             apn: Apn::Given(String::from(apn)),
             user_name: None,

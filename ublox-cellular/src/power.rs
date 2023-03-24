@@ -109,26 +109,23 @@ where
     /// **NOTE** This function will reset NVM settings!
     pub fn hard_reset(&mut self) -> Result<(), Error> {
         trace!("Attempting to hard reset of the modem.");
-        match self.config.rst_pin {
-            Some(ref mut rst) => {
-                rst.set_low().ok();
+        if let Some(ref mut rst) = self.config.rst_pin {
+            rst.set_low().ok();
 
-                self.network
-                    .status
-                    .timer
-                    .start(reset_time::<TIMER_HZ>())
-                    .map_err(from_clock)?;
-                nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
+            self.network
+                .status
+                .timer
+                .start(reset_time::<TIMER_HZ>())
+                .map_err(from_clock)?;
+            nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
 
-                rst.set_high().ok();
-                self.network
-                    .status
-                    .timer
-                    .start(5.secs())
-                    .map_err(from_clock)?;
-                nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
-            }
-            None => {}
+            rst.set_high().ok();
+            self.network
+                .status
+                .timer
+                .start(5.secs())
+                .map_err(from_clock)?;
+            nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
         }
 
         self.power_state = PowerState::Off;

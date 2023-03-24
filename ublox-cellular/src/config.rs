@@ -61,7 +61,8 @@ where
     DTR: OutputPin,
     VINT: InputPin,
 {
-    #[must_use] pub fn new(pin: &str) -> Self {
+    #[must_use]
+    pub fn new(pin: &str) -> Self {
         Self {
             rst_pin: None,
             dtr_pin: None,

@@ -6,10 +6,18 @@ use ublox_sockets::SocketSet;
 use crate::{
     command::device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
     command::{
-        control::{types::{Circuit108Behaviour, Circuit109Behaviour, FlowControl}, SetCircuit108Behaviour, SetCircuit109Behaviour, SetFlowControl},
-        mobile_control::{types::{AutomaticTimezone, Functionality, ResetMode, TerminationErrorMode}, SetAutomaticTimezoneUpdate, SetModuleFunctionality, SetReportMobileTerminationError},
+        control::{
+            types::{Circuit108Behaviour, Circuit109Behaviour, FlowControl},
+            SetCircuit108Behaviour, SetCircuit109Behaviour, SetFlowControl,
+        },
+        ip_transport_layer,
+        mobile_control::{
+            types::{AutomaticTimezone, Functionality, ResetMode, TerminationErrorMode},
+            SetAutomaticTimezoneUpdate, SetModuleFunctionality, SetReportMobileTerminationError,
+        },
+        network_service, psn,
         system_features::{types::PowerSavingMode, SetPowerSavingControl},
-        Urc, ip_transport_layer, network_service, psn,
+        Urc,
     },
     command::{
         general::{GetCCID, GetFirmwareVersion, GetModelId},
@@ -18,9 +26,8 @@ use crate::{
             SetGpioConfiguration,
         },
         network_service::{
-            responses::OperatorSelection,
-            types::{OperatorSelectionMode},
-            GetOperatorSelection, SetOperatorSelection,
+            responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
+            SetOperatorSelection,
         },
         psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
     },
@@ -37,7 +44,6 @@ use psn::{
     types::{EPSNetworkRegistrationUrcConfig, GPRSNetworkRegistrationUrcConfig},
     SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
 };
-
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

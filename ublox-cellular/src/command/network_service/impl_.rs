@@ -2,11 +2,9 @@ use super::types::NetworkRegistrationStat;
 use crate::network::Error;
 
 impl NetworkRegistrationStat {
-    #[must_use] pub fn is_access_alive(&self) -> bool {
-        matches!(
-            self,
-            Self::Registered | Self::RegisteredRoaming
-        )
+    #[must_use]
+    pub fn is_access_alive(&self) -> bool {
+        matches!(self, Self::Registered | Self::RegisteredRoaming)
     }
 
     pub fn registration_ok(self) -> Result<Self, Error> {

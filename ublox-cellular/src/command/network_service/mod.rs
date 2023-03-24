@@ -7,8 +7,13 @@ pub mod urc;
 
 use super::NoResponse;
 use atat::atat_derive::AtatCmd;
-use responses::{NetworkRegistrationStatus, OperatorSelection, RadioAccessTechnology, SignalQuality};
-use types::{FirstRadioAccessTechnology, NetworkRegistrationStat, NetworkRegistrationUrcConfig, OperatorSelectionMode, SecondRadioAccessTechnology, ThirdRadioAccessTechnology};
+use responses::{
+    NetworkRegistrationStatus, OperatorSelection, RadioAccessTechnology, SignalQuality,
+};
+use types::{
+    FirstRadioAccessTechnology, NetworkRegistrationStat, NetworkRegistrationUrcConfig,
+    OperatorSelectionMode, SecondRadioAccessTechnology, ThirdRadioAccessTechnology,
+};
 
 /// 7.4 Extended signal quality +CESQ
 ///

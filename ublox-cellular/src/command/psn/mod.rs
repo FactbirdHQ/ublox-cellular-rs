@@ -25,8 +25,17 @@ pub mod responses;
 pub mod types;
 pub mod urc;
 use atat::atat_derive::AtatCmd;
-use responses::{EPSNetworkRegistrationStatus, ExtendedPSNetworkRegistrationStatus, GPRSAttached, GPRSNetworkRegistrationStatus, PDPContextState, PacketSwitchedConfig, PacketSwitchedNetworkData};
-use types::{AuthenticationType, EPSNetworkRegistrationUrcConfig, ExtendedPSNetworkRegistrationUrcConfig, GPRSAttachedState, GPRSNetworkRegistrationUrcConfig, PDPContextStatus, PSEventReportingMode, PacketSwitchedAction, PacketSwitchedNetworkDataParam, PacketSwitchedParam, PacketSwitchedParamReq};
+use responses::{
+    EPSNetworkRegistrationStatus, ExtendedPSNetworkRegistrationStatus, GPRSAttached,
+    GPRSNetworkRegistrationStatus, PDPContextState, PacketSwitchedConfig,
+    PacketSwitchedNetworkData,
+};
+use types::{
+    AuthenticationType, EPSNetworkRegistrationUrcConfig, ExtendedPSNetworkRegistrationUrcConfig,
+    GPRSAttachedState, GPRSNetworkRegistrationUrcConfig, PDPContextStatus, PSEventReportingMode,
+    PacketSwitchedAction, PacketSwitchedNetworkDataParam, PacketSwitchedParam,
+    PacketSwitchedParamReq,
+};
 
 use super::NoResponse;
 use crate::network::{ContextId, ProfileId};

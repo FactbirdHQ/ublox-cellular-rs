@@ -7,7 +7,10 @@ pub mod urc;
 
 use atat::atat_derive::AtatCmd;
 use embedded_nal::IpAddr;
-use responses::{CreateSocketResponse, SocketControlResponse, SocketData, SocketErrorResponse, UDPSendToDataResponse, UDPSocketData, WriteSocketDataResponse};
+use responses::{
+    CreateSocketResponse, SocketControlResponse, SocketData, SocketErrorResponse,
+    UDPSendToDataResponse, UDPSocketData, WriteSocketDataResponse,
+};
 use types::{HexMode, SocketControlParam, SocketProtocol, SslTlsStatus};
 
 use super::NoResponse;

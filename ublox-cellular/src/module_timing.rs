@@ -1,3 +1,5 @@
+#![allow(clippy::if_same_then_else)]
+
 use fugit::ExtU32;
 use fugit::TimerDurationU32;
 

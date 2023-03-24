@@ -18,18 +18,14 @@ use crate::{
     command::psn::types::PDPContextStatus,
     command::psn::SetPDPContextDefinition,
     command::psn::SetPDPContextState,
+    command::Urc,
     command::{
         ip_transport_layer::{
             responses::{SocketData, UDPSocketData},
             ReadSocketData, ReadUDPSocketData,
         },
-        psn::{
-            self,
-            responses::{GPRSAttached},
-            GetPDPContextState,
-        },
+        psn::{self, responses::GPRSAttached, GetPDPContextState},
     },
-    command::{Urc},
     error::Error as DeviceError,
     error::GenericError,
     network::{ContextId, Network},
@@ -41,12 +37,7 @@ use embedded_hal::digital::{InputPin, OutputPin};
 use fugit::ExtU32;
 
 pub use error::Error;
-use psn::{
-    types::{
-        GPRSAttachedState,
-    },
-    GetGPRSAttached,
-};
+use psn::{types::GPRSAttachedState, GetGPRSAttached};
 use ublox_sockets::{Error as SocketError, SocketSet, SocketType};
 
 #[cfg(feature = "upsd-context-activation")]
@@ -415,7 +406,11 @@ where
     /// Activate context using 3GPP commands
     /// Required for SARA-R4 and TOBY modules.
     #[cfg(not(feature = "upsd-context-activation"))]
-    fn activate_context(&mut self, cid: ContextId, _profile_id: ProfileId) -> nb::Result<(), Error> {
+    fn activate_context(
+        &mut self,
+        cid: ContextId,
+        _profile_id: ProfileId,
+    ) -> nb::Result<(), Error> {
         if self.network.context_state == ContextState::Active {
             return Ok(());
         }
