@@ -13,7 +13,7 @@ use ublox_cellular::prelude::*;
 use ublox_cellular::sockets::Ipv4Addr;
 use ublox_cellular::{error::Error as GSMError, Config, GsmClient};
 
-use atat::AtatClient;
+use atat::blocking::AtatClient;
 use embedded_hal::digital::v2::OutputPin;
 use linux_embedded_hal::Pin;
 use mqttrust::{MqttClient, MqttEvent, MqttOptions, Notification, Request};

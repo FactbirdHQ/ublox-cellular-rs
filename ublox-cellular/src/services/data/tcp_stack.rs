@@ -6,15 +6,14 @@ use crate::command::ip_transport_layer::{
     CloseSocket, ConnectSocket, CreateSocket, PrepareWriteSocketDataBinary, SetSocketSslState,
     WriteSocketDataBinary,
 };
-use atat::clock::Clock;
 use embedded_nal::{SocketAddr, TcpClientStack};
 use ublox_sockets::{Error, SocketHandle, TcpSocket, TcpState};
 
 impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> TcpClientStack
     for DataService<'a, C, CLK, TIMER_HZ, N, L>
 where
-    C: atat::AtatClient,
-    CLK: Clock<TIMER_HZ>,
+    C: atat::blocking::AtatClient,
+    CLK: fugit_timer::Timer<TIMER_HZ>,
 {
     type Error = Error;
 

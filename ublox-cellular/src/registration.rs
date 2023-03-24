@@ -10,7 +10,6 @@ use crate::command::{
         urc::{EPSNetworkRegistration, GPRSNetworkRegistration},
     },
 };
-use atat::clock::Clock;
 use fugit::{ExtU32, TimerInstantU32};
 use heapless::String;
 
@@ -188,7 +187,7 @@ pub struct CellularGlobalIdentity {
 #[derive(Debug, Clone)]
 pub struct RegistrationState<CLK, const TIMER_HZ: u32>
 where
-    CLK: Clock<TIMER_HZ>,
+    CLK: fugit_timer::Timer<TIMER_HZ>,
 {
     pub(crate) timer: CLK,
 
@@ -228,7 +227,7 @@ impl Default for ConnectionState {
 
 impl<CLK, const TIMER_HZ: u32> RegistrationState<CLK, TIMER_HZ>
 where
-    CLK: Clock<TIMER_HZ>,
+    CLK: fugit_timer::Timer<TIMER_HZ>,
 {
     pub fn new(timer: CLK) -> Self {
         Self {

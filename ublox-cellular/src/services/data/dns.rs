@@ -1,4 +1,4 @@
-use atat::{clock::Clock, AtatClient};
+use atat::blocking::AtatClient;
 use core::fmt::Write;
 use embedded_nal::IpAddr;
 use embedded_nal::{AddrType, Dns};
@@ -12,7 +12,7 @@ impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> Dns
     for DataService<'a, C, CLK, TIMER_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock<TIMER_HZ>,
+    CLK: fugit_timer::Timer<TIMER_HZ>,
 {
     type Error = Error;
 

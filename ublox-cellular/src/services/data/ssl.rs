@@ -3,7 +3,7 @@ use crate::command::device_data_security::{
     types::{CertificateValidationLevel, SecurityDataType, SecurityProfileOperation},
     PrepareSecurityDataImport, SecurityProfileManager, SendSecurityDataImport,
 };
-use atat::{atat_derive::AtatLen, clock::Clock};
+use atat::atat_derive::AtatLen;
 use heapless::String;
 use serde::{Deserialize, Serialize};
 
@@ -41,8 +41,8 @@ pub trait SSL {
 impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> SSL
     for DataService<'a, C, CLK, TIMER_HZ, N, L>
 where
-    C: atat::AtatClient,
-    CLK: Clock<TIMER_HZ>,
+    C: atat::blocking::AtatClient,
+    CLK: fugit_timer::Timer<TIMER_HZ>,
 {
     fn import_certificate(
         &mut self,

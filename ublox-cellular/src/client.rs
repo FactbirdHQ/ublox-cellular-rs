@@ -1,4 +1,4 @@
-use atat::{clock::Clock, AtatClient};
+use atat::blocking::AtatClient;
 use embedded_hal::digital::{InputPin, OutputPin};
 use fugit::ExtU32;
 use ublox_sockets::SocketSet;
@@ -59,7 +59,7 @@ pub enum State {
 pub struct Device<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>
 where
     C: AtatClient,
-    CLK: 'static + Clock<TIMER_HZ>,
+    CLK: 'static + fugit_timer::Timer<TIMER_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -78,7 +78,7 @@ impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: 
     for Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock<TIMER_HZ>,
+    CLK: fugit_timer::Timer<TIMER_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -96,7 +96,7 @@ impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: 
     Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock<TIMER_HZ>,
+    CLK: fugit_timer::Timer<TIMER_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -448,7 +448,6 @@ where
             // Catch states where we have no vint sense, and the module is already in powered mode,
             // but for some reason doesn't answer to AT commands.
             // This usually happens on programming after modem power on.
-            self.network.at_tx.reset()?;
             if self.power_on().is_err() {
                 self.hard_reset()?;
             }
@@ -519,7 +518,6 @@ where
     }
 
     pub(crate) fn clear_buffers(&mut self) -> Result<(), Error> {
-        self.network.at_tx.reset()?;
         if let Some(ref mut sockets) = self.sockets.as_deref_mut() {
             sockets.prune();
         }

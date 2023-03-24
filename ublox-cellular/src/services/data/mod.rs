@@ -32,7 +32,7 @@ use crate::{
     ProfileId,
 };
 use apn::{APNInfo, Apn};
-use atat::{clock::Clock, AtatClient};
+use atat::blocking::AtatClient;
 use embedded_hal::digital::{InputPin, OutputPin};
 use fugit::ExtU32;
 
@@ -57,7 +57,7 @@ impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: 
     Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock<TIMER_HZ>,
+    CLK: fugit_timer::Timer<TIMER_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,
@@ -175,8 +175,8 @@ pub enum ContextState {
 
 pub struct DataService<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize>
 where
-    C: atat::AtatClient,
-    CLK: 'static + Clock<TIMER_HZ>,
+    C: atat::blocking::AtatClient,
+    CLK: 'static + fugit_timer::Timer<TIMER_HZ>,
 {
     network: &'a mut Network<C, CLK, TIMER_HZ>,
     pub(crate) sockets: Option<&'a mut SocketSet<TIMER_HZ, N, L>>,
@@ -185,8 +185,8 @@ where
 impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize>
     DataService<'a, C, CLK, TIMER_HZ, N, L>
 where
-    C: atat::AtatClient,
-    CLK: 'static + Clock<TIMER_HZ>,
+    C: atat::blocking::AtatClient,
+    CLK: 'static + fugit_timer::Timer<TIMER_HZ>,
 {
     pub fn try_new(
         apn_info: &APNInfo,

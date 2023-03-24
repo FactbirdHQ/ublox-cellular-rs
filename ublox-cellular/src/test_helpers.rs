@@ -1,5 +1,6 @@
-use atat::{clock::Clock, AtatClient};
+use atat::blocking::AtatClient;
 use fugit::ExtU32;
+use fugit_timer::Timer;
 
 #[derive(Debug)]
 pub struct MockAtClient {
@@ -16,30 +17,25 @@ impl AtatClient for MockAtClient {
     fn send<A: atat::AtatCmd<LEN>, const LEN: usize>(
         &mut self,
         _cmd: &A,
-    ) -> nb::Result<A::Response, atat::Error> {
+    ) -> Result<A::Response, atat::Error> {
         todo!()
     }
 
-    fn peek_urc_with<URC: atat::AtatUrc, F: FnOnce(URC::Response) -> bool>(&mut self, f: F) {
-        if let Some(urc) = URC::parse(b"+UREG:0") {
-            if f(urc) {
+    fn try_read_urc_with<Urc: atat::AtatUrc, F: for<'b> FnOnce(Urc::Response, &'b [u8]) -> bool>(
+        &mut self,
+        handle: F,
+    ) -> bool {
+        if let Some(urc) = Urc::parse(b"+UREG:0") {
+            if handle(urc, b"") {
                 self.n_urcs_dequeued += 1;
             }
         }
+        true
     }
 
-    fn check_response<A: atat::AtatCmd<LEN>, const LEN: usize>(
-        &mut self,
-        _cmd: &A,
-    ) -> nb::Result<A::Response, atat::Error> {
+    fn max_urc_len() -> usize {
         todo!()
     }
-
-    fn get_mode(&self) -> atat::Mode {
-        todo!()
-    }
-
-    fn reset(&mut self) {}
 }
 
 #[derive(Debug)]
@@ -61,7 +57,7 @@ impl<const TIMER_HZ: u32> MockTimer<TIMER_HZ> {
     }
 }
 
-impl<const TIMER_HZ: u32> Clock<TIMER_HZ> for MockTimer<TIMER_HZ> {
+impl<const TIMER_HZ: u32> Timer<TIMER_HZ> for MockTimer<TIMER_HZ> {
     type Error = std::convert::Infallible;
 
     fn now(&mut self) -> fugit::TimerInstantU32<TIMER_HZ> {

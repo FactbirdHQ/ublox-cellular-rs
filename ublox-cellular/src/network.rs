@@ -18,8 +18,9 @@ use crate::{
     registration::{self, ConnectionState, RegistrationParams, RegistrationState},
     services::data::{ContextState, PROFILE_ID},
 };
-use atat::{atat_derive::AtatLen, clock::Clock, AtatClient};
+use atat::{atat_derive::AtatLen, blocking::AtatClient};
 use fugit::{ExtU32, MinutesDurationU32, SecsDurationU32};
+use fugit_timer::Timer;
 use hash32_derive::Hash32;
 use serde::{Deserialize, Serialize};
 
@@ -63,12 +64,6 @@ impl<C: AtatClient> AtTx<C> {
         }
     }
 
-    pub fn reset(&mut self) -> Result<(), Error> {
-        warn!("atat reset");
-        self.client.reset();
-        Ok(())
-    }
-
     pub fn send_ignore_timeout<A, const LEN: usize>(
         &mut self,
         req: &A,
@@ -79,28 +74,16 @@ impl<C: AtatClient> AtTx<C> {
         self.client
             .send_retry(req)
             .map_err(|e| match e {
-                nb::Error::Other(ate) => {
-                    // let request = req.as_bytes();
-
-                    if !matches!(ate, atat::Error::Timeout) {
-                        // error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
-                    }
-
-                    match ate {
-                        atat::Error::Timeout => {
-                            self.consecutive_timeouts += A::ATTEMPTS;
-                            Error::AT(atat::Error::Timeout)
-                        }
-                        atat::Error::Read => Error::AT(atat::Error::Read),
-                        atat::Error::Write => Error::AT(atat::Error::Write),
-                        atat::Error::InvalidResponse => Error::AT(atat::Error::InvalidResponse),
-                        atat::Error::Aborted => Error::AT(atat::Error::Aborted),
-                        atat::Error::Overflow => Error::AT(atat::Error::Overflow),
-                        atat::Error::Parse => Error::AT(atat::Error::Parse),
-                        _ => Error::AT(atat::Error::Error),
-                    }
+                atat::Error::Timeout => {
+                    self.consecutive_timeouts += A::ATTEMPTS;
+                    Error::AT(atat::Error::Timeout)
                 }
-                nb::Error::WouldBlock => Error::_Unknown,
+                atat::Error::Read => Error::AT(atat::Error::Read),
+                atat::Error::Write => Error::AT(atat::Error::Write),
+                atat::Error::InvalidResponse => Error::AT(atat::Error::InvalidResponse),
+                atat::Error::Aborted => Error::AT(atat::Error::Aborted),
+                atat::Error::Parse => Error::AT(atat::Error::Parse),
+                _ => Error::AT(atat::Error::Error),
             })
             .map(|res| {
                 self.consecutive_timeouts = 0;
@@ -115,25 +98,16 @@ impl<C: AtatClient> AtTx<C> {
         self.client
             .send_retry(req)
             .map_err(|e| match e {
-                nb::Error::Other(ate) => {
-                    // let request = req.as_bytes();
-                    // error!("{}: [{=[u8]:a}]", ate, request[..request.len() - 2]);
-
-                    match ate {
-                        atat::Error::Timeout => {
-                            self.consecutive_timeouts += A::ATTEMPTS;
-                            Error::AT(atat::Error::Timeout)
-                        }
-                        atat::Error::Read => Error::AT(atat::Error::Read),
-                        atat::Error::Write => Error::AT(atat::Error::Write),
-                        atat::Error::InvalidResponse => Error::AT(atat::Error::InvalidResponse),
-                        atat::Error::Aborted => Error::AT(atat::Error::Aborted),
-                        atat::Error::Overflow => Error::AT(atat::Error::Overflow),
-                        atat::Error::Parse => Error::AT(atat::Error::Parse),
-                        _ => Error::AT(atat::Error::Error),
-                    }
+                atat::Error::Timeout => {
+                    self.consecutive_timeouts += A::ATTEMPTS;
+                    Error::AT(atat::Error::Timeout)
                 }
-                nb::Error::WouldBlock => Error::_Unknown,
+                atat::Error::Read => Error::AT(atat::Error::Read),
+                atat::Error::Write => Error::AT(atat::Error::Write),
+                atat::Error::InvalidResponse => Error::AT(atat::Error::InvalidResponse),
+                atat::Error::Aborted => Error::AT(atat::Error::Aborted),
+                atat::Error::Parse => Error::AT(atat::Error::Parse),
+                _ => Error::AT(atat::Error::Error),
             })
             .map(|res| {
                 self.consecutive_timeouts = 0;
@@ -145,7 +119,7 @@ impl<C: AtatClient> AtTx<C> {
         let mut a = self.urc_attempts;
         let max = self.max_urc_attempts;
 
-        self.client.peek_urc_with::<Urc, _>(|urc| {
+        self.client.try_read_urc_with::<Urc, _>(|urc, _| {
             if !f(urc) && a < max {
                 a += 1;
                 return false;
@@ -162,7 +136,7 @@ impl<C: AtatClient> AtTx<C> {
 
 pub struct Network<C, CLK, const TIMER_HZ: u32>
 where
-    CLK: Clock<TIMER_HZ>,
+    CLK: fugit_timer::Timer<TIMER_HZ>,
 {
     pub(crate) status: RegistrationState<CLK, TIMER_HZ>,
     pub(crate) context_state: ContextState,
@@ -172,7 +146,7 @@ where
 impl<C, CLK, const TIMER_HZ: u32> Network<C, CLK, TIMER_HZ>
 where
     C: AtatClient,
-    CLK: Clock<TIMER_HZ>,
+    CLK: fugit_timer::Timer<TIMER_HZ>,
 {
     pub(crate) fn new(at_tx: AtTx<C>, timer: CLK) -> Self {
         Self {

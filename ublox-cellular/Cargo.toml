@@ -15,10 +15,12 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.18", features = ["derive", "bytes"] }
+# atat = { version = "0.18", features = ["derive", "bytes"] }
+atat = { path = "../../atat/atat", features = ["async", "derive", "defmt", "bytes"] }
 embedded-hal = "=1.0.0-alpha.9"
 embedded-nal = "0.6"
 fugit = { version = "0.3" }
+fugit-timer = { version = "0.1.3" }
 hash32 = "^0.2.1"
 hash32-derive = "^0.1.0"
 heapless = { version = "^0.7", features = ["serde"] }
