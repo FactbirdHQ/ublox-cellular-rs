@@ -26,10 +26,10 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --all --features "defmt-impl" --target thumbv7m-none-eabi
+          args: --all --features "defmt-impl,lara-r6" --target thumbv7m-none-eabi
 
       - name: Test
         uses: actions-rs/cargo@v1
         with:
           command: test
-          args: --lib --features "log"
+          args: --lib --features "log,lara-r6"
