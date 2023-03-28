@@ -4,15 +4,14 @@ use crate::command::ip_transport_layer::{
     types::SocketProtocol, CloseSocket, CreateSocket, PrepareUDPSendToDataBinary,
     UDPSendToDataBinary,
 };
-use atat::clock::Clock;
 use embedded_nal::{SocketAddr, UdpClientStack};
 use ublox_sockets::{Error, SocketHandle, UdpSocket};
 
 impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> UdpClientStack
     for DataService<'a, C, CLK, TIMER_HZ, N, L>
 where
-    C: atat::AtatClient,
-    CLK: Clock<TIMER_HZ>,
+    C: atat::blocking::AtatClient,
+    CLK: fugit_timer::Timer<TIMER_HZ>,
 {
     type Error = Error;
 

@@ -1,4 +1,4 @@
-use atat::{clock::Clock, AtatClient};
+use atat::blocking::AtatClient;
 use embedded_hal::digital::{InputPin, OutputPin};
 use fugit::{ExtU32, MillisDurationU32};
 
@@ -30,7 +30,7 @@ impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: 
     Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
 where
     C: AtatClient,
-    CLK: Clock<TIMER_HZ>,
+    CLK: fugit_timer::Timer<TIMER_HZ>,
     RST: OutputPin,
     PWR: OutputPin,
     DTR: OutputPin,

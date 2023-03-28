@@ -109,7 +109,6 @@ pub use fugit;
 pub mod prelude {
     #[cfg(any(feature = "socket-udp", feature = "socket-tcp"))]
     pub use super::services::data::ssl::SSL;
-    pub use atat::clock::Clock;
     #[cfg(any(feature = "socket-udp", feature = "socket-tcp"))]
     pub use embedded_nal::{
         IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr, TcpClientStack, UdpClientStack,

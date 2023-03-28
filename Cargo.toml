@@ -8,7 +8,6 @@ members = [
     # "examples/linux_jobs",
 ]
 
-
-
 [patch.crates-io]
-# atat = { path = "../atat/atat" }
+atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "70283be" }
+# ublox-sockets = { path = "../ublox-sockets" }
