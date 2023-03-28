@@ -10,10 +10,7 @@ use atat::atat_derive::AtatCmd;
 use responses::{
     NetworkRegistrationStatus, OperatorSelection, RadioAccessTechnology, SignalQuality,
 };
-use types::{
-    FirstRadioAccessTechnology, NetworkRegistrationStat, NetworkRegistrationUrcConfig,
-    OperatorSelectionMode, SecondRadioAccessTechnology, ThirdRadioAccessTechnology,
-};
+use types::{NetworkRegistrationStat, NetworkRegistrationUrcConfig, OperatorSelectionMode};
 
 /// 7.4 Extended signal quality +CESQ
 ///
@@ -103,7 +100,7 @@ pub struct GetOperatorSelection;
 #[cfg(not(feature = "lara-r6"))]
 pub struct SetRadioAccessTechnology {
     #[at_arg(position = 0)]
-    pub selected_act: RadioAccessTechnologySelected,
+    pub selected_act: types::RadioAccessTechnologySelected,
 }
 
 #[derive(Clone, AtatCmd)]
@@ -111,9 +108,9 @@ pub struct SetRadioAccessTechnology {
 #[cfg(feature = "lara-r6")]
 pub struct SetRadioAccessTechnology {
     #[at_arg(position = 0)]
-    pub first_act: FirstRadioAccessTechnology,
-    pub second_act: Option<SecondRadioAccessTechnology>,
-    pub third_act: Option<ThirdRadioAccessTechnology>,
+    pub first_act: types::FirstRadioAccessTechnology,
+    pub second_act: Option<types::SecondRadioAccessTechnology>,
+    pub third_act: Option<types::ThirdRadioAccessTechnology>,
 }
 
 #[derive(Clone, AtatCmd)]

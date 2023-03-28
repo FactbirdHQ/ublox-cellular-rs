@@ -406,11 +406,7 @@ where
     /// Activate context using 3GPP commands
     /// Required for SARA-R4 and TOBY modules.
     #[cfg(not(feature = "upsd-context-activation"))]
-    fn activate_context(
-        &mut self,
-        cid: ContextId,
-        _profile_id: ProfileId,
-    ) -> nb::Result<(), Error> {
+    fn activate_context(&mut self, cid: ContextId, profile_id: ProfileId) -> nb::Result<(), Error> {
         if self.network.context_state == ContextState::Active {
             return Ok(());
         }
@@ -436,15 +432,15 @@ where
             // so doesn't require/support AT+UPSD.
             #[cfg(not(any(feature = "sara-r4", feature = "lara-r6")))]
             {
-                if let PacketSwitchedConfig {
-                    param: PacketSwitchedParam::MapProfile(context),
+                if let psn::responses::PacketSwitchedConfig {
+                    param: psn::types::PacketSwitchedParam::MapProfile(context),
                     ..
                 } = self
                     .network
                     .send_internal(
-                        &GetPacketSwitchedConfig {
+                        &psn::GetPacketSwitchedConfig {
                             profile_id,
-                            param: PacketSwitchedParamReq::MapProfile,
+                            param: psn::types::PacketSwitchedParamReq::MapProfile,
                         },
                         true,
                     )
@@ -453,9 +449,9 @@ where
                     if context != cid {
                         self.network
                             .send_internal(
-                                &SetPacketSwitchedConfig {
+                                &psn::SetPacketSwitchedConfig {
                                     profile_id,
-                                    param: PacketSwitchedParam::MapProfile(cid),
+                                    param: psn::types::PacketSwitchedParam::MapProfile(cid),
                                 },
                                 true,
                             )
@@ -463,9 +459,9 @@ where
 
                         self.network
                             .send_internal(
-                                &GetPacketSwitchedNetworkData {
+                                &psn::GetPacketSwitchedNetworkData {
                                     profile_id,
-                                    param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+                                    param: psn::types::PacketSwitchedNetworkDataParam::PsdProfileStatus,
                                 },
                                 true,
                             )
@@ -473,12 +469,12 @@ where
                     }
                 }
 
-                let PacketSwitchedNetworkData { param_tag, .. } = self
+                let psn::responses::PacketSwitchedNetworkData { param_tag, .. } = self
                     .network
                     .send_internal(
-                        &GetPacketSwitchedNetworkData {
+                        &psn::GetPacketSwitchedNetworkData {
                             profile_id,
-                            param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+                            param: psn::types::PacketSwitchedNetworkDataParam::PsdProfileStatus,
                         },
                         true,
                     )
@@ -487,9 +483,9 @@ where
                 if param_tag == 0 {
                     self.network
                         .send_internal(
-                            &SetPacketSwitchedAction {
+                            &psn::SetPacketSwitchedAction {
                                 profile_id,
-                                action: PacketSwitchedAction::Activate,
+                                action: psn::types::PacketSwitchedAction::Activate,
                             },
                             true,
                         )
