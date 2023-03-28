@@ -463,8 +463,8 @@ where
         // Disable Message Waiting URCs (UMWI)
         #[cfg(any(feature = "toby-r2"))]
         self.network.send_internal(
-            &SetMessageWaitingIndication {
-                mode: MessageWaitingMode::Disabled,
+            &crate::command::sms::SetMessageWaitingIndication {
+                mode: crate::command::sms::types::MessageWaitingMode::Disabled,
             },
             false,
         )?;
