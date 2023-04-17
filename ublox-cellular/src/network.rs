@@ -20,7 +20,6 @@ use crate::{
 };
 use atat::{atat_derive::AtatLen, blocking::AtatClient};
 use fugit::{ExtU32, MinutesDurationU32, SecsDurationU32};
-use fugit_timer::Timer;
 use hash32_derive::Hash32;
 use serde::{Deserialize, Serialize};
 
@@ -542,6 +541,7 @@ mod tests {
         test_helpers::{MockAtClient, MockTimer},
     };
     use fugit::{MillisDurationU32, TimerInstantU32};
+    use fugit_timer::Timer;
 
     const TIMER_HZ: u32 = 1000;
 
