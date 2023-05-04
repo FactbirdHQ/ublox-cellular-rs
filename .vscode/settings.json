@@ -4,9 +4,12 @@
     // with these changes RA will call `cargo check --bins` on save
     "rust-analyzer.checkOnSave.allTargets": false,
     "rust-analyzer.checkOnSave.extraArgs": [
-        "-bins",
+        "--bins",
         "--target",
         "x86_64-unknown-linux-gnu"
+    ],
+    "rust-analyzer.cargo.features": [
+        "lara-r6",
     ],
     "rust-analyzer.cargo.target": "thumbv7em-none-eabihf",
     "rust-analyzer.diagnostics.disabled": [

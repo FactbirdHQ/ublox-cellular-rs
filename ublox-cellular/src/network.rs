@@ -20,7 +20,6 @@ use crate::{
 };
 use atat::{atat_derive::AtatLen, blocking::AtatClient};
 use fugit::{ExtU32, MinutesDurationU32, SecsDurationU32};
-use fugit_timer::Timer;
 use hash32_derive::Hash32;
 use serde::{Deserialize, Serialize};
 
@@ -196,7 +195,7 @@ where
 
         self.status.reg_check_time.replace(now);
 
-        // self.update_registration()?;
+        self.update_registration()?;
 
         let now = self.status.timer.now();
         let is_timeout = self
@@ -471,15 +470,15 @@ where
                 }) => {
                     info!("[URC] ExtendedPSNetworkRegistration {:?}", state);
                 }
-                Urc::GPRSNetworkRegistration(reg_params) => {
-                    new_reg_params.replace(reg_params.into());
-                }
-                Urc::EPSNetworkRegistration(reg_params) => {
-                    new_reg_params.replace(reg_params.into());
-                }
-                Urc::NetworkRegistration(reg_params) => {
-                    new_reg_params.replace(reg_params.into());
-                }
+                // Urc::GPRSNetworkRegistration(reg_params) => {
+                //     new_reg_params.replace(reg_params.into());
+                // }
+                // Urc::EPSNetworkRegistration(reg_params) => {
+                //     new_reg_params.replace(reg_params.into());
+                // }
+                // Urc::NetworkRegistration(reg_params) => {
+                //     new_reg_params.replace(reg_params.into());
+                // }
                 Urc::DataConnectionActivated(psn::urc::DataConnectionActivated {
                     result,
                     ip_addr: _,
