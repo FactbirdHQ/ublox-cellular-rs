@@ -2,12 +2,12 @@ use crate::command::{
     network_service::{
         responses::NetworkRegistrationStatus,
         types::{NetworkRegistrationStat, RatAct},
-        urc::NetworkRegistration,
+        // urc::NetworkRegistration,
     },
     psn::{
         responses::{EPSNetworkRegistrationStatus, GPRSNetworkRegistrationStatus},
         types::{EPSNetworkRegistrationStat, GPRSNetworkRegistrationStat},
-        urc::{EPSNetworkRegistration, GPRSNetworkRegistration},
+        // urc::{EPSNetworkRegistration, GPRSNetworkRegistration},
     },
 };
 use fugit::{ExtU32, TimerInstantU32};
@@ -308,19 +308,19 @@ where
     }
 }
 
-impl From<NetworkRegistration> for RegistrationParams {
-    fn from(v: NetworkRegistration) -> Self {
-        Self {
-            act: RatAct::Gsm,
-            reg_type: RegType::Creg,
-            status: v.stat.into(),
-            cell_id: None,
-            lac: None,
-            // active_time: None,
-            // periodic_tau: None,
-        }
-    }
-}
+// impl From<NetworkRegistration> for RegistrationParams {
+//     fn from(v: NetworkRegistration) -> Self {
+//         Self {
+//             act: RatAct::Gsm,
+//             reg_type: RegType::Creg,
+//             status: v.stat.into(),
+//             cell_id: None,
+//             lac: None,
+//             // active_time: None,
+//             // periodic_tau: None,
+//         }
+//     }
+// }
 
 impl From<NetworkRegistrationStatus> for RegistrationParams {
     fn from(v: NetworkRegistrationStatus) -> Self {
@@ -336,19 +336,19 @@ impl From<NetworkRegistrationStatus> for RegistrationParams {
     }
 }
 
-impl From<GPRSNetworkRegistration> for RegistrationParams {
-    fn from(v: GPRSNetworkRegistration) -> Self {
-        Self {
-            act: v.act.unwrap_or(RatAct::Unknown),
-            reg_type: RegType::Cgreg,
-            status: v.stat.into(),
-            cell_id: v.ci,
-            lac: v.lac,
-            // active_time: None,
-            // periodic_tau: None,
-        }
-    }
-}
+// impl From<GPRSNetworkRegistration> for RegistrationParams {
+//     fn from(v: GPRSNetworkRegistration) -> Self {
+//         Self {
+//             act: v.act.unwrap_or(RatAct::Unknown),
+//             reg_type: RegType::Cgreg,
+//             status: v.stat.into(),
+//             cell_id: v.ci,
+//             lac: v.lac,
+//             // active_time: None,
+//             // periodic_tau: None,
+//         }
+//     }
+// }
 
 impl From<GPRSNetworkRegistrationStatus> for RegistrationParams {
     fn from(v: GPRSNetworkRegistrationStatus) -> Self {
@@ -364,19 +364,19 @@ impl From<GPRSNetworkRegistrationStatus> for RegistrationParams {
     }
 }
 
-impl From<EPSNetworkRegistration> for RegistrationParams {
-    fn from(v: EPSNetworkRegistration) -> Self {
-        Self {
-            reg_type: RegType::Cereg,
-            status: v.stat.into(),
-            cell_id: v.ci,
-            lac: v.tac,
-            act: v.act.unwrap_or(RatAct::Unknown),
-            // active_time: None,
-            // periodic_tau: None,
-        }
-    }
-}
+// impl From<EPSNetworkRegistration> for RegistrationParams {
+//     fn from(v: EPSNetworkRegistration) -> Self {
+//         Self {
+//             reg_type: RegType::Cereg,
+//             status: v.stat.into(),
+//             cell_id: v.ci,
+//             lac: v.tac,
+//             act: v.act.unwrap_or(RatAct::Unknown),
+//             // active_time: None,
+//             // periodic_tau: None,
+//         }
+//     }
+// }
 
 impl From<EPSNetworkRegistrationStatus> for RegistrationParams {
     fn from(v: EPSNetworkRegistrationStatus) -> Self {

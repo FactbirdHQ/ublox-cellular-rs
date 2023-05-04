@@ -53,12 +53,12 @@ pub enum Urc {
 
     #[at_urc("+UMWI")]
     MessageWaitingIndication(sms::urc::MessageWaitingIndication),
-    #[at_urc("+CREG")]
-    NetworkRegistration(network_service::urc::NetworkRegistration),
-    #[at_urc("+CGREG")]
-    GPRSNetworkRegistration(psn::urc::GPRSNetworkRegistration),
-    #[at_urc("+CEREG")]
-    EPSNetworkRegistration(psn::urc::EPSNetworkRegistration),
+    // #[at_urc("+CREG")]
+    // NetworkRegistration(network_service::urc::NetworkRegistration),
+    // #[at_urc("+CGREG")]
+    // GPRSNetworkRegistration(psn::urc::GPRSNetworkRegistration),
+    // #[at_urc("+CEREG")]
+    // EPSNetworkRegistration(psn::urc::EPSNetworkRegistration),
     #[at_urc("+UREG")]
     ExtendedPSNetworkRegistration(psn::urc::ExtendedPSNetworkRegistration),
 

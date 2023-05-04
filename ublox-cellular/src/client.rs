@@ -22,7 +22,7 @@ use crate::{
     command::{
         general::{GetCCID, GetFirmwareVersion, GetModelId},
         gpio::{
-            types::{GpioMode, GpioOutValue},
+            types::{GpioInPull, GpioMode, GpioOutValue},
             SetGpioConfiguration,
         },
         network_service::{
@@ -276,6 +276,14 @@ where
             &SetGpioConfiguration {
                 gpio_id: 25,
                 gpio_mode: GpioMode::Output(GpioOutValue::High),
+            },
+            false,
+        )?;
+
+        self.network.send_internal(
+            &SetGpioConfiguration {
+                gpio_id: 42,
+                gpio_mode: GpioMode::Input(GpioInPull::NoPull),
             },
             false,
         )?;
@@ -554,7 +562,7 @@ where
         // CREG URC
         self.network.send_internal(
             &SetNetworkRegistrationStatus {
-                n: NetworkRegistrationUrcConfig::UrcVerbose,
+                n: NetworkRegistrationUrcConfig::UrcDisabled,
             },
             true,
         )?;
@@ -562,7 +570,7 @@ where
         // CGREG URC
         self.network.send_internal(
             &SetGPRSNetworkRegistrationStatus {
-                n: GPRSNetworkRegistrationUrcConfig::UrcVerbose,
+                n: GPRSNetworkRegistrationUrcConfig::UrcDisabled,
             },
             true,
         )?;
@@ -570,7 +578,7 @@ where
         // CEREG URC
         self.network.send_internal(
             &SetEPSNetworkRegistrationStatus {
-                n: EPSNetworkRegistrationUrcConfig::UrcVerbose,
+                n: EPSNetworkRegistrationUrcConfig::UrcDisabled,
             },
             true,
         )?;
