@@ -195,7 +195,7 @@ where
 
         self.status.reg_check_time.replace(now);
 
-        // self.update_registration()?;
+        self.update_registration()?;
 
         let now = self.status.timer.now();
         let is_timeout = self
@@ -470,15 +470,15 @@ where
                 }) => {
                     info!("[URC] ExtendedPSNetworkRegistration {:?}", state);
                 }
-                Urc::GPRSNetworkRegistration(reg_params) => {
-                    new_reg_params.replace(reg_params.into());
-                }
-                Urc::EPSNetworkRegistration(reg_params) => {
-                    new_reg_params.replace(reg_params.into());
-                }
-                Urc::NetworkRegistration(reg_params) => {
-                    new_reg_params.replace(reg_params.into());
-                }
+                // Urc::GPRSNetworkRegistration(reg_params) => {
+                //     new_reg_params.replace(reg_params.into());
+                // }
+                // Urc::EPSNetworkRegistration(reg_params) => {
+                //     new_reg_params.replace(reg_params.into());
+                // }
+                // Urc::NetworkRegistration(reg_params) => {
+                //     new_reg_params.replace(reg_params.into());
+                // }
                 Urc::DataConnectionActivated(psn::urc::DataConnectionActivated {
                     result,
                     ip_addr: _,
