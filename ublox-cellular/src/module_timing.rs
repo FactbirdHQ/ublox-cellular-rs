@@ -7,6 +7,8 @@ use fugit::TimerDurationU32;
 pub fn pwr_on_time<const TIMER_HZ: u32>() -> TimerDurationU32<TIMER_HZ> {
     if cfg!(feature = "lara-r6") {
         150.millis()
+    } else if cfg!(feature = "toby-r2") {
+        50.micros()
     } else {
         50.micros()
     }
@@ -16,6 +18,8 @@ pub fn pwr_on_time<const TIMER_HZ: u32>() -> TimerDurationU32<TIMER_HZ> {
 pub fn pwr_off_time<const TIMER_HZ: u32>() -> TimerDurationU32<TIMER_HZ> {
     if cfg!(feature = "lara-r6") {
         1500.millis()
+    } else if cfg!(feature = "toby-r2") {
+        1.secs()
     } else {
         1.secs()
     }
@@ -25,16 +29,20 @@ pub fn pwr_off_time<const TIMER_HZ: u32>() -> TimerDurationU32<TIMER_HZ> {
 pub fn reset_time<const TIMER_HZ: u32>() -> TimerDurationU32<TIMER_HZ> {
     if cfg!(feature = "lara-r6") {
         10.millis()
+    } else if cfg!(feature = "toby-r2") {
+        50.millis()
     } else {
         50.millis()
     }
 }
 
 /// Low time of `RESET_N` pin to trigger module abrupt emergency switch off
-pub fn kill_time<const TIMER_HZ: u32>() -> TimerDurationU32<TIMER_HZ> {
+///
+/// NOTE: Not all modules support this operation from `RESET_N`
+pub fn kill_time<const TIMER_HZ: u32>() -> Option<TimerDurationU32<TIMER_HZ>> {
     if cfg!(feature = "lara-r6") {
-        10.secs()
+        Some(10.secs())
     } else {
-        10.secs()
+        None
     }
 }
