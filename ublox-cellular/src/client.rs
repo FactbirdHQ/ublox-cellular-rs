@@ -543,22 +543,14 @@ where
     }
 
     pub(crate) fn enable_registration_urcs(&mut self) -> Result<(), Error> {
-        // if packet domain event reporting is not set it's not a stopper. We
-        // might lack some events when we are dropped from the network.
-        // TODO: Re-enable this when it works, and is useful!
-        if self
-            .network
-            .send_internal(
-                &SetPacketSwitchedEventReporting {
-                    mode: PSEventReportingMode::CircularBufferUrcs,
-                    bfr: None,
-                },
-                true,
-            )
-            .is_err()
-        {
-            warn!("Packet domain event reporting set failed");
-        }
+        // Report all registration and PDN connectivity status events.
+        self.network.send_internal(
+            &SetPacketSwitchedEventReporting {
+                mode: PSEventReportingMode::BufferUrcs,
+                bfr: Some(1),
+            },
+            true,
+        )?;
 
         // CREG URC
         self.network.send_internal(
@@ -635,8 +627,12 @@ where
         match self.network.process_events() {
             // Catch "Resetting the modem due to the network registration timeout"
             // as well as consecutive AT timeouts and do a hard reset.
-            Err(crate::network::Error::Generic(GenericError::Timeout)) => {
+            Err(crate::network::Error::Generic(GenericError::AtErrors)) => {
                 self.hard_reset()?;
+                Err(Error::Generic(GenericError::Timeout))
+            }
+            Err(crate::network::Error::Generic(GenericError::Timeout)) => {
+                self.soft_reset(false)?;
                 Err(Error::Generic(GenericError::Timeout))
             }
             result => result.map_err(Error::from),

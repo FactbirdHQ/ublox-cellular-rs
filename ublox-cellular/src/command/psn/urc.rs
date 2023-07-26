@@ -61,3 +61,14 @@ pub struct EPSNetworkRegistration {
     #[at_arg(position = 6)]
     pub reject_cause: Option<u8>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum PacketSwitchedEventReporting {
+    NetworkDetach,
+    MobileStationDetach,
+    NetworkDeactivate,
+    MobileStationDeactivate,
+    NetworkPDNDeactivate,
+    MobileStationPDNDeactivate,
+}

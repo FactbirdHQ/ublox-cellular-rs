@@ -17,7 +17,7 @@ use crate::{
     command::mobile_control::SetModuleFunctionality,
     command::psn::types::PDPContextStatus,
     command::psn::SetPDPContextDefinition,
-    command::psn::SetPDPContextState,
+    command::psn::{SetGPRSAttached, SetPDPContextState},
     command::Urc,
     command::{
         ip_transport_layer::{
@@ -51,7 +51,7 @@ pub const EGRESS_CHUNK_SIZE: usize = 1024;
 pub const PROFILE_ID: ProfileId = ProfileId(1);
 
 #[cfg(not(feature = "upsd-context-activation"))]
-const CONTEXT_ID: ContextId = ContextId(1);
+pub const CONTEXT_ID: ContextId = ContextId(1);
 
 impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>
     Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
@@ -258,8 +258,14 @@ where
                 .map_err(|_e| Error::Generic(GenericError::Clock))?;
         }
 
-        // self.network .send_internal( &SetGPRSAttached { state:
-        //     GPRSAttachedState::Attached, }, true, ) .map_err(Error::from)?;
+        self.network
+            .send_internal(
+                &SetGPRSAttached {
+                    state: GPRSAttachedState::Attached,
+                },
+                true,
+            )
+            .map_err(Error::from)?;
 
         Err(nb::Error::WouldBlock)
     }
@@ -272,10 +278,6 @@ where
         profile_id: ProfileId,
         apn_info: &APNInfo,
     ) -> nb::Result<(), Error> {
-        if self.network.context_state == ContextState::Active {
-            return Ok(());
-        }
-
         // Check if the PSD profile is activated (param_tag = 1)
         let PacketSwitchedNetworkData { param_tag, .. } = self
             .network
@@ -407,10 +409,6 @@ where
     /// Required for SARA-R4 and TOBY modules.
     #[cfg(not(feature = "upsd-context-activation"))]
     fn activate_context(&mut self, cid: ContextId, profile_id: ProfileId) -> nb::Result<(), Error> {
-        if self.network.context_state == ContextState::Active {
-            return Ok(());
-        }
-
         let context_states = self
             .network
             .send_internal(&GetPDPContextState, true)

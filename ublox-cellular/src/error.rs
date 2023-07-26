@@ -4,6 +4,7 @@ use crate::services::data::Error as DataServiceError;
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum GenericError {
+    AtErrors,
     Timeout,
     Clock,
     Unsupported,

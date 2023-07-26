@@ -21,6 +21,7 @@
 //! instruct the GGSN to route down-link packets onto different `QoS` flows
 //! towards the TE.
 
+pub mod impl_;
 pub mod responses;
 pub mod types;
 pub mod urc;

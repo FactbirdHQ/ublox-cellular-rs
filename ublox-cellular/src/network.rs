@@ -1,22 +1,26 @@
 use crate::{
     command::{
-        general::GetCIMI,
+        device_lock::GetPinStatus,
+        general::{GetCCID, GetCIMI},
+        gpio::GetGpioConfiguration,
         mobile_control::{
             types::{Functionality, ResetMode},
             GetExtendedErrorReport, SetModuleFunctionality,
         },
         network_service::{
-            types::OperatorSelectionMode, GetNetworkRegistrationStatus, SetOperatorSelection,
+            responses::OperatorSelection, types::OperatorSelectionMode,
+            GetNetworkRegistrationStatus, GetOperatorSelection, SetOperatorSelection,
         },
         psn::{
-            self, types::PDPContextStatus, GetEPSNetworkRegistrationStatus,
-            GetGPRSNetworkRegistrationStatus, GetPDPContextState, SetPDPContextState,
+            self, types::PDPContextStatus, urc::PacketSwitchedEventReporting,
+            GetEPSNetworkRegistrationStatus, GetGPRSNetworkRegistrationStatus, GetPDPContextState,
+            SetPDPContextState,
         },
         Urc, AT,
     },
     error::GenericError,
     registration::{self, ConnectionState, RegistrationParams, RegistrationState},
-    services::data::{ContextState, PROFILE_ID},
+    services::data::{ContextState, CONTEXT_ID, PROFILE_ID},
 };
 use atat::{atat_derive::AtatLen, blocking::AtatClient};
 use fugit::{ExtU32, MinutesDurationU32, SecsDurationU32};
@@ -171,13 +175,13 @@ where
         if self.at_tx.consecutive_timeouts > 10 {
             self.at_tx.consecutive_timeouts = 0;
             warn!("Resetting the modem due to consecutive AT timeouts");
-            return Err(Error::Generic(GenericError::Timeout));
+            return Err(Error::Generic(GenericError::AtErrors));
         }
 
         self.handle_urc().ok(); // Ignore errors
         self.check_registration_state();
         self.intervene_registration()?;
-        self.check_running_imsi().ok(); // Ignore errors
+        // self.check_running_imsi().ok(); // Ignore errors
 
         let now = self.status.timer.now();
         let should_check = self
@@ -192,6 +196,31 @@ where
         if !should_check {
             return Ok(());
         }
+
+        let context_states = self
+            .send_internal(&GetPDPContextState, true)
+            .map_err(Error::from)?;
+
+        let activated = context_states
+            .iter()
+            .find_map(|state| {
+                if state.cid == CONTEXT_ID {
+                    Some(state.status == PDPContextStatus::Activated)
+                } else {
+                    None
+                }
+            })
+            .unwrap_or(false);
+
+        if !activated && self.context_state == ContextState::Active {
+            self.context_state = ContextState::Activating;
+        }
+
+        self.send_internal(&heapless::String::<64>::from("AT+CGDCONT?\r\n"), false)
+            .ok();
+
+        self.send_internal(&heapless::String::<64>::from("AT+UMNOPROF?\r\n"), false)
+            .ok();
 
         self.status.reg_check_time.replace(now);
 
@@ -293,6 +322,11 @@ where
                 self.status.psd.reset();
                 self.status.eps.reset();
                 self.status.registration_interventions += 1;
+
+                self.send_internal(&GetOperatorSelection, true).ok();
+
+                self.send_internal(&GetCCID, false)?;
+                self.send_internal(&GetPinStatus, false)?;
 
                 self.send_internal(
                     &SetOperatorSelection {
@@ -447,23 +481,16 @@ where
 
         self.at_tx.handle_urc(|urc| {
             match urc {
-                Urc::NetworkDetach => {
-                    warn!("Network Detach URC!");
-                }
-                Urc::MobileStationDetach => {
-                    warn!("ME Detach URC!");
-                }
-                Urc::NetworkDeactivate => {
-                    warn!("Network Deactivate URC!");
-                }
-                Urc::MobileStationDeactivate => {
-                    warn!("ME Deactivate URC!");
-                }
-                Urc::NetworkPDNDeactivate => {
-                    warn!("Network PDN Deactivate URC!");
-                }
-                Urc::MobileStationPDNDeactivate => {
-                    warn!("ME PDN Deactivate URC!");
+                Urc::PacketSwitchedEventReporting(ne) => {
+                    use PacketSwitchedEventReporting::*;
+
+                    warn!("Network event URC! {}", ne);
+                    match ne {
+                        NetworkPDNDeactivate | NetworkDetach => {
+                            ctx_state = ContextState::Activating;
+                        }
+                        _ => {}
+                    }
                 }
                 Urc::ExtendedPSNetworkRegistration(psn::urc::ExtendedPSNetworkRegistration {
                     state,
