@@ -280,6 +280,7 @@ where
             false,
         )?;
 
+        #[cfg(any(feature = "lara-r6"))]
         self.network.send_internal(
             &SetGpioConfiguration {
                 gpio_id: 42,
