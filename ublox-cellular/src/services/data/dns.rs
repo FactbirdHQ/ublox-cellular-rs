@@ -8,11 +8,9 @@ use super::DataService;
 use crate::command::dns::{self, types::ResolutionType};
 use ublox_sockets::Error;
 
-impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> Dns
-    for DataService<'a, C, CLK, TIMER_HZ, N, L>
+impl<'a, 'sub, AtCl, const N: usize, const L: usize> Dns for DataService<'a, 'sub, AtCl, N, L>
 where
-    C: AtatClient,
-    CLK: fugit_timer::Timer<TIMER_HZ>,
+    AtCl: AtatClient,
 {
     type Error = Error;
 

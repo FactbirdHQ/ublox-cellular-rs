@@ -1,29 +1,27 @@
-use heapless::String;
-
 #[derive(Debug, Clone)]
-pub enum Apn {
-    Given(String<99>),
+pub enum Apn<'a> {
+    Given(&'a str),
     Automatic,
 }
 
-impl Default for Apn {
+impl<'a> Default for Apn<'a> {
     fn default() -> Self {
         Self::Automatic
     }
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct APNInfo {
-    pub apn: Apn,
-    pub user_name: Option<String<64>>,
-    pub password: Option<String<64>>,
+pub struct APNInfo<'a> {
+    pub apn: Apn<'a>,
+    pub user_name: Option<&'a str>,
+    pub password: Option<&'a str>,
 }
 
-impl APNInfo {
+impl<'a> APNInfo<'a> {
     #[must_use]
-    pub fn new(apn: &str) -> Self {
+    pub fn new(apn: &'a str) -> Self {
         Self {
-            apn: Apn::Given(String::from(apn)),
+            apn: Apn::Given(apn),
             user_name: None,
             password: None,
         }

@@ -16,17 +16,18 @@ doctest = false
 
 [dependencies]
 # atat = { version = "0.18", features = ["derive", "bytes"] }
-atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "70283be", features = ["derive", "defmt", "bytes"] }
+atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "bbe146d", features = ["derive", "defmt", "bytes"] }
 embedded-hal = "=1.0.0-rc.1"
 embedded-nal = "0.6"
-fugit = { version = "0.3" }
-fugit-timer = { version = "0.1.3" }
 hash32 = "^0.2.1"
 hash32-derive = "^0.1.0"
 heapless = { version = "^0.7", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
-ublox-sockets = "0.5.0"
+# ublox-sockets = "0.5.0"
+ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", rev = "b1ff942" }
+embassy-time = "0.1"
+embedded-io = "0.5"
 
 # Enable `serde` feature of `no-std-net`
 no-std-net = { version = "^0.5", features = ["serde"] }
@@ -40,7 +41,7 @@ default = ["socket-udp", "socket-tcp"]
 async = ["atat/async"]
 
 # Use `defmt-impl to enable defmt based logging
-defmt-impl = ["defmt", "ublox-sockets/defmt", "fugit/defmt", "atat/defmt", "heapless/defmt-impl"]
+defmt-impl = ["defmt", "ublox-sockets/defmt", "atat/defmt", "heapless/defmt-impl"]
 # Use `log-impl` to enable log based logging
 log-impl = ["log", "ublox-sockets/log", "atat/log"]
 

@@ -10,17 +10,17 @@ use crate::command::{
         // urc::{EPSNetworkRegistration, GPRSNetworkRegistration},
     },
 };
-use fugit::{ExtU32, TimerInstantU32};
+use embassy_time::{Duration, Instant};
 use heapless::String;
 
 #[derive(Debug, Clone, Default)]
-pub struct CellularRegistrationStatus<const TIMER_HZ: u32> {
+pub struct CellularRegistrationStatus {
     status: Status,
-    updated: Option<TimerInstantU32<TIMER_HZ>>,
-    started: Option<TimerInstantU32<TIMER_HZ>>,
+    updated: Option<Instant>,
+    started: Option<Instant>,
 }
 
-impl<const TIMER_HZ: u32> CellularRegistrationStatus<TIMER_HZ> {
+impl CellularRegistrationStatus {
     pub fn new() -> Self {
         Self {
             status: Status::default(),
@@ -29,17 +29,17 @@ impl<const TIMER_HZ: u32> CellularRegistrationStatus<TIMER_HZ> {
         }
     }
 
-    pub fn duration(&self, ts: TimerInstantU32<TIMER_HZ>) -> fugit::TimerDurationU32<TIMER_HZ> {
+    pub fn duration(&self, ts: Instant) -> Duration {
         self.started
             .and_then(|started| ts.checked_duration_since(started))
-            .unwrap_or_else(|| 0.millis())
+            .unwrap_or_else(|| Duration::from_millis(0))
     }
 
-    pub fn started(&self) -> Option<TimerInstantU32<TIMER_HZ>> {
+    pub fn started(&self) -> Option<Instant> {
         self.started
     }
 
-    pub fn updated(&self) -> Option<TimerInstantU32<TIMER_HZ>> {
+    pub fn updated(&self) -> Option<Instant> {
         self.updated
     }
 
@@ -53,7 +53,8 @@ impl<const TIMER_HZ: u32> CellularRegistrationStatus<TIMER_HZ> {
         self.status
     }
 
-    pub fn set_status(&mut self, stat: Status, ts: TimerInstantU32<TIMER_HZ>) {
+    pub fn set_status(&mut self, stat: Status) {
+        let ts = Instant::now();
         if self.status != stat {
             self.status = stat;
             self.started = Some(ts);
@@ -185,25 +186,20 @@ pub struct CellularGlobalIdentity {
 }
 
 #[derive(Debug, Clone)]
-pub struct RegistrationState<CLK, const TIMER_HZ: u32>
-where
-    CLK: fugit_timer::Timer<TIMER_HZ>,
-{
-    pub(crate) timer: CLK,
-
-    pub(crate) reg_check_time: Option<TimerInstantU32<TIMER_HZ>>,
-    pub(crate) reg_start_time: Option<TimerInstantU32<TIMER_HZ>>,
-    pub(crate) imsi_check_time: Option<TimerInstantU32<TIMER_HZ>>,
+pub struct RegistrationState {
+    pub(crate) reg_check_time: Option<Instant>,
+    pub(crate) reg_start_time: Option<Instant>,
+    pub(crate) imsi_check_time: Option<Instant>,
 
     pub(crate) conn_state: ConnectionState,
     /// CSD (Circuit Switched Data) registration status (registered/searching/roaming etc.).
-    pub(crate) csd: CellularRegistrationStatus<TIMER_HZ>,
+    pub(crate) csd: CellularRegistrationStatus,
     /// PSD (Packet Switched Data) registration status (registered/searching/roaming etc.).
-    pub(crate) psd: CellularRegistrationStatus<TIMER_HZ>,
+    pub(crate) psd: CellularRegistrationStatus,
     /// EPS (Evolved Packet Switched) registration status (registered/searching/roaming etc.).
-    pub(crate) eps: CellularRegistrationStatus<TIMER_HZ>,
+    pub(crate) eps: CellularRegistrationStatus,
 
-    pub(crate) registration_interventions: u32,
+    pub(crate) registration_interventions: u8,
     check_imsi: bool,
 
     pub(crate) cgi: CellularGlobalIdentity,
@@ -225,13 +221,9 @@ impl Default for ConnectionState {
     }
 }
 
-impl<CLK, const TIMER_HZ: u32> RegistrationState<CLK, TIMER_HZ>
-where
-    CLK: fugit_timer::Timer<TIMER_HZ>,
-{
-    pub fn new(timer: CLK) -> Self {
+impl RegistrationState {
+    pub fn new() -> Self {
         Self {
-            timer,
             reg_check_time: None,
             reg_start_time: None,
             imsi_check_time: None,
@@ -252,8 +244,8 @@ where
         self.csd.reset();
         self.psd.reset();
         self.eps.reset();
-        self.reg_start_time = Some(self.timer.now());
-        self.reg_check_time = self.reg_start_time;
+        self.reg_start_time = Some(Instant::now());
+        self.reg_check_time = Some(Instant::now());
         self.imsi_check_time = None;
         self.registration_interventions = 1;
     }
@@ -267,29 +259,25 @@ where
         self.conn_state = state;
     }
 
-    pub fn compare_and_set(
-        &mut self,
-        new_params: RegistrationParams,
-        ts: TimerInstantU32<TIMER_HZ>,
-    ) {
+    pub fn compare_and_set(&mut self, new_params: RegistrationParams) {
         match new_params.reg_type {
             RegType::Creg => {
                 let prev_reg_status = self.csd.registered();
-                self.csd.set_status(new_params.status, ts);
+                self.csd.set_status(new_params.status);
                 if !prev_reg_status && self.csd.registered() {
                     self.check_imsi = true
                 }
             }
             RegType::Cgreg => {
                 let prev_reg_status = self.psd.registered();
-                self.psd.set_status(new_params.status, ts);
+                self.psd.set_status(new_params.status);
                 if !prev_reg_status && self.psd.registered() {
                     self.check_imsi = true
                 }
             }
             RegType::Cereg => {
                 let prev_reg_status = self.eps.registered();
-                self.eps.set_status(new_params.status, ts);
+                self.eps.set_status(new_params.status);
                 if !prev_reg_status && self.eps.registered() {
                     self.check_imsi = true
                 }
