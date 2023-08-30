@@ -287,7 +287,7 @@ where
 
         // Tell module whether we support flow control
         // FIXME: Use AT+IFC=2,2 instead of AT&K here
-        if Config::FLOW_CONTROL == crate::config::FlowControl::RtsCts {
+        if Config::FLOW_CONTROL {
             self.network.send_internal(
                 &SetFlowControl {
                     value: FlowControl::RtsCts,

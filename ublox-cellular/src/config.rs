@@ -26,20 +26,12 @@ impl OutputPin for NoPin {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FlowControl {
-    /// No flow control is being used
-    None,
-    /// Hardware flow control
-    RtsCts,
-}
-
 pub trait CellularConfig {
     type ResetPin: OutputPin;
     type PowerPin: OutputPin;
     type VintPin: InputPin;
 
-    const FLOW_CONTROL: FlowControl = FlowControl::None;
+    const FLOW_CONTROL: bool = false;
     const HEX_MODE: bool = true;
 
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin>;

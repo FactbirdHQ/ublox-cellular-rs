@@ -118,6 +118,8 @@ pub type UbloxCellularIngress<'a, const INGRESS_BUF_SIZE: usize> = atat::Ingress
 
 pub type UbloxCellularUrcChannel = atat::UrcChannel<Urc, URC_CAPACITY, URC_SUBSCRIBERS>;
 
+pub use config::CellularConfig;
+
 /// Prelude - Include traits
 pub mod prelude {
     #[cfg(any(feature = "socket-udp", feature = "socket-tcp"))]
