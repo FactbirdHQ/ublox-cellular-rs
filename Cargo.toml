@@ -9,5 +9,5 @@ members = [
 ]
 
 [patch.crates-io]
-atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "bbe146d" }
+atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "c5caaf7" }
 # ublox-sockets = { path = "../ublox-sockets" }
