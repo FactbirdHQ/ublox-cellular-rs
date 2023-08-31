@@ -1,4 +1,4 @@
-use atat::blocking::AtatClient;
+use atat::{blocking::AtatClient, AtatResp};
 use embedded_hal::digital::{InputPin, OutputPin};
 use fugit::ExtU32;
 use ublox_sockets::SocketSet;
@@ -26,8 +26,8 @@ use crate::{
             SetGpioConfiguration,
         },
         network_service::{
-            responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
-            SetOperatorSelection,
+            responses::{OperatorSelection, SignalQuality}, types::OperatorSelectionMode, GetOperatorSelection,
+            SetOperatorSelection , GetSignalQuality,
         },
         psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
     },
@@ -165,6 +165,11 @@ where
 
         device.power_state = device.power_state().unwrap_or(PowerState::Off);
         device
+    }
+
+    pub fn signal_strength(&mut self) -> Result<SignalQuality, Error>
+    {
+        self.send_at(&GetSignalQuality)
     }
 
     /// Set storage for TCP/UDP sockets
