@@ -78,6 +78,7 @@
 // This mod MUST go first, so that the others see its macros.
 pub(crate) mod fmt;
 
+mod blocking_timer;
 mod client;
 pub mod command;
 mod config;
@@ -89,21 +90,35 @@ mod registration;
 mod services;
 
 pub use atat::serde_bytes;
+use client::{URC_CAPACITY, URC_SUBSCRIBERS};
+use command::Urc;
 pub use ublox_sockets as sockets;
 
-#[cfg(test)]
-mod test_helpers;
-
 pub use client::Device as GsmClient;
-pub use config::{Config, NoPin};
+pub use config::NoPin;
 pub use network::{ContextId, ProfileId};
 pub use services::data::apn::{APNInfo, Apn};
 pub use services::data::ssl::SecurityProfileId;
 pub use services::data::DataService;
 
-// Re-export atat and fugit
+// Re-export atat
 pub use atat;
-pub use fugit;
+
+pub type UbloxCellularBuffers<const INGRESS_BUF_SIZE: usize> =
+    atat::Buffers<Urc, INGRESS_BUF_SIZE, URC_CAPACITY, URC_SUBSCRIBERS>;
+
+pub type UbloxCellularIngress<'a, const INGRESS_BUF_SIZE: usize> = atat::Ingress<
+    'a,
+    atat::DefaultDigester<Urc>,
+    Urc,
+    INGRESS_BUF_SIZE,
+    URC_CAPACITY,
+    URC_SUBSCRIBERS,
+>;
+
+pub type UbloxCellularUrcChannel = atat::UrcChannel<Urc, URC_CAPACITY, URC_SUBSCRIBERS>;
+
+pub use config::CellularConfig;
 
 /// Prelude - Include traits
 pub mod prelude {

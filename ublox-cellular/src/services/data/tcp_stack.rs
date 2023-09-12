@@ -6,14 +6,14 @@ use crate::command::ip_transport_layer::{
     CloseSocket, ConnectSocket, CreateSocket, PrepareWriteSocketDataBinary, SetSocketSslState,
     WriteSocketDataBinary,
 };
+use atat::blocking::AtatClient;
 use embedded_nal::{SocketAddr, TcpClientStack};
 use ublox_sockets::{Error, SocketHandle, TcpSocket, TcpState};
 
-impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> TcpClientStack
-    for DataService<'a, C, CLK, TIMER_HZ, N, L>
+impl<'a, 'sub, AtCl, const N: usize, const L: usize> TcpClientStack
+    for DataService<'a, 'sub, AtCl, N, L>
 where
-    C: atat::blocking::AtatClient,
-    CLK: fugit_timer::Timer<TIMER_HZ>,
+    AtCl: AtatClient,
 {
     type Error = Error;
 
@@ -26,10 +26,9 @@ where
         if let Some(ref mut sockets) = self.sockets {
             // Check if there are any unused sockets available
             if sockets.len() >= sockets.capacity() {
-                let ts = self.network.status.timer.now();
                 // Check if there are any sockets closed by remote, and close it
                 // if it has exceeded its timeout, in order to recycle it.
-                if !sockets.recycle(ts) {
+                if !sockets.recycle() {
                     return Err(Error::SocketSetFull);
                 }
             }
@@ -59,7 +58,7 @@ where
     ) -> nb::Result<(), Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
             let mut tcp = sockets
-                .get::<TcpSocket<TIMER_HZ, L>>(*socket)
+                .get::<TcpSocket<L>>(*socket)
                 .map_err(Self::Error::from)?;
 
             if matches!(tcp.state(), TcpState::Created) {
@@ -102,9 +101,7 @@ where
     /// Check if this socket is still connected
     fn is_connected(&mut self, socket: &Self::TcpSocket) -> Result<bool, Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
-            Ok(sockets
-                .get::<TcpSocket<TIMER_HZ, L>>(*socket)?
-                .is_connected())
+            Ok(sockets.get::<TcpSocket<L>>(*socket)?.is_connected())
         } else {
             Err(Error::Illegal)
         }
@@ -164,7 +161,7 @@ where
     ) -> nb::Result<usize, Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
             let mut tcp = sockets
-                .get::<TcpSocket<TIMER_HZ, L>>(*socket)
+                .get::<TcpSocket<L>>(*socket)
                 .map_err(Self::Error::from)?;
 
             Ok(tcp.recv_slice(buffer).map_err(Self::Error::from)?)
