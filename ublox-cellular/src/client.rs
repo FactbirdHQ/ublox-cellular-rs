@@ -46,7 +46,7 @@ use psn::{
     SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
 };
 
-pub(crate) const URC_CAPACITY: usize = 1 + 3;
+pub(crate) const URC_CAPACITY: usize = 3;
 pub(crate) const URC_SUBSCRIBERS: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -201,7 +201,10 @@ where
         self.power_on()?;
 
         // At this point, if is_alive fails, the configured Baud rate is probably wrong
-        self.is_alive(10).map_err(|_| Error::BaudDetection)?;
+        if let Err(e) = self.is_alive(5).map_err(|_| Error::BaudDetection) {
+            self.hard_reset()?;
+            return Err(e);
+        }
 
         // Extended errors on
         self.network.send_internal(
