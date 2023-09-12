@@ -1,9 +1,9 @@
-use atat::{blocking::AtatClient, AtatResp};
-use embedded_hal::digital::{InputPin, OutputPin};
-use fugit::ExtU32;
+use atat::{blocking::AtatClient, AtatUrcChannel};
+use embassy_time::Duration;
 use ublox_sockets::SocketSet;
 
 use crate::{
+    blocking_timer::BlockingTimer,
     command::device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
     command::{
         control::{
@@ -26,17 +26,19 @@ use crate::{
             SetGpioConfiguration,
         },
         network_service::{
-            responses::{OperatorSelection, SignalQuality}, types::OperatorSelectionMode, GetOperatorSelection,
-            SetOperatorSelection , GetSignalQuality,
+            responses::{OperatorSelection, SignalQuality},
+            types::OperatorSelectionMode,
+            GetOperatorSelection, GetSignalQuality, SetOperatorSelection,
         },
         psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
     },
-    config::Config,
-    error::{from_clock, Error, GenericError},
+    config::CellularConfig,
+    error::{Error, GenericError},
     network::{AtTx, Network},
     power::PowerState,
     registration::ConnectionState,
     services::data::ContextState,
+    UbloxCellularBuffers, UbloxCellularIngress, UbloxCellularUrcChannel,
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
 use network_service::{types::NetworkRegistrationUrcConfig, SetNetworkRegistrationStatus};
@@ -44,6 +46,9 @@ use psn::{
     types::{EPSNetworkRegistrationUrcConfig, GPRSNetworkRegistrationUrcConfig},
     SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
 };
+
+pub(crate) const URC_CAPACITY: usize = 3;
+pub(crate) const URC_SUBSCRIBERS: usize = 1;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -56,122 +61,83 @@ pub enum State {
     FullyInitialized,
 }
 
-pub struct Device<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>
-where
-    C: AtatClient,
-    CLK: 'static + fugit_timer::Timer<TIMER_HZ>,
-    RST: OutputPin,
-    PWR: OutputPin,
-    DTR: OutputPin,
-    VINT: InputPin,
-{
-    pub(crate) config: Config<RST, DTR, PWR, VINT>,
-    pub(crate) network: Network<C, CLK, TIMER_HZ>,
+pub struct Device<'buf, 'sub, AtCl, AtUrcCh, Config, const N: usize, const L: usize> {
+    pub(crate) config: Config,
+    pub(crate) network: Network<'sub, AtCl>,
+    urc_channel: &'buf AtUrcCh,
 
     pub(crate) state: State,
     pub(crate) power_state: PowerState,
     // Ublox devices can hold a maximum of 6 active sockets
-    pub(crate) sockets: Option<&'static mut SocketSet<TIMER_HZ, N, L>>,
+    pub(crate) sockets: Option<&'static mut SocketSet<N, L>>,
 }
 
-impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize> Drop
-    for Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
+impl<'buf, 'sub, W, Config, const INGRESS_BUF_SIZE: usize, const N: usize, const L: usize>
+    Device<
+        'buf,
+        'sub,
+        atat::blocking::Client<'buf, W, INGRESS_BUF_SIZE>,
+        UbloxCellularUrcChannel,
+        Config,
+        N,
+        L,
+    >
 where
-    C: AtatClient,
-    CLK: fugit_timer::Timer<TIMER_HZ>,
-    RST: OutputPin,
-    PWR: OutputPin,
-    DTR: OutputPin,
-    VINT: InputPin,
-{
-    fn drop(&mut self) {
-        if self.state != State::Off {
-            self.state = State::Off;
-            self.hard_power_off().ok();
-        }
-    }
-}
-
-impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>
-    Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
-where
-    C: AtatClient,
-    CLK: fugit_timer::Timer<TIMER_HZ>,
-    RST: OutputPin,
-    PWR: OutputPin,
-    DTR: OutputPin,
-    VINT: InputPin,
+    'buf: 'sub,
+    W: embedded_io::Write,
+    Config: CellularConfig,
 {
     /// Create new u-blox device
     ///
     /// Look for [`data_service`](Device::data_service) how to handle data connection automatically.
     ///
-    /// # Examples
-    ///
-    /// ```ignore
-    /// use bbqueue::BBBuffer;
-    /// use ublox_cellular::prelude::*;
-    /// use ublox_cellular::atat;
-    /// use ublox_cellular::{Config, GsmClient};
-    ///
-    /// const RX_BUF_LEN: usize = 256;
-    /// const RES_CAPACITY: usize = 256;
-    /// const URC_CAPACITY: usize = 256;
-    /// const MAX_SOCKET_COUNT: usize = 1;
-    /// static mut RES_QUEUE: BBBuffer<RES_CAPACITY> = BBBuffer::new();
-    /// static mut URC_QUEUE: BBBuffer<URC_CAPACITY> = BBBuffer::new();
-    ///
-    /// type UbloxResetPin = gpio::Gpio26<gpio::Output>;
-    ///
-    /// let queues = atat::Queues {
-    ///     res_queue: unsafe { RES_QUEUE.try_split_framed().unwrap() },
-    ///     urc_queue: unsafe { URC_QUEUE.try_split_framed().unwrap() },
-    /// };
-    ///
-    /// let (atat_client, mut ingress) =
-    ///     atat::ClientBuilder::<_, _, _, TIMER_HZ, RX_BUF_LEN, RES_CAPACITY, URC_CAPACITY>::new(
-    ///         tx,
-    ///         timer::SysTimer::new(),
-    ///         atat::AtDigester::<Urc>::new(),
-    ///         atat::Config::new(atat::Mode::Timeout),
-    ///     )
-    ///     .build(queues);
-    ///
-    ///
-    /// let mut modem = GsmClient::<
-    ///     _,
-    ///     _,
-    ///     UbloxResetPin,
-    ///     gpio::Gpio0<gpio::Output>,
-    ///     gpio::Gpio0<gpio::Output>,
-    ///     gpio::Gpio0<gpio::Input>,
-    ///     TIMER_HZ,
-    ///     MAX_SOCKET_COUNT,
-    ///     SOCKET_RING_BUFFER_LEN,
-    /// >::new(
-    ///     atat_client,
-    ///     timer::SysTimer::new(),
-    ///     Config::new("").with_flow_control().with_rst(reset),
-    /// );
-    /// ```
-    pub fn new(client: C, timer: CLK, config: Config<RST, DTR, PWR, VINT>) -> Self {
-        let mut device = Self {
+    pub fn from_buffers(
+        buffers: &'buf UbloxCellularBuffers<INGRESS_BUF_SIZE>,
+        tx: W,
+        config: Config,
+    ) -> (UbloxCellularIngress<INGRESS_BUF_SIZE>, Self) {
+        let (ingress, client) = buffers.split_blocking(
+            tx,
+            atat::DefaultDigester::<Urc>::default(),
+            atat::Config::default(),
+        );
+
+        (ingress, Device::new(client, &buffers.urc_channel, config))
+    }
+}
+
+impl<'buf, 'sub, AtCl, AtUrcCh, Config, const N: usize, const L: usize>
+    Device<'buf, 'sub, AtCl, AtUrcCh, Config, N, L>
+where
+    'buf: 'sub,
+    AtCl: AtatClient,
+    AtUrcCh: AtatUrcChannel<Urc, URC_CAPACITY, URC_SUBSCRIBERS>,
+    Config: CellularConfig,
+{
+    pub fn new(client: AtCl, urc_channel: &'buf AtUrcCh, config: Config) -> Self {
+        let urc_subscription = urc_channel.subscribe().unwrap();
+        Self {
             config,
+            network: Network::new(AtTx::new(client, urc_subscription)),
             state: State::Off,
             power_state: PowerState::Off,
-            network: Network::new(AtTx::new(client, 10), timer),
             sockets: None,
-        };
-
-        device.power_state = device.power_state().unwrap_or(PowerState::Off);
-        device
+            urc_channel,
+        }
     }
+}
 
-    pub fn signal_strength(&mut self) -> Result<SignalQuality, Error>
-    {
-        self.send_at(&GetSignalQuality)
-    }
+pub fn signal_strength(&mut self) -> Result<SignalQuality, Error> {
+    self.send_at(&GetSignalQuality)
+}
 
+impl<'buf, 'sub, AtCl, AtUrcCh, Config, const N: usize, const L: usize>
+    Device<'buf, 'sub, AtCl, AtUrcCh, Config, N, L>
+where
+    'buf: 'sub,
+    AtCl: AtatClient,
+    Config: CellularConfig,
+{
     /// Set storage for TCP/UDP sockets
     ///
     /// # Examples
@@ -179,11 +145,10 @@ where
     /// ```ignore
     /// use ublox_cellular::sockets::SocketSet;
     ///
-    /// const TIMER_HZ: u32 = 1000;
     /// const MAX_SOCKET_COUNT: usize = 1;
     /// const SOCKET_RING_BUFFER_LEN: usize = 1024;
     ///
-    /// static mut SOCKET_SET: Option<SocketSet<TIMER_HZ, MAX_SOCKET_COUNT, SOCKET_RING_BUFFER_LEN>> = None;
+    /// static mut SOCKET_SET: Option<SocketSet<MAX_SOCKET_COUNT, SOCKET_RING_BUFFER_LEN>> = None;
     ///
     /// unsafe {
     ///     SOCKET_SET = Some(SocketSet::new());
@@ -191,12 +156,12 @@ where
     ///
     /// modem.set_socket_storage(unsafe { SOCKET_SET.as_mut().unwrap() });
     /// ```
-    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<TIMER_HZ, N, L>) {
+    pub fn set_socket_storage(&mut self, socket_set: &'static mut SocketSet<N, L>) {
         socket_set.prune();
         self.sockets.replace(socket_set);
     }
 
-    pub fn take_socket_storage(&mut self) -> Option<&'static mut SocketSet<TIMER_HZ, N, L>> {
+    pub fn take_socket_storage(&mut self) -> Option<&'static mut SocketSet<N, L>> {
         self.sockets.take()
     }
 
@@ -238,35 +203,13 @@ where
 
         self.clear_buffers()?;
 
-        if self.config.baud_rate > 230_400_u32 {
-            // Needs a way to reconfigure uart baud rate temporarily
-            // Relevant issue: https://github.com/rust-embedded/embedded-hal/issues/79
-            return Err(Error::_Unknown);
-
-            // self.network.send_internal(
-            //     &SetDataRate {
-            //         rate: BaudRate::B115200,
-            //     },
-            //     true,
-            // )?;
-
-            // NOTE: On the UART AT interface, after the reception of the "OK" result code for the +IPR command, the DTE
-            // shall wait for at least 100 ms before issuing a new AT command; this is to guarantee a proper baud rate
-            // reconfiguration.
-
-            // UART end
-            // delay(100);
-            // UART begin(self.config.baud_rate)
-
-            // self.is_alive()?;
-        } else {
-            // Make sure AT commands parser is in clean state.
-            // self.network.at_tx.reset()?;
-            self.power_on()?;
-        }
+        self.power_on()?;
 
         // At this point, if is_alive fails, the configured Baud rate is probably wrong
-        self.is_alive(10).map_err(|_| Error::BaudDetection)?;
+        if let Err(e) = self.is_alive(5).map_err(|_| Error::BaudDetection) {
+            self.hard_reset()?;
+            return Err(e);
+        }
 
         // Extended errors on
         self.network.send_internal(
@@ -334,7 +277,7 @@ where
             false,
         )?;
 
-        if self.config.hex_mode {
+        if Config::HEX_MODE {
             self.network.send_internal(
                 &SetHexMode {
                     hex_mode_disable: HexMode::Enabled,
@@ -352,7 +295,7 @@ where
 
         // Tell module whether we support flow control
         // FIXME: Use AT+IFC=2,2 instead of AT&K here
-        if self.config.flow_control {
+        if Config::FLOW_CONTROL {
             self.network.send_internal(
                 &SetFlowControl {
                     value: FlowControl::RtsCts,
@@ -413,12 +356,7 @@ where
                 _ => {}
             }
 
-            self.network
-                .status
-                .timer
-                .start(1.secs())
-                .map_err(from_clock)?;
-            nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
+            BlockingTimer::after(Duration::from_secs(1)).wait();
         }
 
         // There was an error initializing the SIM
@@ -536,14 +474,6 @@ where
             sockets.prune();
         }
 
-        // Allow ATAT some time to clear the buffers
-        self.network
-            .status
-            .timer
-            .start(300.millis())
-            .map_err(from_clock)?;
-        nb::block!(self.network.status.timer.wait()).map_err(from_clock)?;
-
         Ok(())
     }
 
@@ -564,6 +494,9 @@ where
         {
             warn!("Packet domain event reporting set failed");
         }
+
+        // FIXME: Currently `atat` is unable to distinguish `xREG` family of
+        // commands from URC's
 
         // CREG URC
         self.network.send_internal(
@@ -594,7 +527,6 @@ where
 
     fn handle_urc_internal(&mut self) -> Result<(), Error> {
         if let Some(ref mut sockets) = self.sockets.as_deref_mut() {
-            let ts = self.network.status.timer.now();
             self.network
                 .at_tx
                 .handle_urc(|urc| {
@@ -604,7 +536,7 @@ where
                             if let Some((_, mut sock)) =
                                 sockets.iter_mut().find(|(handle, _)| *handle == socket)
                             {
-                                sock.closed_by_remote(ts);
+                                sock.closed_by_remote();
                             }
                         }
                         Urc::SocketDataAvailable(
@@ -650,97 +582,5 @@ where
 
     pub fn handle_urc<F: FnOnce(Urc) -> bool>(&mut self, f: F) -> Result<(), Error> {
         self.network.at_tx.handle_urc(f).map_err(Error::Network)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use ublox_sockets::{SocketHandle, TcpSocket, UdpSocket};
-
-    use super::*;
-    use crate::test_helpers::{MockAtClient, MockTimer};
-    use crate::{config::Config, services::data::ContextState, APNInfo};
-
-    const SOCKET_SIZE: usize = 128;
-    const SOCKET_SET_LEN: usize = 2;
-    const TIMER_HZ: u32 = 1000;
-
-    static mut SOCKET_SET: Option<SocketSet<TIMER_HZ, SOCKET_SET_LEN, SOCKET_SIZE>> = None;
-
-    #[test]
-    #[ignore]
-    fn prune_on_initialize() {
-        let client = MockAtClient::new(0);
-        let timer = MockTimer::new(None);
-        let config = Config::default();
-
-        let socket_set: &'static mut _ = unsafe {
-            SOCKET_SET = Some(SocketSet::new());
-            SOCKET_SET.as_mut().unwrap_or_else(|| {
-                panic!("Failed to get the static com_queue");
-            })
-        };
-
-        let mut device = Device::<_, _, _, _, _, _, TIMER_HZ, SOCKET_SET_LEN, SOCKET_SIZE>::new(
-            client, timer, config,
-        );
-        device.set_socket_storage(socket_set);
-
-        // device.fsm.set_state(State::Connected);
-        // assert_eq!(device.fsm.get_state(), State::Connected);
-        device.state = State::FullyInitialized;
-        device.power_state = PowerState::On;
-        // assert_eq!(device.spin(), Ok(()));
-
-        device.network.context_state = ContextState::Active;
-
-        let mut data_service = device.data_service(&APNInfo::default()).unwrap();
-
-        if let Some(ref mut sockets) = data_service.sockets {
-            sockets
-                .add(TcpSocket::new(0))
-                .expect("Failed to add new tcp socket!");
-            assert_eq!(sockets.len(), 1);
-
-            let mut tcp = sockets
-                .get::<TcpSocket<TIMER_HZ, SOCKET_SIZE>>(SocketHandle(0))
-                .expect("Failed to get socket");
-
-            assert_eq!(tcp.rx_window(), SOCKET_SIZE);
-            let socket_data = b"This is socket data!!";
-            tcp.rx_enqueue_slice(socket_data);
-            assert_eq!(tcp.recv_queue(), socket_data.len());
-            assert_eq!(tcp.rx_window(), SOCKET_SIZE - socket_data.len());
-
-            sockets
-                .add(UdpSocket::new(1))
-                .expect("Failed to add new udp socket!");
-            assert_eq!(sockets.len(), 2);
-
-            assert!(sockets.add(UdpSocket::new(0)).is_err());
-        } else {
-            panic!()
-        }
-
-        drop(data_service);
-
-        device.clear_buffers().expect("Failed to clear buffers");
-
-        let mut data_service = device.data_service(&APNInfo::default()).unwrap();
-        if let Some(ref mut sockets) = data_service.sockets {
-            assert_eq!(sockets.len(), 0);
-
-            sockets
-                .add(TcpSocket::new(0))
-                .expect("Failed to add new tcp socket!");
-            assert_eq!(sockets.len(), 1);
-
-            let tcp = sockets
-                .get::<TcpSocket<TIMER_HZ, SOCKET_SIZE>>(SocketHandle(0))
-                .expect("Failed to get socket");
-            assert_eq!(tcp.recv_queue(), 0);
-        } else {
-            panic!()
-        }
     }
 }

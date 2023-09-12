@@ -1,0 +1,56 @@
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+name: CI
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Build & Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+      - uses: dsherret/rust-toolchain-file@v1
+      - name: Build
+        uses: actions-rs/cargo@v1
+        with:
+          command: build
+          args: --all --features "defmt-impl,lara-r6" --target thumbv7em-none-eabihf
+
+      - name: Test
+        uses: actions-rs/cargo@v1
+        with:
+          command: test
+          args: --lib --features "log,lara-r6"
+        env: 
+          DEFMT_LOG: off
+
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+      - uses: dsherret/rust-toolchain-file@v1
+      - name: Rustfmt
+        run: cargo fmt -- --check
+
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v3
+      - uses: dsherret/rust-toolchain-file@v1
+      - name: Run clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          args: --features "lara-r6" -- ${{ env.CLIPPY_PARAMS }}

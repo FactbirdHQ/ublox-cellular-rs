@@ -4,14 +4,14 @@ use crate::command::ip_transport_layer::{
     types::SocketProtocol, CloseSocket, CreateSocket, PrepareUDPSendToDataBinary,
     UDPSendToDataBinary,
 };
+use atat::blocking::AtatClient;
 use embedded_nal::{SocketAddr, UdpClientStack};
 use ublox_sockets::{Error, SocketHandle, UdpSocket};
 
-impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize> UdpClientStack
-    for DataService<'a, C, CLK, TIMER_HZ, N, L>
+impl<'a, 'sub, AtCl, const N: usize, const L: usize> UdpClientStack
+    for DataService<'a, 'sub, AtCl, N, L>
 where
-    C: atat::blocking::AtatClient,
-    CLK: fugit_timer::Timer<TIMER_HZ>,
+    AtCl: AtatClient,
 {
     type Error = Error;
 
@@ -24,10 +24,9 @@ where
     fn socket(&mut self) -> Result<Self::UdpSocket, Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
             if sockets.len() >= sockets.capacity() {
-                let ts = self.network.status.timer.now();
                 // Check if there are any sockets closed by remote, and close it
                 // if it has exceeded its timeout, in order to recycle it.
-                if sockets.recycle(ts) {
+                if !sockets.recycle() {
                     return Err(Error::SocketSetFull);
                 }
             }
@@ -56,7 +55,7 @@ where
     ) -> Result<(), Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
             let mut udp = sockets
-                .get::<UdpSocket<TIMER_HZ, L>>(*socket)
+                .get::<UdpSocket<L>>(*socket)
                 .map_err(Self::Error::from)?;
             udp.bind(remote).map_err(Self::Error::from)?;
             Ok(())
@@ -69,7 +68,7 @@ where
     fn send(&mut self, socket: &mut Self::UdpSocket, buffer: &[u8]) -> nb::Result<(), Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
             let udp = sockets
-                .get::<UdpSocket<TIMER_HZ, L>>(*socket)
+                .get::<UdpSocket<L>>(*socket)
                 .map_err(Self::Error::from)?;
 
             if !udp.is_open() {
@@ -125,7 +124,7 @@ where
     ) -> nb::Result<(usize, SocketAddr), Self::Error> {
         if let Some(ref mut sockets) = self.sockets {
             let mut udp = sockets
-                .get::<UdpSocket<TIMER_HZ, L>>(*socket)
+                .get::<UdpSocket<L>>(*socket)
                 .map_err(Self::Error::from)?;
 
             let bytes = udp.recv_slice(buffer).map_err(Self::Error::from)?;

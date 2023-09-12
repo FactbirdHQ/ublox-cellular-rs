@@ -1,4 +1,5 @@
 use crate::{
+    client::{URC_CAPACITY, URC_SUBSCRIBERS},
     command::{
         general::GetCIMI,
         mobile_control::{
@@ -15,17 +16,17 @@ use crate::{
         Urc, AT,
     },
     error::GenericError,
-    registration::{self, ConnectionState, RegistrationParams, RegistrationState},
+    registration::{self, ConnectionState, RegistrationState},
     services::data::{ContextState, PROFILE_ID},
 };
-use atat::{atat_derive::AtatLen, blocking::AtatClient};
-use fugit::{ExtU32, MinutesDurationU32, SecsDurationU32};
+use atat::{atat_derive::AtatLen, blocking::AtatClient, UrcSubscription};
+use embassy_time::{Duration, Instant};
 use hash32_derive::Hash32;
 use serde::{Deserialize, Serialize};
 
-const REGISTRATION_CHECK_INTERVAL: SecsDurationU32 = SecsDurationU32::secs(15);
-const REGISTRATION_TIMEOUT: MinutesDurationU32 = MinutesDurationU32::minutes(3);
-const CHECK_IMSI_TIMEOUT: MinutesDurationU32 = MinutesDurationU32::minutes(1);
+const REGISTRATION_CHECK_INTERVAL: Duration = Duration::from_secs(15);
+const REGISTRATION_TIMEOUT: Duration = Duration::from_secs(3 * 60);
+const CHECK_IMSI_TIMEOUT: Duration = Duration::from_secs(60);
 
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -46,19 +47,20 @@ pub struct ProfileId(pub u8);
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ContextId(pub u8);
 
-pub struct AtTx<C> {
-    urc_attempts: u8,
-    max_urc_attempts: u8,
+pub struct AtTx<'sub, AtCl> {
     consecutive_timeouts: u8,
-    client: C,
+    urc_subscription: UrcSubscription<'sub, Urc, URC_CAPACITY, URC_SUBSCRIBERS>,
+    client: AtCl,
 }
 
-impl<C: AtatClient> AtTx<C> {
-    pub fn new(client: C, max_urc_attempts: u8) -> Self {
+impl<'sub, AtCl: AtatClient> AtTx<'sub, AtCl> {
+    pub fn new(
+        client: AtCl,
+        urc_subscription: UrcSubscription<'sub, Urc, URC_CAPACITY, URC_SUBSCRIBERS>,
+    ) -> Self {
         Self {
-            urc_attempts: 0,
             consecutive_timeouts: 0,
-            max_urc_attempts,
+            urc_subscription,
             client,
         }
     }
@@ -74,7 +76,8 @@ impl<C: AtatClient> AtTx<C> {
             .send_retry(req)
             .map_err(|e| match e {
                 atat::Error::Timeout => {
-                    self.consecutive_timeouts += A::ATTEMPTS;
+                    self.consecutive_timeouts =
+                        self.consecutive_timeouts.saturating_add(A::ATTEMPTS);
                     Error::AT(atat::Error::Timeout)
                 }
                 atat::Error::Read => Error::AT(atat::Error::Read),
@@ -98,7 +101,8 @@ impl<C: AtatClient> AtTx<C> {
             .send_retry(req)
             .map_err(|e| match e {
                 atat::Error::Timeout => {
-                    self.consecutive_timeouts += A::ATTEMPTS;
+                    self.consecutive_timeouts =
+                        self.consecutive_timeouts.saturating_add(A::ATTEMPTS);
                     Error::AT(atat::Error::Timeout)
                 }
                 atat::Error::Read => Error::AT(atat::Error::Read),
@@ -115,41 +119,26 @@ impl<C: AtatClient> AtTx<C> {
     }
 
     pub fn handle_urc<F: FnOnce(Urc) -> bool>(&mut self, f: F) -> Result<(), Error> {
-        let mut a = self.urc_attempts;
-        let max = self.max_urc_attempts;
-
-        self.client.try_read_urc_with::<Urc, _>(|urc, _| {
-            if !f(urc) && a < max {
-                a += 1;
-                return false;
-                // } else {
-                // warn!("Dropping stale URC! {}", Debug2Format(&urc));
-            }
-            a = 0;
-            true
-        });
-        self.urc_attempts = a;
+        if let Some(urc) = self.urc_subscription.try_next_message_pure() {
+            f(urc);
+        }
         Ok(())
     }
 }
 
-pub struct Network<C, CLK, const TIMER_HZ: u32>
-where
-    CLK: fugit_timer::Timer<TIMER_HZ>,
-{
-    pub(crate) status: RegistrationState<CLK, TIMER_HZ>,
+pub struct Network<'sub, AtCl> {
+    pub(crate) status: RegistrationState,
     pub(crate) context_state: ContextState,
-    pub(crate) at_tx: AtTx<C>,
+    pub(crate) at_tx: AtTx<'sub, AtCl>,
 }
 
-impl<C, CLK, const TIMER_HZ: u32> Network<C, CLK, TIMER_HZ>
+impl<'sub, AtCl> Network<'sub, AtCl>
 where
-    C: AtatClient,
-    CLK: fugit_timer::Timer<TIMER_HZ>,
+    AtCl: AtatClient,
 {
-    pub(crate) fn new(at_tx: AtTx<C>, timer: CLK) -> Self {
+    pub(crate) fn new(at_tx: AtTx<'sub, AtCl>) -> Self {
         Self {
-            status: RegistrationState::new(timer),
+            status: RegistrationState::new(),
             context_state: ContextState::Setup,
             at_tx,
         }
@@ -160,9 +149,7 @@ where
     }
 
     pub fn reset_reg_time(&mut self) -> Result<(), Error> {
-        let now = self.status.timer.now();
-
-        self.status.reg_start_time.replace(now);
+        self.status.reg_start_time.replace(Instant::now());
         self.status.reg_check_time = self.status.reg_start_time;
         Ok(())
     }
@@ -179,7 +166,7 @@ where
         self.intervene_registration()?;
         self.check_running_imsi().ok(); // Ignore errors
 
-        let now = self.status.timer.now();
+        let now = Instant::now();
         let should_check = self
             .status
             .reg_check_time
@@ -197,7 +184,7 @@ where
 
         self.update_registration()?;
 
-        let now = self.status.timer.now();
+        let now = Instant::now();
         let is_timeout = self
             .status
             .reg_start_time
@@ -219,7 +206,7 @@ where
         // Check current IMSI if registered successfully in which case
         // imsi_check_time will be `None`, else if not registered, check after
         // CHECK_IMSI_TIMEOUT is expired
-        let now = self.status.timer.now();
+        let now = Instant::now();
         let check_imsi = self
             .status
             .imsi_check_time
@@ -275,10 +262,10 @@ where
             return Ok(());
         }
 
-        let now = self.status.timer.now();
+        let now = Instant::now();
 
         // If EPS has been sticky for longer than `timeout`
-        let timeout: SecsDurationU32 = (self.status.registration_interventions * 15).secs();
+        let timeout = Duration::from_secs(self.status.registration_interventions as u64 * 15);
         if self.status.eps.sticky() && self.status.eps.duration(now) >= timeout {
             // If (EPS + CSD) is not attempting registration
             if self.status.eps.get_status() == registration::Status::NotRegistering
@@ -292,7 +279,8 @@ where
                 self.status.csd.reset();
                 self.status.psd.reset();
                 self.status.eps.reset();
-                self.status.registration_interventions += 1;
+                self.status.registration_interventions =
+                    self.status.registration_interventions.saturating_add(1);
 
                 self.send_internal(
                     &SetOperatorSelection {
@@ -315,7 +303,8 @@ where
                 self.status.csd.reset();
                 self.status.psd.reset();
                 self.status.eps.reset();
-                self.status.registration_interventions += 1;
+                self.status.registration_interventions =
+                    self.status.registration_interventions.saturating_add(1);
                 self.send_internal(
                     &SetModuleFunctionality {
                         fun: Functionality::Minimum,
@@ -355,7 +344,8 @@ where
             self.status.csd.reset();
             self.status.psd.reset();
             self.status.eps.reset();
-            self.status.registration_interventions += 1;
+            self.status.registration_interventions =
+                self.status.registration_interventions.saturating_add(1);
             self.send_internal(
                 &SetModuleFunctionality {
                     fun: Functionality::Minimum,
@@ -390,7 +380,8 @@ where
                 self.status.psd.duration(now)
             );
             self.status.psd.reset();
-            self.status.registration_interventions += 1;
+            self.status.registration_interventions =
+                self.status.registration_interventions.saturating_add(1);
             self.send_internal(&GetPDPContextState, true)?;
 
             if self
@@ -421,20 +412,18 @@ where
     }
 
     pub fn update_registration(&mut self) -> Result<(), Error> {
-        let ts = self.status.timer.now();
-
         self.send_internal(&GetExtendedErrorReport, false).ok();
 
         if let Ok(reg) = self.send_internal(&GetNetworkRegistrationStatus, false) {
-            self.status.compare_and_set(reg.into(), ts);
+            self.status.compare_and_set(reg.into());
         }
 
         if let Ok(reg) = self.send_internal(&GetGPRSNetworkRegistrationStatus, false) {
-            self.status.compare_and_set(reg.into(), ts);
+            self.status.compare_and_set(reg.into());
         }
 
         if let Ok(reg) = self.send_internal(&GetEPSNetworkRegistrationStatus, false) {
-            self.status.compare_and_set(reg.into(), ts);
+            self.status.compare_and_set(reg.into());
         }
 
         Ok(())
@@ -443,7 +432,7 @@ where
     pub(crate) fn handle_urc(&mut self) -> Result<(), Error> {
         // TODO: How to do this cleaner?
         let mut ctx_state = self.context_state;
-        let mut new_reg_params: Option<RegistrationParams> = None;
+        // let mut new_reg_params: Option<RegistrationParams> = None;
 
         self.at_tx.handle_urc(|urc| {
             match urc {
@@ -470,6 +459,9 @@ where
                 }) => {
                     info!("[URC] ExtendedPSNetworkRegistration {:?}", state);
                 }
+                // FIXME: Currently `atat` is unable to distinguish `xREG` family of
+                // commands from URC's
+
                 // Urc::GPRSNetworkRegistration(reg_params) => {
                 //     new_reg_params.replace(reg_params.into());
                 // }
@@ -506,10 +498,9 @@ where
             true
         })?;
 
-        if let Some(reg_params) = new_reg_params {
-            let ts = self.status.timer.now();
-            self.status.compare_and_set(reg_params, ts)
-        }
+        // if let Some(reg_params) = new_reg_params {
+        //     self.status.compare_and_set(reg_params)
+        // }
 
         self.context_state = ctx_state;
         Ok(())
@@ -530,171 +521,5 @@ where
         }
 
         self.at_tx.send(req)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{
-        registration::Status,
-        test_helpers::{MockAtClient, MockTimer},
-    };
-    use fugit::{MillisDurationU32, TimerInstantU32};
-    use fugit_timer::Timer;
-
-    const TIMER_HZ: u32 = 1000;
-
-    #[test]
-    #[ignore]
-    fn intervene_registration() {
-        // Setup
-        let tx = AtTx::new(MockAtClient::new(0), 5);
-        let timer: MockTimer<TIMER_HZ> = MockTimer::new(Some(TimerInstantU32::from_ticks(25_234)));
-        let mut network = Network::new(tx, timer);
-        network.status.conn_state = ConnectionState::Connecting;
-        // Update both started & updated
-        network
-            .status
-            .eps
-            .set_status(Status::NotRegistering, TimerInstantU32::from_ticks(1234));
-        // Update only updated
-        network
-            .status
-            .eps
-            .set_status(Status::NotRegistering, TimerInstantU32::from_ticks(1534));
-        network
-            .status
-            .csd
-            .set_status(Status::NotRegistering, TimerInstantU32::from_ticks(1534));
-
-        assert_eq!(
-            network.status.eps.updated(),
-            Some(TimerInstantU32::from_ticks(1534))
-        );
-        assert_eq!(
-            network.status.eps.started(),
-            Some(TimerInstantU32::from_ticks(1234))
-        );
-        assert!(network.status.eps.sticky());
-
-        let ts = network.status.timer.now();
-        assert_eq!(
-            network.status.eps.duration(ts),
-            MillisDurationU32::millis(24_000)
-        );
-
-        assert!(network.intervene_registration().is_ok());
-
-        assert_eq!(network.status.registration_interventions, 2);
-    }
-
-    #[test]
-    fn reset_reg_time() {
-        let tx = AtTx::new(MockAtClient::new(0), 5);
-        let timer: MockTimer<TIMER_HZ> = MockTimer::new(Some(TimerInstantU32::from_ticks(1234)));
-        let mut network = Network::new(tx, timer);
-
-        assert!(network.reset_reg_time().is_ok());
-
-        assert_eq!(
-            network.status.reg_start_time,
-            Some(TimerInstantU32::from_ticks(1234))
-        );
-        assert_eq!(
-            network.status.reg_check_time,
-            Some(TimerInstantU32::from_ticks(1234))
-        );
-    }
-
-    #[test]
-    fn check_registration_state() {
-        let tx = AtTx::new(MockAtClient::new(0), 5);
-        let timer: MockTimer<TIMER_HZ> = MockTimer::new(Some(TimerInstantU32::from_ticks(1234)));
-        let mut network = Network::new(tx, timer);
-
-        // Check that `ConnectionState` will change from `Connected` to `Connecting`
-        // with a state reset, if neither (csd + psd) || eps is actually registered
-        network.status.conn_state = ConnectionState::Connected;
-        network.status.registration_interventions = 3;
-        network
-            .status
-            .csd
-            .set_status(Status::Denied, TimerInstantU32::from_ticks(1));
-        network
-            .status
-            .eps
-            .set_status(Status::NotRegistering, TimerInstantU32::from_ticks(5));
-
-        network.check_registration_state();
-
-        assert_eq!(network.status.conn_state, ConnectionState::Connecting);
-        assert_eq!(
-            network.status.reg_start_time,
-            Some(TimerInstantU32::from_ticks(1234))
-        );
-        assert_eq!(
-            network.status.reg_check_time,
-            Some(TimerInstantU32::from_ticks(1234))
-        );
-        assert_eq!(network.status.csd.get_status(), Status::None);
-        assert_eq!(network.status.csd.updated(), None);
-        assert_eq!(network.status.csd.started(), None);
-        assert_eq!(network.status.psd.get_status(), Status::None);
-        assert_eq!(network.status.psd.updated(), None);
-        assert_eq!(network.status.psd.started(), None);
-        assert_eq!(network.status.eps.get_status(), Status::None);
-        assert_eq!(network.status.eps.updated(), None);
-        assert_eq!(network.status.eps.started(), None);
-
-        // Check that `ConnectionState` will change from `Connecting` to `Connected`
-        // if eps is actually registered
-        network
-            .status
-            .eps
-            .set_status(Status::Roaming, TimerInstantU32::from_ticks(5));
-
-        network.check_registration_state();
-
-        assert_eq!(network.status.conn_state, ConnectionState::Connected);
-
-        // Check that `ConnectionState` will change from `Connecting` to `Connected`
-        // if (csd + psd) is actually registered
-        network.status.conn_state = ConnectionState::Connecting;
-        network.status.reset();
-        network
-            .status
-            .eps
-            .set_status(Status::Denied, TimerInstantU32::from_ticks(5));
-        network
-            .status
-            .csd
-            .set_status(Status::Roaming, TimerInstantU32::from_ticks(5));
-        network
-            .status
-            .psd
-            .set_status(Status::Home, TimerInstantU32::from_ticks(5));
-
-        network.check_registration_state();
-
-        assert_eq!(network.status.conn_state, ConnectionState::Connected);
-    }
-
-    #[test]
-    fn unhandled_urcs() {
-        let mut tx = AtTx::new(MockAtClient::new(0), 5);
-
-        tx.handle_urc(|_| false).unwrap();
-        assert_eq!(tx.client.n_urcs_dequeued, 0);
-        tx.handle_urc(|_| false).unwrap();
-        tx.handle_urc(|_| false).unwrap();
-        tx.handle_urc(|_| false).unwrap();
-        tx.handle_urc(|_| false).unwrap();
-        tx.handle_urc(|_| false).unwrap();
-        assert_eq!(tx.client.n_urcs_dequeued, 1);
-        tx.handle_urc(|_| false).unwrap();
-        tx.handle_urc(|_| true).unwrap();
-        tx.handle_urc(|_| false).unwrap();
-        assert_eq!(tx.client.n_urcs_dequeued, 2);
     }
 }

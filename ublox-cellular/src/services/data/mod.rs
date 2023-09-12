@@ -12,6 +12,7 @@ mod udp_stack;
 mod hex;
 
 use crate::{
+    blocking_timer::BlockingTimer,
     client::Device,
     command::mobile_control::types::{Functionality, ResetMode},
     command::mobile_control::SetModuleFunctionality,
@@ -26,15 +27,14 @@ use crate::{
         },
         psn::{self, responses::GPRSAttached, GetPDPContextState},
     },
+    config::CellularConfig,
     error::Error as DeviceError,
-    error::GenericError,
     network::{ContextId, Network},
     ProfileId,
 };
 use apn::{APNInfo, Apn};
 use atat::blocking::AtatClient;
-use embedded_hal::digital::{InputPin, OutputPin};
-use fugit::ExtU32;
+use embassy_time::Duration;
 
 pub use error::Error;
 use psn::{types::GPRSAttachedState, GetGPRSAttached};
@@ -53,15 +53,12 @@ pub const PROFILE_ID: ProfileId = ProfileId(1);
 #[cfg(not(feature = "upsd-context-activation"))]
 const CONTEXT_ID: ContextId = ContextId(1);
 
-impl<C, CLK, RST, DTR, PWR, VINT, const TIMER_HZ: u32, const N: usize, const L: usize>
-    Device<C, CLK, RST, DTR, PWR, VINT, TIMER_HZ, N, L>
+impl<'buf, 'sub, AtCl, AtUrcCh, Config, const N: usize, const L: usize>
+    Device<'buf, 'sub, AtCl, AtUrcCh, Config, N, L>
 where
-    C: AtatClient,
-    CLK: fugit_timer::Timer<TIMER_HZ>,
-    RST: OutputPin,
-    PWR: OutputPin,
-    DTR: OutputPin,
-    VINT: InputPin,
+    'buf: 'sub,
+    AtCl: AtatClient,
+    Config: CellularConfig,
 {
     /// Define a PDP context
     #[cfg(not(feature = "upsd-context-activation"))]
@@ -82,12 +79,12 @@ where
             true,
         )?;
 
-        if let Apn::Given(apn) = apn_info.clone().apn {
+        if let Apn::Given(apn) = apn_info.apn {
             self.network.send_internal(
                 &SetPDPContextDefinition {
                     cid,
                     pdp_type: "IP",
-                    apn: apn.as_str(),
+                    apn,
                 },
                 true,
             )?;
@@ -136,7 +133,7 @@ where
     pub fn data_service<'a>(
         &'a mut self,
         apn_info: &APNInfo,
-    ) -> nb::Result<DataService<'a, C, CLK, TIMER_HZ, N, L>, DeviceError> {
+    ) -> nb::Result<DataService<'a, 'sub, AtCl, N, L>, DeviceError> {
         // Spin [`Device`], handling [`Network`] related URC changes and
         // propagting the FSM
         match self.spin() {
@@ -173,25 +170,22 @@ pub enum ContextState {
     Active,
 }
 
-pub struct DataService<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize>
+pub struct DataService<'a, 'sub, AtCl, const N: usize, const L: usize>
 where
-    C: atat::blocking::AtatClient,
-    CLK: 'static + fugit_timer::Timer<TIMER_HZ>,
+    AtCl: AtatClient,
 {
-    network: &'a mut Network<C, CLK, TIMER_HZ>,
-    pub(crate) sockets: Option<&'a mut SocketSet<TIMER_HZ, N, L>>,
+    network: &'a mut Network<'sub, AtCl>,
+    pub(crate) sockets: Option<&'a mut SocketSet<N, L>>,
 }
 
-impl<'a, C, CLK, const TIMER_HZ: u32, const N: usize, const L: usize>
-    DataService<'a, C, CLK, TIMER_HZ, N, L>
+impl<'a, 'sub, AtCl, const N: usize, const L: usize> DataService<'a, 'sub, AtCl, N, L>
 where
-    C: atat::blocking::AtatClient,
-    CLK: 'static + fugit_timer::Timer<TIMER_HZ>,
+    AtCl: AtatClient,
 {
     pub fn try_new(
         apn_info: &APNInfo,
-        network: &'a mut Network<C, CLK, TIMER_HZ>,
-        sockets: Option<&'a mut SocketSet<TIMER_HZ, N, L>>,
+        network: &'a mut Network<'sub, AtCl>,
+        sockets: Option<&'a mut SocketSet<N, L>>,
     ) -> nb::Result<Self, Error> {
         let mut data_service = Self { network, sockets };
 
@@ -248,14 +242,7 @@ where
                 return Ok(());
             }
 
-            self.network
-                .status
-                .timer
-                .start(1.secs())
-                .map_err(|_e| Error::Generic(GenericError::Clock))?;
-
-            nb::block!(self.network.status.timer.wait())
-                .map_err(|_e| Error::Generic(GenericError::Clock))?;
+            BlockingTimer::after(Duration::from_secs(1)).wait();
         }
 
         // self.network .send_internal( &SetGPRSAttached { state:
@@ -532,7 +519,7 @@ where
                     if available_data == 0 {
                         // Check for new socket data available at regular
                         // intervals, just in case a URC is missed
-                        if socket.should_update_available_data(network.status.timer.now()) {
+                        if socket.should_update_available_data() {
                             match network.send_internal(
                                 &ReadSocketData {
                                     socket: handle,
@@ -541,7 +528,7 @@ where
                                 false,
                             ) {
                                 Ok(SocketData { length, .. }) => socket.set_available_data(length),
-                                Err(_) => socket.closed_by_remote(network.status.timer.now()),
+                                Err(_) => socket.closed_by_remote(),
                             }
                         }
 
