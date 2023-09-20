@@ -127,10 +127,6 @@ where
     }
 }
 
-pub fn signal_strength(&mut self) -> Result<SignalQuality, Error> {
-    self.send_at(&GetSignalQuality)
-}
-
 impl<'buf, 'sub, AtCl, AtUrcCh, Config, const N: usize, const L: usize>
     Device<'buf, 'sub, AtCl, AtUrcCh, Config, N, L>
 where
@@ -165,6 +161,9 @@ where
         self.sockets.take()
     }
 
+    pub fn signal_strength(&mut self) -> Result<SignalQuality, Error> {
+        self.send_at(&GetSignalQuality)
+    }
     /// Run modem state machine
     ///
     /// Turns on modem if needed and processes URCs.
