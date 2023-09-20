@@ -16,7 +16,11 @@ doctest = false
 
 [dependencies]
 # atat = { version = "0.18", features = ["derive", "bytes"] }
-atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "c5caaf7", features = ["derive", "defmt", "bytes"] }
+atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "c5caaf7", features = [
+    "derive",
+    "defmt",
+    "bytes",
+] }
 embedded-hal = "=1.0.0-rc.1"
 embedded-nal = "0.6"
 hash32 = "^0.2.1"
@@ -41,7 +45,12 @@ default = ["socket-udp", "socket-tcp"]
 async = ["atat/async"]
 
 # Use `defmt-impl to enable defmt based logging
-defmt-impl = ["defmt", "ublox-sockets/defmt", "atat/defmt", "heapless/defmt-impl"]
+defmt-impl = [
+    "defmt",
+    "ublox-sockets/defmt",
+    "atat/defmt",
+    "heapless/defmt-impl",
+]
 # Use `log-impl` to enable log based logging
 log-impl = ["log", "ublox-sockets/log", "atat/log"]
 

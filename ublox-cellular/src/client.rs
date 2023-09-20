@@ -26,8 +26,9 @@ use crate::{
             SetGpioConfiguration,
         },
         network_service::{
-            responses::OperatorSelection, types::OperatorSelectionMode, GetOperatorSelection,
-            SetOperatorSelection,
+            responses::{OperatorSelection, SignalQuality},
+            types::OperatorSelectionMode,
+            GetOperatorSelection, GetSignalQuality, SetOperatorSelection,
         },
         psn::{types::PSEventReportingMode, SetPacketSwitchedEventReporting},
     },
@@ -160,6 +161,9 @@ where
         self.sockets.take()
     }
 
+    pub fn signal_strength(&mut self) -> Result<SignalQuality, Error> {
+        self.send_at(&GetSignalQuality)
+    }
     /// Run modem state machine
     ///
     /// Turns on modem if needed and processes URCs.
