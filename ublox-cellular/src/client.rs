@@ -37,7 +37,7 @@ use crate::{
     network::{AtTx, Network},
     power::PowerState,
     registration::ConnectionState,
-    services::data::ContextState,
+    services::data::{ContextState, PROFILE_ID},
     UbloxCellularBuffers, UbloxCellularIngress, UbloxCellularUrcChannel,
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
@@ -525,8 +525,10 @@ where
     }
 
     fn handle_urc_internal(&mut self) -> Result<(), Error> {
+        let mut ctx_state = self.network.context_state;
         if let Some(ref mut sockets) = self.sockets.as_deref_mut() {
-            self.network
+            let res = self
+                .network
                 .at_tx
                 .handle_urc(|urc| {
                     match urc {
@@ -551,11 +553,69 @@ where
                                 sock.set_available_data(length);
                             }
                         }
-                        _ => return false,
+                        Urc::NetworkDetach => {
+                            warn!("Network Detach URC!");
+                        }
+                        Urc::MobileStationDetach => {
+                            warn!("ME Detach URC!");
+                        }
+                        Urc::NetworkDeactivate => {
+                            warn!("Network Deactivate URC!");
+                        }
+                        Urc::MobileStationDeactivate => {
+                            warn!("ME Deactivate URC!");
+                        }
+                        Urc::NetworkPDNDeactivate => {
+                            warn!("Network PDN Deactivate URC!");
+                        }
+                        Urc::MobileStationPDNDeactivate => {
+                            warn!("ME PDN Deactivate URC!");
+                        }
+                        Urc::ExtendedPSNetworkRegistration(
+                            psn::urc::ExtendedPSNetworkRegistration { state },
+                        ) => {
+                            info!("[URC] ExtendedPSNetworkRegistration {:?}", state);
+                        }
+                        // FIXME: Currently `atat` is unable to distinguish `xREG` family of
+                        // commands from URC's
+
+                        // Urc::GPRSNetworkRegistration(reg_params) => {
+                        //     new_reg_params.replace(reg_params.into());
+                        // }
+                        // Urc::EPSNetworkRegistration(reg_params) => {
+                        //     new_reg_params.replace(reg_params.into());
+                        // }
+                        // Urc::NetworkRegistration(reg_params) => {
+                        //     new_reg_params.replace(reg_params.into());
+                        // }
+                        Urc::DataConnectionActivated(psn::urc::DataConnectionActivated {
+                            result,
+                            ip_addr: _,
+                        }) => {
+                            info!("[URC] DataConnectionActivated {}", result);
+                            if result == 0 {
+                                ctx_state = ContextState::Active;
+                            } else {
+                                ctx_state = ContextState::Setup;
+                            }
+                        }
+                        Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
+                            profile_id,
+                        }) => {
+                            info!("[URC] DataConnectionDeactivated {:?}", profile_id);
+                            if profile_id == PROFILE_ID {
+                                ctx_state = ContextState::Activating;
+                            }
+                        }
+                        Urc::MessageWaitingIndication(_) => {
+                            info!("[URC] MessageWaitingIndication");
+                        }
+                        _ => {}
                     }
-                    true
                 })
-                .map_err(Error::Network)
+                .map_err(Error::Network);
+            self.network.context_state = ctx_state;
+            res
         } else {
             Ok(())
         }
@@ -577,9 +637,5 @@ where
             }
             result => result.map_err(Error::from),
         }
-    }
-
-    pub fn handle_urc<F: FnOnce(Urc) -> bool>(&mut self, f: F) -> Result<(), Error> {
-        self.network.at_tx.handle_urc(f).map_err(Error::Network)
     }
 }
