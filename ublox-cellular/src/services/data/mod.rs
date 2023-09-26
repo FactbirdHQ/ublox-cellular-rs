@@ -504,10 +504,6 @@ where
         Ok(self.network.send_internal(cmd, true)?)
     }
 
-    pub fn handle_urc<F: FnOnce(Urc) -> bool>(&mut self, f: F) -> Result<(), Error> {
-        self.network.at_tx.handle_urc(f).map_err(Error::Network)
-    }
-
     fn socket_ingress_all(&mut self) -> Result<(), Error> {
         if let Some(ref mut sockets) = self.sockets {
             let network = &mut self.network;

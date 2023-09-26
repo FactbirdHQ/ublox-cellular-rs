@@ -118,7 +118,7 @@ impl<'sub, AtCl: AtatClient> AtTx<'sub, AtCl> {
             })
     }
 
-    pub fn handle_urc<F: FnOnce(Urc) -> bool>(&mut self, f: F) -> Result<(), Error> {
+    pub fn handle_urc<F: FnOnce(Urc)>(&mut self, f: F) -> Result<(), Error> {
         if let Some(urc) = self.urc_subscription.try_next_message_pure() {
             f(urc);
         }
@@ -161,7 +161,6 @@ where
             return Err(Error::Generic(GenericError::Timeout));
         }
 
-        self.handle_urc().ok(); // Ignore errors
         self.check_registration_state();
         self.intervene_registration()?;
         self.check_running_imsi().ok(); // Ignore errors
@@ -429,83 +428,6 @@ where
         Ok(())
     }
 
-    pub(crate) fn handle_urc(&mut self) -> Result<(), Error> {
-        // TODO: How to do this cleaner?
-        let mut ctx_state = self.context_state;
-        // let mut new_reg_params: Option<RegistrationParams> = None;
-
-        self.at_tx.handle_urc(|urc| {
-            match urc {
-                Urc::NetworkDetach => {
-                    warn!("Network Detach URC!");
-                }
-                Urc::MobileStationDetach => {
-                    warn!("ME Detach URC!");
-                }
-                Urc::NetworkDeactivate => {
-                    warn!("Network Deactivate URC!");
-                }
-                Urc::MobileStationDeactivate => {
-                    warn!("ME Deactivate URC!");
-                }
-                Urc::NetworkPDNDeactivate => {
-                    warn!("Network PDN Deactivate URC!");
-                }
-                Urc::MobileStationPDNDeactivate => {
-                    warn!("ME PDN Deactivate URC!");
-                }
-                Urc::ExtendedPSNetworkRegistration(psn::urc::ExtendedPSNetworkRegistration {
-                    state,
-                }) => {
-                    info!("[URC] ExtendedPSNetworkRegistration {:?}", state);
-                }
-                // FIXME: Currently `atat` is unable to distinguish `xREG` family of
-                // commands from URC's
-
-                // Urc::GPRSNetworkRegistration(reg_params) => {
-                //     new_reg_params.replace(reg_params.into());
-                // }
-                // Urc::EPSNetworkRegistration(reg_params) => {
-                //     new_reg_params.replace(reg_params.into());
-                // }
-                // Urc::NetworkRegistration(reg_params) => {
-                //     new_reg_params.replace(reg_params.into());
-                // }
-                Urc::DataConnectionActivated(psn::urc::DataConnectionActivated {
-                    result,
-                    ip_addr: _,
-                }) => {
-                    info!("[URC] DataConnectionActivated {}", result);
-                    if result == 0 {
-                        ctx_state = ContextState::Active;
-                    } else {
-                        ctx_state = ContextState::Setup;
-                    }
-                }
-                Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
-                    profile_id,
-                }) => {
-                    info!("[URC] DataConnectionDeactivated {:?}", profile_id);
-                    if profile_id == PROFILE_ID {
-                        ctx_state = ContextState::Activating;
-                    }
-                }
-                Urc::MessageWaitingIndication(_) => {
-                    info!("[URC] MessageWaitingIndication");
-                }
-                _ => return false,
-            };
-            true
-        })?;
-
-        // if let Some(reg_params) = new_reg_params {
-        //     self.status.compare_and_set(reg_params)
-        // }
-
-        self.context_state = ctx_state;
-        Ok(())
-    }
-
     pub(crate) fn send_internal<A, const LEN: usize>(
         &mut self,
         req: &A,
@@ -514,11 +436,11 @@ where
     where
         A: atat::AtatCmd<LEN>,
     {
-        if check_urc {
-            if let Err(e) = self.handle_urc() {
-                error!("Failed handle URC {:?}", &e);
-            }
-        }
+        // if check_urc {
+        //     if let Err(e) = self.handle_urc() {
+        //         error!("Failed handle URC {:?}", &e);
+        //     }
+        // }
 
         self.at_tx.send(req)
     }
