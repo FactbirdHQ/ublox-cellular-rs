@@ -1,4 +1,4 @@
-use atat::{blocking::AtatClient, AtatUrcChannel};
+use atat::{blocking::AtatClient, AtatUrcChannel, UrcSubscription};
 use embassy_time::Duration;
 use ublox_sockets::SocketSet;
 
@@ -37,7 +37,7 @@ use crate::{
     network::{AtTx, Network},
     power::PowerState,
     registration::ConnectionState,
-    services::data::{ContextState, PROFILE_ID},
+    services::data::ContextState,
     UbloxCellularBuffers, UbloxCellularIngress, UbloxCellularUrcChannel,
 };
 use ip_transport_layer::{types::HexMode, SetHexMode};
@@ -48,7 +48,7 @@ use psn::{
 };
 
 pub(crate) const URC_CAPACITY: usize = 3;
-pub(crate) const URC_SUBSCRIBERS: usize = 1;
+pub(crate) const URC_SUBSCRIBERS: usize = 2;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -65,6 +65,7 @@ pub struct Device<'buf, 'sub, AtCl, AtUrcCh, Config, const N: usize, const L: us
     pub(crate) config: Config,
     pub(crate) network: Network<'sub, AtCl>,
     urc_channel: &'buf AtUrcCh,
+    urc_subscription: UrcSubscription<'sub, Urc, URC_CAPACITY, URC_SUBSCRIBERS>,
 
     pub(crate) state: State,
     pub(crate) power_state: PowerState,
@@ -115,14 +116,15 @@ where
     Config: CellularConfig,
 {
     pub fn new(client: AtCl, urc_channel: &'buf AtUrcCh, config: Config) -> Self {
-        let urc_subscription = urc_channel.subscribe().unwrap();
+        let network_urc_subscription = urc_channel.subscribe().unwrap();
         Self {
             config,
-            network: Network::new(AtTx::new(client, urc_subscription)),
+            network: Network::new(AtTx::new(client, network_urc_subscription)),
             state: State::Off,
             power_state: PowerState::Off,
             sockets: None,
             urc_channel,
+            urc_subscription: urc_channel.subscribe().unwrap(),
         }
     }
 }
@@ -525,97 +527,36 @@ where
     }
 
     fn handle_urc_internal(&mut self) -> Result<(), Error> {
-        let mut ctx_state = self.network.context_state;
         if let Some(ref mut sockets) = self.sockets.as_deref_mut() {
-            let res = self
-                .network
-                .at_tx
-                .handle_urc(|urc| {
-                    match urc {
-                        Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
-                            info!("[URC] SocketClosed {}", socket.0);
-                            if let Some((_, mut sock)) =
-                                sockets.iter_mut().find(|(handle, _)| *handle == socket)
-                            {
-                                sock.closed_by_remote();
-                            }
+            if let Some(urc) = self.urc_subscription.try_next_message_pure() {
+                match urc {
+                    Urc::SocketClosed(ip_transport_layer::urc::SocketClosed { socket }) => {
+                        info!("[URC] SocketClosed {}", socket.0);
+                        if let Some((_, mut sock)) =
+                            sockets.iter_mut().find(|(handle, _)| *handle == socket)
+                        {
+                            sock.closed_by_remote();
                         }
-                        Urc::SocketDataAvailable(
-                            ip_transport_layer::urc::SocketDataAvailable { socket, length },
-                        )
-                        | Urc::SocketDataAvailableUDP(
-                            ip_transport_layer::urc::SocketDataAvailable { socket, length },
-                        ) => {
-                            trace!("[Socket({})] {} bytes available", socket.0, length as u16);
-                            if let Some((_, mut sock)) =
-                                sockets.iter_mut().find(|(handle, _)| *handle == socket)
-                            {
-                                sock.set_available_data(length);
-                            }
-                        }
-                        Urc::NetworkDetach => {
-                            warn!("Network Detach URC!");
-                        }
-                        Urc::MobileStationDetach => {
-                            warn!("ME Detach URC!");
-                        }
-                        Urc::NetworkDeactivate => {
-                            warn!("Network Deactivate URC!");
-                        }
-                        Urc::MobileStationDeactivate => {
-                            warn!("ME Deactivate URC!");
-                        }
-                        Urc::NetworkPDNDeactivate => {
-                            warn!("Network PDN Deactivate URC!");
-                        }
-                        Urc::MobileStationPDNDeactivate => {
-                            warn!("ME PDN Deactivate URC!");
-                        }
-                        Urc::ExtendedPSNetworkRegistration(
-                            psn::urc::ExtendedPSNetworkRegistration { state },
-                        ) => {
-                            info!("[URC] ExtendedPSNetworkRegistration {:?}", state);
-                        }
-                        // FIXME: Currently `atat` is unable to distinguish `xREG` family of
-                        // commands from URC's
-
-                        // Urc::GPRSNetworkRegistration(reg_params) => {
-                        //     new_reg_params.replace(reg_params.into());
-                        // }
-                        // Urc::EPSNetworkRegistration(reg_params) => {
-                        //     new_reg_params.replace(reg_params.into());
-                        // }
-                        // Urc::NetworkRegistration(reg_params) => {
-                        //     new_reg_params.replace(reg_params.into());
-                        // }
-                        Urc::DataConnectionActivated(psn::urc::DataConnectionActivated {
-                            result,
-                            ip_addr: _,
-                        }) => {
-                            info!("[URC] DataConnectionActivated {}", result);
-                            if result == 0 {
-                                ctx_state = ContextState::Active;
-                            } else {
-                                ctx_state = ContextState::Setup;
-                            }
-                        }
-                        Urc::DataConnectionDeactivated(psn::urc::DataConnectionDeactivated {
-                            profile_id,
-                        }) => {
-                            info!("[URC] DataConnectionDeactivated {:?}", profile_id);
-                            if profile_id == PROFILE_ID {
-                                ctx_state = ContextState::Activating;
-                            }
-                        }
-                        Urc::MessageWaitingIndication(_) => {
-                            info!("[URC] MessageWaitingIndication");
-                        }
-                        _ => {}
                     }
-                })
-                .map_err(Error::Network);
-            self.network.context_state = ctx_state;
-            res
+                    Urc::SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable {
+                        socket,
+                        length,
+                    })
+                    | Urc::SocketDataAvailableUDP(ip_transport_layer::urc::SocketDataAvailable {
+                        socket,
+                        length,
+                    }) => {
+                        trace!("[Socket({})] {} bytes available", socket.0, length as u16);
+                        if let Some((_, mut sock)) =
+                            sockets.iter_mut().find(|(handle, _)| *handle == socket)
+                        {
+                            sock.set_available_data(length);
+                        }
+                    }
+                    _ => {}
+                }
+            }
+            Ok(())
         } else {
             Ok(())
         }
