@@ -18,7 +18,6 @@ doctest = false
 # atat = { version = "0.18", features = ["derive", "bytes"] }
 atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "c5caaf7", features = [
     "derive",
-    "defmt",
     "bytes",
 ] }
 embedded-hal = "=1.0.0-rc.1"
@@ -29,7 +28,7 @@ heapless = { version = "^0.7", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
 # ublox-sockets = "0.5.0"
-ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", rev = "b1ff942" }
+ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", rev = "8fcb102" }
 embassy-time = "0.1"
 embedded-io = "0.5"
 
