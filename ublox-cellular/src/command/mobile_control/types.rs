@@ -74,7 +74,6 @@ pub enum Functionality {
         feature = "sara-g3",
         feature = "sara-g4",
         feature = "sara-r5",
-
     ))]
     DedicatedMode = 6,
 
@@ -91,7 +90,6 @@ pub enum Functionality {
         feature = "sara-g3",
         feature = "sara-g4",
         feature = "sara-r5",
-
     ))]
     DisableSimToolkit = 7,
     #[cfg(any(
@@ -169,11 +167,7 @@ pub enum Functionality {
     /// 127: Sets the MT in a deep low power state "HALT" (with detach from the network
     /// and saving of the NVM parameters); the only way to wake up the module is a power
     /// cycle or a module reset
-    #[cfg(any(
-        feature = "toby-l2",
-        feature = "mpci-l2",
-        feature = "sara-r5",
-    ))]
+    #[cfg(any(feature = "toby-l2", feature = "mpci-l2", feature = "sara-r5",))]
     Halt = 127,
 }
 

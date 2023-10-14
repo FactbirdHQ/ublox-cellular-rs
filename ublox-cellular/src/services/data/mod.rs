@@ -40,12 +40,16 @@ pub use error::Error;
 use psn::{types::GPRSAttachedState, GetGPRSAttached};
 use ublox_sockets::{Error as SocketError, SocketSet, SocketType};
 
+use crate::command::psn::responses::PacketSwitchedNetworkData;
+use crate::command::psn::types::{
+    PacketSwitchedAction, PacketSwitchedNetworkDataParam, PacketSwitchedParam, ProtocolType,
+};
+use crate::command::psn::{
+    GetPacketSwitchedNetworkData, SetPacketSwitchedAction, SetPacketSwitchedConfig,
+};
 #[cfg(feature = "upsd-context-activation")]
 use embedded_nal::Ipv4Addr;
 use heapless::String;
-use crate::command::psn::{GetPacketSwitchedNetworkData, SetPacketSwitchedAction, SetPacketSwitchedConfig};
-use crate::command::psn::responses::PacketSwitchedNetworkData;
-use crate::command::psn::types::{PacketSwitchedAction, PacketSwitchedNetworkDataParam, PacketSwitchedParam, ProtocolType};
 
 // NOTE: If these are changed, remember to change the corresponding `Bytes` len
 // in commands for now.
