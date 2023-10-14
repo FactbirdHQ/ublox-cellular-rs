@@ -16,9 +16,8 @@ doctest = false
 
 [dependencies]
 # atat = { version = "0.18", features = ["derive", "bytes"] }
-atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "c5caaf7", features = [
+atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "31a45fc", features = [
     "derive",
-    "defmt",
     "bytes",
 ] }
 embedded-hal = "=1.0.0-rc.1"
@@ -29,9 +28,9 @@ heapless = { version = "^0.7", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
 # ublox-sockets = "0.5.0"
-ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", rev = "b1ff942" }
+ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", rev = "0bc0dc1" }
 embassy-time = "0.1"
-embedded-io = "0.5"
+embedded-io = "0.6.0"
 
 # Enable `serde` feature of `no-std-net`
 no-std-net = { version = "^0.5", features = ["serde"] }
@@ -50,6 +49,7 @@ defmt-impl = [
     "ublox-sockets/defmt",
     "atat/defmt",
     "heapless/defmt-impl",
+    "nb/defmt-0-3"
 ]
 # Use `log-impl` to enable log based logging
 log-impl = ["log", "ublox-sockets/log", "atat/log"]

@@ -3,6 +3,7 @@ use crate::network::Error as NetworkError;
 use ublox_sockets::Error as SocketError;
 
 #[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     InvalidApn,
     SocketMemory,

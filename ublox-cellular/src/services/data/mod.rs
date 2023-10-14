@@ -40,8 +40,16 @@ pub use error::Error;
 use psn::{types::GPRSAttachedState, GetGPRSAttached};
 use ublox_sockets::{Error as SocketError, SocketSet, SocketType};
 
+use crate::command::psn::responses::PacketSwitchedNetworkData;
+use crate::command::psn::types::{
+    PacketSwitchedAction, PacketSwitchedNetworkDataParam, PacketSwitchedParam, ProtocolType,
+};
+use crate::command::psn::{
+    GetPacketSwitchedNetworkData, SetPacketSwitchedAction, SetPacketSwitchedConfig,
+};
 #[cfg(feature = "upsd-context-activation")]
 use embedded_nal::Ipv4Addr;
+use heapless::String;
 
 // NOTE: If these are changed, remember to change the corresponding `Bytes` len
 // in commands for now.
@@ -285,7 +293,7 @@ where
                     .send_internal(
                         &SetPacketSwitchedConfig {
                             profile_id,
-                            param: PacketSwitchedParam::APN(apn),
+                            param: PacketSwitchedParam::APN(String::from(apn)),
                         },
                         true,
                     )
@@ -298,7 +306,7 @@ where
                     .send_internal(
                         &SetPacketSwitchedConfig {
                             profile_id,
-                            param: PacketSwitchedParam::Username(user_name),
+                            param: PacketSwitchedParam::Username(String::from(user_name)),
                         },
                         true,
                     )
@@ -311,7 +319,7 @@ where
                     .send_internal(
                         &SetPacketSwitchedConfig {
                             profile_id,
-                            param: PacketSwitchedParam::Password(password),
+                            param: PacketSwitchedParam::Password(String::from(password)),
                         },
                         true,
                     )
