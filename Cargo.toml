@@ -83,6 +83,6 @@ atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "d2175b4", features 
     "defmt",
     "bytes",
 ] }
-# ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", rev = "7c31d77" }
+# ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", rev = "1b59385" }
 ublox-sockets = { path = "../ublox-sockets" }
 no-std-net = { path = "../no-std-net" }
