@@ -46,9 +46,9 @@ use atat::atat_derive::AtatCmd;
 use heapless::Vec;
 use responses::{SecurityData, SecurityDataImport};
 use types::{SecurityDataType, SecurityProfileOperation};
+use crate::command::device_data_security::types::SecurityProfileId;
 
 use super::NoResponse;
-use crate::services::data::ssl::SecurityProfileId;
 
 /// 26.1.2 SSL/TLS certificates and private keys manager +USECMNG
 ///

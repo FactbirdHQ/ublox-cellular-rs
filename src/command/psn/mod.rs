@@ -34,11 +34,10 @@ use types::{
     AuthenticationType, EPSNetworkRegistrationUrcConfig, ExtendedPSNetworkRegistrationUrcConfig,
     GPRSAttachedState, GPRSNetworkRegistrationUrcConfig, PDPContextStatus, PSEventReportingMode,
     PacketSwitchedAction, PacketSwitchedNetworkDataParam, PacketSwitchedParam,
-    PacketSwitchedParamReq,
+    PacketSwitchedParamReq, ContextId, ProfileId
 };
 
 use super::NoResponse;
-use crate::network::{ContextId, ProfileId};
 
 /// 18.4 PDP context definition +CGDCONT
 ///

@@ -1,3 +1,6 @@
+#![cfg(feature = "dontbuild")]
+
+
 use core::cell::RefCell;
 use core::future::poll_fn;
 use core::mem;

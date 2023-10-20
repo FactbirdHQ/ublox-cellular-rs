@@ -1,3 +1,6 @@
+#![cfg(feature = "dontbuild")]
+
+
 use core::{cell::RefCell, future::poll_fn, task::Poll};
 
 use atat::asynch::AtatClient;

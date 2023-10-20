@@ -7,6 +7,9 @@ use atat::{asynch::AtatClient, UrcSubscription};
 use embassy_time::{with_timeout, Duration, Timer};
 use embedded_hal::digital::OutputPin;
 use no_std_net::{Ipv4Addr, Ipv6Addr};
+use crate::error::Error;
+use crate::error::GenericError::Timeout;
+use crate::module_timing::{boot_time, reset_time};
 
 use super::AtHandle;
 
@@ -56,58 +59,24 @@ impl<
         Ok(())
     }
 
-    async fn wait_startup(&mut self, timeout: Duration) -> Result<(), Error> {
-        let fut = async {
-            loop {
-                match self.urc_subscription.next_message_pure().await {
-                    Urc::StartUp => return,
-                    _ => {}
-                }
-            }
-        };
-
-        with_timeout(timeout, fut).await.map_err(|_| Error::Timeout)
-    }
-
     pub async fn reset(&mut self) -> Result<(), Error> {
         warn!("Hard resetting Ublox Short Range");
-        self.reset.set_low().ok();
-        Timer::after(Duration::from_millis(100)).await;
-        self.reset.set_high().ok();
-
-        self.wait_startup(Duration::from_secs(4)).await?;
-
+        if let Some(pin) = self.config.reset_pin() {
+            pin.set_low().ok();
+            Timer::after(reset_time()).await;
+            pin.set_high().ok();
+            Timer::after(boot_time()).await;
+        } else {
+            warn!("No reset pin configured");
+        }
         Ok(())
     }
 
     pub async fn restart(&mut self, store: bool) -> Result<(), Error> {
-        warn!("Soft resetting Ublox Short Range");
-        if store {
-            self.at.send(StoreCurrentConfig).await?;
-        }
-
-        self.at.send(RebootDCE).await?;
-
-        Timer::after(Duration::from_millis(3500)).await;
 
         Ok(())
     }
 
-    pub async fn is_link_up(&mut self) -> Result<bool, Error> {
-        // Determine link state
-        // let link_state = match self.wifi_connection {
-        //     Some(ref conn)
-        //         if conn.network_up && matches!(conn.wifi_state, WiFiState::Connected) =>
-        //     {
-        //         LinkState::Up
-        //     }
-        //     _ => LinkState::Down,
-        // };
-
-        self.ch.set_link_state(link_state);
-
-        Ok(link_state == LinkState::Up)
-    }
 
     pub async fn run(mut self) -> ! {
         loop {

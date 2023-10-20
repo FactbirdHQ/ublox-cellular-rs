@@ -1,7 +1,8 @@
-use crate::network::ContextId;
-use atat::atat_derive::AtatEnum;
+use atat::atat_derive::{AtatEnum, AtatLen};
 use embedded_nal::IpAddr;
+use hash32_derive::Hash32;
 use heapless::String;
+use serde::{Deserialize, Serialize};
 
 /// Indicates the state of PDP context activation
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
@@ -645,3 +646,12 @@ pub enum EPSNetworkRegistrationStat {
     /// considered as attached for emergency bearer services)
     AttachedEmergencyOnly = 8,
 }
+
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash32, Serialize, Deserialize, AtatLen)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct ProfileId(pub u8);
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, AtatLen)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct ContextId(pub u8);

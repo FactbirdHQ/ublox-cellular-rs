@@ -1,5 +1,5 @@
+use super::types::Error;
 use super::types::NetworkRegistrationStat;
-use crate::network::Error;
 
 impl NetworkRegistrationStat {
     #[must_use]

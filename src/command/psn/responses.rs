@@ -3,9 +3,9 @@ use super::types::{
     EPSNetworkRegistrationStat, EPSNetworkRegistrationUrcConfig,
     ExtendedPSNetworkRegistrationState, ExtendedPSNetworkRegistrationUrcConfig, GPRSAttachedState,
     GPRSNetworkRegistrationStat, GPRSNetworkRegistrationUrcConfig, PDPContextStatus,
-    PacketSwitchedNetworkDataParam, PacketSwitchedParam,
+    PacketSwitchedNetworkDataParam, PacketSwitchedParam, ProfileId, ContextId
 };
-use crate::{command::network_service::types::RatAct, network::ProfileId, ContextId};
+use crate::{command::network_service::types::RatAct};
 use atat::atat_derive::AtatResp;
 use heapless::String;
 

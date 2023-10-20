@@ -1,10 +1,11 @@
 //! Responses for Internet protocol transport layer Commands
 use super::types::SocketControlParam;
-use crate::services::data::INGRESS_CHUNK_SIZE;
 use atat::atat_derive::AtatResp;
 use embedded_nal::IpAddr;
 use heapless::String;
 use ublox_sockets::SocketHandle;
+
+pub const INGRESS_CHUNK_SIZE: usize = 256;
 
 /// 25.3 Create Socket +USOCR
 #[derive(Debug, Clone, AtatResp)]
