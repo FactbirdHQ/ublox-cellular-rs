@@ -22,7 +22,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --all --features "defmt-impl,lara-r6" --target thumbv7em-none-eabihf
+          args: --all --features "defmt,lara-r6" --target thumbv7em-none-eabihf
 
       - name: Test
         uses: actions-rs/cargo@v1
