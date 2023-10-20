@@ -16,6 +16,7 @@ pub enum Error {
     Busy,
     Uninitialized,
     StateTimeout,
+    PoweredDown,
 
     // Network errors
     Network(NetworkError),
@@ -26,7 +27,11 @@ pub enum Error {
     // Generic shared errors, e.g. from `core::`
     Generic(GenericError),
 
+    Atat(atat::Error),
+
     _Unknown,
+
+    IoPin,
 }
 
 #[cfg(feature = "defmt")]
@@ -43,5 +48,11 @@ impl defmt::Format for Error {
             Self::_Unknown => defmt::write!(f, "_Unknown"),
             _ => defmt::write!(f, "non_exhaustive"),
         }
+    }
+}
+
+impl From<atat::Error> for Error {
+    fn from(e: atat::Error) -> Self {
+        Self::Atat(e)
     }
 }

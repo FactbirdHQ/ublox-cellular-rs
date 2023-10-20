@@ -31,8 +31,8 @@ pub trait CellularConfig {
     type PowerPin: OutputPin;
     type VintPin: InputPin;
 
-    const FLOW_CONTROL: bool = false;
-    const HEX_MODE: bool = true;
+    const FLOW_CONTROL: bool;
+    const HEX_MODE: bool;
 
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin>;
     fn power_pin(&mut self) -> Option<&mut Self::PowerPin>;

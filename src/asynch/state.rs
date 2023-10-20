@@ -20,6 +20,17 @@ pub enum LinkState {
     Up,
 }
 
+/// If the celular modem is up and responding to AT.
+#[derive(PartialEq, Eq, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum PowerState {
+    PowerDown,
+    PowerUp,
+    Alive,
+    Initialized,
+}
+
+
 use crate::command::Urc;
 
 use super::AtHandle;
@@ -43,6 +54,7 @@ struct StateInner {
 /// State of the LinkState
 pub struct Shared {
     link_state: LinkState,
+    power_state: PowerState,
     waker: WakerRegistration,
 }
 
@@ -69,6 +81,15 @@ impl<'d> Runner<'d> {
             s.waker.wake();
         });
     }
+
+    pub fn set_power_state(&mut self, state: PowerState) {
+        self.shared.lock(|s| {
+            let s = &mut *s.borrow_mut();
+            s.power_state = state;
+            s.waker.wake();
+        });
+    }
+
 }
 
 impl<'d> StateRunner<'d> {
@@ -87,6 +108,22 @@ impl<'d> StateRunner<'d> {
             s.link_state
         })
     }
+
+    pub fn set_power_state(&self, state: PowerState) {
+        self.shared.lock(|s| {
+            let s = &mut *s.borrow_mut();
+            s.power_state = state;
+            s.waker.wake();
+        });
+    }
+
+    pub fn power_state(&mut self, cx: &mut Context) -> PowerState {
+        self.shared.lock(|s| {
+            let s = &mut *s.borrow_mut();
+            s.waker.register(cx.waker());
+            s.power_state
+        })
+    }
 }
 
 pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize>(
@@ -103,6 +140,7 @@ pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize>(
     let state = unsafe { &mut *state_uninit }.write(StateInner {
         shared: Mutex::new(RefCell::new(Shared {
             link_state: LinkState::Down,
+            power_state: PowerState::PowerDown,
             waker: WakerRegistration::new(),
         })),
     });
@@ -137,6 +175,14 @@ impl<'d> TestShared<'d> {
             let s = &mut *s.borrow_mut();
             s.waker.register(cx.waker());
             s.link_state
+        })
+    }
+
+    pub fn power_state(&mut self, cx: &mut Context) -> PowerState {
+        self.inner.lock(|s| {
+            let s = &mut *s.borrow_mut();
+            s.waker.register(cx.waker());
+            s.power_state
         })
     }
 }
