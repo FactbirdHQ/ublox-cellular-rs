@@ -30,6 +30,23 @@ pub enum Error {
     _Unknown,
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for Error {
+    fn format(&self, f: defmt::Formatter<'_>) {
+        match self {
+            Self::BaudDetection => defmt::write!(f, "BaudDetection"),
+            Self::Busy => defmt::write!(f, "Busy"),
+            Self::Uninitialized => defmt::write!(f, "Uninitialized"),
+            Self::StateTimeout => defmt::write!(f, "StateTimeout"),
+            Self::Network(e) => defmt::write!(f, "Network({:?})", e),
+            Self::DataService(e) => defmt::write!(f, "DataService({:?})", e),
+            Self::Generic(e) => defmt::write!(f, "Generic({:?})", e),
+            Self::_Unknown => defmt::write!(f, "_Unknown"),
+            _ => defmt::write!(f, "non_exhaustive"),
+        }
+    }
+}
+
 impl From<DataServiceError> for Error {
     fn from(e: DataServiceError) -> Self {
         // Unwrap generic and network errors
