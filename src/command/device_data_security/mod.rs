@@ -42,11 +42,11 @@
 pub mod responses;
 pub mod types;
 
+use crate::command::device_data_security::types::SecurityProfileId;
 use atat::atat_derive::AtatCmd;
 use heapless::Vec;
 use responses::{SecurityData, SecurityDataImport};
 use types::{SecurityDataType, SecurityProfileOperation};
-use crate::command::device_data_security::types::SecurityProfileId;
 
 use super::NoResponse;
 

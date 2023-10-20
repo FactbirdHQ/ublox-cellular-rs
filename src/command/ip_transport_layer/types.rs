@@ -1,6 +1,6 @@
 //! Argument and parameter types used by Internet protocol transport layer Commands and Responses
-use atat::atat_derive::AtatEnum;
 use crate::command::device_data_security::types::SecurityProfileId;
+use atat::atat_derive::AtatEnum;
 
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum SocketProtocol {

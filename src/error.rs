@@ -45,6 +45,3 @@ impl defmt::Format for Error {
         }
     }
 }
-
-
-

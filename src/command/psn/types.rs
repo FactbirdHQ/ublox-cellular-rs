@@ -647,7 +647,6 @@ pub enum EPSNetworkRegistrationStat {
     AttachedEmergencyOnly = 8,
 }
 
-
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash32, Serialize, Deserialize, AtatLen)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ProfileId(pub u8);

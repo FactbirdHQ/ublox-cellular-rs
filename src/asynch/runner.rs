@@ -3,37 +3,28 @@ use core::str::FromStr;
 use crate::{command::Urc, config::CellularConfig};
 
 use super::state::{self, LinkState};
+use crate::error::Error;
+use crate::error::GenericError::Timeout;
+use crate::module_timing::{boot_time, reset_time};
 use atat::{asynch::AtatClient, UrcSubscription};
 use embassy_time::{with_timeout, Duration, Timer};
 use embedded_hal::digital::OutputPin;
 use no_std_net::{Ipv4Addr, Ipv6Addr};
-use crate::error::Error;
-use crate::error::GenericError::Timeout;
-use crate::module_timing::{boot_time, reset_time};
 
 use super::AtHandle;
 
 /// Background runner for the Ublox Module.
 ///
 /// You must call `.run()` in a background task for the Ublox Module to operate.
-pub struct Runner<
-    'd,
-    AT: AtatClient,
-    C: CellularConfig,
-    const URC_CAPACITY: usize,
-> {
+pub struct Runner<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize> {
     ch: state::Runner<'d>,
     at: AtHandle<'d, AT>,
     config: C,
     urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
 }
 
-impl<
-        'd,
-        AT: AtatClient,
-        C: CellularConfig,
-        const URC_CAPACITY: usize,
-    > Runner<'d, AT, C, URC_CAPACITY>
+impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
+    Runner<'d, AT, C, URC_CAPACITY>
 {
     pub(crate) fn new(
         ch: state::Runner<'d>,
@@ -55,7 +46,6 @@ impl<
         // Hard reset module
         self.reset().await?;
 
-
         Ok(())
     }
 
@@ -73,10 +63,8 @@ impl<
     }
 
     pub async fn restart(&mut self, store: bool) -> Result<(), Error> {
-
         Ok(())
     }
-
 
     pub async fn run(mut self) -> ! {
         loop {

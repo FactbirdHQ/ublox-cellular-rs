@@ -1,11 +1,11 @@
 //! Responses for Packet Switched Data Services Commands
 use super::types::{
-    EPSNetworkRegistrationStat, EPSNetworkRegistrationUrcConfig,
+    ContextId, EPSNetworkRegistrationStat, EPSNetworkRegistrationUrcConfig,
     ExtendedPSNetworkRegistrationState, ExtendedPSNetworkRegistrationUrcConfig, GPRSAttachedState,
     GPRSNetworkRegistrationStat, GPRSNetworkRegistrationUrcConfig, PDPContextStatus,
-    PacketSwitchedNetworkDataParam, PacketSwitchedParam, ProfileId, ContextId
+    PacketSwitchedNetworkDataParam, PacketSwitchedParam, ProfileId,
 };
-use crate::{command::network_service::types::RatAct};
+use crate::command::network_service::types::RatAct;
 use atat::atat_derive::AtatResp;
 use heapless::String;
 

@@ -31,10 +31,10 @@ use responses::{
     PacketSwitchedNetworkData,
 };
 use types::{
-    AuthenticationType, EPSNetworkRegistrationUrcConfig, ExtendedPSNetworkRegistrationUrcConfig,
-    GPRSAttachedState, GPRSNetworkRegistrationUrcConfig, PDPContextStatus, PSEventReportingMode,
-    PacketSwitchedAction, PacketSwitchedNetworkDataParam, PacketSwitchedParam,
-    PacketSwitchedParamReq, ContextId, ProfileId
+    AuthenticationType, ContextId, EPSNetworkRegistrationUrcConfig,
+    ExtendedPSNetworkRegistrationUrcConfig, GPRSAttachedState, GPRSNetworkRegistrationUrcConfig,
+    PDPContextStatus, PSEventReportingMode, PacketSwitchedAction, PacketSwitchedNetworkDataParam,
+    PacketSwitchedParam, PacketSwitchedParamReq, ProfileId,
 };
 
 use super::NoResponse;
