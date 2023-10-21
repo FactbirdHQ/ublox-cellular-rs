@@ -3,6 +3,22 @@ use core::str::FromStr;
 use crate::{command::Urc, config::CellularConfig};
 
 use super::state::{self, LinkState};
+use crate::asynch::state::PowerState;
+use crate::command::control::types::{Circuit108Behaviour, Circuit109Behaviour, FlowControl};
+use crate::command::control::{SetCircuit108Behaviour, SetCircuit109Behaviour, SetFlowControl};
+use crate::command::device_lock::responses::PinStatus;
+use crate::command::device_lock::types::PinStatusCode;
+use crate::command::device_lock::GetPinStatus;
+use crate::command::general::{GetCCID, GetFirmwareVersion, GetModelId, IdentificationInformation};
+use crate::command::gpio::types::{GpioInPull, GpioMode, GpioOutValue};
+use crate::command::gpio::SetGpioConfiguration;
+use crate::command::ip_transport_layer::types::HexMode;
+use crate::command::ip_transport_layer::SetHexMode;
+use crate::command::mobile_control::types::{Functionality, ResetMode, TerminationErrorMode};
+use crate::command::mobile_control::{SetModuleFunctionality, SetReportMobileTerminationError};
+use crate::command::system_features::types::PowerSavingMode;
+use crate::command::system_features::SetPowerSavingControl;
+use crate::command::AT;
 use crate::error::Error;
 use crate::error::GenericError::Timeout;
 use crate::module_timing::{boot_time, reset_time};
@@ -10,23 +26,8 @@ use atat::{asynch::AtatClient, UrcSubscription};
 use embassy_time::{with_timeout, Duration, Timer};
 use embedded_hal::digital::{InputPin, OutputPin};
 use futures::future::ok;
+use heapless::String;
 use no_std_net::{Ipv4Addr, Ipv6Addr};
-use crate::asynch::state::PowerState;
-use crate::command::AT;
-use crate::command::control::{SetCircuit108Behaviour, SetCircuit109Behaviour, SetFlowControl};
-use crate::command::control::types::{Circuit108Behaviour, Circuit109Behaviour, FlowControl};
-use crate::command::device_lock::GetPinStatus;
-use crate::command::device_lock::responses::PinStatus;
-use crate::command::device_lock::types::PinStatusCode;
-use crate::command::general::{GetCCID, GetFirmwareVersion, GetModelId};
-use crate::command::gpio::SetGpioConfiguration;
-use crate::command::gpio::types::{GpioInPull, GpioMode, GpioOutValue};
-use crate::command::ip_transport_layer::SetHexMode;
-use crate::command::ip_transport_layer::types::HexMode;
-use crate::command::mobile_control::{SetModuleFunctionality, SetReportMobileTerminationError};
-use crate::command::mobile_control::types::{Functionality, ResetMode, TerminationErrorMode};
-use crate::command::system_features::SetPowerSavingControl;
-use crate::command::system_features::types::PowerSavingMode;
 
 use super::AtHandle;
 
@@ -58,13 +59,13 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
     }
 
     // TODO: crate visibility only makes sense if reset and co are also crate visibility
-    pub(crate) async fn init(&mut self) -> Result<(), Error> {
+    // pub(crate) async fn init(&mut self) -> Result<(), Error> {
+    pub async fn init(&mut self) -> Result<(), Error> {
         // Initilize a new ublox device to a known state (set RS232 settings)
         debug!("Initializing module");
         // Hard reset module
         self.reset().await?;
         self.is_alive().await?;
-
 
         Ok(())
     }
@@ -78,7 +79,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
             Ok(_) => {
                 self.ch.set_power_state(PowerState::Alive);
                 Ok(true)
-            },
+            }
             Err(err) => return Err(Error::Atat(err)),
         };
         alive
@@ -106,97 +107,92 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
         }
 
         // Extended errors on
-        self.at.send(
-            SetReportMobileTerminationError {
+        self.at
+            .send(SetReportMobileTerminationError {
                 n: TerminationErrorMode::Enabled,
-            }
-        ).await?;
+            })
+            .await?;
 
         // Select SIM
-        self.at.send(
-            SetGpioConfiguration {
+        self.at
+            .send(SetGpioConfiguration {
                 gpio_id: 25,
                 gpio_mode: GpioMode::Output(GpioOutValue::High),
-            }
-        ).await?;
+            })
+            .await?;
 
         #[cfg(any(feature = "lara-r6"))]
-        self.at.send(
-            SetGpioConfiguration {
+        self.at
+            .send(SetGpioConfiguration {
                 gpio_id: 42,
                 gpio_mode: GpioMode::Input(GpioInPull::NoPull),
-            },
-        ).await?;
+            })
+            .await?;
 
-        self.at.send(
-            GetModelId).await?;
+        let model_id = self.at.send(GetModelId).await?;
 
-        // self.network.send_internal(
+        // self.at.send(
         //     &IdentificationInformation {
         //         n: 9
         //     },
-        //     false,
-        // )?;
+        // ).await?;
 
-        self.at.send(
-            GetFirmwareVersion).await?;
+        self.at.send(GetFirmwareVersion).await?;
 
         self.select_sim_card().await?;
 
-        self.at.send(
-            GetCCID).await?;
-
+        let ccid = self.at.send(GetCCID).await?;
+        info!("CCID: {}", ccid.ccid);
         // DCD circuit (109) changes in accordance with the carrier
-        self.at.send(
-
-            SetCircuit109Behaviour {
+        self.at
+            .send(SetCircuit109Behaviour {
                 value: Circuit109Behaviour::ChangesWithCarrier,
-            },
-        ).await?;
+            })
+            .await?;
 
         // Ignore changes to DTR
-        self.at.send(
-            SetCircuit108Behaviour {
+        self.at
+            .send(SetCircuit108Behaviour {
                 value: Circuit108Behaviour::Ignore,
-            },
-        ).await?;
+            })
+            .await?;
 
         // Switch off UART power saving until it is integrated into this API
-        self.at.send(
-            SetPowerSavingControl {
+        self.at
+            .send(SetPowerSavingControl {
                 mode: PowerSavingMode::Disabled,
                 timeout: None,
-            },
-        ).await?;
+            })
+            .await?;
 
         if C::HEX_MODE {
-            self.at.send(
-                SetHexMode {
+            self.at
+                .send(SetHexMode {
                     hex_mode_disable: HexMode::Enabled,
-                },
-            ).await?;
+                })
+                .await?;
         } else {
-            self.at.send(
-                SetHexMode {
+            self.at
+                .send(SetHexMode {
                     hex_mode_disable: HexMode::Disabled,
-                },
-            ).await?;
+                })
+                .await?;
         }
 
         // Tell module whether we support flow control
         // FIXME: Use AT+IFC=2,2 instead of AT&K here
         if C::FLOW_CONTROL {
-            self.at.send(
-                SetFlowControl {
+            self.at
+                .send(SetFlowControl {
                     value: FlowControl::RtsCts,
-                },
-            ).await?;
+                })
+                .await?;
         } else {
-            self.at.send(
-                SetFlowControl {
+            self.at
+                .send(SetFlowControl {
                     value: FlowControl::Disabled,
-                },
-            ).await?;
+                })
+                .await?;
         }
 
         self.ch.set_power_state(PowerState::Initialized);
@@ -219,22 +215,22 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
         // There was an error initializing the SIM
         // We've seen issues on uBlox-based devices, as a precation, we'll cycle
         // the modem here through minimal/full functional state.
-        self.at.send(
-            SetModuleFunctionality {
+        self.at
+            .send(SetModuleFunctionality {
                 fun: Functionality::Minimum,
                 // SARA-R5 This parameter can be used only when <fun> is 1, 4 or 19
                 #[cfg(feature = "sara-r5")]
                 rst: None,
                 #[cfg(not(feature = "sara-r5"))]
                 rst: Some(ResetMode::DontReset),
-            },
-        ).await?;
-        self.at.send(
-            SetModuleFunctionality {
+            })
+            .await?;
+        self.at
+            .send(SetModuleFunctionality {
                 fun: Functionality::Full,
                 rst: Some(ResetMode::DontReset),
-            },
-        ).await?;
+            })
+            .await?;
 
         Err(Error::Busy)
     }

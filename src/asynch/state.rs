@@ -30,7 +30,6 @@ pub enum PowerState {
     Initialized,
 }
 
-
 use crate::command::Urc;
 
 use super::AtHandle;
@@ -89,7 +88,6 @@ impl<'d> Runner<'d> {
             s.waker.wake();
         });
     }
-
 }
 
 impl<'d> StateRunner<'d> {

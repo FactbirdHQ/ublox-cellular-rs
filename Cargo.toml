@@ -50,6 +50,7 @@ defmt = [
     "ublox-sockets?/defmt",
     "atat/defmt",
     "heapless/defmt-impl",
+    "embassy-time/defmt",
 ]
 
 log = ["dep:log", "ublox-sockets?/log", "atat/log"]
@@ -79,11 +80,5 @@ default-members = ["."]
 exclude = ["examples"]
 
 [patch.crates-io]
-#atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "d2175b4", features = [
-#    "derive",
-#    "defmt",
-#    "bytes",
-#] }
-# ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", rev = "1b59385" }
 ublox-sockets = { path = "../ublox-sockets" }
 no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
