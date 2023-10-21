@@ -24,7 +24,7 @@ heapless = { version = "^0.7", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
 ublox-sockets = { version = "0.5", optional = true }
-embassy-time = "0.1"
+embassy-time = "0.1.5"
 embassy-sync = "0.3"
 
 no-std-net = { version = "^0.6", features = ["serde"] }

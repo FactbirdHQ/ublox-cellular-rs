@@ -26,4 +26,4 @@ ublox-cellular-rs = {version = "0.4.0", path = "../..", features = ["sara-r5", "
 [patch.crates-io]
 ublox-sockets = { path = "../../../ublox-sockets" }
 no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
-embassy-time = { version = "0.1.5", package = "embassy-time", git = "https://github.com/embassy-rs/embassy", rev = "213b4c9dca2e541c00e702b4476db3612f4d62b9" }
+embassy-time = { package = "embassy-time", git = "https://github.com/embassy-rs/embassy", branch = "main" }
