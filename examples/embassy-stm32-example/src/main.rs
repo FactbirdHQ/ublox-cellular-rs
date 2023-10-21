@@ -125,7 +125,7 @@ async fn main_task(spawner: Spawner) {
         rx_buf,
         uart_config,
     );
-    let (mut writer, reader) = uart.unwrap().split();
+    let (writer, reader) = uart.unwrap().split();
     // let power = Output::new(p.PJ4, Level::High, Speed::VeryHigh).degrade();
     // let reset = Output::new(p.PF8, Level::High, Speed::VeryHigh).degrade();
     let celullar_config = MyCelullarConfig {
