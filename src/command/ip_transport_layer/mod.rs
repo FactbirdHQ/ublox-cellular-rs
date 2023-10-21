@@ -53,7 +53,9 @@ pub struct CreateSocket {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USOSEC", NoResponse)]
 pub struct SetSocketSslState {
-    #[at_arg(position = 0)]
+    // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
+    // FIXME: having all the lines use a constant something like  #[at_arg(position = 0, len = MAX_SOCKETS)]
+    #[at_arg(position = 0, len = 1)]
     pub socket: SocketHandle,
     #[at_arg(position = 1)]
     pub ssl_tls_status: SslTlsStatus,
@@ -70,7 +72,8 @@ pub struct SetSocketSslState {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USOCL", NoResponse, attempts = 1, timeout_ms = 120000)]
 pub struct CloseSocket {
-    #[at_arg(position = 0)]
+    // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
+    #[at_arg(position = 0, len = 1)]
     pub socket: SocketHandle,
 }
 
@@ -95,7 +98,8 @@ pub struct GetSocketError;
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USOCO", NoResponse, attempts = 1, timeout_ms = 120000)]
 pub struct ConnectSocket {
-    #[at_arg(position = 0)]
+    // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
+    #[at_arg(position = 0, len = 1)]
     pub socket: SocketHandle,
     #[at_arg(position = 1, len = 39)]
     pub remote_addr: IpAddr,
@@ -114,7 +118,8 @@ pub struct ConnectSocket {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USOWR", WriteSocketDataResponse)]
 pub struct WriteSocketData<'a> {
-    #[at_arg(position = 0)]
+    // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
+    #[at_arg(position = 0, len = 1)]
     pub socket: SocketHandle,
     #[at_arg(position = 1)]
     pub length: usize,
@@ -134,7 +139,8 @@ pub struct WriteSocketData<'a> {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USOWR", WriteSocketDataResponse)]
 pub struct WriteSocketDataHex<'a> {
-    #[at_arg(position = 0)]
+    // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
+    #[at_arg(position = 0, len = 1)]
     pub socket: SocketHandle,
     #[at_arg(position = 1)]
     pub length: usize,
@@ -153,7 +159,8 @@ pub struct WriteSocketDataHex<'a> {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USOWR", NoResponse)]
 pub struct PrepareWriteSocketDataBinary {
-    #[at_arg(position = 0)]
+    // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
+    #[at_arg(position = 0, len = 1)]
     pub socket: SocketHandle,
     #[at_arg(position = 1)]
     pub length: usize,
@@ -185,7 +192,8 @@ pub struct WriteSocketDataBinary<'a> {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USOST", NoResponse)]
 pub struct PrepareUDPSendToDataBinary {
-    #[at_arg(position = 0)]
+    // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
+    #[at_arg(position = 0, len = 1)]
     pub socket: SocketHandle,
     #[at_arg(position = 1, len = 39)]
     pub remote_addr: IpAddr,
@@ -228,7 +236,8 @@ pub struct UDPSendToDataBinary<'a> {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USORD", SocketData)]
 pub struct ReadSocketData {
-    #[at_arg(position = 0)]
+    // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
+    #[at_arg(position = 0, len = 1)]
     pub socket: SocketHandle,
     #[at_arg(position = 1)]
     pub length: usize,
@@ -244,7 +253,8 @@ pub struct ReadSocketData {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USORF", UDPSocketData)]
 pub struct ReadUDPSocketData {
-    #[at_arg(position = 0)]
+    // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
+    #[at_arg(position = 0, len = 1)]
     pub socket: SocketHandle,
     #[at_arg(position = 1)]
     pub length: usize,
@@ -267,7 +277,8 @@ pub struct SetHexMode {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+USOCTL", SocketControlResponse)]
 pub struct SocketControl {
-    #[at_arg(position = 0)]
+    // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
+    #[at_arg(position = 0, len = 1)]
     pub socket: SocketHandle,
     #[at_arg(position = 1)]
     pub param_id: SocketControlParam,
