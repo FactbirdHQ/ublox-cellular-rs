@@ -130,7 +130,8 @@ async fn main_task(spawner: Spawner) {
     // let reset = Output::new(p.PF8, Level::High, Speed::VeryHigh).degrade();
     let celullar_config = MyCelullarConfig {
         reset_pin: Some(Output::new(p.PF8, Level::High, Speed::VeryHigh).degrade()),
-        power_pin: Some(Output::new(p.PJ4, Level::High, Speed::VeryHigh).degrade()),
+        // power_pin: Some(Output::new(p.PJ4, Level::High, Speed::Low).degrade()),
+        power_pin: None,
         vint_pin: Some(Input::new(p.PJ3, Pull::Down).degrade())
     };
 
@@ -142,7 +143,12 @@ async fn main_task(spawner: Spawner) {
     let state = make_static!(State::new(client));
     let (device, mut control, mut runner) = ublox_cellular::asynch::new(state, &buffers.urc_channel, celullar_config).await;
 
-    runner.init().await.unwrap();
+    // defmt::info!("{:?}", runner.init().await);
+    loop {
+        // runner.init().await.unwrap();
+        defmt::info!("{:?}", runner.is_alive().await);
+        Timer::after(Duration::from_millis(1000)).await;
+    }
     defmt::unwrap!(spawner.spawn(cellular_task(runner)));
 
     loop {
@@ -156,7 +162,8 @@ async fn ingress_task(
     mut ingress: Ingress<'static, DefaultDigester<Urc>, ublox_cellular::command::Urc, {INGRESS_BUF_SIZE}, {URC_CAPACITY}, {URC_SUBSCRIBERS}>,
     mut reader: BufferedUartRx<'static, UART8>,
 ) -> ! {
-    ingress.read_from(&mut reader).await
+    ingress.read_from(&mut reader).await;
+    defmt::panic!("ingress_task ended");
 }
 
 #[embassy_executor::task]

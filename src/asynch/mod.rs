@@ -67,10 +67,11 @@ pub async fn new<
         subscriber.subscribe().unwrap(),
     );
 
-    runner.init().await.unwrap();
+    // FIXME: Unwrapping the init is not nice, maybe return a Result for new()?
+    // runner.init().await.unwrap();
 
     let mut control = Control::new(state_ch, AtHandle(&state.at_handle));
-    control.init().await.unwrap();
+    // control.init().await.unwrap();
 
     (net_device, control, runner)
 }

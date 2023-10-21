@@ -45,6 +45,7 @@ impl defmt::Format for Error {
             Self::Network(e) => defmt::write!(f, "Network({:?})", e),
             // Self::DataService(e) => defmt::write!(f, "DataService({:?})", e),
             Self::Generic(e) => defmt::write!(f, "Generic({:?})", e),
+            Self::Atat(e) => defmt::write!(f, "Atat({:?})", e),
             Self::_Unknown => defmt::write!(f, "_Unknown"),
             _ => defmt::write!(f, "non_exhaustive"),
         }
