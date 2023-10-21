@@ -64,6 +64,9 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
         // Initilize a new ublox device to a known state (set RS232 settings)
         debug!("Initializing module");
         // Hard reset module
+        if Ok(false) == self.has_power().await {
+            self.power_up().await?;
+        };
         self.reset().await?;
         self.is_alive().await?;
 
@@ -98,6 +101,42 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
             info!("No VInt pin configured");
             self.ch.set_power_state(PowerState::PowerUp);
             Ok(true)
+        }
+    }
+
+    pub async fn power_up(&mut self) -> Result<(), Error> {
+        if !self.has_power().await? {
+            if let Some(pin) = self.config.power_pin() {
+                pin.set_low().map_err(|_| Error::IoPin)?;
+                Timer::after(crate::module_timing::pwr_on_time()).await;
+                pin.set_high().map_err(|_| Error::IoPin)?;
+                self.ch.set_power_state(PowerState::PowerUp);
+                debug!("Powered up");
+                Ok(())
+            } else {
+                warn!("No power pin configured");
+                Ok(())
+            }
+        } else {
+            Ok(())
+        }
+    }
+
+    pub async fn power_down(&mut self) -> Result<(), Error> {
+        if self.has_power().await? {
+            if let Some(pin) = self.config.power_pin() {
+                pin.set_low().map_err(|_| Error::IoPin)?;
+                Timer::after(crate::module_timing::pwr_off_time()).await;
+                pin.set_high().map_err(|_| Error::IoPin)?;
+                self.ch.set_power_state(PowerState::PowerDown);
+                debug!("Powered down");
+                Ok(())
+            } else {
+                defmt::warn!("No power pin configured");
+                Ok(())
+            }
+        } else {
+            Ok(())
         }
     }
 

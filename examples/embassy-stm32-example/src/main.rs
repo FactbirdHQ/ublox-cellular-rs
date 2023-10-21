@@ -109,7 +109,7 @@ async fn main_task(spawner: Spawner) {
     let mut uart_config = embassy_stm32::usart::Config::default();
     {
         uart_config.baudrate = 115200;
-        uart_config.baudrate = 9600;
+        // uart_config.baudrate = 9600;
         uart_config.parity = embassy_stm32::usart::Parity::ParityNone;
         uart_config.stop_bits = embassy_stm32::usart::StopBits::STOP1;
         uart_config.data_bits = embassy_stm32::usart::DataBits::DataBits8;
@@ -147,6 +147,9 @@ async fn main_task(spawner: Spawner) {
     loop {
         // runner.init().await.unwrap();
         defmt::info!("{:?}", runner.is_alive().await);
+        if runner.is_alive().await != Ok(true){
+            runner.init().await.unwrap();
+        }
         Timer::after(Duration::from_millis(1000)).await;
     }
     defmt::unwrap!(spawner.spawn(cellular_task(runner)));

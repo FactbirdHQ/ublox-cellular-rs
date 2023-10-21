@@ -27,3 +27,10 @@ ublox-cellular-rs = {version = "0.4.0", path = "../..", features = ["sara-r5", "
 ublox-sockets = { path = "../../../ublox-sockets" }
 no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
 embassy-time = { package = "embassy-time", git = "https://github.com/embassy-rs/embassy", branch = "main" }
+
+
+[profile.dev]
+opt-level = "s"
+
+[profile.release]
+opt-level = "s"
