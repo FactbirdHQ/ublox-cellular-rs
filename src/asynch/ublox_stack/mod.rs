@@ -1,3 +1,5 @@
+#![cfg(feature = "dontbuild")]
+
 #[cfg(feature = "socket-tcp")]
 pub mod tcp;
 // #[cfg(feature = "socket-udp")]

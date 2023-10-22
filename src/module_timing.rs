@@ -6,6 +6,8 @@ use embassy_time::Duration;
 pub fn pwr_on_time() -> Duration {
     if cfg!(feature = "lara-r6") {
         Duration::from_millis(150)
+    } else if cfg!(feature = "sara-r5") {
+        Duration::from_millis(150)
     } else if cfg!(feature = "toby-r2") {
         Duration::from_micros(50)
     } else {
@@ -17,9 +19,11 @@ pub fn pwr_on_time() -> Duration {
 pub fn pwr_off_time() -> Duration {
     if cfg!(feature = "lara-r6") {
         Duration::from_millis(1500)
+    } else if cfg!(feature = "sara-r5") {
+        Duration::from_millis(5000)
     } else if cfg!(feature = "toby-r2") {
         Duration::from_secs(1)
-    } else {
+    }    else {
         Duration::from_secs(1)
     }
 }
@@ -30,8 +34,19 @@ pub fn reset_time() -> Duration {
         Duration::from_millis(10)
     } else if cfg!(feature = "toby-r2") {
         Duration::from_millis(50)
+    } else if cfg!(feature = "sara-r5") {
+        Duration::from_millis(100)
     } else {
         Duration::from_millis(50)
+    }
+}
+
+/// Time to wait for module to boot
+pub fn boot_time() -> Duration {
+    if cfg!(feature = "sara-r5") {
+        Duration::from_secs(1)
+    } else {
+        Duration::from_secs(1)
     }
 }
 

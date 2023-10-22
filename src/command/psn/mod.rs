@@ -31,14 +31,13 @@ use responses::{
     PacketSwitchedNetworkData,
 };
 use types::{
-    AuthenticationType, EPSNetworkRegistrationUrcConfig, ExtendedPSNetworkRegistrationUrcConfig,
-    GPRSAttachedState, GPRSNetworkRegistrationUrcConfig, PDPContextStatus, PSEventReportingMode,
-    PacketSwitchedAction, PacketSwitchedNetworkDataParam, PacketSwitchedParam,
-    PacketSwitchedParamReq,
+    AuthenticationType, ContextId, EPSNetworkRegistrationUrcConfig,
+    ExtendedPSNetworkRegistrationUrcConfig, GPRSAttachedState, GPRSNetworkRegistrationUrcConfig,
+    PDPContextStatus, PSEventReportingMode, PacketSwitchedAction, PacketSwitchedNetworkDataParam,
+    PacketSwitchedParam, PacketSwitchedParamReq, ProfileId,
 };
 
 use super::NoResponse;
-use crate::network::{ContextId, ProfileId};
 
 /// 18.4 PDP context definition +CGDCONT
 ///

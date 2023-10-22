@@ -2,7 +2,7 @@
 use super::types::{
     EPSNetworkRegistrationStat, ExtendedPSNetworkRegistrationState, GPRSNetworkRegistrationStat,
 };
-use crate::{command::network_service::types::RatAct, network::ProfileId};
+use crate::{command::network_service::types::RatAct, command::psn::types::ProfileId};
 use atat::atat_derive::AtatResp;
 use embedded_nal::IpAddr;
 use heapless::String;

@@ -1,3 +1,5 @@
+#![cfg(feature = "dontbuild")]
+
 use core::{cell::RefCell, future::poll_fn, task::Poll};
 
 use atat::asynch::AtatClient;
@@ -61,9 +63,7 @@ impl<'a> DnsSocket<'a> {
                 .insert(heapless::String::from(name), DnsQuery::new())
                 .is_err()
             {
-                error!(
-                    "Attempted to start more simultaneous DNS requests than the (4) supported"
-                );
+                error!("Attempted to start more simultaneous DNS requests than the (4) supported");
             }
             s.waker.wake();
         }

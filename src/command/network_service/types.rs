@@ -181,3 +181,12 @@ pub enum OperatorNameFormat {
     #[at_arg(value = 2)]
     Numeric(String<6>),
 }
+
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Error {
+    RegistrationDenied,
+    UnknownProfile,
+    ActivationFailed,
+    _Unknown,
+}

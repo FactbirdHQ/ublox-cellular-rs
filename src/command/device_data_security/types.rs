@@ -1,7 +1,8 @@
 //! Argument and parameter types used by Device and data security Commands and Responses
 
-use atat::atat_derive::AtatEnum;
+use atat::atat_derive::{AtatEnum, AtatLen};
 use heapless::String;
+use serde::{Deserialize, Serialize};
 
 /// Type of operation
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
@@ -218,3 +219,6 @@ pub enum SecurityProfileOperation {
     #[at_arg(value = 13)]
     TlsSessionResumption,
 }
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, AtatLen)]
+pub struct SecurityProfileId(pub u8);

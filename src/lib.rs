@@ -8,9 +8,9 @@
 pub(crate) mod fmt;
 
 pub mod command;
-mod config;
+pub mod config;
 pub mod error;
 mod module_timing;
 
 #[cfg(feature = "async")]
-mod asynch;
+pub mod asynch;
