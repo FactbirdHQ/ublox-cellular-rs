@@ -7,7 +7,7 @@ use core::cell::RefCell;
 use cortex_m_rt::entry;
 use defmt::*;
 use embassy_executor::{Executor, Spawner};
-use embassy_stm32::gpio::{AnyPin, Input, Level, Output, Pin, Pull, Speed};
+use embassy_stm32::gpio::{AnyPin, Input, Level, Output, Pin, Pull, Speed, OutputOpenDrain};
 use embassy_stm32::rcc::VoltageScale;
 use embassy_stm32::time::{khz, mhz};
 use embassy_stm32::{bind_interrupts, peripherals, Config, interrupt, usart};
@@ -22,7 +22,7 @@ use {defmt_rtt as _, panic_probe as _};
 // use embedded_hal::digital::{ErrorType, InputPin, OutputPin};
 
 use ublox_cellular;
-use ublox_cellular::config::CellularConfig;
+use ublox_cellular::config::{CellularConfig, ReverseOutputPin};
 
 use atat::{Buffers, DefaultDigester, Ingress, AtatIngress, AtDigester, Parser};
 use atat::asynch::AtatClient;
@@ -42,7 +42,7 @@ const URC_SUBSCRIBERS: usize = 2;
 struct MyCelullarConfig {
     reset_pin: Option<Output<'static, AnyPin>>,
     // reset_pin: Option<NoPin>,
-    power_pin: Option<Output<'static, AnyPin>>,
+    power_pin: Option<ReverseOutputPin<Output<'static, AnyPin>>>,
     // power_pin: Option<NoPin>,
     vint_pin: Option<Input<'static, AnyPin>>,
     // vint_pin: Option<NoPin>
@@ -51,7 +51,7 @@ struct MyCelullarConfig {
 impl CellularConfig for MyCelullarConfig {
     type ResetPin = Output<'static, AnyPin>;
     // type ResetPin = NoPin;
-    type PowerPin = Output<'static, AnyPin>;
+    type PowerPin = ReverseOutputPin<Output<'static, AnyPin>>;
     // type PowerPin = NoPin;
     type VintPin = Input<'static, AnyPin>;
     // type VintPin = NoPin;
@@ -129,9 +129,11 @@ async fn main_task(spawner: Spawner) {
     // let power = Output::new(p.PJ4, Level::High, Speed::VeryHigh).degrade();
     // let reset = Output::new(p.PF8, Level::High, Speed::VeryHigh).degrade();
     let celullar_config = MyCelullarConfig {
-        reset_pin: Some(Output::new(p.PF8, Level::High, Speed::VeryHigh).degrade()),
-        // power_pin: Some(Output::new(p.PJ4, Level::High, Speed::Low).degrade()),
-        power_pin: None,
+        reset_pin: Some(Output::new(p.PF8, Level::High, Speed::Low).degrade()),
+        power_pin: Some(ReverseOutputPin(Output::new(p.PJ4, Level::High, Speed::Low).degrade())),
+        // reset_pin: Some(OutputOpenDrain::new(p.PF8, Level::High, Speed::Low, Pull::None).degrade()),
+        // power_pin: Some(OutputOpenDrain::new(p.PJ4, Level::High, Speed::Low, Pull::None).degrade()),
+        // power_pin: None,
         vint_pin: Some(Input::new(p.PJ3, Pull::Down).degrade())
     };
 
@@ -151,6 +153,13 @@ async fn main_task(spawner: Spawner) {
             runner.init().await.unwrap();
         }
         Timer::after(Duration::from_millis(1000)).await;
+        if runner.has_power().await == Ok(true){
+            runner.power_down().await.unwrap();
+        }
+        Timer::after(Duration::from_millis(5000)).await;
+        if runner.has_power().await == Ok(false){
+            runner.power_up().await.unwrap();
+        }
     }
     defmt::unwrap!(spawner.spawn(cellular_task(runner)));
 
