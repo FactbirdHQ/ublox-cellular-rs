@@ -25,7 +25,7 @@ nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
 ublox-sockets = { version = "0.5", optional = true }
 embassy-time = "0.1.5"
-embassy-sync = "0.3"
+embassy-sync = "0.4"
 
 no-std-net = { version = "^0.6", features = ["serde"] }
 
@@ -80,5 +80,5 @@ default-members = ["."]
 exclude = ["examples"]
 
 [patch.crates-io]
-ublox-sockets = { path = "../ublox-sockets" }
+ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", branch = "feature/async-borrowed-sockets" }
 no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
