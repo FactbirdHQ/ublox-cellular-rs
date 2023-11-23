@@ -4,6 +4,7 @@ use crate::{command::Urc, config::CellularConfig};
 
 use super::state::{self, LinkState};
 use crate::asynch::state::PowerState;
+use crate::asynch::state::PowerState::PowerDown;
 use crate::command::control::types::{Circuit108Behaviour, Circuit109Behaviour, FlowControl};
 use crate::command::control::{SetCircuit108Behaviour, SetCircuit109Behaviour, SetFlowControl};
 use crate::command::device_lock::responses::PinStatus;
@@ -23,29 +24,42 @@ use crate::error::Error;
 use crate::error::GenericError::Timeout;
 use crate::module_timing::{boot_time, reset_time};
 use atat::{asynch::AtatClient, UrcSubscription};
+use embassy_futures::select::select;
 use embassy_time::{with_timeout, Duration, Timer};
 use embedded_hal::digital::{InputPin, OutputPin};
-use futures::future::ok;
 use heapless::String;
 use no_std_net::{Ipv4Addr, Ipv6Addr};
+
+use embassy_futures::select::Either;
 
 use super::AtHandle;
 
 /// Background runner for the Ublox Module.
 ///
 /// You must call `.run()` in a background task for the Ublox Module to operate.
-pub struct Runner<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize> {
-    ch: state::Runner<'d>,
+pub struct Runner<
+    'd,
+    AT: AtatClient,
+    C: CellularConfig,
+    const URC_CAPACITY: usize,
+    const MAX_STATE_LISTENERS: usize,
+> {
+    ch: state::Runner<'d, MAX_STATE_LISTENERS>,
     at: AtHandle<'d, AT>,
     config: C,
     urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
 }
 
-impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
-    Runner<'d, AT, C, URC_CAPACITY>
+impl<
+        'd,
+        AT: AtatClient,
+        C: CellularConfig,
+        const URC_CAPACITY: usize,
+        const MAX_STATE_LISTENERS: usize,
+    > Runner<'d, AT, C, URC_CAPACITY, MAX_STATE_LISTENERS>
 {
     pub(crate) fn new(
-        ch: state::Runner<'d>,
+        ch: state::Runner<'d, MAX_STATE_LISTENERS>,
         at: AtHandle<'d, AT>,
         config: C,
         urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
@@ -132,7 +146,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
                 debug!("Powered down");
                 Ok(())
             } else {
-                defmt::warn!("No power pin configured");
+                warn!("No power pin configured");
                 Ok(())
             }
         } else {
@@ -294,24 +308,80 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
 
     pub async fn run(mut self) -> ! {
         loop {
-            let event = self.urc_subscription.next_message_pure().await;
-            match event {
-                // Handle network URCs
-                Urc::NetworkDetach => todo!(),
-                Urc::MobileStationDetach => todo!(),
-                Urc::NetworkDeactivate => todo!(),
-                Urc::MobileStationDeactivate => todo!(),
-                Urc::NetworkPDNDeactivate => todo!(),
-                Urc::MobileStationPDNDeactivate => todo!(),
-                Urc::SocketDataAvailable(_) => todo!(),
-                Urc::SocketDataAvailableUDP(_) => todo!(),
-                Urc::DataConnectionActivated(_) => todo!(),
-                Urc::DataConnectionDeactivated(_) => todo!(),
-                Urc::SocketClosed(_) => todo!(),
-                Urc::MessageWaitingIndication(_) => todo!(),
-                Urc::ExtendedPSNetworkRegistration(_) => todo!(),
-                Urc::HttpResponse(_) => todo!(),
-            };
+            match select(
+                self.ch.state_runner().wait_for_desired_state_change(),
+                self.urc_subscription.next_message_pure(),
+            )
+            .await
+            {
+                Either::First(desired_state) => {
+                    info!("Desired state: {:?}", desired_state);
+                    match desired_state {
+                        Ok(PowerState::PowerDown) => {
+                            self.power_down().await.ok();
+                        }
+                        Ok(PowerState::PowerUp) => {
+                            self.power_up().await.ok();
+                        }
+                        Ok(PowerState::Initialized) => {
+                            self.init_at().await.ok();
+                        }
+                        Ok(PowerState::Alive) => {
+                            self.is_alive().await.ok();
+                        }
+                        Ok(PowerState::Connected) => {
+                            todo!()
+                        }
+                        Ok(PowerState::DataEstablished) => {
+                            todo!()
+                        }
+                        Err(err) => {
+                            error!("Error in desired state: {:?}", err);
+                        }
+                    }
+                }
+                Either::Second(event) => {
+                    match event {
+                        // Handle network URCs
+                        Urc::NetworkDetach => todo!(),
+                        Urc::MobileStationDetach => todo!(),
+                        Urc::NetworkDeactivate => todo!(),
+                        Urc::MobileStationDeactivate => todo!(),
+                        Urc::NetworkPDNDeactivate => todo!(),
+                        Urc::MobileStationPDNDeactivate => todo!(),
+                        Urc::SocketDataAvailable(_) => todo!(),
+                        Urc::SocketDataAvailableUDP(_) => todo!(),
+                        Urc::DataConnectionActivated(_) => todo!(),
+                        Urc::DataConnectionDeactivated(_) => todo!(),
+                        Urc::SocketClosed(_) => todo!(),
+                        Urc::MessageWaitingIndication(_) => todo!(),
+                        Urc::ExtendedPSNetworkRegistration(_) => todo!(),
+                        Urc::HttpResponse(_) => todo!(),
+                    };
+                }
+            }
+
+            //     let desired_state = self.ch.state_runner().wait_for_desired_state_change().await;
+            //     // let desired_state = self.ch.state_runner().desired_state();
+            //     info!("Desired state: {:?}", desired_state);
+            // let event = self.urc_subscription.next_message_pure().await;
+            // match event {
+            //     // Handle network URCs
+            //     Urc::NetworkDetach => todo!(),
+            //     Urc::MobileStationDetach => todo!(),
+            //     Urc::NetworkDeactivate => todo!(),
+            //     Urc::MobileStationDeactivate => todo!(),
+            //     Urc::NetworkPDNDeactivate => todo!(),
+            //     Urc::MobileStationPDNDeactivate => todo!(),
+            //     Urc::SocketDataAvailable(_) => todo!(),
+            //     Urc::SocketDataAvailableUDP(_) => todo!(),
+            //     Urc::DataConnectionActivated(_) => todo!(),
+            //     Urc::DataConnectionDeactivated(_) => todo!(),
+            //     Urc::SocketClosed(_) => todo!(),
+            //     Urc::MessageWaitingIndication(_) => todo!(),
+            //     Urc::ExtendedPSNetworkRegistration(_) => todo!(),
+            //     Urc::HttpResponse(_) => todo!(),
+            // };
         }
     }
 }

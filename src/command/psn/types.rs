@@ -1,6 +1,5 @@
 use atat::atat_derive::{AtatEnum, AtatLen};
 use embedded_nal::IpAddr;
-use hash32_derive::Hash32;
 use heapless::String;
 use serde::{Deserialize, Serialize};
 
@@ -647,7 +646,7 @@ pub enum EPSNetworkRegistrationStat {
     AttachedEmergencyOnly = 8,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash32, Serialize, Deserialize, AtatLen)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, AtatLen)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ProfileId(pub u8);
 

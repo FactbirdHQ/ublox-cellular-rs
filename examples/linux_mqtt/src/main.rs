@@ -156,11 +156,11 @@ fn main() {
             SubscribeRequest {
                 topics: Vec::from_slice(&[
                     SubscribeTopic {
-                        topic_path: String::from("mqttrust/tester/subscriber"),
+                        topic_path: String::try_from("mqttrust/tester/subscriber").unwrap(),
                         qos: QoS::AtLeastOnce,
                     },
                     SubscribeTopic {
-                        topic_path: String::from("mqttrust/tester/subscriber2"),
+                        topic_path: String::try_from("mqttrust/tester/subscriber2").unwrap(),
                         qos: QoS::AtLeastOnce,
                     },
                 ])
@@ -178,7 +178,7 @@ fn main() {
                     // Subscribe @ http://www.hivemq.com/demos/websocket-client/
                     p.enqueue(
                         PublishRequest::new(
-                            String::from("fbmini/input/test_mini_1"),
+                            String::try_from("fbmini/input/test_mini_1").unwrap(),
                             format!("{{\"key\": \"Hello World from Factbird Mini - {}!\"}}", cnt)
                                 .as_bytes()
                                 .to_owned(),

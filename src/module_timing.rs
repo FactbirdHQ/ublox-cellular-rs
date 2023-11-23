@@ -23,7 +23,7 @@ pub fn pwr_off_time() -> Duration {
         Duration::from_millis(5000)
     } else if cfg!(feature = "toby-r2") {
         Duration::from_secs(1)
-    }    else {
+    } else {
         Duration::from_secs(1)
     }
 }

@@ -29,6 +29,7 @@ use atat::asynch::AtatClient;
 use ublox_cellular::asynch::runner::Runner;
 use ublox_cellular::asynch::State;
 use ublox_cellular::command::{AT, Urc};
+use ublox_cellular::asynch::state::{LinkState, PowerState};
 
 
 bind_interrupts!(struct Irqs {
@@ -38,6 +39,7 @@ bind_interrupts!(struct Irqs {
 const INGRESS_BUF_SIZE: usize = 1024;
 const URC_CAPACITY: usize = 2;
 const URC_SUBSCRIBERS: usize = 2;
+const MAX_DESIRED_STATE_LISTENERS: usize = 5;
 
 struct MyCelullarConfig {
     reset_pin: Option<Output<'static, AnyPin>>,
@@ -144,22 +146,53 @@ async fn main_task(spawner: Spawner) {
 
     let state = make_static!(State::new(client));
     let (device, mut control, mut runner) = ublox_cellular::asynch::new(state, &buffers.urc_channel, celullar_config).await;
-
     // defmt::info!("{:?}", runner.init().await);
+    // control.set_desired_state(PowerState::Connected).await;
+
+    defmt::unwrap!(spawner.spawn(cellular_task(runner)));
     loop {
+        // loop {
+        //     control.set_desired_state(PowerState::Connected).await;
+        //     info!("set_desired_state(PowerState::Connected)");
+        //     Timer::after(Duration::from_millis(1000)).await;
+        //     control.set_desired_state(PowerState::PowerDown).await;
+        //     info!("set_desired_state(PowerState::PowerDown)");
+        //     Timer::after(Duration::from_millis(1000)).await;
+        // }
         // runner.init().await.unwrap();
-        defmt::info!("{:?}", runner.is_alive().await);
-        if runner.is_alive().await != Ok(true){
-            runner.init().await.unwrap();
-        }
-        Timer::after(Duration::from_millis(1000)).await;
-        if runner.has_power().await == Ok(true){
-            runner.power_down().await.unwrap();
+        match control.power_state() {
+            PowerState::PowerDown => {
+                info!("PowerState::PowerDown");
+                control.set_desired_state(PowerState::PowerUp).await;
+                info!("set_desired_state(PowerState::PowerUp)");
+            }
+            PowerState::PowerUp => {
+                info!("PowerState::PowerUp");
+                control.set_desired_state(PowerState::Alive).await;
+                info!("set_desired_state(PowerState::Alive)");
+            }
+            PowerState::Alive => {
+                info!("PowerState::Alive");
+                control.set_desired_state(PowerState::Initialized).await;
+                info!("set_desired_state(PowerState::Initialized)");
+            }
+            PowerState::Initialized => {
+                info!("PowerState::Initialized");
+                control.set_desired_state(PowerState::PowerDown).await;
+                info!("set_desired_state(PowerState::PowerDown)");
+            }
+            PowerState::Connected => {
+                info!("PowerState::Connected");
+                control.set_desired_state(PowerState::PowerDown).await;
+                info!("set_desired_state(PowerState::PowerDown)");
+            }
+            PowerState::DataEstablished => {
+                info!("PowerState::DataEstablished");
+                control.set_desired_state(PowerState::PowerDown).await;
+                info!("set_desired_state(PowerState::PowerDown)");
+            }
         }
         Timer::after(Duration::from_millis(5000)).await;
-        if runner.has_power().await == Ok(false){
-            runner.power_up().await.unwrap();
-        }
     }
     defmt::unwrap!(spawner.spawn(cellular_task(runner)));
 
@@ -180,7 +213,7 @@ async fn ingress_task(
 
 #[embassy_executor::task]
 async fn cellular_task(
-    runner: Runner<'static, atat::asynch::Client<'_, BufferedUartTx<'static, UART8>, {INGRESS_BUF_SIZE}>, MyCelullarConfig, {URC_CAPACITY}>,
+    runner: Runner<'static, atat::asynch::Client<'_, BufferedUartTx<'static, UART8>, {INGRESS_BUF_SIZE}>, MyCelullarConfig, {URC_CAPACITY}, {MAX_DESIRED_STATE_LISTENERS}>,
 ) -> ! {
     runner.run().await
 }
