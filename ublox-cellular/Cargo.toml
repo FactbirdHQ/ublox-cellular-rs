@@ -20,7 +20,7 @@ atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "31a45fc", features 
     "derive",
     "bytes",
 ] }
-embedded-hal = "=1.0.0-rc.1"
+embedded-hal = "=1.0.0-rc.2"
 embedded-nal = "0.6"
 hash32 = "^0.2.1"
 hash32-derive = "^0.1.0"
@@ -34,7 +34,7 @@ embedded-io = "0.6.0"
 
 # Enable `serde` feature of `no-std-net`
 no-std-net = { version = "^0.5", features = ["serde"] }
-
+ 
 log = { version = "^0.4", default-features = false, optional = true }
 defmt = { version = "^0.3", optional = true }
 
