@@ -11,7 +11,6 @@ use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::pubsub::PubSubChannel;
 use embassy_sync::waitqueue::WakerRegistration;
 
-
 const MAX_STATE_LISTENERS: usize = 5;
 
 /// The link state of a network device.
@@ -68,13 +67,15 @@ pub struct Shared {
 
 pub struct Runner<'d> {
     shared: &'d Mutex<NoopRawMutex, RefCell<Shared>>,
-    desired_state_pub_sub: &'d PubSubChannel<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>,
+    desired_state_pub_sub:
+        &'d PubSubChannel<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>,
 }
 
 #[derive(Clone, Copy)]
 pub struct StateRunner<'d> {
     shared: &'d Mutex<NoopRawMutex, RefCell<Shared>>,
-    desired_state_pub_sub: &'d PubSubChannel<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>,
+    desired_state_pub_sub:
+        &'d PubSubChannel<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>,
 }
 
 impl<'d> Runner<'d> {
@@ -178,7 +179,10 @@ impl<'d> StateRunner<'d> {
             .publish_immediate(ps);
     }
 
-    pub async fn wait_for_desired_state(&mut self, ps: OperationState) -> Result<OperationState, Error> {
+    pub async fn wait_for_desired_state(
+        &mut self,
+        ps: OperationState,
+    ) -> Result<OperationState, Error> {
         if self.desired_state() == ps {
             info!("Desired state already set to {:?}, returning", ps);
             return Ok(ps);
@@ -208,10 +212,7 @@ pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize>(
     state: &'d mut State,
     at: AtHandle<'d, AT>,
     urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
-) -> (
-    Runner<'d>,
-    Device<'d, AT, URC_CAPACITY>,
-) {
+) -> (Runner<'d>, Device<'d, AT, URC_CAPACITY>) {
     // safety: this is a self-referential struct, however:
     // - it can't move while the `'d` borrow is active.
     // - when the borrow ends, the dangling references inside the MaybeUninit will never be used again.
@@ -225,8 +226,13 @@ pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize>(
             desired_state: OperationState::PowerDown,
             waker: WakerRegistration::new(),
         })),
-        desired_state_pub_sub:
-            PubSubChannel::<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>::new(),
+        desired_state_pub_sub: PubSubChannel::<
+            NoopRawMutex,
+            OperationState,
+            1,
+            MAX_STATE_LISTENERS,
+            1,
+        >::new(),
     });
 
     (
@@ -251,9 +257,7 @@ pub struct Device<'d, AT: AtatClient, const URC_CAPACITY: usize> {
     pub(crate) urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
 }
 
-impl<'d, AT: AtatClient, const URC_CAPACITY: usize>
-    Device<'d, AT, URC_CAPACITY>
-{
+impl<'d, AT: AtatClient, const URC_CAPACITY: usize> Device<'d, AT, URC_CAPACITY> {
     pub fn link_state_poll_fn(&mut self, cx: &mut Context) -> LinkState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
@@ -302,7 +306,10 @@ impl<'d, AT: AtatClient, const URC_CAPACITY: usize>
             .publish_immediate(ps);
     }
 
-    pub async fn wait_for_desired_state(&mut self, ps: OperationState) -> Result<OperationState, Error> {
+    pub async fn wait_for_desired_state(
+        &mut self,
+        ps: OperationState,
+    ) -> Result<OperationState, Error> {
         if self.desired_state() == ps {
             return Ok(ps);
         }

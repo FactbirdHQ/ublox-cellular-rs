@@ -44,7 +44,6 @@ pub async fn new<
     SUB: AtatUrcChannel<Urc, URC_CAPACITY, 2>,
     C: CellularConfig,
     const URC_CAPACITY: usize,
-
 >(
     state: &'a mut State<AT>,
     subscriber: &'a SUB,

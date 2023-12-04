@@ -15,10 +15,7 @@ pub struct Control<'a, AT: AtatClient> {
 }
 
 impl<'a, AT: AtatClient> Control<'a, AT> {
-    pub(crate) fn new(
-        state_ch: state::StateRunner<'a>,
-        at: AtHandle<'a, AT>,
-    ) -> Self {
+    pub(crate) fn new(state_ch: state::StateRunner<'a>, at: AtHandle<'a, AT>) -> Self {
         Self { state_ch, at }
     }
 

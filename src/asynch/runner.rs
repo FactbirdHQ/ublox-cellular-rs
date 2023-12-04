@@ -37,26 +37,15 @@ use super::AtHandle;
 /// Background runner for the Ublox Module.
 ///
 /// You must call `.run()` in a background task for the Ublox Module to operate.
-pub struct Runner<
-    'd,
-    AT: AtatClient,
-    C: CellularConfig,
-    const URC_CAPACITY: usize,
-
-> {
+pub struct Runner<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize> {
     ch: state::Runner<'d>,
     at: AtHandle<'d, AT>,
     config: C,
     urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
 }
 
-impl<
-        'd,
-        AT: AtatClient,
-        C: CellularConfig,
-        const URC_CAPACITY: usize,
-
-    > Runner<'d, AT, C, URC_CAPACITY>
+impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
+    Runner<'d, AT, C, URC_CAPACITY>
 {
     pub(crate) fn new(
         ch: state::Runner<'d>,
