@@ -141,14 +141,14 @@ where
 
                     pwr.set_high().ok();
 
-                    BlockingTimer::after(Duration::from_secs(1)).wait();
-
                     if let Err(e) = self.wait_power_state(PowerState::On, Duration::from_secs(10)) {
                         error!("Failed to power on modem");
                         return Err(e);
                     } else {
                         trace!("Modem powered on");
                     }
+
+                    BlockingTimer::after(Duration::from_secs(3)).wait();
                 }
                 _ => {
                     // Software restart
