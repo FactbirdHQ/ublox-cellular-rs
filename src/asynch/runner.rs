@@ -42,9 +42,9 @@ pub struct Runner<
     AT: AtatClient,
     C: CellularConfig,
     const URC_CAPACITY: usize,
-    const MAX_STATE_LISTENERS: usize,
+
 > {
-    ch: state::Runner<'d, MAX_STATE_LISTENERS>,
+    ch: state::Runner<'d>,
     at: AtHandle<'d, AT>,
     config: C,
     urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
@@ -55,11 +55,11 @@ impl<
         AT: AtatClient,
         C: CellularConfig,
         const URC_CAPACITY: usize,
-        const MAX_STATE_LISTENERS: usize,
-    > Runner<'d, AT, C, URC_CAPACITY, MAX_STATE_LISTENERS>
+
+    > Runner<'d, AT, C, URC_CAPACITY>
 {
     pub(crate) fn new(
-        ch: state::Runner<'d, MAX_STATE_LISTENERS>,
+        ch: state::Runner<'d>,
         at: AtHandle<'d, AT>,
         config: C,
         urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,

@@ -39,7 +39,6 @@ bind_interrupts!(struct Irqs {
 const INGRESS_BUF_SIZE: usize = 1024;
 const URC_CAPACITY: usize = 2;
 const URC_SUBSCRIBERS: usize = 2;
-const MAX_DESIRED_STATE_LISTENERS: usize = 5;
 
 struct MyCelullarConfig {
     reset_pin: Option<Output<'static, AnyPin>>,
@@ -213,7 +212,7 @@ async fn ingress_task(
 
 #[embassy_executor::task]
 async fn cellular_task(
-    runner: Runner<'static, atat::asynch::Client<'_, BufferedUartTx<'static, UART8>, {INGRESS_BUF_SIZE}>, MyCelullarConfig, {URC_CAPACITY}, {MAX_DESIRED_STATE_LISTENERS}>,
+    runner: Runner<'static, atat::asynch::Client<'_, BufferedUartTx<'static, UART8>, {INGRESS_BUF_SIZE}>, MyCelullarConfig, {URC_CAPACITY}>,
 ) -> ! {
     runner.run().await
 }

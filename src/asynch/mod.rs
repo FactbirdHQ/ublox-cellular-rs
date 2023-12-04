@@ -24,12 +24,12 @@ impl<'d, AT: AtatClient> AtHandle<'d, AT> {
     }
 }
 
-pub struct State<AT: AtatClient, const MAX_STATE_LISTENERS: usize> {
-    ch: state::State<MAX_STATE_LISTENERS>,
+pub struct State<AT: AtatClient> {
+    ch: state::State,
     at_handle: Mutex<NoopRawMutex, AT>,
 }
 
-impl<AT: AtatClient, const MAX_STATE_LISTENERS: usize> State<AT, MAX_STATE_LISTENERS> {
+impl<AT: AtatClient> State<AT> {
     pub fn new(at_handle: AT) -> Self {
         Self {
             ch: state::State::new(),
@@ -44,15 +44,15 @@ pub async fn new<
     SUB: AtatUrcChannel<Urc, URC_CAPACITY, 2>,
     C: CellularConfig,
     const URC_CAPACITY: usize,
-    const MAX_STATE_LISTENERS: usize,
+
 >(
-    state: &'a mut State<AT, MAX_STATE_LISTENERS>,
+    state: &'a mut State<AT>,
     subscriber: &'a SUB,
     config: C,
 ) -> (
-    Device<'a, AT, URC_CAPACITY, MAX_STATE_LISTENERS>,
-    Control<'a, AT, MAX_STATE_LISTENERS>,
-    Runner<'a, AT, C, URC_CAPACITY, MAX_STATE_LISTENERS>,
+    Device<'a, AT, URC_CAPACITY>,
+    Control<'a, AT>,
+    Runner<'a, AT, C, URC_CAPACITY>,
 ) {
     let (ch_runner, net_device) = state::new(
         &mut state.ch,

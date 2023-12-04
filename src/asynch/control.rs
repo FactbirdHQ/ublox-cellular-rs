@@ -9,14 +9,14 @@ use crate::error::Error;
 use super::state::{LinkState, PowerState};
 use super::{state, AtHandle};
 
-pub struct Control<'a, AT: AtatClient, const MAX_STATE_LISTENERS: usize> {
-    state_ch: state::StateRunner<'a, MAX_STATE_LISTENERS>,
+pub struct Control<'a, AT: AtatClient> {
+    state_ch: state::StateRunner<'a>,
     at: AtHandle<'a, AT>,
 }
 
-impl<'a, AT: AtatClient, const MAX_STATE_LISTENERS: usize> Control<'a, AT, MAX_STATE_LISTENERS> {
+impl<'a, AT: AtatClient> Control<'a, AT> {
     pub(crate) fn new(
-        state_ch: state::StateRunner<'a, MAX_STATE_LISTENERS>,
+        state_ch: state::StateRunner<'a>,
         at: AtHandle<'a, AT>,
     ) -> Self {
         Self { state_ch, at }

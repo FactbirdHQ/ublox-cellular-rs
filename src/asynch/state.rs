@@ -11,6 +11,9 @@ use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::pubsub::PubSubChannel;
 use embassy_sync::waitqueue::WakerRegistration;
 
+
+const MAX_STATE_LISTENERS: usize = 5;
+
 /// The link state of a network device.
 #[derive(PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -38,11 +41,11 @@ use crate::error::Error;
 
 use super::AtHandle;
 
-pub struct State<const MAX_STATE_LISTENERS: usize> {
-    inner: MaybeUninit<StateInner<MAX_STATE_LISTENERS>>,
+pub struct State {
+    inner: MaybeUninit<StateInner>,
 }
 
-impl<const MAX_STATE_LISTENERS: usize> State<MAX_STATE_LISTENERS> {
+impl State {
     pub const fn new() -> Self {
         Self {
             inner: MaybeUninit::uninit(),
@@ -50,7 +53,7 @@ impl<const MAX_STATE_LISTENERS: usize> State<MAX_STATE_LISTENERS> {
     }
 }
 
-struct StateInner<const MAX_STATE_LISTENERS: usize> {
+struct StateInner {
     shared: Mutex<NoopRawMutex, RefCell<Shared>>,
     desired_state_pub_sub: PubSubChannel<NoopRawMutex, PowerState, 1, MAX_STATE_LISTENERS, 1>,
 }
@@ -63,19 +66,19 @@ pub struct Shared {
     waker: WakerRegistration,
 }
 
-pub struct Runner<'d, const MAX_STATE_LISTENERS: usize> {
+pub struct Runner<'d> {
     shared: &'d Mutex<NoopRawMutex, RefCell<Shared>>,
     desired_state_pub_sub: &'d PubSubChannel<NoopRawMutex, PowerState, 1, MAX_STATE_LISTENERS, 1>,
 }
 
 #[derive(Clone, Copy)]
-pub struct StateRunner<'d, const MAX_STATE_LISTENERS: usize> {
+pub struct StateRunner<'d> {
     shared: &'d Mutex<NoopRawMutex, RefCell<Shared>>,
     desired_state_pub_sub: &'d PubSubChannel<NoopRawMutex, PowerState, 1, MAX_STATE_LISTENERS, 1>,
 }
 
-impl<'d, const MAX_STATE_LISTENERS: usize> Runner<'d, MAX_STATE_LISTENERS> {
-    pub fn state_runner(&self) -> StateRunner<'d, MAX_STATE_LISTENERS> {
+impl<'d> Runner<'d> {
+    pub fn state_runner(&self) -> StateRunner<'d> {
         StateRunner {
             shared: self.shared,
             desired_state_pub_sub: self.desired_state_pub_sub,
@@ -110,7 +113,7 @@ impl<'d, const MAX_STATE_LISTENERS: usize> Runner<'d, MAX_STATE_LISTENERS> {
     }
 }
 
-impl<'d, const MAX_STATE_LISTENERS: usize> StateRunner<'d, MAX_STATE_LISTENERS> {
+impl<'d> StateRunner<'d> {
     pub fn set_link_state(&self, state: LinkState) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
@@ -201,19 +204,19 @@ impl<'d, const MAX_STATE_LISTENERS: usize> StateRunner<'d, MAX_STATE_LISTENERS> 
     }
 }
 
-pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize, const MAX_STATE_LISTENERS: usize>(
-    state: &'d mut State<MAX_STATE_LISTENERS>,
+pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize>(
+    state: &'d mut State,
     at: AtHandle<'d, AT>,
     urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
 ) -> (
-    Runner<'d, MAX_STATE_LISTENERS>,
-    Device<'d, AT, URC_CAPACITY, MAX_STATE_LISTENERS>,
+    Runner<'d>,
+    Device<'d, AT, URC_CAPACITY>,
 ) {
     // safety: this is a self-referential struct, however:
     // - it can't move while the `'d` borrow is active.
     // - when the borrow ends, the dangling references inside the MaybeUninit will never be used again.
-    let state_uninit: *mut MaybeUninit<StateInner<MAX_STATE_LISTENERS>> =
-        (&mut state.inner as *mut MaybeUninit<StateInner<MAX_STATE_LISTENERS>>).cast();
+    let state_uninit: *mut MaybeUninit<StateInner> =
+        (&mut state.inner as *mut MaybeUninit<StateInner>).cast();
 
     let state = unsafe { &mut *state_uninit }.write(StateInner {
         shared: Mutex::new(RefCell::new(Shared {
@@ -240,7 +243,7 @@ pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize, const MAX_STATE_LISTEN
     )
 }
 
-pub struct Device<'d, AT: AtatClient, const URC_CAPACITY: usize, const MAX_STATE_LISTENERS: usize> {
+pub struct Device<'d, AT: AtatClient, const URC_CAPACITY: usize> {
     pub(crate) shared: &'d Mutex<NoopRawMutex, RefCell<Shared>>,
     pub(crate) desired_state_pub_sub:
         &'d PubSubChannel<NoopRawMutex, PowerState, 1, MAX_STATE_LISTENERS, 1>,
@@ -248,8 +251,8 @@ pub struct Device<'d, AT: AtatClient, const URC_CAPACITY: usize, const MAX_STATE
     pub(crate) urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
 }
 
-impl<'d, AT: AtatClient, const URC_CAPACITY: usize, const MAX_STATE_LISTENERS: usize>
-    Device<'d, AT, URC_CAPACITY, MAX_STATE_LISTENERS>
+impl<'d, AT: AtatClient, const URC_CAPACITY: usize>
+    Device<'d, AT, URC_CAPACITY>
 {
     pub fn link_state_poll_fn(&mut self, cx: &mut Context) -> LinkState {
         self.shared.lock(|s| {
