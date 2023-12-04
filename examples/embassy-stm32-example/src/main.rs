@@ -29,7 +29,7 @@ use atat::asynch::AtatClient;
 use ublox_cellular::asynch::runner::Runner;
 use ublox_cellular::asynch::State;
 use ublox_cellular::command::{AT, Urc};
-use ublox_cellular::asynch::state::{LinkState, PowerState};
+use ublox_cellular::asynch::state::{LinkState, OperationState};
 
 
 bind_interrupts!(struct Irqs {
@@ -160,34 +160,34 @@ async fn main_task(spawner: Spawner) {
         // }
         // runner.init().await.unwrap();
         match control.power_state() {
-            PowerState::PowerDown => {
+            OperationState::PowerDown => {
                 info!("PowerState::PowerDown");
-                control.set_desired_state(PowerState::PowerUp).await;
+                control.set_desired_state(OperationState::PowerUp).await;
                 info!("set_desired_state(PowerState::PowerUp)");
             }
-            PowerState::PowerUp => {
+            OperationState::PowerUp => {
                 info!("PowerState::PowerUp");
-                control.set_desired_state(PowerState::Alive).await;
+                control.set_desired_state(OperationState::Alive).await;
                 info!("set_desired_state(PowerState::Alive)");
             }
-            PowerState::Alive => {
+            OperationState::Alive => {
                 info!("PowerState::Alive");
-                control.set_desired_state(PowerState::Initialized).await;
+                control.set_desired_state(OperationState::Initialized).await;
                 info!("set_desired_state(PowerState::Initialized)");
             }
-            PowerState::Initialized => {
+            OperationState::Initialized => {
                 info!("PowerState::Initialized");
-                control.set_desired_state(PowerState::PowerDown).await;
+                control.set_desired_state(OperationState::PowerDown).await;
                 info!("set_desired_state(PowerState::PowerDown)");
             }
-            PowerState::Connected => {
+            OperationState::Connected => {
                 info!("PowerState::Connected");
-                control.set_desired_state(PowerState::PowerDown).await;
+                control.set_desired_state(OperationState::PowerDown).await;
                 info!("set_desired_state(PowerState::PowerDown)");
             }
-            PowerState::DataEstablished => {
+            OperationState::DataEstablished => {
                 info!("PowerState::DataEstablished");
-                control.set_desired_state(PowerState::PowerDown).await;
+                control.set_desired_state(OperationState::PowerDown).await;
                 info!("set_desired_state(PowerState::PowerDown)");
             }
         }

@@ -27,7 +27,7 @@ pub enum LinkState {
 /// If the celular modem is up and responding to AT.
 #[derive(PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
-pub enum PowerState {
+pub enum OperationState {
     PowerDown,
     PowerUp,
     Alive,
@@ -55,26 +55,26 @@ impl State {
 
 struct StateInner {
     shared: Mutex<NoopRawMutex, RefCell<Shared>>,
-    desired_state_pub_sub: PubSubChannel<NoopRawMutex, PowerState, 1, MAX_STATE_LISTENERS, 1>,
+    desired_state_pub_sub: PubSubChannel<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>,
 }
 
 /// State of the LinkState
 pub struct Shared {
     link_state: LinkState,
-    power_state: PowerState,
-    desired_state: PowerState,
+    power_state: OperationState,
+    desired_state: OperationState,
     waker: WakerRegistration,
 }
 
 pub struct Runner<'d> {
     shared: &'d Mutex<NoopRawMutex, RefCell<Shared>>,
-    desired_state_pub_sub: &'d PubSubChannel<NoopRawMutex, PowerState, 1, MAX_STATE_LISTENERS, 1>,
+    desired_state_pub_sub: &'d PubSubChannel<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>,
 }
 
 #[derive(Clone, Copy)]
 pub struct StateRunner<'d> {
     shared: &'d Mutex<NoopRawMutex, RefCell<Shared>>,
-    desired_state_pub_sub: &'d PubSubChannel<NoopRawMutex, PowerState, 1, MAX_STATE_LISTENERS, 1>,
+    desired_state_pub_sub: &'d PubSubChannel<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>,
 }
 
 impl<'d> Runner<'d> {
@@ -93,7 +93,7 @@ impl<'d> Runner<'d> {
         });
     }
 
-    pub fn set_power_state(&mut self, state: PowerState) {
+    pub fn set_power_state(&mut self, state: OperationState) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.power_state = state;
@@ -101,7 +101,7 @@ impl<'d> Runner<'d> {
         });
     }
 
-    pub fn set_desired_state(&mut self, ps: PowerState) {
+    pub fn set_desired_state(&mut self, ps: OperationState) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.desired_state = ps;
@@ -130,7 +130,7 @@ impl<'d> StateRunner<'d> {
         })
     }
 
-    pub fn set_power_state(&self, state: PowerState) {
+    pub fn set_power_state(&self, state: OperationState) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.power_state = state;
@@ -138,7 +138,7 @@ impl<'d> StateRunner<'d> {
         });
     }
 
-    pub fn power_state_poll_fn(&mut self, cx: &mut Context) -> PowerState {
+    pub fn power_state_poll_fn(&mut self, cx: &mut Context) -> OperationState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.waker.register(cx.waker());
@@ -153,21 +153,21 @@ impl<'d> StateRunner<'d> {
         })
     }
 
-    pub fn power_state(&mut self) -> PowerState {
+    pub fn power_state(&mut self) -> OperationState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.power_state
         })
     }
 
-    pub fn desired_state(&mut self) -> PowerState {
+    pub fn desired_state(&mut self) -> OperationState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.desired_state
         })
     }
 
-    pub async fn set_desired_state(&mut self, ps: PowerState) {
+    pub async fn set_desired_state(&mut self, ps: OperationState) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.desired_state = ps;
@@ -178,7 +178,7 @@ impl<'d> StateRunner<'d> {
             .publish_immediate(ps);
     }
 
-    pub async fn wait_for_desired_state(&mut self, ps: PowerState) -> Result<PowerState, Error> {
+    pub async fn wait_for_desired_state(&mut self, ps: OperationState) -> Result<OperationState, Error> {
         if self.desired_state() == ps {
             info!("Desired state already set to {:?}, returning", ps);
             return Ok(ps);
@@ -195,7 +195,7 @@ impl<'d> StateRunner<'d> {
         }
     }
 
-    pub async fn wait_for_desired_state_change(&mut self) -> Result<PowerState, Error> {
+    pub async fn wait_for_desired_state_change(&mut self) -> Result<OperationState, Error> {
         let mut sub = self
             .desired_state_pub_sub
             .subscriber()
@@ -221,12 +221,12 @@ pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize>(
     let state = unsafe { &mut *state_uninit }.write(StateInner {
         shared: Mutex::new(RefCell::new(Shared {
             link_state: LinkState::Down,
-            power_state: PowerState::PowerDown,
-            desired_state: PowerState::PowerDown,
+            power_state: OperationState::PowerDown,
+            desired_state: OperationState::PowerDown,
             waker: WakerRegistration::new(),
         })),
         desired_state_pub_sub:
-            PubSubChannel::<NoopRawMutex, PowerState, 1, MAX_STATE_LISTENERS, 1>::new(),
+            PubSubChannel::<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>::new(),
     });
 
     (
@@ -246,7 +246,7 @@ pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize>(
 pub struct Device<'d, AT: AtatClient, const URC_CAPACITY: usize> {
     pub(crate) shared: &'d Mutex<NoopRawMutex, RefCell<Shared>>,
     pub(crate) desired_state_pub_sub:
-        &'d PubSubChannel<NoopRawMutex, PowerState, 1, MAX_STATE_LISTENERS, 1>,
+        &'d PubSubChannel<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>,
     pub(crate) at: AtHandle<'d, AT>,
     pub(crate) urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
 }
@@ -262,7 +262,7 @@ impl<'d, AT: AtatClient, const URC_CAPACITY: usize>
         })
     }
 
-    pub fn power_state_poll_fn(&mut self, cx: &mut Context) -> PowerState {
+    pub fn power_state_poll_fn(&mut self, cx: &mut Context) -> OperationState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.waker.register(cx.waker());
@@ -277,21 +277,21 @@ impl<'d, AT: AtatClient, const URC_CAPACITY: usize>
         })
     }
 
-    pub fn power_state(&mut self) -> PowerState {
+    pub fn power_state(&mut self) -> OperationState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.power_state
         })
     }
 
-    pub fn desired_state(&mut self) -> PowerState {
+    pub fn desired_state(&mut self) -> OperationState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.desired_state
         })
     }
 
-    pub fn set_desired_state(&mut self, ps: PowerState) {
+    pub fn set_desired_state(&mut self, ps: OperationState) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.desired_state = ps;
@@ -302,7 +302,7 @@ impl<'d, AT: AtatClient, const URC_CAPACITY: usize>
             .publish_immediate(ps);
     }
 
-    pub async fn wait_for_desired_state(&mut self, ps: PowerState) -> Result<PowerState, Error> {
+    pub async fn wait_for_desired_state(&mut self, ps: OperationState) -> Result<OperationState, Error> {
         if self.desired_state() == ps {
             return Ok(ps);
         }

@@ -3,8 +3,8 @@ use core::str::FromStr;
 use crate::{command::Urc, config::CellularConfig};
 
 use super::state::{self, LinkState};
-use crate::asynch::state::PowerState;
-use crate::asynch::state::PowerState::PowerDown;
+use crate::asynch::state::OperationState;
+use crate::asynch::state::OperationState::PowerDown;
 use crate::command::control::types::{Circuit108Behaviour, Circuit109Behaviour, FlowControl};
 use crate::command::control::{SetCircuit108Behaviour, SetCircuit109Behaviour, SetFlowControl};
 use crate::command::device_lock::responses::PinStatus;
@@ -94,7 +94,7 @@ impl<
 
         let alive = match self.at.send(AT).await {
             Ok(_) => {
-                self.ch.set_power_state(PowerState::Alive);
+                self.ch.set_power_state(OperationState::Alive);
                 Ok(true)
             }
             Err(err) => return Err(Error::Atat(err)),
@@ -105,15 +105,15 @@ impl<
     pub async fn has_power(&mut self) -> Result<bool, Error> {
         if let Some(pin) = self.config.vint_pin() {
             if pin.is_high().map_err(|_| Error::IoPin)? {
-                self.ch.set_power_state(PowerState::PowerUp);
+                self.ch.set_power_state(OperationState::PowerUp);
                 Ok(true)
             } else {
-                self.ch.set_power_state(PowerState::PowerDown);
+                self.ch.set_power_state(OperationState::PowerDown);
                 Ok(false)
             }
         } else {
             info!("No VInt pin configured");
-            self.ch.set_power_state(PowerState::PowerUp);
+            self.ch.set_power_state(OperationState::PowerUp);
             Ok(true)
         }
     }
@@ -124,7 +124,7 @@ impl<
                 pin.set_low().map_err(|_| Error::IoPin)?;
                 Timer::after(crate::module_timing::pwr_on_time()).await;
                 pin.set_high().map_err(|_| Error::IoPin)?;
-                self.ch.set_power_state(PowerState::PowerUp);
+                self.ch.set_power_state(OperationState::PowerUp);
                 debug!("Powered up");
                 Ok(())
             } else {
@@ -142,7 +142,7 @@ impl<
                 pin.set_low().map_err(|_| Error::IoPin)?;
                 Timer::after(crate::module_timing::pwr_off_time()).await;
                 pin.set_high().map_err(|_| Error::IoPin)?;
-                self.ch.set_power_state(PowerState::PowerDown);
+                self.ch.set_power_state(OperationState::PowerDown);
                 debug!("Powered down");
                 Ok(())
             } else {
@@ -248,7 +248,7 @@ impl<
                 .await?;
         }
 
-        self.ch.set_power_state(PowerState::Initialized);
+        self.ch.set_power_state(OperationState::Initialized);
 
         Ok(())
     }
@@ -295,7 +295,7 @@ impl<
             Timer::after(reset_time()).await;
             pin.set_high().ok();
             Timer::after(boot_time()).await;
-            self.ch.set_power_state(PowerState::PowerUp);
+            self.ch.set_power_state(OperationState::PowerUp);
         } else {
             warn!("No reset pin configured");
         }
@@ -317,22 +317,22 @@ impl<
                 Either::First(desired_state) => {
                     info!("Desired state: {:?}", desired_state);
                     match desired_state {
-                        Ok(PowerState::PowerDown) => {
+                        Ok(OperationState::PowerDown) => {
                             self.power_down().await.ok();
                         }
-                        Ok(PowerState::PowerUp) => {
+                        Ok(OperationState::PowerUp) => {
                             self.power_up().await.ok();
                         }
-                        Ok(PowerState::Initialized) => {
+                        Ok(OperationState::Initialized) => {
                             self.init_at().await.ok();
                         }
-                        Ok(PowerState::Alive) => {
+                        Ok(OperationState::Alive) => {
                             self.is_alive().await.ok();
                         }
-                        Ok(PowerState::Connected) => {
+                        Ok(OperationState::Connected) => {
                             todo!()
                         }
-                        Ok(PowerState::DataEstablished) => {
+                        Ok(OperationState::DataEstablished) => {
                             todo!()
                         }
                         Err(err) => {
