@@ -106,7 +106,7 @@ where
     ///
     /// **NOTE** This function will reset NVM settings!
     pub fn hard_reset(&mut self) -> Result<(), Error> {
-        trace!("Attempting to hard reset of the modem.");
+        warn!("Attempting to hard reset of the modem.");
         if let Some(rst) = self.config.reset_pin() {
             rst.set_low().ok();
 
@@ -140,15 +140,15 @@ where
                     BlockingTimer::after(pwr_on_time()).wait();
 
                     pwr.set_high().ok();
-
-                    BlockingTimer::after(Duration::from_secs(1)).wait();
-
+                    
                     if let Err(e) = self.wait_power_state(PowerState::On, Duration::from_secs(10)) {
                         error!("Failed to power on modem");
                         return Err(e);
                     } else {
                         trace!("Modem powered on");
                     }
+
+                    BlockingTimer::after(Duration::from_secs(3)).wait();
                 }
                 _ => {
                     // Software restart
@@ -164,12 +164,12 @@ where
     }
 
     pub fn soft_power_off(&mut self) -> Result<(), Error> {
-        trace!("Attempting to soft power off the modem.");
+        warn!("Attempting to soft power off the modem.");
 
         self.network.send_internal(&ModuleSwitchOff, false)?;
 
         self.power_state = PowerState::Off;
-        trace!("Modem powered off");
+        warn!("Modem powered off");
 
         BlockingTimer::after(Duration::from_secs(10)).wait();
 
@@ -177,7 +177,7 @@ where
     }
 
     pub fn hard_power_off(&mut self) -> Result<(), Error> {
-        trace!("Attempting to hard power off the modem.");
+        warn!("Attempting to hard power off the modem.");
 
         if self.power_state()? == PowerState::On {
             match self.config.power_pin() {
@@ -188,7 +188,10 @@ where
 
                     pwr.set_high().ok();
                     self.power_state = PowerState::Off;
-                    trace!("Modem powered off");
+
+                    BlockingTimer::after(Duration::from_secs(3)).wait();
+
+                    warn!("Modem powered off");
                 }
                 _ => {
                     return Err(Error::Generic(GenericError::Unsupported));

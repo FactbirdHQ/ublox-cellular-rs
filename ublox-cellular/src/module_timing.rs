@@ -5,7 +5,7 @@ use embassy_time::Duration;
 /// Low time of `PWR_ON` pin to trigger module switch on from power off mode
 pub fn pwr_on_time() -> Duration {
     if cfg!(feature = "lara-r6") {
-        Duration::from_millis(150)
+        Duration::from_millis(250)
     } else if cfg!(feature = "toby-r2") {
         Duration::from_micros(50)
     } else {
@@ -16,7 +16,7 @@ pub fn pwr_on_time() -> Duration {
 /// Low time of `PWR_ON` pin to trigger module graceful switch off
 pub fn pwr_off_time() -> Duration {
     if cfg!(feature = "lara-r6") {
-        Duration::from_millis(1500)
+        Duration::from_millis(2000)
     } else if cfg!(feature = "toby-r2") {
         Duration::from_secs(1)
     } else {
@@ -27,7 +27,7 @@ pub fn pwr_off_time() -> Duration {
 /// Low time of `RESET_N` pin to trigger module reset (reboot)
 pub fn reset_time() -> Duration {
     if cfg!(feature = "lara-r6") {
-        Duration::from_millis(10)
+        Duration::from_millis(1000)
     } else if cfg!(feature = "toby-r2") {
         Duration::from_millis(50)
     } else {
@@ -40,7 +40,7 @@ pub fn reset_time() -> Duration {
 /// NOTE: Not all modules support this operation from `RESET_N`
 pub fn kill_time() -> Option<Duration> {
     if cfg!(feature = "lara-r6") {
-        Some(Duration::from_secs(10))
+        Some(Duration::from_secs(11))
     } else {
         None
     }

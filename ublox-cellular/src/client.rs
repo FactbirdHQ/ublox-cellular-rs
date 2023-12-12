@@ -208,10 +208,7 @@ where
 
         // At this point, if is_alive fails, the configured Baud rate is probably wrong
         if let Err(e) = self.is_alive(5).map_err(|_| Error::BaudDetection) {
-            if self.hard_reset().is_err() {
-                self.hard_power_off()?;
-                BlockingTimer::after(Duration::from_secs(1)).wait();
-            }
+            self.hard_power_off()?;
             return Err(e);
         }
 
