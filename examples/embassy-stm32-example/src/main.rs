@@ -149,48 +149,19 @@ async fn main_task(spawner: Spawner) {
     // control.set_desired_state(PowerState::Connected).await;
 
     defmt::unwrap!(spawner.spawn(cellular_task(runner)));
+    Timer::after(Duration::from_millis(1000)).await;
     loop {
-        // loop {
-        //     control.set_desired_state(PowerState::Connected).await;
-        //     info!("set_desired_state(PowerState::Connected)");
-        //     Timer::after(Duration::from_millis(1000)).await;
-        //     control.set_desired_state(PowerState::PowerDown).await;
-        //     info!("set_desired_state(PowerState::PowerDown)");
-        //     Timer::after(Duration::from_millis(1000)).await;
-        // }
-        // runner.init().await.unwrap();
-        match control.power_state() {
-            OperationState::PowerDown => {
-                info!("PowerState::PowerDown");
-                control.set_desired_state(OperationState::PowerUp).await;
-                info!("set_desired_state(PowerState::PowerUp)");
+            control.set_desired_state(OperationState::Alive).await;
+            info!("set_desired_state(PowerState::Initialized)");
+            while control.power_state() != OperationState::Alive {
+                Timer::after(Duration::from_millis(1000)).await;
             }
-            OperationState::PowerUp => {
-                info!("PowerState::PowerUp");
-                control.set_desired_state(OperationState::Alive).await;
-                info!("set_desired_state(PowerState::Alive)");
+            Timer::after(Duration::from_millis(1000)).await;
+            control.set_desired_state(OperationState::PowerDown).await;
+            info!("set_desired_state(PowerState::PowerDown)");
+            while control.power_state() != OperationState::PowerDown {
+                Timer::after(Duration::from_millis(1000)).await;
             }
-            OperationState::Alive => {
-                info!("PowerState::Alive");
-                control.set_desired_state(OperationState::Initialized).await;
-                info!("set_desired_state(PowerState::Initialized)");
-            }
-            OperationState::Initialized => {
-                info!("PowerState::Initialized");
-                control.set_desired_state(OperationState::PowerDown).await;
-                info!("set_desired_state(PowerState::PowerDown)");
-            }
-            OperationState::Connected => {
-                info!("PowerState::Connected");
-                control.set_desired_state(OperationState::PowerDown).await;
-                info!("set_desired_state(PowerState::PowerDown)");
-            }
-            OperationState::DataEstablished => {
-                info!("PowerState::DataEstablished");
-                control.set_desired_state(OperationState::PowerDown).await;
-                info!("set_desired_state(PowerState::PowerDown)");
-            }
-        }
         Timer::after(Duration::from_millis(5000)).await;
     }
     defmt::unwrap!(spawner.spawn(cellular_task(runner)));

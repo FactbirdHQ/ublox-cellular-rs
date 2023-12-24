@@ -111,6 +111,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
                 pin.set_low().map_err(|_| Error::IoPin)?;
                 Timer::after(crate::module_timing::pwr_on_time()).await;
                 pin.set_high().map_err(|_| Error::IoPin)?;
+                Timer::after(boot_time()).await;
                 self.ch.set_power_state(OperationState::PowerUp);
                 debug!("Powered up");
                 Ok(())
@@ -291,6 +292,17 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
     }
 
     pub async fn run(mut self) -> ! {
+        match self.has_power().await.ok() {
+            Some(false) => {
+                self.ch.set_power_state(OperationState::PowerDown);
+            }
+            Some(true) => {
+                self.ch.set_power_state(OperationState::PowerUp);
+            }
+            None => {
+                self.ch.set_power_state(OperationState::PowerDown);
+            }
+        }
         loop {
             match select(
                 self.ch.state_runner().wait_for_desired_state_change(),
@@ -305,13 +317,24 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
                         continue;
                     }
                     let desired_state = desired_state.unwrap();
-                    if 0 < desired_state as isize - self.ch.state_runner().power_state() as isize {
+                    if 0 >= desired_state as isize - self.ch.state_runner().power_state() as isize {
+                        debug!(
+                            "Power steps was negative, power down: {}",
+                            desired_state as isize - self.ch.state_runner().power_state() as isize
+                        );
                         self.power_down().await.ok();
                         self.ch.set_power_state(OperationState::PowerDown);
                     }
                     let start_state = self.ch.state_runner().power_state() as isize;
                     let steps = desired_state as isize - start_state;
-                    for step in 0..steps {
+                    for step in 0..=steps {
+                        debug!(
+                            "State transition {} steps: {} -> {}, {}",
+                            steps,
+                            start_state,
+                            start_state + step,
+                            step
+                        );
                         let next_state = start_state + step;
                         match OperationState::try_from(next_state) {
                             Ok(OperationState::PowerDown) => {}
@@ -326,7 +349,9 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
                             },
                             Ok(OperationState::Alive) => match self.is_alive().await {
                                 Ok(_) => {
+                                    debug!("Will set Alive");
                                     self.ch.set_power_state(OperationState::Alive);
+                                    debug!("Set Alive");
                                 }
                                 Err(err) => {
                                     error!("Error in is_alive: {:?}", err);
