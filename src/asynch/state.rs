@@ -36,18 +36,19 @@ pub enum OperationState {
     DataEstablished,
 }
 
-impl OperationState {
-    pub fn from(state: isize) -> Option<Self> {
+impl TryFrom<isize> for OperationState {
+    fn try_from(state: isize) -> Result<Self, ()> {
         match state {
-            0 => Some(OperationState::PowerDown),
-            1 => Some(OperationState::PowerUp),
-            2 => Some(OperationState::Alive),
-            3 => Some(OperationState::Initialized),
-            4 => Some(OperationState::Connected),
-            5 => Some(OperationState::DataEstablished),
-            _ => None,
+            0 => Ok(OperationState::PowerDown),
+            1 => Ok(OperationState::PowerUp),
+            2 => Ok(OperationState::Alive),
+            3 => Ok(OperationState::Initialized),
+            4 => Ok(OperationState::Connected),
+            5 => Ok(OperationState::DataEstablished),
+            _ => Err(()),
         }
     }
+    type Error = ();
 }
 
 use crate::command::Urc;

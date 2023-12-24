@@ -313,9 +313,9 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
                     let steps = desired_state as isize - start_state;
                     for step in 0..steps {
                         let next_state = start_state + step;
-                        match OperationState::from(next_state) {
-                            Some(OperationState::PowerDown) => {}
-                            Some(OperationState::PowerUp) => match self.power_up().await {
+                        match OperationState::try_from(next_state) {
+                            Ok(OperationState::PowerDown) => {}
+                            Ok(OperationState::PowerUp) => match self.power_up().await {
                                 Ok(_) => {
                                     self.ch.set_power_state(OperationState::PowerUp);
                                 }
@@ -324,7 +324,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
                                     break;
                                 }
                             },
-                            Some(OperationState::Alive) => match self.is_alive().await {
+                            Ok(OperationState::Alive) => match self.is_alive().await {
                                 Ok(_) => {
                                     self.ch.set_power_state(OperationState::Alive);
                                 }
@@ -333,7 +333,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
                                     break;
                                 }
                             },
-                            Some(OperationState::Initialized) => match self.init_at().await {
+                            Ok(OperationState::Initialized) => match self.init_at().await {
                                 Ok(_) => {
                                     self.ch.set_power_state(OperationState::Initialized);
                                 }
@@ -342,13 +342,13 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
                                     break;
                                 }
                             },
-                            Some(OperationState::Connected) => {
+                            Ok(OperationState::Connected) => {
                                 todo!()
                             }
-                            Some(OperationState::DataEstablished) => {
+                            Ok(OperationState::DataEstablished) => {
                                 todo!()
                             }
-                            None => {
+                            Err(_) => {
                                 error!("State transition next_state not valid: start_state={}, next_state={}, steps={} ", start_state, next_state, steps);
                                 break;
                             }
