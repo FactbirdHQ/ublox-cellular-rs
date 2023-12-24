@@ -4,6 +4,7 @@ use core::cell::RefCell;
 use core::mem::MaybeUninit;
 use core::task::Context;
 
+use crate::asynch::state::OperationState::DataEstablished;
 use atat::asynch::AtatClient;
 use atat::UrcSubscription;
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
@@ -27,12 +28,26 @@ pub enum LinkState {
 #[derive(PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum OperationState {
-    PowerDown,
+    PowerDown = 0,
     PowerUp,
     Alive,
     Initialized,
     Connected,
     DataEstablished,
+}
+
+impl OperationState {
+    pub fn from(state: isize) -> Option<Self> {
+        match state {
+            0 => Some(OperationState::PowerDown),
+            1 => Some(OperationState::PowerUp),
+            2 => Some(OperationState::Alive),
+            3 => Some(OperationState::Initialized),
+            4 => Some(OperationState::Connected),
+            5 => Some(OperationState::DataEstablished),
+            _ => None,
+        }
+    }
 }
 
 use crate::command::Urc;

@@ -4,7 +4,7 @@ use crate::{command::Urc, config::CellularConfig};
 
 use super::state::{self, LinkState};
 use crate::asynch::state::OperationState;
-use crate::asynch::state::OperationState::PowerDown;
+use crate::asynch::state::OperationState::{PowerDown, PowerUp};
 use crate::command::control::types::{Circuit108Behaviour, Circuit109Behaviour, FlowControl};
 use crate::command::control::{SetCircuit108Behaviour, SetCircuit109Behaviour, SetFlowControl};
 use crate::command::device_lock::responses::PinStatus;
@@ -77,32 +77,30 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
     }
 
     pub async fn is_alive(&mut self) -> Result<bool, Error> {
-        if !self.has_power().await? {
-            return Ok(false);
+        let has_power = self.has_power().await?;
+        if !has_power {
+            return Err(Error::PoweredDown);
         }
 
         let alive = match self.at.send(AT).await {
             Ok(_) => {
-                self.ch.set_power_state(OperationState::Alive);
-                Ok(true)
+                return Ok(true);
             }
-            Err(err) => return Err(Error::Atat(err)),
+            Err(err) => {
+                return Err(Error::Atat(err));
+            }
         };
-        alive
     }
 
     pub async fn has_power(&mut self) -> Result<bool, Error> {
         if let Some(pin) = self.config.vint_pin() {
             if pin.is_high().map_err(|_| Error::IoPin)? {
-                self.ch.set_power_state(OperationState::PowerUp);
                 Ok(true)
             } else {
-                self.ch.set_power_state(OperationState::PowerDown);
                 Ok(false)
             }
         } else {
             info!("No VInt pin configured");
-            self.ch.set_power_state(OperationState::PowerUp);
             Ok(true)
         }
     }
@@ -236,9 +234,6 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
                 })
                 .await?;
         }
-
-        self.ch.set_power_state(OperationState::Initialized);
-
         Ok(())
     }
 
@@ -284,7 +279,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
             Timer::after(reset_time()).await;
             pin.set_high().ok();
             Timer::after(boot_time()).await;
-            self.ch.set_power_state(OperationState::PowerUp);
+            self.is_alive().await?;
         } else {
             warn!("No reset pin configured");
         }
@@ -305,72 +300,85 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
             {
                 Either::First(desired_state) => {
                     info!("Desired state: {:?}", desired_state);
-                    match desired_state {
-                        Ok(OperationState::PowerDown) => {
-                            self.power_down().await.ok();
-                        }
-                        Ok(OperationState::PowerUp) => {
-                            self.power_up().await.ok();
-                        }
-                        Ok(OperationState::Initialized) => {
-                            self.init_at().await.ok();
-                        }
-                        Ok(OperationState::Alive) => {
-                            self.is_alive().await.ok();
-                        }
-                        Ok(OperationState::Connected) => {
-                            todo!()
-                        }
-                        Ok(OperationState::DataEstablished) => {
-                            todo!()
-                        }
-                        Err(err) => {
-                            error!("Error in desired state: {:?}", err);
+                    if let Err(err) = desired_state {
+                        error!("Error in desired_state retrival: {:?}", err);
+                        continue;
+                    }
+                    let desired_state = desired_state.unwrap();
+                    if 0 < desired_state as isize - self.ch.state_runner().power_state() as isize {
+                        self.power_down().await.ok();
+                        self.ch.set_power_state(OperationState::PowerDown);
+                    }
+                    let start_state = self.ch.state_runner().power_state() as isize;
+                    let steps = desired_state as isize - start_state;
+                    for step in 0..steps {
+                        let next_state = start_state + step;
+                        match OperationState::from(next_state) {
+                            Some(OperationState::PowerDown) => {}
+                            Some(OperationState::PowerUp) => match self.power_up().await {
+                                Ok(_) => {
+                                    self.ch.set_power_state(OperationState::PowerUp);
+                                }
+                                Err(err) => {
+                                    error!("Error in power_up: {:?}", err);
+                                    break;
+                                }
+                            },
+                            Some(OperationState::Alive) => match self.is_alive().await {
+                                Ok(_) => {
+                                    self.ch.set_power_state(OperationState::Alive);
+                                }
+                                Err(err) => {
+                                    error!("Error in is_alive: {:?}", err);
+                                    break;
+                                }
+                            },
+                            Some(OperationState::Initialized) => match self.init_at().await {
+                                Ok(_) => {
+                                    self.ch.set_power_state(OperationState::Initialized);
+                                }
+                                Err(err) => {
+                                    error!("Error in init_at: {:?}", err);
+                                    break;
+                                }
+                            },
+                            Some(OperationState::Connected) => {
+                                todo!()
+                            }
+                            Some(OperationState::DataEstablished) => {
+                                todo!()
+                            }
+                            None => {
+                                error!("State transition next_state not valid: start_state={}, next_state={}, steps={} ", start_state, next_state, steps);
+                                break;
+                            }
                         }
                     }
                 }
                 Either::Second(event) => {
-                    match event {
-                        // Handle network URCs
-                        Urc::NetworkDetach => todo!(),
-                        Urc::MobileStationDetach => todo!(),
-                        Urc::NetworkDeactivate => todo!(),
-                        Urc::MobileStationDeactivate => todo!(),
-                        Urc::NetworkPDNDeactivate => todo!(),
-                        Urc::MobileStationPDNDeactivate => todo!(),
-                        Urc::SocketDataAvailable(_) => todo!(),
-                        Urc::SocketDataAvailableUDP(_) => todo!(),
-                        Urc::DataConnectionActivated(_) => todo!(),
-                        Urc::DataConnectionDeactivated(_) => todo!(),
-                        Urc::SocketClosed(_) => todo!(),
-                        Urc::MessageWaitingIndication(_) => todo!(),
-                        Urc::ExtendedPSNetworkRegistration(_) => todo!(),
-                        Urc::HttpResponse(_) => todo!(),
-                    };
+                    self.handle_urc(event).await;
                 }
             }
-
-            //     let desired_state = self.ch.state_runner().wait_for_desired_state_change().await;
-            //     // let desired_state = self.ch.state_runner().desired_state();
-            //     info!("Desired state: {:?}", desired_state);
-            // let event = self.urc_subscription.next_message_pure().await;
-            // match event {
-            //     // Handle network URCs
-            //     Urc::NetworkDetach => todo!(),
-            //     Urc::MobileStationDetach => todo!(),
-            //     Urc::NetworkDeactivate => todo!(),
-            //     Urc::MobileStationDeactivate => todo!(),
-            //     Urc::NetworkPDNDeactivate => todo!(),
-            //     Urc::MobileStationPDNDeactivate => todo!(),
-            //     Urc::SocketDataAvailable(_) => todo!(),
-            //     Urc::SocketDataAvailableUDP(_) => todo!(),
-            //     Urc::DataConnectionActivated(_) => todo!(),
-            //     Urc::DataConnectionDeactivated(_) => todo!(),
-            //     Urc::SocketClosed(_) => todo!(),
-            //     Urc::MessageWaitingIndication(_) => todo!(),
-            //     Urc::ExtendedPSNetworkRegistration(_) => todo!(),
-            //     Urc::HttpResponse(_) => todo!(),
-            // };
         }
+    }
+
+    async fn handle_urc(&mut self, event: Urc) -> Error {
+        match event {
+            // Handle network URCs
+            Urc::NetworkDetach => todo!(),
+            Urc::MobileStationDetach => todo!(),
+            Urc::NetworkDeactivate => todo!(),
+            Urc::MobileStationDeactivate => todo!(),
+            Urc::NetworkPDNDeactivate => todo!(),
+            Urc::MobileStationPDNDeactivate => todo!(),
+            Urc::SocketDataAvailable(_) => todo!(),
+            Urc::SocketDataAvailableUDP(_) => todo!(),
+            Urc::DataConnectionActivated(_) => todo!(),
+            Urc::DataConnectionDeactivated(_) => todo!(),
+            Urc::SocketClosed(_) => todo!(),
+            Urc::MessageWaitingIndication(_) => todo!(),
+            Urc::ExtendedPSNetworkRegistration(_) => todo!(),
+            Urc::HttpResponse(_) => todo!(),
+        };
     }
 }
