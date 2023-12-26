@@ -44,9 +44,9 @@ pub fn reset_time() -> Duration {
 /// Time to wait for module to boot
 pub fn boot_time() -> Duration {
     if cfg!(feature = "sara-r5") {
-        Duration::from_secs(1)
+        Duration::from_secs(3)
     } else {
-        Duration::from_secs(1)
+        Duration::from_secs(3)
     }
 }
 
