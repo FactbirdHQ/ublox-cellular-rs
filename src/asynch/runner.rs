@@ -184,6 +184,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
 
         let ccid = self.at.send(&GetCCID).await?;
         info!("CCID: {}", ccid.ccid);
+
         // DCD circuit (109) changes in accordance with the carrier
         self.at
             .send(&SetCircuit109Behaviour {
@@ -237,11 +238,108 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
         }
         Ok(())
     }
+    /// Initializes the network only valid after `init_at`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any of the internal network operations fail.
+    ///
+    pub async fn init_network(&mut self) -> Result<(), Error> {
+        // Disable Message Waiting URCs (UMWI)
+        #[cfg(any(feature = "toby-r2"))]
+        self.at
+            .send(&crate::command::sms::SetMessageWaitingIndication {
+                mode: crate::command::sms::types::MessageWaitingMode::Disabled,
+            })
+            .await?;
+
+        self.at
+            .send(
+                &crate::command::mobile_control::SetAutomaticTimezoneUpdate {
+                    on_off: crate::command::mobile_control::types::AutomaticTimezone::EnabledLocal,
+                },
+            )
+            .await?;
+
+        self.at
+            .send(&crate::command::mobile_control::SetModuleFunctionality {
+                fun: Functionality::Full,
+                rst: None,
+            })
+            .await?;
+
+        self.enable_registration_urcs().await?;
+
+        // Set automatic operator selection, if not already set
+        let crate::command::network_service::responses::OperatorSelection { mode, .. } = self
+            .at
+            .send(&crate::command::network_service::GetOperatorSelection)
+            .await?;
+
+        // Only run AT+COPS=0 if currently de-registered, to avoid PLMN reselection
+        if !matches!(
+            mode,
+            crate::command::network_service::types::OperatorSelectionMode::Automatic
+                | crate::command::network_service::types::OperatorSelectionMode::Manual
+        ) {
+            self.at
+                .send(&crate::command::network_service::SetOperatorSelection {
+                    mode: crate::command::network_service::types::OperatorSelectionMode::Automatic,
+                    format: Some(2),
+                })
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    pub(crate) async fn enable_registration_urcs(&mut self) -> Result<(), Error> {
+        // if packet domain event reporting is not set it's not a stopper. We
+        // might lack some events when we are dropped from the network.
+        // TODO: Re-enable this when it works, and is useful!
+        if self
+            .at
+            .send(&crate::command::psn::SetPacketSwitchedEventReporting {
+                mode: crate::command::psn::types::PSEventReportingMode::CircularBufferUrcs,
+                bfr: None,
+            })
+            .await
+            .is_err()
+        {
+            warn!("Packet domain event reporting set failed");
+        }
+
+        // FIXME: Currently `atat` is unable to distinguish `xREG` family of
+        // commands from URC's
+
+        // CREG URC
+        self.at.send(
+            &crate::command::network_service::SetNetworkRegistrationStatus {
+                n: crate::command::network_service::types::NetworkRegistrationUrcConfig::UrcDisabled,
+            }).await?;
+
+        // CGREG URC
+        self.at
+            .send(&crate::command::psn::SetGPRSNetworkRegistrationStatus {
+                n: crate::command::psn::types::GPRSNetworkRegistrationUrcConfig::UrcDisabled,
+            })
+            .await?;
+
+        // CEREG URC
+        self.at
+            .send(&crate::command::psn::SetEPSNetworkRegistrationStatus {
+                n: crate::command::psn::types::EPSNetworkRegistrationUrcConfig::UrcDisabled,
+            })
+            .await?;
+
+        Ok(())
+    }
 
     pub async fn select_sim_card(&mut self) -> Result<(), Error> {
         for _ in 0..2 {
             match self.at.send(&GetPinStatus).await {
                 Ok(PinStatus { code }) if code == PinStatusCode::Ready => {
+                    debug!("SIM is ready");
                     return Ok(());
                 }
                 _ => {}
@@ -270,9 +368,12 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
             })
             .await?;
 
-        Err(Error::Busy)
+        Ok(())
     }
 
+    /// Reset the module by driving it's `RESET_N` pin low for 50 ms
+    ///
+    /// **NOTE** This function will reset NVM settings!
     pub async fn reset(&mut self) -> Result<(), Error> {
         warn!("Hard resetting Ublox Cellular Module");
         if let Some(pin) = self.config.reset_pin() {
@@ -287,8 +388,69 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
         Ok(())
     }
 
-    pub async fn restart(&mut self, store: bool) -> Result<(), Error> {
+    /// Perform at full factory reset of the module, clearing all NVM sectors in the process
+    pub async fn factory_reset(&mut self) -> Result<(), Error> {
+        self.at
+            .send(&crate::command::system_features::SetFactoryConfiguration {
+                fs_op: crate::command::system_features::types::FSFactoryRestoreType::AllFiles,
+                nvm_op:
+                    crate::command::system_features::types::NVMFactoryRestoreType::NVMFlashSectors,
+            })
+            .await?;
+
+        info!("Successfully factory reset modem!");
+
+        if self.soft_reset(true).await.is_err() {
+            self.reset().await?;
+        }
+
         Ok(())
+    }
+
+    /// Reset the module by sending AT CFUN command
+    pub async fn soft_reset(&mut self, sim_reset: bool) -> Result<(), Error> {
+        trace!(
+            "Attempting to soft reset of the modem with sim reset: {}.",
+            sim_reset
+        );
+
+        let fun = if sim_reset {
+            Functionality::SilentResetWithSimReset
+        } else {
+            Functionality::SilentReset
+        };
+
+        match self
+            .at
+            .send(&SetModuleFunctionality {
+                fun,
+                // SARA-R5 This parameter can be used only when <fun> is 1, 4 or 19
+                #[cfg(feature = "sara-r5")]
+                rst: None,
+                #[cfg(not(feature = "sara-r5"))]
+                rst: Some(ResetMode::DontReset),
+            })
+            .await
+        {
+            Ok(_) => {
+                info!("Successfully soft reset modem!");
+                Ok(())
+            }
+            Err(err) => {
+                error!("Failed to soft reset modem: {:?}", err);
+                Err(Error::Atat(err))
+            }
+        }
+    }
+
+    // checks alive status continuiously until it is alive
+    async fn check_is_alive_loop(&mut self) -> bool {
+        loop {
+            if let Ok(alive) = self.is_alive().await {
+                return alive;
+            }
+            Timer::after(Duration::from_millis(100)).await;
+        }
     }
 
     pub async fn run(mut self) -> ! {
@@ -347,17 +509,36 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
                                     break;
                                 }
                             },
-                            Ok(OperationState::Alive) => match self.is_alive().await {
-                                Ok(_) => {
-                                    debug!("Will set Alive");
-                                    self.ch.set_power_state(OperationState::Alive);
-                                    debug!("Set Alive");
+                            Ok(OperationState::Alive) => {
+                                match with_timeout(boot_time() * 2, self.check_is_alive_loop())
+                                    .await
+                                {
+                                    Ok(true) => {
+                                        debug!("Will set Alive");
+                                        self.ch.set_power_state(OperationState::Alive);
+                                        debug!("Set Alive");
+                                    }
+                                    Ok(false) => {
+                                        error!("Error in is_alive: {:?}", Error::PoweredDown);
+                                        break;
+                                    }
+                                    Err(err) => {
+                                        error!("Error in is_alive: {:?}", err);
+                                        break;
+                                    }
                                 }
-                                Err(err) => {
-                                    error!("Error in is_alive: {:?}", err);
-                                    break;
-                                }
-                            },
+                            }
+                            // Ok(OperationState::Alive) => match self.is_alive().await {
+                            //     Ok(_) => {
+                            //         debug!("Will set Alive");
+                            //         self.ch.set_power_state(OperationState::Alive);
+                            //         debug!("Set Alive");
+                            //     }
+                            //     Err(err) => {
+                            //         error!("Error in is_alive: {:?}", err);
+                            //         break;
+                            //     }
+                            // },
                             Ok(OperationState::Initialized) => match self.init_at().await {
                                 Ok(_) => {
                                     self.ch.set_power_state(OperationState::Initialized);
@@ -367,9 +548,15 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
                                     break;
                                 }
                             },
-                            Ok(OperationState::Connected) => {
-                                todo!()
-                            }
+                            Ok(OperationState::Connected) => match self.init_network().await {
+                                Ok(_) => {
+                                    self.ch.set_power_state(OperationState::Connected);
+                                }
+                                Err(err) => {
+                                    error!("Error in init_network: {:?}", err);
+                                    break;
+                                }
+                            },
                             Ok(OperationState::DataEstablished) => {
                                 todo!()
                             }

@@ -132,7 +132,7 @@ async fn main_task(spawner: Spawner) {
     let celullar_config = MyCelullarConfig {
         reset_pin: Some(Output::new(p.PF8, Level::High, Speed::Low).degrade()),
         power_pin: Some(ReverseOutputPin(
-            Output::new(p.PJ4, Level::High, Speed::Low).degrade(),
+            Output::new(p.PJ4, Level::Low, Speed::Low).degrade(),
         )),
         // reset_pin: Some(OutputOpenDrain::new(p.PF8, Level::High, Speed::Low, Pull::None).degrade()),
         // power_pin: Some(OutputOpenDrain::new(p.PJ4, Level::High, Speed::Low, Pull::None).degrade()),
@@ -171,9 +171,9 @@ async fn main_task(spawner: Spawner) {
     defmt::unwrap!(spawner.spawn(cellular_task(runner)));
     Timer::after(Duration::from_millis(1000)).await;
     loop {
-        control.set_desired_state(OperationState::Alive).await;
+        control.set_desired_state(OperationState::Initialized).await;
         info!("set_desired_state(PowerState::Alive)");
-        while control.power_state() != OperationState::Alive {
+        while control.power_state() != OperationState::Initialized {
             Timer::after(Duration::from_millis(1000)).await;
         }
         Timer::after(Duration::from_millis(1000)).await;
