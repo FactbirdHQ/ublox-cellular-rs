@@ -16,10 +16,7 @@ use self::control::Control;
 pub struct AtHandle<'d, AT: AtatClient>(&'d Mutex<NoopRawMutex, AT>);
 
 impl<'d, AT: AtatClient> AtHandle<'d, AT> {
-    async fn send<Cmd: atat::AtatCmd>(
-        &mut self,
-        cmd: &Cmd,
-    ) -> Result<Cmd::Response, atat::Error> {
+    async fn send<Cmd: atat::AtatCmd>(&mut self, cmd: &Cmd) -> Result<Cmd::Response, atat::Error> {
         self.0.lock().await.send_retry::<Cmd>(cmd).await
     }
 }
@@ -38,12 +35,7 @@ impl<AT: AtatClient> State<AT> {
     }
 }
 
-pub async fn new<
-    'a,
-    AT: AtatClient,
-    C: CellularConfig,
-    const URC_CAPACITY: usize,
->(
+pub async fn new<'a, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>(
     state: &'a mut State<AT>,
     subscriber: &'a UrcChannel<Urc, URC_CAPACITY, 2>,
     config: C,
