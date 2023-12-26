@@ -1,11 +1,11 @@
 #![no_std]
 #![no_main]
 #![allow(stable_features)]
-#![feature(type_alias_impl_trait)]
+// #![feature(type_alias_impl_trait)]
 
 use atat::asynch::Client;
-use atat::UrcChannel;
 use atat::ResponseSlot;
+use atat::UrcChannel;
 use core::cell::RefCell;
 use cortex_m_rt::entry;
 use defmt::*;
@@ -17,7 +17,6 @@ use embassy_stm32::time::{khz, mhz};
 use embassy_stm32::usart::{BufferedUart, BufferedUartRx, BufferedUartTx};
 use embassy_stm32::{bind_interrupts, interrupt, peripherals, usart, Config};
 use embassy_time::{Duration, Timer};
-use static_cell::make_static;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
@@ -80,6 +79,7 @@ async fn main_task(spawner: Spawner) {
     let mut config = Config::default();
     {
         use embassy_stm32::rcc::*;
+        config.rcc.supply_config = SupplyConfig::DirectSMPS;
         config.rcc.hsi = Some(HSIPrescaler::DIV1);
         config.rcc.csi = true;
         config.rcc.pll1 = Some(Pll {
@@ -87,7 +87,7 @@ async fn main_task(spawner: Spawner) {
             prediv: PllPreDiv::DIV4,
             mul: PllMul::MUL50,
             divp: Some(PllDiv::DIV2),
-            divq: Some(PllDiv::DIV8), // used by SPI3. 100Mhz.
+            divq: Some(PllDiv::DIV8), // 100mhz
             divr: None,
         });
         config.rcc.sys = Sysclk::PLL1_P; // 400 Mhz
@@ -104,8 +104,9 @@ async fn main_task(spawner: Spawner) {
     let led2_pin = p.PI13.degrade();
     let led3_pin = p.PI14.degrade();
 
-    let tx_buf = &mut make_static!([0u8; 16])[..];
-    let rx_buf = &mut make_static!([0u8; 16])[..];
+    static tx_buf: StaticCell<[u8; 16]> = StaticCell::new();
+    static rx_buf: StaticCell<[u8; 16]> = StaticCell::new();
+
     let (tx_pin, rx_pin, uart) = (p.PJ8, p.PJ9, p.UART8);
     let mut uart_config = embassy_stm32::usart::Config::default();
     {
@@ -116,7 +117,15 @@ async fn main_task(spawner: Spawner) {
         uart_config.data_bits = embassy_stm32::usart::DataBits::DataBits8;
     }
 
-    let uart = BufferedUart::new(uart, Irqs, rx_pin, tx_pin, tx_buf, rx_buf, uart_config);
+    let uart = BufferedUart::new(
+        uart,
+        Irqs,
+        rx_pin,
+        tx_pin,
+        tx_buf.init([0u8; 16]),
+        rx_buf.init([0u8; 16]),
+        uart_config,
+    );
     let (writer, reader) = uart.unwrap().split();
     // let power = Output::new(p.PJ4, Level::High, Speed::VeryHigh).degrade();
     // let reset = Output::new(p.PF8, Level::High, Speed::VeryHigh).degrade();
@@ -138,14 +147,24 @@ async fn main_task(spawner: Spawner) {
         &RES_SLOT,
         &URC_CHANNEL,
     );
-    let buf = static_cell::make_static!([0; 1024]);
-    let mut client = Client::new(writer, &RES_SLOT, buf, atat::Config::default());
+    static buf: StaticCell<[u8; INGRESS_BUF_SIZE]> = StaticCell::new();
+    let mut client = Client::new(
+        writer,
+        &RES_SLOT,
+        buf.init([0; INGRESS_BUF_SIZE]),
+        atat::Config::default(),
+    );
 
     spawner.spawn(ingress_task(ingress, reader)).unwrap();
 
-    let state = make_static!(State::new(client));
-    let (device, mut control, mut runner) =
-        ublox_cellular::asynch::new(state, &URC_CHANNEL, celullar_config).await;
+    static state: StaticCell<State<Client<BufferedUartTx<UART8>, INGRESS_BUF_SIZE>>> =
+        StaticCell::new();
+    let (device, mut control, mut runner) = ublox_cellular::asynch::new(
+        state.init(State::new(client)),
+        &URC_CHANNEL,
+        celullar_config,
+    )
+    .await;
     // defmt::info!("{:?}", runner.init().await);
     // control.set_desired_state(PowerState::Connected).await;
 
@@ -165,7 +184,6 @@ async fn main_task(spawner: Spawner) {
         }
         Timer::after(Duration::from_millis(5000)).await;
     }
-    defmt::unwrap!(spawner.spawn(cellular_task(runner)));
 
     loop {
         Timer::after(Duration::from_millis(1000)).await;

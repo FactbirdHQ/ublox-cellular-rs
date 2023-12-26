@@ -90,6 +90,10 @@ exclude = ["examples"]
 no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
 ublox-sockets = { path = "../ublox-sockets" }
 atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
-embassy-time = { package = "embassy-time", git = "https://github.com/embassy-rs/embassy", branch = "main" }
-embassy-sync = { package = "embassy-sync", git = "https://github.com/embassy-rs/embassy", branch = "main" }
-embassy-futures = { package = "embassy-futures", git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-futures = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+
+#embassy-time = { path = "../embassy/embassy-time" }
+#embassy-sync = { path = "../embassy/embassy-sync" }
+#embassy-futures = { path = "../embassy/embassy-futures" }
