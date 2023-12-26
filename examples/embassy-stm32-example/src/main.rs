@@ -3,6 +3,9 @@
 #![allow(stable_features)]
 #![feature(type_alias_impl_trait)]
 
+use atat::asynch::Client;
+use atat::UrcChannel;
+use atat::ResponseSlot;
 use core::cell::RefCell;
 use cortex_m_rt::entry;
 use defmt::*;
@@ -24,10 +27,11 @@ use ublox_cellular;
 use ublox_cellular::config::{CellularConfig, ReverseOutputPin};
 
 use atat::asynch::AtatClient;
-use atat::{AtDigester, AtatIngress, Buffers, DefaultDigester, Ingress, Parser};
+use atat::{AtDigester, AtatIngress, DefaultDigester, Ingress, Parser};
 use ublox_cellular::asynch::runner::Runner;
 use ublox_cellular::asynch::state::{LinkState, OperationState};
 use ublox_cellular::asynch::State;
+use ublox_cellular::command;
 use ublox_cellular::command::{Urc, AT};
 
 bind_interrupts!(struct Irqs {
@@ -127,14 +131,21 @@ async fn main_task(spawner: Spawner) {
         vint_pin: Some(Input::new(p.PJ3, Pull::Down).degrade()),
     };
 
-    let buffers = &*make_static!(atat::Buffers::new());
-    let (ingress, client) = buffers.split(writer, AtDigester::default(), atat::Config::new());
+    static RES_SLOT: ResponseSlot<INGRESS_BUF_SIZE> = ResponseSlot::new();
+    static URC_CHANNEL: UrcChannel<command::Urc, URC_CAPACITY, URC_SUBSCRIBERS> = UrcChannel::new();
+    let ingress = Ingress::new(
+        DefaultDigester::<command::Urc>::default(),
+        &RES_SLOT,
+        &URC_CHANNEL,
+    );
+    let buf = static_cell::make_static!([0; 1024]);
+    let mut client = Client::new(writer, &RES_SLOT, buf, atat::Config::default());
 
     spawner.spawn(ingress_task(ingress, reader)).unwrap();
 
     let state = make_static!(State::new(client));
     let (device, mut control, mut runner) =
-        ublox_cellular::asynch::new(state, &buffers.urc_channel, celullar_config).await;
+        ublox_cellular::asynch::new(state, &URC_CHANNEL, celullar_config).await;
     // defmt::info!("{:?}", runner.init().await);
     // control.set_desired_state(PowerState::Connected).await;
 

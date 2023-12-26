@@ -82,7 +82,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
             return Err(Error::PoweredDown);
         }
 
-        let alive = match self.at.send(AT).await {
+        let alive = match self.at.send(&AT).await {
             Ok(_) => {
                 return Ok(true);
             }
@@ -149,14 +149,14 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
 
         // Extended errors on
         self.at
-            .send(SetReportMobileTerminationError {
+            .send(&SetReportMobileTerminationError {
                 n: TerminationErrorMode::Enabled,
             })
             .await?;
 
         // Select SIM
         self.at
-            .send(SetGpioConfiguration {
+            .send(&SetGpioConfiguration {
                 gpio_id: 25,
                 gpio_mode: GpioMode::Output(GpioOutValue::High),
             })
@@ -164,13 +164,13 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
 
         #[cfg(any(feature = "lara-r6"))]
         self.at
-            .send(SetGpioConfiguration {
+            .send(&SetGpioConfiguration {
                 gpio_id: 42,
                 gpio_mode: GpioMode::Input(GpioInPull::NoPull),
             })
             .await?;
 
-        let model_id = self.at.send(GetModelId).await?;
+        let model_id = self.at.send(&GetModelId).await?;
 
         // self.at.send(
         //     &IdentificationInformation {
@@ -178,29 +178,29 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
         //     },
         // ).await?;
 
-        self.at.send(GetFirmwareVersion).await?;
+        self.at.send(&GetFirmwareVersion).await?;
 
         self.select_sim_card().await?;
 
-        let ccid = self.at.send(GetCCID).await?;
+        let ccid = self.at.send(&GetCCID).await?;
         info!("CCID: {}", ccid.ccid);
         // DCD circuit (109) changes in accordance with the carrier
         self.at
-            .send(SetCircuit109Behaviour {
+            .send(&SetCircuit109Behaviour {
                 value: Circuit109Behaviour::ChangesWithCarrier,
             })
             .await?;
 
         // Ignore changes to DTR
         self.at
-            .send(SetCircuit108Behaviour {
+            .send(&SetCircuit108Behaviour {
                 value: Circuit108Behaviour::Ignore,
             })
             .await?;
 
         // Switch off UART power saving until it is integrated into this API
         self.at
-            .send(SetPowerSavingControl {
+            .send(&SetPowerSavingControl {
                 mode: PowerSavingMode::Disabled,
                 timeout: None,
             })
@@ -208,13 +208,13 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
 
         if C::HEX_MODE {
             self.at
-                .send(SetHexMode {
+                .send(&SetHexMode {
                     hex_mode_disable: HexMode::Enabled,
                 })
                 .await?;
         } else {
             self.at
-                .send(SetHexMode {
+                .send(&SetHexMode {
                     hex_mode_disable: HexMode::Disabled,
                 })
                 .await?;
@@ -224,13 +224,13 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
         // FIXME: Use AT+IFC=2,2 instead of AT&K here
         if C::FLOW_CONTROL {
             self.at
-                .send(SetFlowControl {
+                .send(&SetFlowControl {
                     value: FlowControl::RtsCts,
                 })
                 .await?;
         } else {
             self.at
-                .send(SetFlowControl {
+                .send(&SetFlowControl {
                     value: FlowControl::Disabled,
                 })
                 .await?;
@@ -240,7 +240,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
 
     pub async fn select_sim_card(&mut self) -> Result<(), Error> {
         for _ in 0..2 {
-            match self.at.send(GetPinStatus).await {
+            match self.at.send(&GetPinStatus).await {
                 Ok(PinStatus { code }) if code == PinStatusCode::Ready => {
                     return Ok(());
                 }
@@ -254,7 +254,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
         // We've seen issues on uBlox-based devices, as a precation, we'll cycle
         // the modem here through minimal/full functional state.
         self.at
-            .send(SetModuleFunctionality {
+            .send(&SetModuleFunctionality {
                 fun: Functionality::Minimum,
                 // SARA-R5 This parameter can be used only when <fun> is 1, 4 or 19
                 #[cfg(feature = "sara-r5")]
@@ -264,7 +264,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
             })
             .await?;
         self.at
-            .send(SetModuleFunctionality {
+            .send(&SetModuleFunctionality {
                 fun: Functionality::Full,
                 rst: Some(ResetMode::DontReset),
             })

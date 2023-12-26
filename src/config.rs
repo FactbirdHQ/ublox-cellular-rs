@@ -8,11 +8,11 @@ impl ErrorType for NoPin {
 }
 
 impl InputPin for NoPin {
-    fn is_high(&self) -> Result<bool, Self::Error> {
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
         Ok(true)
     }
 
-    fn is_low(&self) -> Result<bool, Self::Error> {
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
         Ok(false)
     }
 }
@@ -57,11 +57,11 @@ impl<P: InputPin<Error = Infallible>> ErrorType for ReverseInputPin<P> {
 }
 
 impl<P: InputPin<Error = Infallible>> InputPin for ReverseInputPin<P> {
-    fn is_high(&self) -> Result<bool, Self::Error> {
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
         self.0.is_low()
     }
 
-    fn is_low(&self) -> Result<bool, Self::Error> {
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
         self.0.is_high()
     }
 }
