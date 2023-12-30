@@ -104,6 +104,10 @@ async fn main_task(spawner: Spawner) {
     let led2_pin = p.PI13.degrade();
     let led3_pin = p.PI14.degrade();
 
+    spawner.spawn(blinky(led1_pin)).unwrap();
+    spawner.spawn(blinky(led2_pin)).unwrap();
+    spawner.spawn(blinky(led3_pin)).unwrap();
+
     static tx_buf: StaticCell<[u8; 16]> = StaticCell::new();
     static rx_buf: StaticCell<[u8; 16]> = StaticCell::new();
 
@@ -185,9 +189,6 @@ async fn main_task(spawner: Spawner) {
         Timer::after(Duration::from_millis(5000)).await;
     }
 
-    loop {
-        Timer::after(Duration::from_millis(1000)).await;
-    }
 }
 
 #[embassy_executor::task]
@@ -216,6 +217,17 @@ async fn cellular_task(
     >,
 ) -> ! {
     runner.run().await
+}
+
+#[embassy_executor::task(pool_size = 3)]
+async fn blinky(mut led: AnyPin){
+    let mut output = Output::new(led, Level::High, Speed::Low).degrade();
+    loop {
+        output.set_high();
+        Timer::after(Duration::from_millis(1000)).await;
+        output.set_low();
+        Timer::after(Duration::from_millis(1000)).await;
+    }
 }
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();
