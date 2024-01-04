@@ -71,10 +71,18 @@ pub trait CellularConfig {
     type PowerPin: OutputPin;
     type VintPin: InputPin;
 
-    const FLOW_CONTROL: bool;
-    const HEX_MODE: bool;
+    const FLOW_CONTROL: bool = false;
+    const HEX_MODE: bool = true;
+    const OPERATOR_FORMAT: OperatorFormat = OperatorFormat::Long;
 
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin>;
     fn power_pin(&mut self) -> Option<&mut Self::PowerPin>;
     fn vint_pin(&mut self) -> Option<&mut Self::VintPin>;
+}
+
+#[repr(u8)]
+pub enum OperatorFormat {
+    Long = 0,
+    Short = 1,
+    Numeric = 2,
 }

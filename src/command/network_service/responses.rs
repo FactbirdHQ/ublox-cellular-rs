@@ -26,6 +26,7 @@ pub struct SignalQuality {
 
 /// 7.5 Operator selection +COPS
 #[derive(Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct OperatorSelection {
     #[at_arg(position = 0)]
     pub mode: OperatorSelectionMode,

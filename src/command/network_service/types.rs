@@ -173,6 +173,7 @@ pub enum ThirdRadioAccessTechnology {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum OperatorNameFormat {
     #[at_arg(value = 0)]
     Long(String<24>),
