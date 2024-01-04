@@ -1,35 +1,37 @@
 #![no_std]
 #![no_main]
 #![allow(stable_features)]
-#![feature(type_alias_impl_trait)]
+// #![feature(type_alias_impl_trait)]
 
+use atat::asynch::Client;
+use atat::ResponseSlot;
+use atat::UrcChannel;
 use core::cell::RefCell;
 use cortex_m_rt::entry;
 use defmt::*;
 use embassy_executor::{Executor, Spawner};
-use embassy_stm32::gpio::{AnyPin, Input, Level, Output, Pin, Pull, Speed, OutputOpenDrain};
+use embassy_stm32::gpio::{AnyPin, Input, Level, Output, OutputOpenDrain, Pin, Pull, Speed};
+use embassy_stm32::peripherals::UART8;
 use embassy_stm32::rcc::VoltageScale;
 use embassy_stm32::time::{khz, mhz};
-use embassy_stm32::{bind_interrupts, peripherals, Config, interrupt, usart};
-use embassy_stm32::peripherals::UART8;
 use embassy_stm32::usart::{BufferedUart, BufferedUartRx, BufferedUartTx};
+use embassy_stm32::{bind_interrupts, interrupt, peripherals, usart, Config};
 use embassy_time::{Duration, Timer};
 use static_cell::StaticCell;
-use static_cell::make_static;
 use {defmt_rtt as _, panic_probe as _};
-
 
 // use embedded_hal::digital::{ErrorType, InputPin, OutputPin};
 
 use ublox_cellular;
 use ublox_cellular::config::{CellularConfig, ReverseOutputPin};
 
-use atat::{Buffers, DefaultDigester, Ingress, AtatIngress, AtDigester, Parser};
 use atat::asynch::AtatClient;
+use atat::{AtDigester, AtatIngress, DefaultDigester, Ingress, Parser};
 use ublox_cellular::asynch::runner::Runner;
+use ublox_cellular::asynch::state::{LinkState, OperationState};
 use ublox_cellular::asynch::State;
-use ublox_cellular::command::{AT, Urc};
-
+use ublox_cellular::command;
+use ublox_cellular::command::{Urc, AT};
 
 bind_interrupts!(struct Irqs {
     UART8 => embassy_stm32::usart::BufferedInterruptHandler<peripherals::UART8>;
@@ -60,15 +62,15 @@ impl CellularConfig for MyCelullarConfig {
     const HEX_MODE: bool = true;
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin> {
         info!("reset_pin");
-        return self.reset_pin.as_mut()
+        return self.reset_pin.as_mut();
     }
     fn power_pin(&mut self) -> Option<&mut Self::PowerPin> {
         info!("power_pin");
-        return self.power_pin.as_mut()
+        return self.power_pin.as_mut();
     }
     fn vint_pin(&mut self) -> Option<&mut Self::VintPin> {
         info!("vint_pin = {}", self.vint_pin.as_mut()?.is_high());
-        return self.vint_pin.as_mut()
+        return self.vint_pin.as_mut();
     }
 }
 
@@ -77,6 +79,7 @@ async fn main_task(spawner: Spawner) {
     let mut config = Config::default();
     {
         use embassy_stm32::rcc::*;
+        config.rcc.supply_config = SupplyConfig::DirectSMPS;
         config.rcc.hsi = Some(HSIPrescaler::DIV1);
         config.rcc.csi = true;
         config.rcc.pll1 = Some(Pll {
@@ -84,7 +87,7 @@ async fn main_task(spawner: Spawner) {
             prediv: PllPreDiv::DIV4,
             mul: PllMul::MUL50,
             divp: Some(PllDiv::DIV2),
-            divq: Some(PllDiv::DIV8), // used by SPI3. 100Mhz.
+            divq: Some(PllDiv::DIV8), // 100mhz
             divr: None,
         });
         config.rcc.sys = Sysclk::PLL1_P; // 400 Mhz
@@ -101,10 +104,13 @@ async fn main_task(spawner: Spawner) {
     let led2_pin = p.PI13.degrade();
     let led3_pin = p.PI14.degrade();
 
+    spawner.spawn(blinky(led1_pin)).unwrap();
+    spawner.spawn(blinky(led2_pin)).unwrap();
+    spawner.spawn(blinky(led3_pin)).unwrap();
 
+    static tx_buf: StaticCell<[u8; 16]> = StaticCell::new();
+    static rx_buf: StaticCell<[u8; 16]> = StaticCell::new();
 
-    let tx_buf = &mut make_static!([0u8; 16])[..];
-    let rx_buf = &mut make_static!([0u8; 16])[..];
     let (tx_pin, rx_pin, uart) = (p.PJ8, p.PJ9, p.UART8);
     let mut uart_config = embassy_stm32::usart::Config::default();
     {
@@ -115,14 +121,13 @@ async fn main_task(spawner: Spawner) {
         uart_config.data_bits = embassy_stm32::usart::DataBits::DataBits8;
     }
 
-
     let uart = BufferedUart::new(
         uart,
         Irqs,
         rx_pin,
         tx_pin,
-        tx_buf,
-        rx_buf,
+        tx_buf.init([0u8; 16]),
+        rx_buf.init([0u8; 16]),
         uart_config,
     );
     let (writer, reader) = uart.unwrap().split();
@@ -130,48 +135,72 @@ async fn main_task(spawner: Spawner) {
     // let reset = Output::new(p.PF8, Level::High, Speed::VeryHigh).degrade();
     let celullar_config = MyCelullarConfig {
         reset_pin: Some(Output::new(p.PF8, Level::High, Speed::Low).degrade()),
-        power_pin: Some(ReverseOutputPin(Output::new(p.PJ4, Level::High, Speed::Low).degrade())),
+        power_pin: Some(ReverseOutputPin(
+            Output::new(p.PJ4, Level::Low, Speed::Low).degrade(),
+        )),
         // reset_pin: Some(OutputOpenDrain::new(p.PF8, Level::High, Speed::Low, Pull::None).degrade()),
         // power_pin: Some(OutputOpenDrain::new(p.PJ4, Level::High, Speed::Low, Pull::None).degrade()),
         // power_pin: None,
-        vint_pin: Some(Input::new(p.PJ3, Pull::Down).degrade())
+        vint_pin: Some(Input::new(p.PJ3, Pull::Down).degrade()),
     };
 
-    let buffers = &*make_static!(atat::Buffers::new());
-    let (ingress, client) = buffers.split(writer, AtDigester::default(), atat::Config::new());
+    static RES_SLOT: ResponseSlot<INGRESS_BUF_SIZE> = ResponseSlot::new();
+    static URC_CHANNEL: UrcChannel<command::Urc, URC_CAPACITY, URC_SUBSCRIBERS> = UrcChannel::new();
+    let ingress = Ingress::new(
+        DefaultDigester::<command::Urc>::default(),
+        &RES_SLOT,
+        &URC_CHANNEL,
+    );
+    static buf: StaticCell<[u8; INGRESS_BUF_SIZE]> = StaticCell::new();
+    let mut client = Client::new(
+        writer,
+        &RES_SLOT,
+        buf.init([0; INGRESS_BUF_SIZE]),
+        atat::Config::default(),
+    );
 
     spawner.spawn(ingress_task(ingress, reader)).unwrap();
 
-    let state = make_static!(State::new(client));
-    let (device, mut control, mut runner) = ublox_cellular::asynch::new(state, &buffers.urc_channel, celullar_config).await;
-
+    static state: StaticCell<State<Client<BufferedUartTx<UART8>, INGRESS_BUF_SIZE>>> =
+        StaticCell::new();
+    let (device, mut control, mut runner) = ublox_cellular::asynch::new(
+        state.init(State::new(client)),
+        &URC_CHANNEL,
+        celullar_config,
+    )
+    .await;
     // defmt::info!("{:?}", runner.init().await);
+    // control.set_desired_state(PowerState::Connected).await;
+
+    defmt::unwrap!(spawner.spawn(cellular_task(runner)));
+    Timer::after(Duration::from_millis(1000)).await;
     loop {
-        // runner.init().await.unwrap();
-        defmt::info!("{:?}", runner.is_alive().await);
-        if runner.is_alive().await != Ok(true){
-            runner.init().await.unwrap();
+        control.set_desired_state(OperationState::Initialized).await;
+        info!("set_desired_state(PowerState::Alive)");
+        while control.power_state() != OperationState::Initialized {
+            Timer::after(Duration::from_millis(1000)).await;
         }
         Timer::after(Duration::from_millis(1000)).await;
-        if runner.has_power().await == Ok(true){
-            runner.power_down().await.unwrap();
+        control.set_desired_state(OperationState::PowerDown).await;
+        info!("set_desired_state(PowerState::PowerDown)");
+        while control.power_state() != OperationState::PowerDown {
+            Timer::after(Duration::from_millis(1000)).await;
         }
         Timer::after(Duration::from_millis(5000)).await;
-        if runner.has_power().await == Ok(false){
-            runner.power_up().await.unwrap();
-        }
     }
-    defmt::unwrap!(spawner.spawn(cellular_task(runner)));
 
-    loop {
-        Timer::after(Duration::from_millis(1000)).await;
-    }
 }
-
 
 #[embassy_executor::task]
 async fn ingress_task(
-    mut ingress: Ingress<'static, DefaultDigester<Urc>, ublox_cellular::command::Urc, {INGRESS_BUF_SIZE}, {URC_CAPACITY}, {URC_SUBSCRIBERS}>,
+    mut ingress: Ingress<
+        'static,
+        DefaultDigester<Urc>,
+        ublox_cellular::command::Urc,
+        { INGRESS_BUF_SIZE },
+        { URC_CAPACITY },
+        { URC_SUBSCRIBERS },
+    >,
     mut reader: BufferedUartRx<'static, UART8>,
 ) -> ! {
     ingress.read_from(&mut reader).await;
@@ -180,9 +209,25 @@ async fn ingress_task(
 
 #[embassy_executor::task]
 async fn cellular_task(
-    runner: Runner<'static, atat::asynch::Client<'_, BufferedUartTx<'static, UART8>, {INGRESS_BUF_SIZE}>, MyCelullarConfig, {URC_CAPACITY}>,
+    runner: Runner<
+        'static,
+        atat::asynch::Client<'_, BufferedUartTx<'static, UART8>, { INGRESS_BUF_SIZE }>,
+        MyCelullarConfig,
+        { URC_CAPACITY },
+    >,
 ) -> ! {
     runner.run().await
+}
+
+#[embassy_executor::task(pool_size = 3)]
+async fn blinky(mut led: AnyPin){
+    let mut output = Output::new(led, Level::High, Speed::Low).degrade();
+    loop {
+        output.set_high();
+        Timer::after(Duration::from_millis(1000)).await;
+        output.set_low();
+        Timer::after(Duration::from_millis(1000)).await;
+    }
 }
 
 static EXECUTOR: StaticCell<Executor> = StaticCell::new();

@@ -148,7 +148,7 @@ mod test {
         };
         let s = to_string::<_, 32>(&PinStatusCode::PhNetSubPin, "", options).unwrap();
 
-        assert_eq!(s, String::<32>::from("PH-NETSUB PIN"))
+        assert_eq!(s, String::<32>::try_from("PH-NETSUB PIN").unwrap())
     }
 
     #[test]

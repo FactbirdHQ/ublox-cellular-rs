@@ -60,7 +60,7 @@ impl<'a> DnsSocket<'a> {
         {
             let mut s = self.stack.borrow_mut();
             if s.dns_queries
-                .insert(heapless::String::from(name), DnsQuery::new())
+                .insert(heapless::String::try_from(name).unwrap(), DnsQuery::new())
                 .is_err()
             {
                 error!("Attempted to start more simultaneous DNS requests than the (4) supported");
@@ -93,22 +93,25 @@ impl<'a> DnsSocket<'a> {
 
         let drop = OnDrop::new(|| {
             let mut s = self.stack.borrow_mut();
-            s.dns_queries.remove(&heapless::String::from(name));
+            s.dns_queries
+                .remove(&heapless::String::try_from(name).unwrap());
         });
 
         let res = poll_fn(|cx| {
             let mut s = self.stack.borrow_mut();
             let query = s
                 .dns_queries
-                .get_mut(&heapless::String::from(name))
+                .get_mut(&heapless::String::try_from(name).unwrap())
                 .unwrap();
             match query.state {
                 DnsState::Ok(ip) => {
-                    s.dns_queries.remove(&heapless::String::from(name));
+                    s.dns_queries
+                        .remove(&heapless::String::try_from(name).unwrap());
                     return Poll::Ready(Ok(ip));
                 }
                 DnsState::Err => {
-                    s.dns_queries.remove(&heapless::String::from(name));
+                    s.dns_queries
+                        .remove(&heapless::String::try_from(name).unwrap());
                     return Poll::Ready(Err(Error::Failed));
                 }
                 _ => {

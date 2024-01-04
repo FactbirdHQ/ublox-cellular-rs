@@ -146,13 +146,16 @@ impl<AT: AtatClient + 'static, const URC_CAPACITY: usize> UbloxStack<AT, URC_CAP
                 urc_subscription.next_message_pure(),
                 should_tx,
                 ticker.next(),
-                poll_fn(
-                    |cx| match (self.link_up.load(Ordering::Relaxed), shared.link_state(cx)) {
+                poll_fn(|cx| {
+                    match (
+                        self.link_up.load(Ordering::Relaxed),
+                        device.link_state_poll_fn(cx),
+                    ) {
                         (true, LinkState::Down) => Poll::Ready(LinkState::Down),
                         (false, LinkState::Up) => Poll::Ready(LinkState::Up),
                         _ => Poll::Pending,
-                    },
-                ),
+                    }
+                }),
             )
             .await
             {

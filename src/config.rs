@@ -8,11 +8,11 @@ impl ErrorType for NoPin {
 }
 
 impl InputPin for NoPin {
-    fn is_high(&self) -> Result<bool, Self::Error> {
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
         Ok(true)
     }
 
-    fn is_low(&self) -> Result<bool, Self::Error> {
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
         Ok(false)
     }
 }
@@ -27,9 +27,11 @@ impl OutputPin for NoPin {
     }
 }
 
-pub struct ReverseOutputPin<P: OutputPin<Error = Infallible>> (pub P);
+pub struct ReverseOutputPin<P: OutputPin<Error = Infallible>>(pub P);
 
-impl<P: OutputPin<Error = Infallible>> ErrorType for ReverseOutputPin<P> { type Error = Infallible; }
+impl<P: OutputPin<Error = Infallible>> ErrorType for ReverseOutputPin<P> {
+    type Error = Infallible;
+}
 
 impl<P: OutputPin<Error = Infallible>> OutputPin for ReverseOutputPin<P> {
     fn set_low(&mut self) -> Result<(), Self::Error> {
@@ -48,16 +50,18 @@ impl<P: OutputPin<Error = Infallible>> OutputPin for ReverseOutputPin<P> {
     }
 }
 
-pub struct ReverseInputPin<P: InputPin<Error = Infallible>> (pub P);
+pub struct ReverseInputPin<P: InputPin<Error = Infallible>>(pub P);
 
-impl <P: InputPin<Error = Infallible>> ErrorType for ReverseInputPin<P> { type Error = Infallible; }
+impl<P: InputPin<Error = Infallible>> ErrorType for ReverseInputPin<P> {
+    type Error = Infallible;
+}
 
-impl <P: InputPin<Error = Infallible>> InputPin for ReverseInputPin<P> {
-    fn is_high(&self) -> Result<bool, Self::Error> {
+impl<P: InputPin<Error = Infallible>> InputPin for ReverseInputPin<P> {
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
         self.0.is_low()
     }
 
-    fn is_low(&self) -> Result<bool, Self::Error> {
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
         self.0.is_high()
     }
 }

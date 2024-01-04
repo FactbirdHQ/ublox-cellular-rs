@@ -5,10 +5,10 @@ edition = "2021"
 
 # Example for the STM32H747I-DISCO board with SARA-R5 modem attached to UART8
 [dependencies]
-embassy-stm32 = { version = "0.1.0", git = "https://github.com/embassy-rs/embassy.git", branch = "main", features = ["nightly", "defmt", "stm32h747xi-cm7", "time-driver-any", "exti", "memory-x", "unstable-pac", "unstable-traits"]  }
-embassy-executor = { version = "0.3.0", features = ["nightly", "arch-cortex-m", "executor-thread", "defmt", "integrated-timers"] }
-embassy-time = { version = "0.1", features = ["defmt", "defmt-timestamp-uptime", "unstable-traits", "nightly"] }
-embassy-sync = { version = "0.3.0", features = ["defmt"] }
+embassy-stm32 = { version = "0.1.0", features = ["defmt", "stm32h747xi-cm7", "time-driver-any", "exti", "memory-x", "unstable-pac"]  }
+embassy-executor = { version = "0.4.0", features = ["arch-cortex-m", "executor-thread", "defmt", "integrated-timers"] }
+embassy-time = { version = "0.2", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-sync = { version = "0.5", features = ["defmt"] }
 
 
 cortex-m = { version = "0.7.7", features = ["inline-asm", "critical-section-single-core"] }
@@ -18,16 +18,29 @@ defmt = "0.3.5"
 defmt-rtt = "0.4.0"
 panic-probe = { version = "0.3.1", features = ["print-defmt"] }
 
-static_cell = { version = "1.2.0", features = ["nightly"]}
+static_cell = { version = "2.0", features = []}
 
 atat = { version = "0.20.0", features = ["derive", "bytes", "defmt"] }
 ublox-cellular-rs = {version = "0.4.0", path = "../..", features = ["sara-r5", "defmt", "async"]}
 
 [patch.crates-io]
-ublox-sockets = { path = "../../../ublox-sockets" }
+ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", branch = "feature/async-borrowed-sockets" }
+atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
 no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
-embassy-time = { package = "embassy-time", git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-stm32 = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-futures = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+embassy-executor = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 
+#embassy-stm32 = { path = "../../../embassy/embassy-stm32" }
+#embassy-time = { path = "../../../embassy/embassy-time" }
+#embassy-sync = { path = "../../../embassy/embassy-sync" }
+#embassy-futures = { path = "../../../embassy/embassy-futures" }
+#embassy-executor = { path = "../../../embassy/embassy-executor" }
+
+#ublox-sockets = { path = "../../../ublox-sockets" }
+#atat = { path = "../../../atat/atat" }
 
 [profile.dev]
 opt-level = "s"

@@ -3,10 +3,10 @@ pub mod runner;
 #[cfg(feature = "ublox-sockets")]
 pub mod ublox_stack;
 
-pub(crate) mod state;
+pub mod state;
 
 use crate::{command::Urc, config::CellularConfig};
-use atat::{asynch::AtatClient, AtatUrcChannel};
+use atat::{asynch::AtatClient, UrcChannel};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use runner::Runner;
 use state::Device;
@@ -16,11 +16,8 @@ use self::control::Control;
 pub struct AtHandle<'d, AT: AtatClient>(&'d Mutex<NoopRawMutex, AT>);
 
 impl<'d, AT: AtatClient> AtHandle<'d, AT> {
-    async fn send<Cmd: atat::AtatCmd<LEN>, const LEN: usize>(
-        &mut self,
-        cmd: Cmd,
-    ) -> Result<Cmd::Response, atat::Error> {
-        self.0.lock().await.send_retry::<Cmd, LEN>(&cmd).await
+    async fn send<Cmd: atat::AtatCmd>(&mut self, cmd: &Cmd) -> Result<Cmd::Response, atat::Error> {
+        self.0.lock().await.send_retry::<Cmd>(cmd).await
     }
 }
 
@@ -38,15 +35,9 @@ impl<AT: AtatClient> State<AT> {
     }
 }
 
-pub async fn new<
-    'a,
-    AT: AtatClient,
-    SUB: AtatUrcChannel<Urc, URC_CAPACITY, 2>,
-    C: CellularConfig,
-    const URC_CAPACITY: usize,
->(
+pub async fn new<'a, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>(
     state: &'a mut State<AT>,
-    subscriber: &'a SUB,
+    subscriber: &'a UrcChannel<Urc, URC_CAPACITY, 2>,
     config: C,
 ) -> (
     Device<'a, AT, URC_CAPACITY>,

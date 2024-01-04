@@ -32,6 +32,8 @@ pub enum Error {
     _Unknown,
 
     IoPin,
+
+    SubscriberOverflow(embassy_sync::pubsub::Error),
 }
 
 #[cfg(feature = "defmt")]
