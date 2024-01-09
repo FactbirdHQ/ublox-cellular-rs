@@ -86,7 +86,7 @@ async fn main_task(spawner: Spawner) {
             source: PllSource::HSI,
             prediv: PllPreDiv::DIV4,
             mul: PllMul::MUL50,
-            divp: Some(PllDiv::DIV2),
+            divp: Some(PllDiv::DIV2), //400mhz
             divq: Some(PllDiv::DIV8), // 100mhz
             divr: None,
         });
@@ -211,6 +211,7 @@ async fn main_task(spawner: Spawner) {
         while control.power_state() != OperationState::PowerDown {
             Timer::after(Duration::from_millis(1000)).await;
         }
+
         Timer::after(Duration::from_millis(5000)).await;
     }
 

@@ -88,7 +88,7 @@ exclude = ["examples"]
 [patch.crates-io]
 #ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", branch = "feature/async-borrowed-sockets" }
 no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
-ublox-sockets = { path = "../ublox-sockets" }
+#ublox-sockets = { path = "../ublox-sockets" }
 atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
 embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 embassy-sync = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
