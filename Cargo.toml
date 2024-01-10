@@ -36,7 +36,7 @@ futures-util = { version = "0.3.29", default-features = false }
 
 embassy-futures = { version = "0.1", optional = true }
 
-embedded-hal = "=1.0.0-rc.3"
+embedded-hal = "1.0.0"
 embedded-nal = "0.8"
 embedded-nal-async = { version = "0.7", optional = true }
 
