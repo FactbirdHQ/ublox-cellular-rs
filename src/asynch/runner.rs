@@ -285,7 +285,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
             self.at
                 .send(&crate::command::network_service::SetOperatorSelection {
                     mode: crate::command::network_service::types::OperatorSelectionMode::Automatic,
-                    format: Some(2),
+                    format: Some(C::OPERATOR_FORMAT as u8),
                 })
                 .await?;
         }

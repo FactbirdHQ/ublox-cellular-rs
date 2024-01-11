@@ -86,7 +86,7 @@ async fn main_task(spawner: Spawner) {
             source: PllSource::HSI,
             prediv: PllPreDiv::DIV4,
             mul: PllMul::MUL50,
-            divp: Some(PllDiv::DIV2),
+            divp: Some(PllDiv::DIV2), //400mhz
             divq: Some(PllDiv::DIV8), // 100mhz
             divr: None,
         });
@@ -171,21 +171,47 @@ async fn main_task(spawner: Spawner) {
     .await;
     // defmt::info!("{:?}", runner.init().await);
     // control.set_desired_state(PowerState::Connected).await;
+    control
+        .send(&crate::command::network_service::SetOperatorSelection {
+            mode: crate::command::network_service::types::OperatorSelectionMode::Automatic,
+            format: Some(0),
+        })
+        .await;
+
 
     defmt::unwrap!(spawner.spawn(cellular_task(runner)));
     Timer::after(Duration::from_millis(1000)).await;
     loop {
-        control.set_desired_state(OperationState::Initialized).await;
+        control.set_desired_state(OperationState::Connected).await;
         info!("set_desired_state(PowerState::Alive)");
-        while control.power_state() != OperationState::Initialized {
+        while control.power_state() != OperationState::Connected {
             Timer::after(Duration::from_millis(1000)).await;
         }
-        Timer::after(Duration::from_millis(1000)).await;
+        Timer::after(Duration::from_millis(10000)).await;
+        loop {
+            Timer::after(Duration::from_millis(1000)).await;
+            let operator = control.get_operator().await;
+            info!("{}", operator);
+            let signal_quality = control.get_signal_quality().await;
+            info!("{}", signal_quality);
+            if let Ok(sq) = signal_quality {
+                if let  Ok(op) = operator {
+                    if op.oper == None {
+                        continue;
+                    }
+                }
+                if sq.rxlev > 0 && sq.rsrp != 255 {
+                    break;
+                }
+            }
+        }
+        Timer::after(Duration::from_millis(10000)).await;
         control.set_desired_state(OperationState::PowerDown).await;
         info!("set_desired_state(PowerState::PowerDown)");
         while control.power_state() != OperationState::PowerDown {
             Timer::after(Duration::from_millis(1000)).await;
         }
+
         Timer::after(Duration::from_millis(5000)).await;
     }
 

@@ -40,4 +40,31 @@ impl<'a, AT: AtatClient> Control<'a, AT> {
     pub async fn set_desired_state(&mut self, ps: OperationState) {
         self.state_ch.set_desired_state(ps).await;
     }
+
+    pub async fn get_signal_quality(
+        &mut self,
+    ) -> Result<crate::command::network_service::responses::SignalQuality, Error> {
+        self.at
+            .send(&crate::command::network_service::GetSignalQuality)
+            .await
+            .map_err(|e| Error::Atat(e))
+    }
+
+    pub async fn get_operator(
+        &mut self,
+    ) -> Result<crate::command::network_service::responses::OperatorSelection, Error> {
+        self.at
+            .send(&crate::command::network_service::GetOperatorSelection)
+            .await
+            .map_err(|e| Error::Atat(e))
+    }
+
+    /// Send an AT command to the modem
+    /// This is usefull if you have special configuration but might break the drivers functionality if your settings interfere with the drivers settings
+    pub async fn send<Cmd: atat::AtatCmd>(
+        &mut self,
+        cmd: &Cmd,
+    ) -> Result<Cmd::Response, atat::Error> {
+        self.at.send::<Cmd>(cmd).await
+    }
 }

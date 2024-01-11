@@ -15,7 +15,7 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.20.0", features = ["derive", "bytes"] }
+atat = { version = "0.21.0", features = ["derive", "bytes"] }
 heapless = { version = "^0.8", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
@@ -36,7 +36,7 @@ futures-util = { version = "0.3.29", default-features = false }
 
 embassy-futures = { version = "0.1", optional = true }
 
-embedded-hal = "=1.0.0-rc.3"
+embedded-hal = "1.0.0"
 embedded-nal = "0.8"
 embedded-nal-async = { version = "0.7", optional = true }
 
@@ -47,7 +47,7 @@ embedded-io-async = "0.6"
 [features]
 default = ["socket-udp", "socket-tcp", "async", "ublox-sockets"]
 
-async = ["dep:embedded-nal-async", "dep:embassy-futures", "atat/async", "ublox-sockets?/async"]
+async = ["dep:embedded-nal-async", "dep:embassy-futures", "ublox-sockets?/async"]
 
 defmt = [
     "dep:defmt",
@@ -88,7 +88,7 @@ exclude = ["examples"]
 [patch.crates-io]
 #ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", branch = "feature/async-borrowed-sockets" }
 no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
-ublox-sockets = { path = "../ublox-sockets" }
+#ublox-sockets = { path = "../ublox-sockets" }
 atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
 embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 embassy-sync = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
