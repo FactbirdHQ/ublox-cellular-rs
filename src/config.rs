@@ -1,5 +1,6 @@
 use core::convert::Infallible;
 use embedded_hal::digital::{ErrorType, InputPin, OutputPin, PinState};
+use heapless::String;
 
 pub struct NoPin;
 
@@ -75,6 +76,12 @@ pub trait CellularConfig {
     const HEX_MODE: bool = true;
     const OPERATOR_FORMAT: OperatorFormat = OperatorFormat::Long;
 
+    const APN: APNInfo = APNInfo {
+        apn: Apn::Automatic,
+        user_name: None,
+        password: None,
+    };
+
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin>;
     fn power_pin(&mut self) -> Option<&mut Self::PowerPin>;
     fn vint_pin(&mut self) -> Option<&mut Self::VintPin>;
@@ -85,4 +92,34 @@ pub enum OperatorFormat {
     Long = 0,
     Short = 1,
     Numeric = 2,
+}
+
+#[derive(Debug, Clone)]
+pub enum Apn {
+    Given(String<100>),
+    Automatic,
+}
+
+impl Default for Apn {
+    fn default() -> Self {
+        Self::Automatic
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct APNInfo {
+    pub apn: Apn,
+    pub user_name: Option<String<64>>,
+    pub password: Option<String<64>>,
+}
+
+impl APNInfo {
+    #[must_use]
+    pub fn new(apn: &str) -> Self {
+        Self {
+            apn: Apn::Given(String::try_from(apn).unwrap()),
+            user_name: None,
+            password: None,
+        }
+    }
 }
