@@ -76,11 +76,7 @@ pub trait CellularConfig {
     const HEX_MODE: bool = true;
     const OPERATOR_FORMAT: OperatorFormat = OperatorFormat::Long;
 
-    const APN: APNInfo = APNInfo {
-        apn: Apn::Automatic,
-        user_name: None,
-        password: None,
-    };
+    const APN: Apn = Apn::None;
 
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin>;
     fn power_pin(&mut self) -> Option<&mut Self::PowerPin>;
@@ -96,30 +92,14 @@ pub enum OperatorFormat {
 
 #[derive(Debug, Clone)]
 pub enum Apn {
-    Given(String<100>),
+    None,
+    Given{ name: String<64>, username: Option<String<64>>, password: Option<String<64>>},
+    #[cfg(any(feature = "automatic-apn"))]
     Automatic,
 }
 
 impl Default for Apn {
     fn default() -> Self {
-        Self::Automatic
-    }
-}
-
-#[derive(Debug, Clone, Default)]
-pub struct APNInfo {
-    pub apn: Apn,
-    pub user_name: Option<String<64>>,
-    pub password: Option<String<64>>,
-}
-
-impl APNInfo {
-    #[must_use]
-    pub fn new(apn: &str) -> Self {
-        Self {
-            apn: Apn::Given(String::try_from(apn).unwrap()),
-            user_name: None,
-            password: None,
-        }
+        Self::None
     }
 }

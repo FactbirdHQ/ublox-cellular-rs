@@ -61,6 +61,8 @@ defmt = [
 
 log = ["dep:log", "ublox-sockets?/log", "atat/log"]
 
+automatic-apn = []
+
 lara-r2 = []
 lara-r6 = []
 leon-g1 = []
