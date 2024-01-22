@@ -93,7 +93,11 @@ pub enum OperatorFormat {
 #[derive(Debug, Clone)]
 pub enum Apn {
     None,
-    Given{ name: String<64>, username: Option<String<64>>, password: Option<String<64>>},
+    Given {
+        name: String<64>,
+        username: Option<String<64>>,
+        password: Option<String<64>>,
+    },
     #[cfg(any(feature = "automatic-apn"))]
     Automatic,
 }

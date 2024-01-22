@@ -42,20 +42,20 @@ const URC_CAPACITY: usize = 2;
 const URC_SUBSCRIBERS: usize = 2;
 
 struct MyCelullarConfig {
-    reset_pin: Option<Output<'static, AnyPin>>,
+    reset_pin: Option<Output<'static, >>,
     // reset_pin: Option<NoPin>,
-    power_pin: Option<ReverseOutputPin<Output<'static, AnyPin>>>,
+    power_pin: Option<ReverseOutputPin<Output<'static, >>>,
     // power_pin: Option<NoPin>,
-    vint_pin: Option<Input<'static, AnyPin>>,
+    vint_pin: Option<Input<'static, >>,
     // vint_pin: Option<NoPin>
 }
 
 impl CellularConfig for MyCelullarConfig {
-    type ResetPin = Output<'static, AnyPin>;
+    type ResetPin = Output<'static, >;
     // type ResetPin = NoPin;
-    type PowerPin = ReverseOutputPin<Output<'static, AnyPin>>;
+    type PowerPin = ReverseOutputPin<Output<'static, >>;
     // type PowerPin = NoPin;
-    type VintPin = Input<'static, AnyPin>;
+    type VintPin = Input<'static, >;
     // type VintPin = NoPin;
 
     const FLOW_CONTROL: bool = false;
@@ -134,14 +134,14 @@ async fn main_task(spawner: Spawner) {
     // let power = Output::new(p.PJ4, Level::High, Speed::VeryHigh).degrade();
     // let reset = Output::new(p.PF8, Level::High, Speed::VeryHigh).degrade();
     let celullar_config = MyCelullarConfig {
-        reset_pin: Some(Output::new(p.PF8, Level::High, Speed::Low).degrade()),
+        reset_pin: Some(Output::new(p.PF8, Level::High, Speed::Low)),
         power_pin: Some(ReverseOutputPin(
-            Output::new(p.PJ4, Level::Low, Speed::Low).degrade(),
+            Output::new(p.PJ4, Level::Low, Speed::Low),
         )),
         // reset_pin: Some(OutputOpenDrain::new(p.PF8, Level::High, Speed::Low, Pull::None).degrade()),
         // power_pin: Some(OutputOpenDrain::new(p.PJ4, Level::High, Speed::Low, Pull::None).degrade()),
         // power_pin: None,
-        vint_pin: Some(Input::new(p.PJ3, Pull::Down).degrade()),
+        vint_pin: Some(Input::new(p.PJ3, Pull::Down)),
     };
 
     static RES_SLOT: ResponseSlot<INGRESS_BUF_SIZE> = ResponseSlot::new();
@@ -247,7 +247,7 @@ async fn cellular_task(
 
 #[embassy_executor::task(pool_size = 3)]
 async fn blinky(mut led: AnyPin){
-    let mut output = Output::new(led, Level::High, Speed::Low).degrade();
+    let mut output = Output::new(led, Level::High, Speed::Low);
     loop {
         output.set_high();
         Timer::after(Duration::from_millis(1000)).await;

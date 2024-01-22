@@ -21,7 +21,7 @@ nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
 #ublox-sockets = { version = "0.5", optional = true }
 ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", branch = "feature/async-borrowed-sockets", optional = true }
-embassy-time = "0.2"
+embassy-time = "0.3"
 embassy-sync = "0.5"
 
 no-std-net = { version = "^0.6", features = ["serde"] }
@@ -47,7 +47,7 @@ embedded-io-async = "0.6"
 [features]
 default = ["socket-udp", "socket-tcp", "async", "ublox-sockets"]
 
-async = ["dep:embedded-nal-async", "dep:embassy-futures", "ublox-sockets?/async"]
+async = ["dep:embedded-nal-async", "dep:embassy-futures"]
 
 defmt = [
     "dep:defmt",
