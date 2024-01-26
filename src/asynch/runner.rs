@@ -505,7 +505,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
                         continue;
                     }
                     let desired_state = desired_state.unwrap();
-                    self.change_state_to_desired_state(desired_state).await;
+                    let _ = self.change_state_to_desired_state(desired_state).await;
                 }
                 Either::Second(event) => {
                     self.handle_urc(event).await;

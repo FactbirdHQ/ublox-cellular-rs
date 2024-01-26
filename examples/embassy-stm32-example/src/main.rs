@@ -4,6 +4,7 @@
 // #![feature(type_alias_impl_trait)]
 
 use atat::asynch::Client;
+use atat::heapless::String;
 use atat::ResponseSlot;
 use atat::UrcChannel;
 use core::cell::RefCell;
@@ -17,7 +18,6 @@ use embassy_stm32::time::{khz, mhz};
 use embassy_stm32::usart::{BufferedUart, BufferedUartRx, BufferedUartTx};
 use embassy_stm32::{bind_interrupts, interrupt, peripherals, usart, Config};
 use embassy_time::{Duration, Timer};
-use atat::heapless::String;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
@@ -43,25 +43,29 @@ const URC_CAPACITY: usize = 2;
 const URC_SUBSCRIBERS: usize = 2;
 
 struct MyCelullarConfig {
-    reset_pin: Option<Output<'static, >>,
+    reset_pin: Option<Output<'static>>,
     // reset_pin: Option<NoPin>,
-    power_pin: Option<ReverseOutputPin<Output<'static, >>>,
+    power_pin: Option<ReverseOutputPin<Output<'static>>>,
     // power_pin: Option<NoPin>,
-    vint_pin: Option<Input<'static, >>,
+    vint_pin: Option<Input<'static>>,
     // vint_pin: Option<NoPin>
 }
 
 impl<'a> CellularConfig<'a> for MyCelullarConfig {
-    type ResetPin = Output<'static, >;
+    type ResetPin = Output<'static>;
     // type ResetPin = NoPin;
-    type PowerPin = ReverseOutputPin<Output<'static, >>;
+    type PowerPin = ReverseOutputPin<Output<'static>>;
     // type PowerPin = NoPin;
-    type VintPin = Input<'static, >;
+    type VintPin = Input<'static>;
     // type VintPin = NoPin;
 
     const FLOW_CONTROL: bool = false;
     const HEX_MODE: bool = true;
-    const APN: Apn<'a> = Apn::Given {name: "hologram", username: None, password: None};
+    const APN: Apn<'a> = Apn::Given {
+        name: "hologram",
+        username: None,
+        password: None,
+    };
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin> {
         info!("reset_pin");
         return self.reset_pin.as_mut();
@@ -137,9 +141,7 @@ async fn main_task(spawner: Spawner) {
     // let reset = Output::new(p.PF8, Level::High, Speed::VeryHigh).degrade();
     let celullar_config = MyCelullarConfig {
         reset_pin: Some(Output::new(p.PF8, Level::High, Speed::Low)),
-        power_pin: Some(ReverseOutputPin(
-            Output::new(p.PJ4, Level::Low, Speed::Low),
-        )),
+        power_pin: Some(ReverseOutputPin(Output::new(p.PJ4, Level::Low, Speed::Low))),
         // reset_pin: Some(OutputOpenDrain::new(p.PF8, Level::High, Speed::Low, Pull::None).degrade()),
         // power_pin: Some(OutputOpenDrain::new(p.PJ4, Level::High, Speed::Low, Pull::None).degrade()),
         // power_pin: None,
@@ -180,24 +182,30 @@ async fn main_task(spawner: Spawner) {
     //     })
     //     .await;
 
-
     defmt::unwrap!(spawner.spawn(cellular_task(runner)));
     Timer::after(Duration::from_millis(1000)).await;
     loop {
-        control.set_desired_state(OperationState::DataEstablished).await;
+        control
+            .set_desired_state(OperationState::DataEstablished)
+            .await;
         info!("set_desired_state(PowerState::Alive)");
         while control.power_state() != OperationState::DataEstablished {
             Timer::after(Duration::from_millis(1000)).await;
         }
         Timer::after(Duration::from_millis(10000)).await;
+
         loop {
             Timer::after(Duration::from_millis(1000)).await;
             let operator = control.get_operator().await;
             info!("{}", operator);
             let signal_quality = control.get_signal_quality().await;
             info!("{}", signal_quality);
+            if signal_quality.is_err() {
+                let desired_state = control.desired_state();
+                control.set_desired_state(desired_state).await
+            }
             if let Ok(sq) = signal_quality {
-                if let  Ok(op) = operator {
+                if let Ok(op) = operator {
                     if op.oper == None {
                         continue;
                     }
@@ -207,7 +215,13 @@ async fn main_task(spawner: Spawner) {
                 }
             }
         }
-        let dns = control.send(&ublox_cellular::command::dns::ResolveNameIp{resolution_type: ublox_cellular::command::dns::types::ResolutionType::DomainNameToIp, ip_domain_string: "www.google.com"}).await;
+        let dns = control
+            .send(&ublox_cellular::command::dns::ResolveNameIp {
+                resolution_type:
+                    ublox_cellular::command::dns::types::ResolutionType::DomainNameToIp,
+                ip_domain_string: "www.google.com",
+            })
+            .await;
         debug!("dns: {:?}", dns);
         Timer::after(Duration::from_millis(10000)).await;
         control.set_desired_state(OperationState::PowerDown).await;
@@ -218,7 +232,6 @@ async fn main_task(spawner: Spawner) {
 
         Timer::after(Duration::from_millis(5000)).await;
     }
-
 }
 
 #[embassy_executor::task]
@@ -250,7 +263,7 @@ async fn cellular_task(
 }
 
 #[embassy_executor::task(pool_size = 3)]
-async fn blinky(mut led: AnyPin){
+async fn blinky(mut led: AnyPin) {
     let mut output = Output::new(led, Level::High, Speed::Low);
     loop {
         output.set_high();
