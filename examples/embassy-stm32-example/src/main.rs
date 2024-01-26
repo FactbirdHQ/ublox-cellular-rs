@@ -173,12 +173,12 @@ async fn main_task(spawner: Spawner) {
     .await;
     // defmt::info!("{:?}", runner.init().await);
     // control.set_desired_state(PowerState::Connected).await;
-    control
-        .send(&crate::command::network_service::SetOperatorSelection {
-            mode: crate::command::network_service::types::OperatorSelectionMode::Automatic,
-            format: Some(0),
-        })
-        .await;
+    // control
+    //     .send(&crate::command::network_service::SetOperatorSelection {
+    //         mode: crate::command::network_service::types::OperatorSelectionMode::Automatic,
+    //         format: Some(0),
+    //     })
+    //     .await;
 
 
     defmt::unwrap!(spawner.spawn(cellular_task(runner)));

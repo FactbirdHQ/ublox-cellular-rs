@@ -19,6 +19,7 @@ pub enum Error {
     PoweredDown,
     AttachTimeout,
     ContextActivationTimeout,
+    InvalidStateTransition,
 
     // Network errors
     Network(NetworkError),
@@ -49,6 +50,7 @@ impl defmt::Format for Error {
             Self::PoweredDown => defmt::write!(f, "PoweredDown"),
             Self::AttachTimeout => defmt::write!(f, "AttachTimeout"),
             Self::ContextActivationTimeout => defmt::write!(f, "ContextActivationTimeout"),
+            Self::InvalidStateTransition => defmt::write!(f, "InvalidStateTransition"),
             Self::Network(e) => defmt::write!(f, "Network({:?})", e),
             // Self::DataService(e) => defmt::write!(f, "DataService({:?})", e),
             Self::Generic(e) => defmt::write!(f, "Generic({:?})", e),

@@ -505,127 +505,122 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
                         continue;
                     }
                     let desired_state = desired_state.unwrap();
-                    if 0 >= desired_state as isize - self.ch.state_runner().power_state() as isize {
-                        debug!(
-                            "Power steps was negative, power down: {}",
-                            desired_state as isize - self.ch.state_runner().power_state() as isize
-                        );
-                        self.power_down().await.ok();
-                        self.ch.set_power_state(OperationState::PowerDown);
-                    }
-                    let start_state = self.ch.state_runner().power_state() as isize;
-                    let steps = desired_state as isize - start_state;
-                    for step in 0..=steps {
-                        debug!(
-                            "State transition {} steps: {} -> {}, {}",
-                            steps,
-                            start_state,
-                            start_state + step,
-                            step
-                        );
-                        let next_state = start_state + step;
-                        match OperationState::try_from(next_state) {
-                            Ok(OperationState::PowerDown) => {}
-                            Ok(OperationState::PowerUp) => match self.power_up().await {
-                                Ok(_) => {
-                                    self.ch.set_power_state(OperationState::PowerUp);
-                                }
-                                Err(err) => {
-                                    error!("Error in power_up: {:?}", err);
-                                    break;
-                                }
-                            },
-                            Ok(OperationState::Alive) => {
-                                match with_timeout(boot_time() * 2, self.check_is_alive_loop())
-                                    .await
-                                {
-                                    Ok(true) => {
-                                        debug!("Will set Alive");
-                                        self.ch.set_power_state(OperationState::Alive);
-                                        debug!("Set Alive");
-                                    }
-                                    Ok(false) => {
-                                        error!("Error in is_alive: {:?}", Error::PoweredDown);
-                                        break;
-                                    }
-                                    Err(err) => {
-                                        error!("Error in is_alive: {:?}", err);
-                                        break;
-                                    }
-                                }
-                            }
-                            // Ok(OperationState::Alive) => match self.is_alive().await {
-                            //     Ok(_) => {
-                            //         debug!("Will set Alive");
-                            //         self.ch.set_power_state(OperationState::Alive);
-                            //         debug!("Set Alive");
-                            //     }
-                            //     Err(err) => {
-                            //         error!("Error in is_alive: {:?}", err);
-                            //         break;
-                            //     }
-                            // },
-                            Ok(OperationState::Initialized) => match self.init_at().await {
-                                Ok(_) => {
-                                    self.ch.set_power_state(OperationState::Initialized);
-                                }
-                                Err(err) => {
-                                    error!("Error in init_at: {:?}", err);
-                                    break;
-                                }
-                            },
-                            Ok(OperationState::Connected) => match self.init_network().await {
-                                Ok(_) => {
-                                    match with_timeout(
-                                        Duration::from_secs(180),
-                                        self.is_network_attached_loop(),
-                                    )
-                                    .await
-                                    {
-                                        Ok(_) => {
-                                            debug!("Will set Connected");
-                                            self.ch.set_power_state(OperationState::Connected);
-                                            debug!("Set Connected");
-                                        }
-                                        Err(err) => {
-                                            error!("Timeout waiting for network attach: {:?}", err);
-                                            break;
-                                        }
-                                    }
-                                }
-                                Err(err) => {
-                                    error!("Error in init_network: {:?}", err);
-                                    break;
-                                }
-                            },
-                            Ok(OperationState::DataEstablished) => match self
-                                .connect(
-                                    C::APN,
-                                    crate::command::psn::types::ProfileId(C::PROFILE_ID),
-                                    crate::command::psn::types::ContextId(C::CONTEXT_ID),
-                                )
-                                .await
-                            {
-                                Ok(_) => {
-                                    self.ch.set_power_state(OperationState::DataEstablished);
-                                }
-                                Err(err) => {
-                                    error!("Error in connect: {:?}", err);
-                                    break;
-                                }
-                            },
-                            Err(_) => {
-                                error!("State transition next_state not valid: start_state={}, next_state={}, steps={} ", start_state, next_state, steps);
-                                break;
-                            }
-                        }
-                    }
+                    self.change_state_to_desired_state(desired_state).await;
                 }
                 Either::Second(event) => {
                     self.handle_urc(event).await;
                 }
             }
         }
+    }
+
+    async fn change_state_to_desired_state(
+        &mut self,
+        desired_state: OperationState,
+    ) -> Result<(), Error> {
+        if 0 >= desired_state as isize - self.ch.state_runner().power_state() as isize {
+            debug!(
+                "Power steps was negative, power down: {}",
+                desired_state as isize - self.ch.state_runner().power_state() as isize
+            );
+            self.power_down().await.ok();
+            self.ch.set_power_state(OperationState::PowerDown);
+        }
+        let start_state = self.ch.state_runner().power_state() as isize;
+        let steps = desired_state as isize - start_state;
+        for step in 0..=steps {
+            debug!(
+                "State transition {} steps: {} -> {}, {}",
+                steps,
+                start_state,
+                start_state + step,
+                step
+            );
+            let next_state = start_state + step;
+            match OperationState::try_from(next_state) {
+                Ok(OperationState::PowerDown) => {}
+                Ok(OperationState::PowerUp) => match self.power_up().await {
+                    Ok(_) => {
+                        self.ch.set_power_state(OperationState::PowerUp);
+                    }
+                    Err(err) => {
+                        error!("Error in power_up: {:?}", err);
+                        return Err(err);
+                    }
+                },
+                Ok(OperationState::Alive) => {
+                    match with_timeout(boot_time() * 2, self.check_is_alive_loop()).await {
+                        Ok(true) => {
+                            debug!("Will set Alive");
+                            self.ch.set_power_state(OperationState::Alive);
+                            debug!("Set Alive");
+                        }
+                        Ok(false) => {
+                            error!("Error in is_alive: {:?}", Error::PoweredDown);
+                            return Err(Error::PoweredDown);
+                        }
+                        Err(err) => {
+                            error!("Error in is_alive: {:?}", err);
+                            return Err(Error::StateTimeout);
+                        }
+                    }
+                }
+                Ok(OperationState::Initialized) => match self.init_at().await {
+                    Ok(_) => {
+                        self.ch.set_power_state(OperationState::Initialized);
+                    }
+                    Err(err) => {
+                        error!("Error in init_at: {:?}", err);
+                        return Err(err);
+                    }
+                },
+                Ok(OperationState::Connected) => match self.init_network().await {
+                    Ok(_) => {
+                        match with_timeout(
+                            Duration::from_secs(180),
+                            self.is_network_attached_loop(),
+                        )
+                        .await
+                        {
+                            Ok(_) => {
+                                debug!("Will set Connected");
+                                self.ch.set_power_state(OperationState::Connected);
+                                debug!("Set Connected");
+                            }
+                            Err(err) => {
+                                error!("Timeout waiting for network attach: {:?}", err);
+                                return Err(Error::StateTimeout);
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        error!("Error in init_network: {:?}", err);
+                        return Err(err);
+                    }
+                },
+                Ok(OperationState::DataEstablished) => match self
+                    .connect(
+                        C::APN,
+                        crate::command::psn::types::ProfileId(C::PROFILE_ID),
+                        crate::command::psn::types::ContextId(C::CONTEXT_ID),
+                    )
+                    .await
+                {
+                    Ok(_) => {
+                        self.ch.set_power_state(OperationState::DataEstablished);
+                    }
+                    Err(err) => {
+                        error!("Error in connect: {:?}", err);
+                        return Err(err);
+                    }
+                },
+                Err(_) => {
+                    error!("State transition next_state not valid: start_state={}, next_state={}, steps={} ", start_state, next_state, steps);
+                    return Err(Error::InvalidStateTransition);
+                }
+            }
+        }
+        Ok(())
     }
 
     async fn handle_urc(&mut self, event: Urc) -> Result<(), Error> {
