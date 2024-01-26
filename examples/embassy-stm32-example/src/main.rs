@@ -17,13 +17,14 @@ use embassy_stm32::time::{khz, mhz};
 use embassy_stm32::usart::{BufferedUart, BufferedUartRx, BufferedUartTx};
 use embassy_stm32::{bind_interrupts, interrupt, peripherals, usart, Config};
 use embassy_time::{Duration, Timer};
+use atat::heapless::String;
 use static_cell::StaticCell;
 use {defmt_rtt as _, panic_probe as _};
 
 // use embedded_hal::digital::{ErrorType, InputPin, OutputPin};
 
 use ublox_cellular;
-use ublox_cellular::config::{CellularConfig, ReverseOutputPin};
+use ublox_cellular::config::{Apn, CellularConfig, ReverseOutputPin};
 
 use atat::asynch::AtatClient;
 use atat::{AtDigester, AtatIngress, DefaultDigester, Ingress, Parser};
@@ -50,7 +51,7 @@ struct MyCelullarConfig {
     // vint_pin: Option<NoPin>
 }
 
-impl CellularConfig for MyCelullarConfig {
+impl<'a> CellularConfig<'a> for MyCelullarConfig {
     type ResetPin = Output<'static, >;
     // type ResetPin = NoPin;
     type PowerPin = ReverseOutputPin<Output<'static, >>;
@@ -60,6 +61,7 @@ impl CellularConfig for MyCelullarConfig {
 
     const FLOW_CONTROL: bool = false;
     const HEX_MODE: bool = true;
+    const APN: Apn<'a> = Apn::Given {name: "hologram", username: None, password: None};
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin> {
         info!("reset_pin");
         return self.reset_pin.as_mut();
@@ -182,9 +184,9 @@ async fn main_task(spawner: Spawner) {
     defmt::unwrap!(spawner.spawn(cellular_task(runner)));
     Timer::after(Duration::from_millis(1000)).await;
     loop {
-        control.set_desired_state(OperationState::Connected).await;
+        control.set_desired_state(OperationState::DataEstablished).await;
         info!("set_desired_state(PowerState::Alive)");
-        while control.power_state() != OperationState::Connected {
+        while control.power_state() != OperationState::DataEstablished {
             Timer::after(Duration::from_millis(1000)).await;
         }
         Timer::after(Duration::from_millis(10000)).await;
@@ -205,6 +207,8 @@ async fn main_task(spawner: Spawner) {
                 }
             }
         }
+        let dns = control.send(&ublox_cellular::command::dns::ResolveNameIp{resolution_type: ublox_cellular::command::dns::types::ResolutionType::DomainNameToIp, ip_domain_string: "www.google.com"}).await;
+        debug!("dns: {:?}", dns);
         Timer::after(Duration::from_millis(10000)).await;
         control.set_desired_state(OperationState::PowerDown).await;
         info!("set_desired_state(PowerState::PowerDown)");

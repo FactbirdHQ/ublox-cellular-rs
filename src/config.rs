@@ -67,7 +67,7 @@ impl<P: InputPin<Error = Infallible>> InputPin for ReverseInputPin<P> {
     }
 }
 
-pub trait CellularConfig {
+pub trait CellularConfig<'a> {
     type ResetPin: OutputPin;
     type PowerPin: OutputPin;
     type VintPin: InputPin;
@@ -76,7 +76,11 @@ pub trait CellularConfig {
     const HEX_MODE: bool = true;
     const OPERATOR_FORMAT: OperatorFormat = OperatorFormat::Long;
 
-    const APN: Apn = Apn::None;
+    const PROFILE_ID: u8 = 1;
+    // #[cfg(not(feature = "upsd-context-activation"))]
+    const CONTEXT_ID: u8 = 1;
+
+    const APN: Apn<'a> = Apn::None;
 
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin>;
     fn power_pin(&mut self) -> Option<&mut Self::PowerPin>;
@@ -91,18 +95,18 @@ pub enum OperatorFormat {
 }
 
 #[derive(Debug, Clone)]
-pub enum Apn {
+pub enum Apn<'a> {
     None,
     Given {
-        name: String<64>,
-        username: Option<String<64>>,
-        password: Option<String<64>>,
+        name: &'a str,
+        username: Option<&'a str>,
+        password: Option<&'a str>,
     },
     #[cfg(any(feature = "automatic-apn"))]
     Automatic,
 }
 
-impl Default for Apn {
+impl Default for Apn<'_> {
     fn default() -> Self {
         Self::None
     }

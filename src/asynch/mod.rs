@@ -35,7 +35,7 @@ impl<AT: AtatClient> State<AT> {
     }
 }
 
-pub async fn new<'a, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>(
+pub async fn new<'a, AT: AtatClient, C: CellularConfig<'a>, const URC_CAPACITY: usize>(
     state: &'a mut State<AT>,
     subscriber: &'a UrcChannel<Urc, URC_CAPACITY, 2>,
     config: C,
