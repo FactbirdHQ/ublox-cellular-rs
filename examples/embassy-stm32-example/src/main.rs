@@ -116,6 +116,7 @@ async fn main_task(spawner: Spawner) {
 
     static tx_buf: StaticCell<[u8; 16]> = StaticCell::new();
     static rx_buf: StaticCell<[u8; 16]> = StaticCell::new();
+    static INGRESS_BUF: StaticCell<[u8; INGRESS_BUF_SIZE]> = StaticCell::new();
 
     let (tx_pin, rx_pin, uart) = (p.PJ8, p.PJ9, p.UART8);
     let mut uart_config = embassy_stm32::usart::Config::default();
@@ -152,6 +153,7 @@ async fn main_task(spawner: Spawner) {
     static URC_CHANNEL: UrcChannel<command::Urc, URC_CAPACITY, URC_SUBSCRIBERS> = UrcChannel::new();
     let ingress = Ingress::new(
         DefaultDigester::<command::Urc>::default(),
+        INGRESS_BUF.init([0; INGRESS_BUF_SIZE]),
         &RES_SLOT,
         &URC_CHANNEL,
     );
