@@ -1,3 +1,10 @@
+use crate::command::psn::types::PacketSwitchedParam;
+use crate::command::psn::types::ProtocolType;
+use crate::command::psn::GetGPRSAttached;
+use crate::command::psn::GetPDPContextState;
+use crate::command::psn::GetPacketSwitchedNetworkData;
+use crate::command::psn::SetPDPContextState;
+use crate::command::psn::SetPacketSwitchedConfig;
 use core::str::FromStr;
 
 use crate::{command::Urc, config::CellularConfig};
@@ -17,6 +24,13 @@ use crate::command::ip_transport_layer::types::HexMode;
 use crate::command::ip_transport_layer::SetHexMode;
 use crate::command::mobile_control::types::{Functionality, ResetMode, TerminationErrorMode};
 use crate::command::mobile_control::{SetModuleFunctionality, SetReportMobileTerminationError};
+use crate::command::psn::responses::GPRSAttached;
+use crate::command::psn::responses::PacketSwitchedNetworkData;
+use crate::command::psn::types::GPRSAttachedState;
+use crate::command::psn::types::PDPContextStatus;
+use crate::command::psn::types::PacketSwitchedAction;
+use crate::command::psn::types::PacketSwitchedNetworkDataParam;
+use crate::command::psn::SetPacketSwitchedAction;
 use crate::command::system_features::types::PowerSavingMode;
 use crate::command::system_features::SetPowerSavingControl;
 use crate::command::AT;
@@ -30,6 +44,9 @@ use embedded_hal::digital::{InputPin, OutputPin};
 use heapless::String;
 use no_std_net::{Ipv4Addr, Ipv6Addr};
 
+use crate::command::psn::types::{ContextId, ProfileId};
+use crate::config::Apn;
+use crate::error::Error::Network;
 use embassy_futures::select::Either;
 
 use super::AtHandle;
@@ -37,14 +54,14 @@ use super::AtHandle;
 /// Background runner for the Ublox Module.
 ///
 /// You must call `.run()` in a background task for the Ublox Module to operate.
-pub struct Runner<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize> {
+pub struct Runner<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize> {
     ch: state::Runner<'d>,
     at: AtHandle<'d, AT>,
     config: C,
     urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
 }
 
-impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
+impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
     Runner<'d, AT, C, URC_CAPACITY>
 {
     pub(crate) fn new(
@@ -453,6 +470,15 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
         }
     }
 
+    async fn is_network_attached_loop(&mut self) -> bool {
+        loop {
+            if let Ok(true) = self.is_network_attached().await {
+                return true;
+            }
+            Timer::after(Duration::from_secs(1)).await;
+        }
+    }
+
     pub async fn run(mut self) -> ! {
         match self.has_power().await.ok() {
             Some(false) => {
@@ -479,93 +505,7 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
                         continue;
                     }
                     let desired_state = desired_state.unwrap();
-                    if 0 >= desired_state as isize - self.ch.state_runner().power_state() as isize {
-                        debug!(
-                            "Power steps was negative, power down: {}",
-                            desired_state as isize - self.ch.state_runner().power_state() as isize
-                        );
-                        self.power_down().await.ok();
-                        self.ch.set_power_state(OperationState::PowerDown);
-                    }
-                    let start_state = self.ch.state_runner().power_state() as isize;
-                    let steps = desired_state as isize - start_state;
-                    for step in 0..=steps {
-                        debug!(
-                            "State transition {} steps: {} -> {}, {}",
-                            steps,
-                            start_state,
-                            start_state + step,
-                            step
-                        );
-                        let next_state = start_state + step;
-                        match OperationState::try_from(next_state) {
-                            Ok(OperationState::PowerDown) => {}
-                            Ok(OperationState::PowerUp) => match self.power_up().await {
-                                Ok(_) => {
-                                    self.ch.set_power_state(OperationState::PowerUp);
-                                }
-                                Err(err) => {
-                                    error!("Error in power_up: {:?}", err);
-                                    break;
-                                }
-                            },
-                            Ok(OperationState::Alive) => {
-                                match with_timeout(boot_time() * 2, self.check_is_alive_loop())
-                                    .await
-                                {
-                                    Ok(true) => {
-                                        debug!("Will set Alive");
-                                        self.ch.set_power_state(OperationState::Alive);
-                                        debug!("Set Alive");
-                                    }
-                                    Ok(false) => {
-                                        error!("Error in is_alive: {:?}", Error::PoweredDown);
-                                        break;
-                                    }
-                                    Err(err) => {
-                                        error!("Error in is_alive: {:?}", err);
-                                        break;
-                                    }
-                                }
-                            }
-                            // Ok(OperationState::Alive) => match self.is_alive().await {
-                            //     Ok(_) => {
-                            //         debug!("Will set Alive");
-                            //         self.ch.set_power_state(OperationState::Alive);
-                            //         debug!("Set Alive");
-                            //     }
-                            //     Err(err) => {
-                            //         error!("Error in is_alive: {:?}", err);
-                            //         break;
-                            //     }
-                            // },
-                            Ok(OperationState::Initialized) => match self.init_at().await {
-                                Ok(_) => {
-                                    self.ch.set_power_state(OperationState::Initialized);
-                                }
-                                Err(err) => {
-                                    error!("Error in init_at: {:?}", err);
-                                    break;
-                                }
-                            },
-                            Ok(OperationState::Connected) => match self.init_network().await {
-                                Ok(_) => {
-                                    self.ch.set_power_state(OperationState::Connected);
-                                }
-                                Err(err) => {
-                                    error!("Error in init_network: {:?}", err);
-                                    break;
-                                }
-                            },
-                            Ok(OperationState::DataEstablished) => {
-                                todo!()
-                            }
-                            Err(_) => {
-                                error!("State transition next_state not valid: start_state={}, next_state={}, steps={} ", start_state, next_state, steps);
-                                break;
-                            }
-                        }
-                    }
+                    let _ = self.change_state_to_desired_state(desired_state).await;
                 }
                 Either::Second(event) => {
                     self.handle_urc(event).await;
@@ -574,23 +514,399 @@ impl<'d, AT: AtatClient, C: CellularConfig, const URC_CAPACITY: usize>
         }
     }
 
-    async fn handle_urc(&mut self, event: Urc) -> Error {
+    async fn change_state_to_desired_state(
+        &mut self,
+        desired_state: OperationState,
+    ) -> Result<(), Error> {
+        if 0 >= desired_state as isize - self.ch.state_runner().power_state() as isize {
+            debug!(
+                "Power steps was negative, power down: {}",
+                desired_state as isize - self.ch.state_runner().power_state() as isize
+            );
+            self.power_down().await.ok();
+            self.ch.set_power_state(OperationState::PowerDown);
+        }
+        let start_state = self.ch.state_runner().power_state() as isize;
+        let steps = desired_state as isize - start_state;
+        for step in 0..=steps {
+            debug!(
+                "State transition {} steps: {} -> {}, {}",
+                steps,
+                start_state,
+                start_state + step,
+                step
+            );
+            let next_state = start_state + step;
+            match OperationState::try_from(next_state) {
+                Ok(OperationState::PowerDown) => {}
+                Ok(OperationState::PowerUp) => match self.power_up().await {
+                    Ok(_) => {
+                        self.ch.set_power_state(OperationState::PowerUp);
+                    }
+                    Err(err) => {
+                        error!("Error in power_up: {:?}", err);
+                        return Err(err);
+                    }
+                },
+                Ok(OperationState::Alive) => {
+                    match with_timeout(boot_time() * 2, self.check_is_alive_loop()).await {
+                        Ok(true) => {
+                            debug!("Will set Alive");
+                            self.ch.set_power_state(OperationState::Alive);
+                            debug!("Set Alive");
+                        }
+                        Ok(false) => {
+                            error!("Error in is_alive: {:?}", Error::PoweredDown);
+                            return Err(Error::PoweredDown);
+                        }
+                        Err(err) => {
+                            error!("Error in is_alive: {:?}", err);
+                            return Err(Error::StateTimeout);
+                        }
+                    }
+                }
+                Ok(OperationState::Initialized) => match self.init_at().await {
+                    Ok(_) => {
+                        self.ch.set_power_state(OperationState::Initialized);
+                    }
+                    Err(err) => {
+                        error!("Error in init_at: {:?}", err);
+                        return Err(err);
+                    }
+                },
+                Ok(OperationState::Connected) => match self.init_network().await {
+                    Ok(_) => {
+                        match with_timeout(
+                            Duration::from_secs(180),
+                            self.is_network_attached_loop(),
+                        )
+                        .await
+                        {
+                            Ok(_) => {
+                                debug!("Will set Connected");
+                                self.ch.set_power_state(OperationState::Connected);
+                                debug!("Set Connected");
+                            }
+                            Err(err) => {
+                                error!("Timeout waiting for network attach: {:?}", err);
+                                return Err(Error::StateTimeout);
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        error!("Error in init_network: {:?}", err);
+                        return Err(err);
+                    }
+                },
+                Ok(OperationState::DataEstablished) => match self
+                    .connect(
+                        C::APN,
+                        crate::command::psn::types::ProfileId(C::PROFILE_ID),
+                        crate::command::psn::types::ContextId(C::CONTEXT_ID),
+                    )
+                    .await
+                {
+                    Ok(_) => {
+                        self.ch.set_power_state(OperationState::DataEstablished);
+                    }
+                    Err(err) => {
+                        error!("Error in connect: {:?}", err);
+                        return Err(err);
+                    }
+                },
+                Err(_) => {
+                    error!("State transition next_state not valid: start_state={}, next_state={}, steps={} ", start_state, next_state, steps);
+                    return Err(Error::InvalidStateTransition);
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn handle_urc(&mut self, event: Urc) -> Result<(), Error> {
         match event {
             // Handle network URCs
-            Urc::NetworkDetach => todo!(),
-            Urc::MobileStationDetach => todo!(),
-            Urc::NetworkDeactivate => todo!(),
-            Urc::MobileStationDeactivate => todo!(),
-            Urc::NetworkPDNDeactivate => todo!(),
-            Urc::MobileStationPDNDeactivate => todo!(),
-            Urc::SocketDataAvailable(_) => todo!(),
-            Urc::SocketDataAvailableUDP(_) => todo!(),
-            Urc::DataConnectionActivated(_) => todo!(),
-            Urc::DataConnectionDeactivated(_) => todo!(),
-            Urc::SocketClosed(_) => todo!(),
-            Urc::MessageWaitingIndication(_) => todo!(),
-            Urc::ExtendedPSNetworkRegistration(_) => todo!(),
-            Urc::HttpResponse(_) => todo!(),
+            Urc::NetworkDetach => warn!("Network detached"),
+            Urc::MobileStationDetach => warn!("Mobile station detached"),
+            Urc::NetworkDeactivate => warn!("Network deactivated"),
+            Urc::MobileStationDeactivate => warn!("Mobile station deactivated"),
+            Urc::NetworkPDNDeactivate => warn!("Network PDN deactivated"),
+            Urc::MobileStationPDNDeactivate => warn!("Mobile station PDN deactivated"),
+            Urc::SocketDataAvailable(_) => warn!("Socket data available"),
+            Urc::SocketDataAvailableUDP(_) => warn!("Socket data available UDP"),
+            Urc::DataConnectionActivated(_) => warn!("Data connection activated"),
+            Urc::DataConnectionDeactivated(_) => warn!("Data connection deactivated"),
+            Urc::SocketClosed(_) => warn!("Socket closed"),
+            Urc::MessageWaitingIndication(_) => warn!("Message waiting indication"),
+            Urc::ExtendedPSNetworkRegistration(_) => warn!("Extended PS network registration"),
+            Urc::HttpResponse(_) => warn!("HTTP response"),
         };
+        Ok(())
+    }
+
+    #[allow(unused_variables)]
+    async fn connect(
+        &mut self,
+        apn_info: Apn<'_>,
+        profile_id: ProfileId,
+        context_id: ContextId,
+    ) -> Result<(), Error> {
+        // This step _shouldn't_ be necessary.  However, for reasons I don't
+        // understand, SARA-R4 can be registered but not attached (i.e. AT+CGATT
+        // returns 0) on both RATs (unh?).  Phil Ware, who knows about these
+        // things, always goes through (a) register, (b) wait for AT+CGATT to
+        // return 1 and then (c) check that a context is active with AT+CGACT or
+        // using AT+UPSD (even for EUTRAN). Since this sequence works for both
+        // RANs, it is best to be consistent.
+        let mut attached = false;
+        for _ in 0..10 {
+            attached = self.is_network_attached().await?;
+            if attached {
+                break;
+            }
+        }
+        if !attached {
+            return Err(Error::AttachTimeout);
+        }
+
+        // Activate the context
+        #[cfg(feature = "upsd-context-activation")]
+        self.activate_context_upsd(profile_id, apn_info).await?;
+        #[cfg(not(feature = "upsd-context-activation"))]
+        self.activate_context(context_id, profile_id).await?;
+
+        Ok(())
+    }
+
+    // Make sure we are attached to the cellular network.
+    async fn is_network_attached(&mut self) -> Result<bool, Error> {
+        // Check for AT+CGATT to return 1
+        let GPRSAttached { state } = self.at.send(&GetGPRSAttached).await.map_err(Error::from)?;
+
+        if state == GPRSAttachedState::Attached {
+            return Ok(true);
+        }
+        return Ok(false);
+
+        // self.at .send( &SetGPRSAttached { state:
+        //     GPRSAttachedState::Attached, } ).await .map_err(Error::from)?;
+    }
+
+    /// Activate context using AT+UPSD commands
+    /// Required for SARA-G3, SARA-U2 SARA-R5 modules.
+    #[cfg(feature = "upsd-context-activation")]
+    async fn activate_context_upsd(
+        &mut self,
+        profile_id: ProfileId,
+        apn_info: Apn<'_>,
+    ) -> Result<(), Error> {
+        // Check if the PSD profile is activated (param_tag = 1)
+        let PacketSwitchedNetworkData { param_tag, .. } = self
+            .at
+            .send(&GetPacketSwitchedNetworkData {
+                profile_id,
+                param: PacketSwitchedNetworkDataParam::PsdProfileStatus,
+            })
+            .await
+            .map_err(Error::from)?;
+
+        if param_tag == 0 {
+            // SARA-U2 pattern: everything is done through AT+UPSD
+            // Set up the APN
+            if let Apn::Given {
+                name,
+                username,
+                password,
+            } = apn_info
+            {
+                self.at
+                    .send(&SetPacketSwitchedConfig {
+                        profile_id,
+                        param: PacketSwitchedParam::APN(String::<99>::try_from(name).unwrap()),
+                    })
+                    .await
+                    .map_err(Error::from)?;
+
+                // Set up the user name
+                if let Some(user_name) = username {
+                    self.at
+                        .send(&SetPacketSwitchedConfig {
+                            profile_id,
+                            param: PacketSwitchedParam::Username(
+                                String::<64>::try_from(user_name).unwrap(),
+                            ),
+                        })
+                        .await
+                        .map_err(Error::from)?;
+                }
+
+                // Set up the password
+                if let Some(password) = password {
+                    self.at
+                        .send(&SetPacketSwitchedConfig {
+                            profile_id,
+                            param: PacketSwitchedParam::Password(
+                                String::<64>::try_from(password).unwrap(),
+                            ),
+                        })
+                        .await
+                        .map_err(Error::from)?;
+                }
+            }
+            // Set up the dynamic IP address assignment.
+            #[cfg(not(feature = "sara-r5"))]
+            self.at
+                .send(&SetPacketSwitchedConfig {
+                    profile_id,
+                    param: PacketSwitchedParam::IPAddress(Ipv4Addr::unspecified().into()),
+                })
+                .await
+                .map_err(Error::from)?;
+
+            // Automatic authentication protocol selection
+            #[cfg(not(feature = "sara-r5"))]
+            self.at
+                .send(&SetPacketSwitchedConfig {
+                    profile_id,
+                    param: PacketSwitchedParam::Authentication(AuthenticationType::Auto),
+                })
+                .await
+                .map_err(Error::from)?;
+
+            #[cfg(not(feature = "sara-r5"))]
+            self.at
+                .send(&SetPacketSwitchedConfig {
+                    profile_id,
+                    param: PacketSwitchedParam::IPAddress(Ipv4Addr::unspecified().into()),
+                })
+                .await
+                .map_err(Error::from)?;
+
+            #[cfg(feature = "sara-r5")]
+            self.at
+                .send(&SetPacketSwitchedConfig {
+                    profile_id,
+                    param: PacketSwitchedParam::ProtocolType(ProtocolType::IPv4),
+                })
+                .await
+                .map_err(Error::from)?;
+
+            #[cfg(feature = "sara-r5")]
+            self.at
+                .send(&SetPacketSwitchedConfig {
+                    profile_id,
+                    param: PacketSwitchedParam::MapProfile(ContextId(1)),
+                })
+                .await
+                .map_err(Error::from)?;
+
+            self.at
+                .send(&SetPacketSwitchedAction {
+                    profile_id,
+                    action: PacketSwitchedAction::Activate,
+                })
+                .await
+                .map_err(Error::from)?;
+        }
+
+        Ok(())
+    }
+
+    /// Activate context using 3GPP commands
+    /// Required for SARA-R4 and TOBY modules.
+    #[cfg(not(feature = "upsd-context-activation"))]
+    async fn activate_context(
+        &mut self,
+        cid: ContextId,
+        profile_id: ProfileId,
+    ) -> Result<(), Error> {
+        for _ in 0..10 {
+            let context_states = self
+                .at
+                .send(&GetPDPContextState)
+                .await
+                .map_err(Error::from)?;
+
+            let activated = context_states
+                .iter()
+                .find_map(|state| {
+                    if state.cid == cid {
+                        Some(state.status == PDPContextStatus::Activated)
+                    } else {
+                        None
+                    }
+                })
+                .unwrap_or(false);
+
+            if activated {
+                // Note: SARA-R4 only supports a single context at any one time and
+                // so doesn't require/support AT+UPSD.
+                #[cfg(not(any(feature = "sara-r4", feature = "lara-r6")))]
+                {
+                    if let psn::responses::PacketSwitchedConfig {
+                        param: psn::types::PacketSwitchedParam::MapProfile(context),
+                        ..
+                    } = self
+                        .at
+                        .send(&psn::GetPacketSwitchedConfig {
+                            profile_id,
+                            param: psn::types::PacketSwitchedParamReq::MapProfile,
+                        })
+                        .await
+                        .map_err(Error::from)?
+                    {
+                        if context != cid {
+                            self.at
+                                .send(&psn::SetPacketSwitchedConfig {
+                                    profile_id,
+                                    param: psn::types::PacketSwitchedParam::MapProfile(cid),
+                                })
+                                .await
+                                .map_err(Error::from)?;
+
+                            self.at
+                                .send(
+                                    &psn::GetPacketSwitchedNetworkData {
+                                        profile_id,
+                                        param: psn::types::PacketSwitchedNetworkDataParam::PsdProfileStatus,
+                                    },
+                                ).await
+                                .map_err(Error::from)?;
+                        }
+                    }
+
+                    let psn::responses::PacketSwitchedNetworkData { param_tag, .. } = self
+                        .at
+                        .send(&psn::GetPacketSwitchedNetworkData {
+                            profile_id,
+                            param: psn::types::PacketSwitchedNetworkDataParam::PsdProfileStatus,
+                        })
+                        .await
+                        .map_err(Error::from)?;
+
+                    if param_tag == 0 {
+                        self.at
+                            .send(&psn::SetPacketSwitchedAction {
+                                profile_id,
+                                action: psn::types::PacketSwitchedAction::Activate,
+                            })
+                            .await
+                            .map_err(Error::from)?;
+                    }
+                }
+
+                return Ok(());
+            } else {
+                self.at
+                    .send(&SetPDPContextState {
+                        status: PDPContextStatus::Activated,
+                        cid: Some(cid),
+                    })
+                    .await
+                    .map_err(Error::from)?;
+                Timer::after(Duration::from_secs(1)).await;
+            }
+        }
+        return Err(Error::ContextActivationTimeout);
     }
 }

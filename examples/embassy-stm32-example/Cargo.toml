@@ -6,8 +6,8 @@ edition = "2021"
 # Example for the STM32H747I-DISCO board with SARA-R5 modem attached to UART8
 [dependencies]
 embassy-stm32 = { version = "0.1.0", features = ["defmt", "stm32h747xi-cm7", "time-driver-any", "exti", "memory-x", "unstable-pac"]  }
-embassy-executor = { version = "0.4.0", features = ["arch-cortex-m", "executor-thread", "defmt", "integrated-timers"] }
-embassy-time = { version = "0.2", features = ["defmt", "defmt-timestamp-uptime"] }
+embassy-executor = { version = "0.5.0", features = ["arch-cortex-m", "executor-thread", "defmt", "integrated-timers"] }
+embassy-time = { version = "0.3", features = ["defmt", "defmt-timestamp-uptime"] }
 embassy-sync = { version = "0.5", features = ["defmt"] }
 
 

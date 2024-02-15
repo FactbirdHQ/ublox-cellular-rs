@@ -4,6 +4,7 @@
 // #![feature(type_alias_impl_trait)]
 
 use atat::asynch::Client;
+use atat::heapless::String;
 use atat::ResponseSlot;
 use atat::UrcChannel;
 use core::cell::RefCell;
@@ -23,7 +24,7 @@ use {defmt_rtt as _, panic_probe as _};
 // use embedded_hal::digital::{ErrorType, InputPin, OutputPin};
 
 use ublox_cellular;
-use ublox_cellular::config::{CellularConfig, ReverseOutputPin};
+use ublox_cellular::config::{Apn, CellularConfig, ReverseOutputPin};
 
 use atat::asynch::AtatClient;
 use atat::{AtDigester, AtatIngress, DefaultDigester, Ingress, Parser};
@@ -42,24 +43,29 @@ const URC_CAPACITY: usize = 2;
 const URC_SUBSCRIBERS: usize = 2;
 
 struct MyCelullarConfig {
-    reset_pin: Option<Output<'static, AnyPin>>,
+    reset_pin: Option<Output<'static>>,
     // reset_pin: Option<NoPin>,
-    power_pin: Option<ReverseOutputPin<Output<'static, AnyPin>>>,
+    power_pin: Option<ReverseOutputPin<Output<'static>>>,
     // power_pin: Option<NoPin>,
-    vint_pin: Option<Input<'static, AnyPin>>,
+    vint_pin: Option<Input<'static>>,
     // vint_pin: Option<NoPin>
 }
 
-impl CellularConfig for MyCelullarConfig {
-    type ResetPin = Output<'static, AnyPin>;
+impl<'a> CellularConfig<'a> for MyCelullarConfig {
+    type ResetPin = Output<'static>;
     // type ResetPin = NoPin;
-    type PowerPin = ReverseOutputPin<Output<'static, AnyPin>>;
+    type PowerPin = ReverseOutputPin<Output<'static>>;
     // type PowerPin = NoPin;
-    type VintPin = Input<'static, AnyPin>;
+    type VintPin = Input<'static>;
     // type VintPin = NoPin;
 
     const FLOW_CONTROL: bool = false;
     const HEX_MODE: bool = true;
+    const APN: Apn<'a> = Apn::Given {
+        name: "hologram",
+        username: None,
+        password: None,
+    };
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin> {
         info!("reset_pin");
         return self.reset_pin.as_mut();
@@ -110,6 +116,7 @@ async fn main_task(spawner: Spawner) {
 
     static tx_buf: StaticCell<[u8; 16]> = StaticCell::new();
     static rx_buf: StaticCell<[u8; 16]> = StaticCell::new();
+    static INGRESS_BUF: StaticCell<[u8; INGRESS_BUF_SIZE]> = StaticCell::new();
 
     let (tx_pin, rx_pin, uart) = (p.PJ8, p.PJ9, p.UART8);
     let mut uart_config = embassy_stm32::usart::Config::default();
@@ -134,20 +141,19 @@ async fn main_task(spawner: Spawner) {
     // let power = Output::new(p.PJ4, Level::High, Speed::VeryHigh).degrade();
     // let reset = Output::new(p.PF8, Level::High, Speed::VeryHigh).degrade();
     let celullar_config = MyCelullarConfig {
-        reset_pin: Some(Output::new(p.PF8, Level::High, Speed::Low).degrade()),
-        power_pin: Some(ReverseOutputPin(
-            Output::new(p.PJ4, Level::Low, Speed::Low).degrade(),
-        )),
+        reset_pin: Some(Output::new(p.PF8, Level::High, Speed::Low)),
+        power_pin: Some(ReverseOutputPin(Output::new(p.PJ4, Level::Low, Speed::Low))),
         // reset_pin: Some(OutputOpenDrain::new(p.PF8, Level::High, Speed::Low, Pull::None).degrade()),
         // power_pin: Some(OutputOpenDrain::new(p.PJ4, Level::High, Speed::Low, Pull::None).degrade()),
         // power_pin: None,
-        vint_pin: Some(Input::new(p.PJ3, Pull::Down).degrade()),
+        vint_pin: Some(Input::new(p.PJ3, Pull::Down)),
     };
 
     static RES_SLOT: ResponseSlot<INGRESS_BUF_SIZE> = ResponseSlot::new();
     static URC_CHANNEL: UrcChannel<command::Urc, URC_CAPACITY, URC_SUBSCRIBERS> = UrcChannel::new();
     let ingress = Ingress::new(
         DefaultDigester::<command::Urc>::default(),
+        INGRESS_BUF.init([0; INGRESS_BUF_SIZE]),
         &RES_SLOT,
         &URC_CHANNEL,
     );
@@ -171,31 +177,37 @@ async fn main_task(spawner: Spawner) {
     .await;
     // defmt::info!("{:?}", runner.init().await);
     // control.set_desired_state(PowerState::Connected).await;
-    control
-        .send(&crate::command::network_service::SetOperatorSelection {
-            mode: crate::command::network_service::types::OperatorSelectionMode::Automatic,
-            format: Some(0),
-        })
-        .await;
-
+    // control
+    //     .send(&crate::command::network_service::SetOperatorSelection {
+    //         mode: crate::command::network_service::types::OperatorSelectionMode::Automatic,
+    //         format: Some(0),
+    //     })
+    //     .await;
 
     defmt::unwrap!(spawner.spawn(cellular_task(runner)));
     Timer::after(Duration::from_millis(1000)).await;
     loop {
-        control.set_desired_state(OperationState::Connected).await;
+        control
+            .set_desired_state(OperationState::DataEstablished)
+            .await;
         info!("set_desired_state(PowerState::Alive)");
-        while control.power_state() != OperationState::Connected {
+        while control.power_state() != OperationState::DataEstablished {
             Timer::after(Duration::from_millis(1000)).await;
         }
         Timer::after(Duration::from_millis(10000)).await;
+
         loop {
             Timer::after(Duration::from_millis(1000)).await;
             let operator = control.get_operator().await;
             info!("{}", operator);
             let signal_quality = control.get_signal_quality().await;
             info!("{}", signal_quality);
+            if signal_quality.is_err() {
+                let desired_state = control.desired_state();
+                control.set_desired_state(desired_state).await
+            }
             if let Ok(sq) = signal_quality {
-                if let  Ok(op) = operator {
+                if let Ok(op) = operator {
                     if op.oper == None {
                         continue;
                     }
@@ -205,6 +217,14 @@ async fn main_task(spawner: Spawner) {
                 }
             }
         }
+        let dns = control
+            .send(&ublox_cellular::command::dns::ResolveNameIp {
+                resolution_type:
+                    ublox_cellular::command::dns::types::ResolutionType::DomainNameToIp,
+                ip_domain_string: "www.google.com",
+            })
+            .await;
+        debug!("dns: {:?}", dns);
         Timer::after(Duration::from_millis(10000)).await;
         control.set_desired_state(OperationState::PowerDown).await;
         info!("set_desired_state(PowerState::PowerDown)");
@@ -214,7 +234,6 @@ async fn main_task(spawner: Spawner) {
 
         Timer::after(Duration::from_millis(5000)).await;
     }
-
 }
 
 #[embassy_executor::task]
@@ -246,8 +265,8 @@ async fn cellular_task(
 }
 
 #[embassy_executor::task(pool_size = 3)]
-async fn blinky(mut led: AnyPin){
-    let mut output = Output::new(led, Level::High, Speed::Low).degrade();
+async fn blinky(mut led: AnyPin) {
+    let mut output = Output::new(led, Level::High, Speed::Low);
     loop {
         output.set_high();
         Timer::after(Duration::from_millis(1000)).await;

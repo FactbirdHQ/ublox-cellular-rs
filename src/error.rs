@@ -17,6 +17,9 @@ pub enum Error {
     Uninitialized,
     StateTimeout,
     PoweredDown,
+    AttachTimeout,
+    ContextActivationTimeout,
+    InvalidStateTransition,
 
     // Network errors
     Network(NetworkError),
@@ -44,6 +47,10 @@ impl defmt::Format for Error {
             Self::Busy => defmt::write!(f, "Busy"),
             Self::Uninitialized => defmt::write!(f, "Uninitialized"),
             Self::StateTimeout => defmt::write!(f, "StateTimeout"),
+            Self::PoweredDown => defmt::write!(f, "PoweredDown"),
+            Self::AttachTimeout => defmt::write!(f, "AttachTimeout"),
+            Self::ContextActivationTimeout => defmt::write!(f, "ContextActivationTimeout"),
+            Self::InvalidStateTransition => defmt::write!(f, "InvalidStateTransition"),
             Self::Network(e) => defmt::write!(f, "Network({:?})", e),
             // Self::DataService(e) => defmt::write!(f, "DataService({:?})", e),
             Self::Generic(e) => defmt::write!(f, "Generic({:?})", e),
