@@ -1,0 +1,9 @@
+**/*.rs.bk
+.#*
+.gdb_history
+*.fifo
+target/
+*.o
+**/*secrets*
+
+.DS_Store
