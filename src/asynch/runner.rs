@@ -1,23 +1,17 @@
-use crate::command::psn::types::PacketSwitchedParam;
-use crate::command::psn::types::ProtocolType;
 use crate::command::psn::GetGPRSAttached;
 use crate::command::psn::GetPDPContextState;
-use crate::command::psn::GetPacketSwitchedNetworkData;
 use crate::command::psn::SetPDPContextState;
-use crate::command::psn::SetPacketSwitchedConfig;
-use core::str::FromStr;
 
 use crate::{command::Urc, config::CellularConfig};
 
-use super::state::{self, LinkState};
+use super::state;
 use crate::asynch::state::OperationState;
-use crate::asynch::state::OperationState::{PowerDown, PowerUp};
 use crate::command::control::types::{Circuit108Behaviour, Circuit109Behaviour, FlowControl};
 use crate::command::control::{SetCircuit108Behaviour, SetCircuit109Behaviour, SetFlowControl};
 use crate::command::device_lock::responses::PinStatus;
 use crate::command::device_lock::types::PinStatusCode;
 use crate::command::device_lock::GetPinStatus;
-use crate::command::general::{GetCCID, GetFirmwareVersion, GetModelId, IdentificationInformation};
+use crate::command::general::{GetCCID, GetFirmwareVersion, GetModelId};
 use crate::command::gpio::types::{GpioInPull, GpioMode, GpioOutValue};
 use crate::command::gpio::SetGpioConfiguration;
 use crate::command::ip_transport_layer::types::HexMode;
@@ -25,28 +19,20 @@ use crate::command::ip_transport_layer::SetHexMode;
 use crate::command::mobile_control::types::{Functionality, ResetMode, TerminationErrorMode};
 use crate::command::mobile_control::{SetModuleFunctionality, SetReportMobileTerminationError};
 use crate::command::psn::responses::GPRSAttached;
-use crate::command::psn::responses::PacketSwitchedNetworkData;
 use crate::command::psn::types::GPRSAttachedState;
 use crate::command::psn::types::PDPContextStatus;
-use crate::command::psn::types::PacketSwitchedAction;
-use crate::command::psn::types::PacketSwitchedNetworkDataParam;
-use crate::command::psn::SetPacketSwitchedAction;
 use crate::command::system_features::types::PowerSavingMode;
 use crate::command::system_features::SetPowerSavingControl;
 use crate::command::AT;
 use crate::error::Error;
-use crate::error::GenericError::Timeout;
 use crate::module_timing::{boot_time, reset_time};
 use atat::{asynch::AtatClient, UrcSubscription};
 use embassy_futures::select::select;
 use embassy_time::{with_timeout, Duration, Timer};
 use embedded_hal::digital::{InputPin, OutputPin};
-use heapless::String;
-use no_std_net::{Ipv4Addr, Ipv6Addr};
 
 use crate::command::psn::types::{ContextId, ProfileId};
 use crate::config::Apn;
-use crate::error::Error::Network;
 use embassy_futures::select::Either;
 
 use super::AtHandle;
@@ -94,19 +80,14 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
     }
 
     pub async fn is_alive(&mut self) -> Result<bool, Error> {
-        let has_power = self.has_power().await?;
-        if !has_power {
+        if !self.has_power().await? {
             return Err(Error::PoweredDown);
         }
 
-        let alive = match self.at.send(&AT).await {
-            Ok(_) => {
-                return Ok(true);
-            }
-            Err(err) => {
-                return Err(Error::Atat(err));
-            }
-        };
+        match self.at.send(&AT).await {
+            Ok(_) => Ok(true),
+            Err(err) => Err(Error::Atat(err)),
+        }
     }
 
     pub async fn has_power(&mut self) -> Result<bool, Error> {
@@ -187,7 +168,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
             })
             .await?;
 
-        let model_id = self.at.send(&GetModelId).await?;
+        let _model_id = self.at.send(&GetModelId).await?;
 
         // self.at.send(
         //     &IdentificationInformation {
@@ -479,7 +460,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
         }
     }
 
-    pub async fn run(mut self) -> ! {
+    pub async fn run(&mut self) -> ! {
         match self.has_power().await.ok() {
             Some(false) => {
                 self.ch.set_power_state(OperationState::PowerDown);
@@ -818,7 +799,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
     async fn activate_context(
         &mut self,
         cid: ContextId,
-        profile_id: ProfileId,
+        _profile_id: ProfileId,
     ) -> Result<(), Error> {
         for _ in 0..10 {
             let context_states = self
@@ -849,7 +830,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
                     } = self
                         .at
                         .send(&psn::GetPacketSwitchedConfig {
-                            profile_id,
+                            profile_id: _profile_id,
                             param: psn::types::PacketSwitchedParamReq::MapProfile,
                         })
                         .await
@@ -858,7 +839,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
                         if context != cid {
                             self.at
                                 .send(&psn::SetPacketSwitchedConfig {
-                                    profile_id,
+                                    profile_id: _profile_id,
                                     param: psn::types::PacketSwitchedParam::MapProfile(cid),
                                 })
                                 .await
@@ -867,7 +848,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
                             self.at
                                 .send(
                                     &psn::GetPacketSwitchedNetworkData {
-                                        profile_id,
+                                        profile_id: _profile_id,
                                         param: psn::types::PacketSwitchedNetworkDataParam::PsdProfileStatus,
                                     },
                                 ).await
@@ -878,7 +859,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
                     let psn::responses::PacketSwitchedNetworkData { param_tag, .. } = self
                         .at
                         .send(&psn::GetPacketSwitchedNetworkData {
-                            profile_id,
+                            profile_id: _profile_id,
                             param: psn::types::PacketSwitchedNetworkDataParam::PsdProfileStatus,
                         })
                         .await
@@ -887,7 +868,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
                     if param_tag == 0 {
                         self.at
                             .send(&psn::SetPacketSwitchedAction {
-                                profile_id,
+                                profile_id: _profile_id,
                                 action: psn::types::PacketSwitchedAction::Activate,
                             })
                             .await

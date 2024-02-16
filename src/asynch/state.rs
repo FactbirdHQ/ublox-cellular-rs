@@ -4,7 +4,6 @@ use core::cell::RefCell;
 use core::mem::MaybeUninit;
 use core::task::Context;
 
-use crate::asynch::state::OperationState::DataEstablished;
 use atat::asynch::AtatClient;
 use atat::UrcSubscription;
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
@@ -82,8 +81,8 @@ pub struct Shared {
 }
 
 pub struct Runner<'d> {
-    shared: &'d Mutex<NoopRawMutex, RefCell<Shared>>,
-    desired_state_pub_sub:
+    pub(crate) shared: &'d Mutex<NoopRawMutex, RefCell<Shared>>,
+    pub(crate) desired_state_pub_sub:
         &'d PubSubChannel<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>,
 }
 
@@ -229,6 +228,23 @@ pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize>(
     at: AtHandle<'d, AT>,
     urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
 ) -> (Runner<'d>, Device<'d, AT, URC_CAPACITY>) {
+    let runner = new_ppp(state);
+
+    let shared = runner.shared;
+    let desired_state_pub_sub = runner.desired_state_pub_sub;
+
+    (
+        runner,
+        Device {
+            shared,
+            urc_subscription,
+            at,
+            desired_state_pub_sub,
+        },
+    )
+}
+
+pub fn new_ppp<'d>(state: &'d mut State) -> Runner<'d> {
     // safety: this is a self-referential struct, however:
     // - it can't move while the `'d` borrow is active.
     // - when the borrow ends, the dangling references inside the MaybeUninit will never be used again.
@@ -251,18 +267,10 @@ pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize>(
         >::new(),
     });
 
-    (
-        Runner {
-            shared: &state.shared,
-            desired_state_pub_sub: &state.desired_state_pub_sub,
-        },
-        Device {
-            shared: &state.shared,
-            urc_subscription,
-            at,
-            desired_state_pub_sub: &state.desired_state_pub_sub,
-        },
-    )
+    Runner {
+        shared: &state.shared,
+        desired_state_pub_sub: &state.desired_state_pub_sub,
+    }
 }
 
 pub struct Device<'d, AT: AtatClient, const URC_CAPACITY: usize> {

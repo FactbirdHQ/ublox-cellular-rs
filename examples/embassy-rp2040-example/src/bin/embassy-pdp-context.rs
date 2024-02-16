@@ -133,8 +133,7 @@ async fn main_task(spawner: Spawner) {
         STATE.init(State::new(client)),
         &URC_CHANNEL,
         celullar_config,
-    )
-    .await;
+    );
     // defmt::info!("{:?}", runner.init().await);
     // control.set_desired_state(PowerState::Connected).await;
     // control
@@ -213,7 +212,7 @@ async fn ingress_task(
 
 #[embassy_executor::task]
 async fn cellular_task(
-    runner: Runner<
+    mut runner: Runner<
         'static,
         atat::asynch::Client<'_, BufferedUartTx<'static, UART0>, { INGRESS_BUF_SIZE }>,
         MyCelullarConfig,

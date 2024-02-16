@@ -35,7 +35,7 @@ impl<AT: AtatClient> State<AT> {
     }
 }
 
-pub async fn new<'a, AT: AtatClient, C: CellularConfig<'a>, const URC_CAPACITY: usize>(
+pub fn new<'a, AT: AtatClient, C: CellularConfig<'a>, const URC_CAPACITY: usize>(
     state: &'a mut State<AT>,
     subscriber: &'a UrcChannel<Urc, URC_CAPACITY, 2>,
     config: C,
@@ -51,18 +51,34 @@ pub async fn new<'a, AT: AtatClient, C: CellularConfig<'a>, const URC_CAPACITY: 
     );
     let state_ch = ch_runner.state_runner();
 
-    let mut runner = Runner::new(
+    let runner = Runner::new(
         ch_runner,
         AtHandle(&state.at_handle),
         config,
         subscriber.subscribe().unwrap(),
     );
 
-    // FIXME: Unwrapping the init is not nice, maybe return a Result for new()?
-    // runner.init().await.unwrap();
-
-    let mut control = Control::new(state_ch, AtHandle(&state.at_handle));
-    // control.init().await.unwrap();
+    let control = Control::new(state_ch, AtHandle(&state.at_handle));
 
     (net_device, control, runner)
+}
+
+pub fn new_ppp<'a, AT: AtatClient, C: CellularConfig<'a>, const URC_CAPACITY: usize>(
+    state: &'a mut State<AT>,
+    subscriber: &'a atat::UrcChannel<Urc, URC_CAPACITY, 2>,
+    config: C,
+) -> (Control<'a, AT>, Runner<'a, AT, C, URC_CAPACITY>) {
+    let ch_runner = state::new_ppp(&mut state.ch);
+    let state_ch = ch_runner.state_runner();
+
+    let runner = Runner::new(
+        ch_runner,
+        AtHandle(&state.at_handle),
+        config,
+        subscriber.subscribe().unwrap(),
+    );
+
+    let control = Control::new(state_ch, AtHandle(&state.at_handle));
+
+    (control, runner)
 }
