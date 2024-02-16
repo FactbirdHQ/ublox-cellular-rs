@@ -1,6 +1,7 @@
 //! AT Commands for u-blox cellular module family\
-//! Following the [u-blox cellular modules AT commands manual](https://www.u-blox.com/sites/default/files/u-blox-CEL_ATCommands_%28UBX-13002752%29.pdf)
+//! Following the [u-blox cellular modules AT commands manual](https://content.u-blox.com/sites/default/files/u-blox-CEL_ATCommands_UBX-13002752.pdf)
 
+pub mod call_control;
 pub mod control;
 pub mod device_data_security;
 pub mod device_lock;
@@ -10,6 +11,7 @@ pub mod general;
 pub mod gpio;
 pub mod http;
 pub mod ip_transport_layer;
+pub mod ipc;
 pub mod mobile_control;
 pub mod network_service;
 pub mod psn;

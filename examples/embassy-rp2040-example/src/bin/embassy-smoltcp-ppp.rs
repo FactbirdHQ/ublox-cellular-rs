@@ -1,7 +1,9 @@
 #![no_std]
 #![no_main]
 #![allow(stable_features)]
+#![feature(type_alias_impl_trait)]
 
+use atat::asynch::AtatClient;
 use atat::asynch::Client;
 
 use atat::asynch::SimpleClient;
@@ -11,6 +13,7 @@ use atat::UrcChannel;
 use cortex_m_rt::entry;
 use defmt::*;
 use embassy_executor::{Executor, Spawner};
+use embassy_futures::join::join;
 use embassy_net::ConfigV4;
 use embassy_net::Ipv4Address;
 use embassy_net::Ipv4Cidr;
@@ -24,8 +27,30 @@ use embassy_rp::uart::BufferedUart;
 use embassy_rp::{bind_interrupts, peripherals::UART0, uart::BufferedInterruptHandler};
 use embassy_time::Instant;
 use embassy_time::{Duration, Timer};
+use embedded_io_async::Read as _;
 use static_cell::StaticCell;
 use ublox_cellular::asynch::state::OperationState;
+use ublox_cellular::command::control::types::Circuit108Behaviour;
+use ublox_cellular::command::control::types::Circuit109Behaviour;
+use ublox_cellular::command::control::types::FlowControl;
+use ublox_cellular::command::control::SetCircuit108Behaviour;
+use ublox_cellular::command::control::SetCircuit109Behaviour;
+use ublox_cellular::command::control::SetFlowControl;
+use ublox_cellular::command::general::GetCCID;
+use ublox_cellular::command::general::GetFirmwareVersion;
+use ublox_cellular::command::general::GetModelId;
+use ublox_cellular::command::gpio::types::GpioInPull;
+use ublox_cellular::command::gpio::types::GpioMode;
+use ublox_cellular::command::gpio::types::GpioOutValue;
+use ublox_cellular::command::gpio::SetGpioConfiguration;
+use ublox_cellular::command::ipc::SetMultiplexing;
+use ublox_cellular::command::mobile_control::types::TerminationErrorMode;
+use ublox_cellular::command::mobile_control::SetReportMobileTerminationError;
+use ublox_cellular::command::psn::types::ContextId;
+use ublox_cellular::command::psn::DeactivatePDPContext;
+use ublox_cellular::command::psn::EnterPPP;
+use ublox_cellular::command::system_features::types::PowerSavingMode;
+use ublox_cellular::command::system_features::SetPowerSavingControl;
 use {defmt_rtt as _, panic_probe as _};
 
 use embassy_at_cmux::Mux;
@@ -57,18 +82,16 @@ struct Networking {
 
 impl Networking {
     pub async fn run(mut self) -> ! {
-        let ppp_fut = async {
+        let fut = async {
             loop {
+                // let _ = self.cellular_runner.reset().await;
                 // Reboot modem and start again
-                let _ = self.cellular_runner.reset().await;
-
+                Timer::after(Duration::from_secs(5)).await;
                 embassy_futures::select::select(self.cellular_runner.run(), self.ppp.run()).await;
             }
         };
-
-        embassy_futures::join::join(ppp_fut, self.mux.run()).await;
-
-        core::unreachable!()
+        join(self.mux.run(), fut).await;
+        core::unreachable!();
     }
 }
 
@@ -84,9 +107,11 @@ impl PPP {
         let mut last_start = None;
 
         loop {
+            Timer::after(Duration::from_secs(15)).await;
+
             if let Some(last_start) = last_start {
-                // Do not attempt to start too fast.
                 Timer::at(last_start + Duration::from_secs(10)).await;
+                // Do not attempt to start too fast.
 
                 // If was up stably for at least 1 min, reset fail counter.
                 if Instant::now() > last_start + Duration::from_secs(60) {
@@ -102,7 +127,7 @@ impl PPP {
             last_start = Some(Instant::now());
 
             let mut buf = [0u8; 64];
-            let at_client = SimpleClient::new(
+            let mut at_client = SimpleClient::new(
                 &mut self.ppp_channel,
                 atat::AtDigester::<Urc>::new(),
                 &mut buf,
@@ -116,27 +141,22 @@ impl PPP {
 
             Timer::after(Duration::from_secs(2)).await;
 
-            // Send AT command `ATO3` to enter PPP mode
-            // let res = at_client
-            //     .send(&ChangeMode {
-            //         mode: data_mode::types::Mode::PPPMode,
-            //     })
-            //     .await;
+            // hangup just in case a call was already in progress.
+            // Ignore errors because this fails if it wasn't.
+            let _ = at_client.send(&DeactivatePDPContext).await;
 
-            // if let Err(e) = res {
-            //     warn!("ppp dial failed {:?}", e);
-            //     continue;
-            // }
+            // Send AT command to enter PPP mode
+            let res = at_client.send(&EnterPPP { cid: ContextId(1) }).await;
+
+            if let Err(e) = res {
+                warn!("ppp dial failed {:?}", e);
+                continue;
+            }
 
             drop(at_client);
 
-            // Drain the UART
-            // embassy_time::with_timeout(Duration::from_secs(2), async {
-            //     loop {
-            //         self.ppp_channel.read(&mut buf).await;
-            //     }
-            // })
-            // .await;
+            // Check for CTS low (bit 2)
+            // self.ppp_channel.set_hangup_detection(0x04, 0x00);
 
             info!("RUNNING PPP");
             let config = embassy_net_ppp::Config {
@@ -164,6 +184,13 @@ impl PPP {
                 .await;
 
             info!("ppp failed: {:?}", res);
+
+            self.ppp_channel.clear_hangup_detection();
+
+            // escape back to data mode.
+            self.ppp_channel.set_lines(0x44);
+            Timer::after(Duration::from_millis(100)).await;
+            self.ppp_channel.set_lines(0x46);
         }
     }
 }
@@ -174,9 +201,126 @@ struct GsmMux {
 }
 
 impl GsmMux {
-    pub async fn run(self) {
-        let (rx, tx) = self.iface.split();
-        self.mux_runner.run(rx, tx).await
+    async fn init(&mut self) -> Result<(), atat::Error> {
+        let mut buf = [0u8; 64];
+        let mut at_client = SimpleClient::new(
+            &mut self.iface,
+            atat::AtDigester::<Urc>::new(),
+            &mut buf,
+            atat::Config::default(),
+        );
+
+        at_client
+            .send(&SetReportMobileTerminationError {
+                n: TerminationErrorMode::Enabled,
+            })
+            .await?;
+
+        // Select SIM
+        at_client
+            .send(&SetGpioConfiguration {
+                gpio_id: 25,
+                gpio_mode: GpioMode::Output(GpioOutValue::High),
+            })
+            .await?;
+
+        at_client
+            .send(&SetGpioConfiguration {
+                gpio_id: 42,
+                gpio_mode: GpioMode::Input(GpioInPull::NoPull),
+            })
+            .await?;
+
+        let _model_id = at_client.send(&GetModelId).await?;
+
+        // at_client.send(
+        //     &IdentificationInformation {
+        //         n: 9
+        //     },
+        // ).await?;
+
+        at_client.send(&GetFirmwareVersion).await?;
+
+        // self.select_sim_card().await?;
+
+        let ccid = at_client.send(&GetCCID).await?;
+        info!("CCID: {}", ccid.ccid);
+
+        // DCD circuit (109) changes in accordance with the carrier
+        at_client
+            .send(&SetCircuit109Behaviour {
+                value: Circuit109Behaviour::ChangesWithCarrier,
+            })
+            .await?;
+
+        // Ignore changes to DTR
+        at_client
+            .send(&SetCircuit108Behaviour {
+                value: Circuit108Behaviour::Ignore,
+            })
+            .await?;
+
+        // Switch off UART power saving until it is integrated into this API
+        at_client
+            .send(&SetPowerSavingControl {
+                mode: PowerSavingMode::Disabled,
+                timeout: None,
+            })
+            .await?;
+
+        at_client
+            .send(&SetFlowControl {
+                value: FlowControl::RtsCts,
+            })
+            .await?;
+
+        at_client
+            .send(&SetMultiplexing {
+                mode: 0,
+                subset: None,
+                port_speed: None,
+                n1: None,
+                t1: None,
+                n2: None,
+                t2: None,
+                t3: None,
+                k: None,
+            })
+            .await?;
+
+        Timer::after(Duration::from_secs(1)).await;
+
+        Ok(())
+    }
+    pub async fn run(mut self) {
+        let mut fails = 0;
+        let mut last_start = None;
+
+        loop {
+            if let Some(last_start) = last_start {
+                // Do not attempt to start too fast.
+                Timer::at(last_start + Duration::from_secs(10)).await;
+
+                // If was up stably for at least 1 min, reset fail counter.
+                if Instant::now() > last_start + Duration::from_secs(60) {
+                    fails = 0;
+                } else {
+                    fails += 1;
+                    if fails == 10 {
+                        warn!("modem: CMUX failed too much, rebooting modem.");
+                        // return;
+                    }
+                }
+            }
+            last_start = Some(Instant::now());
+
+            if self.init().await.is_err() {
+                continue;
+            }
+
+            let (mut rx, mut tx) = self.iface.split();
+            self.mux_runner.run(&mut rx, &mut tx).await
+        }
     }
 }
 
@@ -192,12 +336,13 @@ impl<'a> CellularConfig<'a> for MyCelullarConfig {
     type VintPin = Input<'static>;
 
     const FLOW_CONTROL: bool = true;
-    const HEX_MODE: bool = true;
+
     const APN: Apn<'a> = Apn::Given {
         name: "em",
         username: None,
         password: None,
     };
+
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin> {
         info!("reset_pin");
         self.reset_pin.as_mut()
@@ -309,9 +454,9 @@ async fn main_task(spawner: Spawner) {
     spawner.spawn(net_task(stack)).unwrap();
     spawner.spawn(ppp_task(networking)).unwrap();
 
-    control
-        .set_desired_state(OperationState::Connected)
-        .await;
+    Timer::after(Duration::from_secs(15)).await;
+
+    control.set_desired_state(OperationState::Connected).await;
 
     stack.wait_config_up().await;
 

@@ -265,6 +265,34 @@ pub struct SetPDPContextState {
 #[at_cmd("+CGACT?", heapless::Vec<PDPContextState, 7>, attempts = 1, timeout_ms = 150000, abortable = true)]
 pub struct GetPDPContextState;
 
+/// 18.21 Enter PPP state/GPRS dial-up D*
+///
+/// The V.24 dial command "D", similar to the command with the syntax
+/// AT+CGDATA="PPP",<cid>, causes the MT to perform the necessary actions to
+/// establish the communication between the DTE and the external PDP network
+/// through the PPP protocol. This can include performing a PS attach and, if
+/// the PPP server on the DTE side starts communication, PDP context activation
+/// on the specified PDP context identifier (if not already requested by means
+/// of +CGATT and +CGACT commands).
+///
+/// If the command is accepted and the preliminary PS procedures have succeeded,
+/// the "CONNECT" intermediate result code is returned, the MT enters the
+/// V.25ter online data state and the PPP L2 protocol between the MT and the DTE
+/// is started.
+#[derive(Clone, AtatCmd)]
+#[at_cmd(
+    "D*99***",
+    NoResponse,
+    value_sep = false,
+    timeout_ms = 180000,
+    abortable = true,
+    termination = "#\r\n"
+)]
+pub struct EnterPPP {
+    #[at_arg(position = 0)]
+    pub cid: ContextId,
+}
+
 /// 18.26 Packet switched event reporting +CGEREP
 ///
 /// Configures sending of URCs from MT to the DTE, in case of certain events
@@ -346,6 +374,22 @@ pub struct SetExtendedPSNetworkRegistrationStatus {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+UREG?", ExtendedPSNetworkRegistrationStatus)]
 pub struct GetExtendedPSNetworkRegistrationStatus;
+
+/// 18.29 Manual deactivation of a PDP context H
+///
+/// Deactivates an active PDP context with PPP L2 protocol in online command
+/// mode. The MT responds with a final result code. For a detailed description,
+/// see the H command description. For additional information about OLCM, see
+/// the AT command settings.
+///
+/// **NOTES**:
+/// - In GPRS online command mode, entered by typing the escape sequence "+++"
+///   or "~+++" (see &D), the ATH command is needed to terminate the connection.
+///   Alternatively, in data transfer mode, DTE originated DTR toggling or PPP
+///   disconnection may be used.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("H", NoResponse)]
+pub struct DeactivatePDPContext;
 
 /// 18.36 EPS network registration status +CEREG
 ///
