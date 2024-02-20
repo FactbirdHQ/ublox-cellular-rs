@@ -14,6 +14,7 @@ use cortex_m_rt::entry;
 use defmt::*;
 use embassy_executor::{Executor, Spawner};
 use embassy_futures::join::join;
+use embassy_net::tcp::TcpSocket;
 use embassy_net::ConfigV4;
 use embassy_net::Ipv4Address;
 use embassy_net::Ipv4Cidr;
@@ -27,7 +28,6 @@ use embassy_rp::uart::BufferedUart;
 use embassy_rp::{bind_interrupts, peripherals::UART0, uart::BufferedInterruptHandler};
 use embassy_time::Instant;
 use embassy_time::{Duration, Timer};
-use embedded_io_async::Read as _;
 use static_cell::StaticCell;
 use ublox_cellular::asynch::state::OperationState;
 use ublox_cellular::command::control::types::Circuit108Behaviour;
@@ -44,11 +44,15 @@ use ublox_cellular::command::gpio::types::GpioMode;
 use ublox_cellular::command::gpio::types::GpioOutValue;
 use ublox_cellular::command::gpio::SetGpioConfiguration;
 use ublox_cellular::command::ipc::SetMultiplexing;
+use ublox_cellular::command::mobile_control::types::Functionality;
+use ublox_cellular::command::mobile_control::types::ResetMode;
 use ublox_cellular::command::mobile_control::types::TerminationErrorMode;
+use ublox_cellular::command::mobile_control::SetModuleFunctionality;
 use ublox_cellular::command::mobile_control::SetReportMobileTerminationError;
 use ublox_cellular::command::psn::types::ContextId;
 use ublox_cellular::command::psn::DeactivatePDPContext;
 use ublox_cellular::command::psn::EnterPPP;
+use ublox_cellular::command::psn::SetPDPContextDefinition;
 use ublox_cellular::command::system_features::types::PowerSavingMode;
 use ublox_cellular::command::system_features::SetPowerSavingControl;
 use {defmt_rtt as _, panic_probe as _};
@@ -78,16 +82,23 @@ struct Networking {
         MyCelullarConfig,
         2,
     >,
+    btn: embassy_rp::gpio::Input<'static>,
 }
 
 impl Networking {
     pub async fn run(mut self) -> ! {
         let fut = async {
             loop {
-                // let _ = self.cellular_runner.reset().await;
                 // Reboot modem and start again
                 Timer::after(Duration::from_secs(5)).await;
-                embassy_futures::select::select(self.cellular_runner.run(), self.ppp.run()).await;
+                embassy_futures::select::select3(
+                    self.cellular_runner.run(),
+                    self.ppp.run(),
+                    self.btn.wait_for_any_edge(),
+                )
+                .await;
+
+                let _ = self.cellular_runner.reset().await;
             }
         };
         join(self.mux.run(), fut).await;
@@ -102,6 +113,31 @@ struct PPP {
 }
 
 impl PPP {
+    async fn configure<A: AtatClient>(at_client: &mut A) -> Result<(), atat::Error> {
+        at_client
+            .send(&SetModuleFunctionality {
+                fun: Functionality::Minimum,
+                rst: Some(ResetMode::DontReset),
+            })
+            .await?;
+
+        at_client
+            .send(&SetPDPContextDefinition {
+                cid: ContextId(1),
+                pdp_type: "IP",
+                apn: "em",
+            })
+            .await?;
+
+        at_client
+            .send(&SetModuleFunctionality {
+                fun: Functionality::Full,
+                rst: Some(ResetMode::DontReset),
+            })
+            .await?;
+        Ok(())
+    }
+
     async fn run(&mut self) {
         let mut fails = 0;
         let mut last_start = None;
@@ -134,10 +170,10 @@ impl PPP {
                 atat::Config::default(),
             );
 
-            // if let Err(e) = Self::configure(&mut at_client).await {
-            //     warn!("modem: configure failed {:?}", e);
-            //     continue;
-            // }
+            if let Err(e) = Self::configure(&mut at_client).await {
+                warn!("modem: configure failed {:?}", e);
+                continue;
+            }
 
             Timer::after(Duration::from_secs(2)).await;
 
@@ -156,7 +192,7 @@ impl PPP {
             drop(at_client);
 
             // Check for CTS low (bit 2)
-            // self.ppp_channel.set_hangup_detection(0x04, 0x00);
+            self.ppp_channel.set_hangup_detection(0x04, 0x00);
 
             info!("RUNNING PPP");
             let config = embassy_net_ppp::Config {
@@ -288,39 +324,13 @@ impl GsmMux {
             })
             .await?;
 
-        Timer::after(Duration::from_secs(1)).await;
-
         Ok(())
     }
     pub async fn run(mut self) {
-        let mut fails = 0;
-        let mut last_start = None;
+        self.init().await.unwrap();
 
-        loop {
-            if let Some(last_start) = last_start {
-                // Do not attempt to start too fast.
-                Timer::at(last_start + Duration::from_secs(10)).await;
-
-                // If was up stably for at least 1 min, reset fail counter.
-                if Instant::now() > last_start + Duration::from_secs(60) {
-                    fails = 0;
-                } else {
-                    fails += 1;
-                    if fails == 10 {
-                        warn!("modem: CMUX failed too much, rebooting modem.");
-                        // return;
-                    }
-                }
-            }
-            last_start = Some(Instant::now());
-
-            if self.init().await.is_err() {
-                continue;
-            }
-
-            let (mut rx, mut tx) = self.iface.split();
-            self.mux_runner.run(&mut rx, &mut tx).await
-        }
+        let (mut rx, mut tx) = self.iface.split();
+        self.mux_runner.run(&mut rx, &mut tx).await
     }
 }
 
@@ -438,6 +448,8 @@ async fn main_task(spawner: Spawner) {
         },
     );
 
+    control.set_desired_state(OperationState::Alive).await;
+
     let networking = Networking {
         mux: GsmMux {
             iface: cell_uart,
@@ -449,6 +461,7 @@ async fn main_task(spawner: Spawner) {
             ppp_channel: ch1,
         },
         cellular_runner: runner,
+        btn: gpio::Input::new(p.PIN_27, gpio::Pull::Up),
     };
 
     spawner.spawn(net_task(stack)).unwrap();
@@ -460,55 +473,23 @@ async fn main_task(spawner: Spawner) {
 
     stack.wait_config_up().await;
 
-    // Timer::after(Duration::from_millis(1000)).await;
-    // loop {
-    //     control
-    //         .set_desired_state(OperationState::DataEstablished)
-    //         .await;
-    //     info!("set_desired_state(PowerState::Alive)");
-    //     while control.power_state() != OperationState::DataEstablished {
-    //         Timer::after(Duration::from_millis(1000)).await;
-    //     }
-    //     Timer::after(Duration::from_millis(10000)).await;
+    info!("WE have network!");
 
-    //     loop {
-    //         Timer::after(Duration::from_millis(1000)).await;
-    //         let operator = control.get_operator().await;
-    //         info!("{}", operator);
-    //         let signal_quality = control.get_signal_quality().await;
-    //         info!("{}", signal_quality);
-    //         if signal_quality.is_err() {
-    //             let desired_state = control.desired_state();
-    //             control.set_desired_state(desired_state).await
-    //         }
-    //         if let Ok(sq) = signal_quality {
-    //             if let Ok(op) = operator {
-    //                 if op.oper.is_none() {
-    //                     continue;
-    //                 }
-    //             }
-    //             if sq.rxlev > 0 && sq.rsrp != 255 {
-    //                 break;
-    //             }
-    //         }
-    //     }
-    //     let dns = control
-    //         .send(&ublox_cellular::command::dns::ResolveNameIp {
-    //             resolution_type:
-    //                 ublox_cellular::command::dns::types::ResolutionType::DomainNameToIp,
-    //             ip_domain_string: "www.google.com",
-    //         })
-    //         .await;
-    //     info!("dns: {:?}", dns);
-    //     Timer::after(Duration::from_millis(10000)).await;
-    //     control.set_desired_state(OperationState::PowerDown).await;
-    //     info!("set_desired_state(PowerState::PowerDown)");
-    //     while control.power_state() != OperationState::PowerDown {
-    //         Timer::after(Duration::from_millis(1000)).await;
-    //     }
+    // Then we can use it!
+    let mut rx_buffer = [0; 4096];
+    let mut tx_buffer = [0; 4096];
+    let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
 
-    //     Timer::after(Duration::from_millis(5000)).await;
-    // }
+    socket.set_timeout(Some(Duration::from_secs(10)));
+
+    let remote_endpoint = (Ipv4Address::new(93, 184, 216, 34), 80);
+    info!("connecting to {:?}...", remote_endpoint);
+    let r = socket.connect(remote_endpoint).await;
+    if let Err(e) = r {
+        warn!("connect error: {:?}", e);
+        return;
+    }
+    info!("TCP connected!");
 }
 
 #[embassy_executor::task]
