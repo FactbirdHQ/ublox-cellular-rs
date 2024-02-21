@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 
 use core::cell::RefCell;
-use core::mem::MaybeUninit;
 use core::task::Context;
 
 use atat::asynch::AtatClient;
@@ -32,6 +31,7 @@ pub enum OperationState {
     Alive,
     Initialized,
     Connected,
+    #[cfg(not(feature = "ppp"))]
     DataEstablished,
 }
 
@@ -43,6 +43,7 @@ impl TryFrom<isize> for OperationState {
             2 => Ok(OperationState::Alive),
             3 => Ok(OperationState::Initialized),
             4 => Ok(OperationState::Connected),
+            #[cfg(not(feature = "ppp"))]
             5 => Ok(OperationState::DataEstablished),
             _ => Err(()),
         }
@@ -56,20 +57,28 @@ use crate::error::Error;
 use super::AtHandle;
 
 pub struct State {
-    inner: MaybeUninit<StateInner>,
+    shared: Mutex<NoopRawMutex, RefCell<Shared>>,
+    desired_state_pub_sub: PubSubChannel<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>,
 }
 
 impl State {
     pub const fn new() -> Self {
         Self {
-            inner: MaybeUninit::uninit(),
+            shared: Mutex::new(RefCell::new(Shared {
+                link_state: LinkState::Down,
+                power_state: OperationState::PowerDown,
+                desired_state: OperationState::PowerDown,
+                waker: WakerRegistration::new(),
+            })),
+            desired_state_pub_sub: PubSubChannel::<
+                NoopRawMutex,
+                OperationState,
+                1,
+                MAX_STATE_LISTENERS,
+                1,
+            >::new(),
         }
     }
-}
-
-struct StateInner {
-    shared: Mutex<NoopRawMutex, RefCell<Shared>>,
-    desired_state_pub_sub: PubSubChannel<NoopRawMutex, OperationState, 1, MAX_STATE_LISTENERS, 1>,
 }
 
 /// State of the LinkState
@@ -228,7 +237,10 @@ pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize>(
     at: AtHandle<'d, AT>,
     urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
 ) -> (Runner<'d>, Device<'d, AT, URC_CAPACITY>) {
-    let runner = new_ppp(state);
+    let runner = Runner {
+        shared: &state.shared,
+        desired_state_pub_sub: &state.desired_state_pub_sub,
+    };
 
     let shared = runner.shared;
     let desired_state_pub_sub = runner.desired_state_pub_sub;
@@ -245,28 +257,6 @@ pub fn new<'d, AT: AtatClient, const URC_CAPACITY: usize>(
 }
 
 pub fn new_ppp<'d>(state: &'d mut State) -> Runner<'d> {
-    // safety: this is a self-referential struct, however:
-    // - it can't move while the `'d` borrow is active.
-    // - when the borrow ends, the dangling references inside the MaybeUninit will never be used again.
-    let state_uninit: *mut MaybeUninit<StateInner> =
-        (&mut state.inner as *mut MaybeUninit<StateInner>).cast();
-
-    let state = unsafe { &mut *state_uninit }.write(StateInner {
-        shared: Mutex::new(RefCell::new(Shared {
-            link_state: LinkState::Down,
-            power_state: OperationState::PowerDown,
-            desired_state: OperationState::PowerDown,
-            waker: WakerRegistration::new(),
-        })),
-        desired_state_pub_sub: PubSubChannel::<
-            NoopRawMutex,
-            OperationState,
-            1,
-            MAX_STATE_LISTENERS,
-            1,
-        >::new(),
-    });
-
     Runner {
         shared: &state.shared,
         desired_state_pub_sub: &state.desired_state_pub_sub,

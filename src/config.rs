@@ -2,6 +2,8 @@ use core::convert::Infallible;
 use embedded_hal::digital::{ErrorType, InputPin, OutputPin, PinState};
 use heapless::String;
 
+use crate::command::psn::types::{ContextId, ProfileId};
+
 pub struct NoPin;
 
 impl ErrorType for NoPin {
@@ -72,15 +74,21 @@ pub trait CellularConfig<'a> {
     type PowerPin: OutputPin;
     type VintPin: InputPin;
 
+    // const INGRESS_BUF_SIZE: usize;
+    // const URC_CAPACITY: usize;
+
     const FLOW_CONTROL: bool = false;
     const HEX_MODE: bool = true;
     const OPERATOR_FORMAT: OperatorFormat = OperatorFormat::Long;
 
-    const PROFILE_ID: u8 = 1;
+    const PROFILE_ID: ProfileId = ProfileId(1);
     // #[cfg(not(feature = "upsd-context-activation"))]
-    const CONTEXT_ID: u8 = 1;
+    const CONTEXT_ID: ContextId = ContextId(1);
 
     const APN: Apn<'a> = Apn::None;
+
+    #[cfg(feature = "ppp")]
+    const PPP_CONFIG: embassy_net_ppp::Config<'a>;
 
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin>;
     fn power_pin(&mut self) -> Option<&mut Self::PowerPin>;

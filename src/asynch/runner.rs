@@ -141,99 +141,99 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
     }
 
     pub async fn init_at(&mut self) -> Result<(), Error> {
-        // if !self.is_alive().await? {
-        //     return Err(Error::PoweredDown);
-        // }
+        if !self.is_alive().await? {
+            return Err(Error::PoweredDown);
+        }
 
-        // // Extended errors on
-        // self.at
-        //     .send(&SetReportMobileTerminationError {
-        //         n: TerminationErrorMode::Enabled,
-        //     })
-        //     .await?;
+        // Extended errors on
+        self.at
+            .send(&SetReportMobileTerminationError {
+                n: TerminationErrorMode::Enabled,
+            })
+            .await?;
 
-        // // Select SIM
-        // self.at
-        //     .send(&SetGpioConfiguration {
-        //         gpio_id: 25,
-        //         gpio_mode: GpioMode::Output(GpioOutValue::High),
-        //     })
-        //     .await?;
+        // Select SIM
+        self.at
+            .send(&SetGpioConfiguration {
+                gpio_id: 25,
+                gpio_mode: GpioMode::Output(GpioOutValue::High),
+            })
+            .await?;
 
-        // #[cfg(any(feature = "lara-r6"))]
-        // self.at
-        //     .send(&SetGpioConfiguration {
-        //         gpio_id: 42,
-        //         gpio_mode: GpioMode::Input(GpioInPull::NoPull),
-        //     })
-        //     .await?;
+        #[cfg(any(feature = "lara-r6"))]
+        self.at
+            .send(&SetGpioConfiguration {
+                gpio_id: 42,
+                gpio_mode: GpioMode::Input(GpioInPull::NoPull),
+            })
+            .await?;
 
-        // let _model_id = self.at.send(&GetModelId).await?;
+        let _model_id = self.at.send(&GetModelId).await?;
 
-        // // self.at.send(
-        // //     &IdentificationInformation {
-        // //         n: 9
-        // //     },
-        // // ).await?;
+        // self.at.send(
+        //     &IdentificationInformation {
+        //         n: 9
+        //     },
+        // ).await?;
 
-        // self.at.send(&GetFirmwareVersion).await?;
+        self.at.send(&GetFirmwareVersion).await?;
 
-        // self.select_sim_card().await?;
+        self.select_sim_card().await?;
 
-        // let ccid = self.at.send(&GetCCID).await?;
-        // info!("CCID: {}", ccid.ccid);
+        let ccid = self.at.send(&GetCCID).await?;
+        info!("CCID: {}", ccid.ccid);
 
-        // // DCD circuit (109) changes in accordance with the carrier
-        // self.at
-        //     .send(&SetCircuit109Behaviour {
-        //         value: Circuit109Behaviour::ChangesWithCarrier,
-        //     })
-        //     .await?;
+        // DCD circuit (109) changes in accordance with the carrier
+        self.at
+            .send(&SetCircuit109Behaviour {
+                value: Circuit109Behaviour::ChangesWithCarrier,
+            })
+            .await?;
 
-        // // Ignore changes to DTR
-        // self.at
-        //     .send(&SetCircuit108Behaviour {
-        //         value: Circuit108Behaviour::Ignore,
-        //     })
-        //     .await?;
+        // Ignore changes to DTR
+        self.at
+            .send(&SetCircuit108Behaviour {
+                value: Circuit108Behaviour::Ignore,
+            })
+            .await?;
 
-        // // Switch off UART power saving until it is integrated into this API
-        // self.at
-        //     .send(&SetPowerSavingControl {
-        //         mode: PowerSavingMode::Disabled,
-        //         timeout: None,
-        //     })
-        //     .await?;
+        // Switch off UART power saving until it is integrated into this API
+        self.at
+            .send(&SetPowerSavingControl {
+                mode: PowerSavingMode::Disabled,
+                timeout: None,
+            })
+            .await?;
 
-        // if C::HEX_MODE {
-        //     self.at
-        //         .send(&SetHexMode {
-        //             hex_mode_disable: HexMode::Enabled,
-        //         })
-        //         .await?;
-        // } else {
-        //     self.at
-        //         .send(&SetHexMode {
-        //             hex_mode_disable: HexMode::Disabled,
-        //         })
-        //         .await?;
-        // }
+        if C::HEX_MODE {
+            self.at
+                .send(&SetHexMode {
+                    hex_mode_disable: HexMode::Enabled,
+                })
+                .await?;
+        } else {
+            self.at
+                .send(&SetHexMode {
+                    hex_mode_disable: HexMode::Disabled,
+                })
+                .await?;
+        }
 
-        // // Tell module whether we support flow control
-        // // FIXME: Use AT+IFC=2,2 instead of AT&K here
-        // if C::FLOW_CONTROL {
-        //     self.at
-        //         .send(&SetFlowControl {
-        //             value: FlowControl::RtsCts,
-        //         })
-        //         .await?;
-        // } else {
-        //     self.at
-        //         .send(&SetFlowControl {
-        //             value: FlowControl::Disabled,
-        //         })
-        //         .await?;
-        // }
+        // Tell module whether we support flow control
+        // FIXME: Use AT+IFC=2,2 instead of AT&K here
+        if C::FLOW_CONTROL {
+            self.at
+                .send(&SetFlowControl {
+                    value: FlowControl::RtsCts,
+                })
+                .await?;
+        } else {
+            self.at
+                .send(&SetFlowControl {
+                    value: FlowControl::Disabled,
+                })
+                .await?;
+        }
         Ok(())
     }
     /// Initializes the network only valid after `init_at`.
@@ -546,15 +546,23 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
                         }
                     }
                 }
-                Ok(OperationState::Initialized) => match self.init_at().await {
-                    Ok(_) => {
+                Ok(OperationState::Initialized) => {
+                    #[cfg(not(feature = "ppp"))]
+                    match self.init_at().await {
+                        Ok(_) => {
+                            self.ch.set_power_state(OperationState::Initialized);
+                        }
+                        Err(err) => {
+                            error!("Error in init_at: {:?}", err);
+                            return Err(err);
+                        }
+                    }
+
+                    #[cfg(feature = "ppp")]
+                    {
                         self.ch.set_power_state(OperationState::Initialized);
                     }
-                    Err(err) => {
-                        error!("Error in init_at: {:?}", err);
-                        return Err(err);
-                    }
-                },
+                }
                 Ok(OperationState::Connected) => match self.init_network().await {
                     Ok(_) => {
                         match with_timeout(
@@ -579,22 +587,18 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
                         return Err(err);
                     }
                 },
-                Ok(OperationState::DataEstablished) => match self
-                    .connect(
-                        C::APN,
-                        crate::command::psn::types::ProfileId(C::PROFILE_ID),
-                        crate::command::psn::types::ContextId(C::CONTEXT_ID),
-                    )
-                    .await
-                {
-                    Ok(_) => {
-                        self.ch.set_power_state(OperationState::DataEstablished);
+                #[cfg(not(feature = "ppp"))]
+                Ok(OperationState::DataEstablished) => {
+                    match self.connect(C::APN, C::PROFILE_ID, C::CONTEXT_ID).await {
+                        Ok(_) => {
+                            self.ch.set_power_state(OperationState::DataEstablished);
+                        }
+                        Err(err) => {
+                            error!("Error in connect: {:?}", err);
+                            return Err(err);
+                        }
                     }
-                    Err(err) => {
-                        error!("Error in connect: {:?}", err);
-                        return Err(err);
-                    }
-                },
+                }
                 Err(_) => {
                     error!("State transition next_state not valid: start_state={}, next_state={}, steps={} ", start_state, next_state, steps);
                     return Err(Error::InvalidStateTransition);
@@ -626,6 +630,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
     }
 
     #[allow(unused_variables)]
+    #[cfg(not(feature = "ppp"))]
     async fn connect(
         &mut self,
         apn_info: Apn<'_>,
