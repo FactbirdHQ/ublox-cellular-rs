@@ -1,8 +1,4 @@
-use core::future::poll_fn;
-use core::task::Poll;
-
 use atat::asynch::AtatClient;
-use embassy_time::{with_timeout, Duration};
 
 use crate::error::Error;
 

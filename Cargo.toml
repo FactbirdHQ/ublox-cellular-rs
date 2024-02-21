@@ -52,7 +52,7 @@ atat = { version = "*", features = ["heapless"] }
 
 
 [features]
-default = ["socket-udp", "socket-tcp", "async"]
+default = ["socket-udp", "socket-tcp", "async", "ppp"]
 
 ppp = ["dep:embassy-at-cmux", "dep:embassy-net-ppp", "dep:embassy-net"]
 internal-network-stack = ["dep:ublox-sockets"]

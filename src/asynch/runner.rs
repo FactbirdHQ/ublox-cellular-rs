@@ -30,7 +30,6 @@ use embassy_time::{with_timeout, Duration, Timer};
 use embedded_hal::digital::{InputPin, OutputPin};
 
 use crate::command::psn::types::{ContextId, ProfileId};
-use crate::config::Apn;
 use embassy_futures::select::Either;
 
 use super::AtHandle;
@@ -635,7 +634,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
     #[cfg(not(feature = "ppp"))]
     async fn connect(
         &mut self,
-        apn_info: Apn<'_>,
+        apn_info: crate::config::Apn<'_>,
         profile_id: ProfileId,
         context_id: ContextId,
     ) -> Result<(), Error> {

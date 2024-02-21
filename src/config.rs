@@ -1,6 +1,5 @@
 use core::convert::Infallible;
 use embedded_hal::digital::{ErrorType, InputPin, OutputPin, PinState};
-use heapless::String;
 
 use crate::command::psn::types::{ContextId, ProfileId};
 
