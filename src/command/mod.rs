@@ -10,6 +10,7 @@ pub mod file_system;
 pub mod general;
 pub mod gpio;
 pub mod http;
+#[cfg(feature = "internal-network-stack")]
 pub mod ip_transport_layer;
 pub mod ipc;
 pub mod mobile_control;
@@ -42,16 +43,20 @@ pub enum Urc {
     #[at_urc("+CGEV: ME PDN DEACT")]
     MobileStationPDNDeactivate,
 
+    #[cfg(feature = "internal-network-stack")]
     #[at_urc("+UUSORD")]
     SocketDataAvailable(ip_transport_layer::urc::SocketDataAvailable),
+    #[cfg(feature = "internal-network-stack")]
     #[at_urc("+UUSORF")]
     SocketDataAvailableUDP(ip_transport_layer::urc::SocketDataAvailable),
+    #[cfg(feature = "internal-network-stack")]
+    #[at_urc("+UUSOCL")]
+    SocketClosed(ip_transport_layer::urc::SocketClosed),
+
     #[at_urc("+UUPSDA")]
     DataConnectionActivated(psn::urc::DataConnectionActivated),
     #[at_urc("+UUPSDD")]
     DataConnectionDeactivated(psn::urc::DataConnectionDeactivated),
-    #[at_urc("+UUSOCL")]
-    SocketClosed(ip_transport_layer::urc::SocketClosed),
 
     #[at_urc("+UMWI")]
     MessageWaitingIndication(sms::urc::MessageWaitingIndication),

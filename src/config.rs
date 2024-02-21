@@ -78,7 +78,10 @@ pub trait CellularConfig<'a> {
     // const URC_CAPACITY: usize;
 
     const FLOW_CONTROL: bool = false;
+
+    #[cfg(feature = "internal-network-stack")]
     const HEX_MODE: bool = true;
+
     const OPERATOR_FORMAT: OperatorFormat = OperatorFormat::Long;
 
     const PROFILE_ID: ProfileId = ProfileId(1);

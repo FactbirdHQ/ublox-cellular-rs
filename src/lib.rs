@@ -4,6 +4,9 @@
 // #![cfg_attr(feature = "async", feature(async_fn_in_trait))]
 // #![cfg_attr(feature = "async", feature(type_alias_impl_trait))]
 
+#[cfg(all(feature = "ppp", feature = "internal-network-stack"))]
+compile_error!("You may not enable both `ppp` and `internal-network-stack` features.");
+
 // This mod MUST go first, so that the others see its macros.
 pub(crate) mod fmt;
 

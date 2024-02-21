@@ -15,8 +15,8 @@ use embassy_rp::uart::BufferedUartTx;
 use embassy_rp::{bind_interrupts, peripherals::UART0, uart::BufferedInterruptHandler};
 use embassy_time::{Duration, Timer};
 use static_cell::StaticCell;
+use ublox_cellular::asynch::InternalRunner;
 use ublox_cellular::asynch::Resources;
-use ublox_cellular::asynch::UbloxRunner;
 use {defmt_rtt as _, panic_probe as _};
 
 use ublox_cellular::config::{Apn, CellularConfig};
@@ -95,7 +95,7 @@ async fn main(spawner: Spawner) {
         Resources<BufferedUartTx<UART0>, CMD_BUF_SIZE, INGRESS_BUF_SIZE, URC_CAPACITY>,
     > = StaticCell::new();
 
-    let (_net_device, mut control, runner) = ublox_cellular::asynch::new(
+    let (_net_device, mut control, runner) = ublox_cellular::asynch::new_internal(
         uart_rx,
         uart_tx,
         RESOURCES.init(Resources::new()),
@@ -175,7 +175,7 @@ async fn main(spawner: Spawner) {
 
 #[embassy_executor::task]
 async fn cell_task(
-    mut runner: UbloxRunner<
+    mut runner: InternalRunner<
         'static,
         BufferedUartRx<'static, UART0>,
         BufferedUartTx<'static, UART0>,

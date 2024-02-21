@@ -31,6 +31,10 @@ static_cell = { version = "2.0", features = []}
 atat = { version = "0.21.0", features = ["derive", "bytes", "defmt"] }
 ublox-cellular-rs = {version = "0.4.0", path = "../..", features = ["lara-r6", "defmt", "async"]}
 
+[features]
+ppp = ["ublox-cellular-rs/ppp"]
+internal-network-stack = ["ublox-cellular-rs/internal-network-stack"]
+
 [patch.crates-io]
 ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", branch = "feature/async-borrowed-sockets" }
 # atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }

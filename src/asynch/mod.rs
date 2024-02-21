@@ -1,6 +1,6 @@
 pub mod control;
 pub mod runner;
-#[cfg(feature = "ublox-sockets")]
+#[cfg(feature = "internal-network-stack")]
 pub mod ublox_stack;
 
 pub mod state;
@@ -9,9 +9,11 @@ use core::mem::MaybeUninit;
 
 use crate::{
     command::{
+        control::{types::FlowControl, SetFlowControl},
+        ipc::SetMultiplexing,
         mobile_control::{
-            types::{Functionality, ResetMode},
-            SetModuleFunctionality,
+            types::{Functionality, ResetMode, TerminationErrorMode},
+            SetModuleFunctionality, SetReportMobileTerminationError,
         },
         psn::{DeactivatePDPContext, EnterPPP, SetPDPContextDefinition},
         Urc,
@@ -24,7 +26,8 @@ use atat::{
 };
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Instant, Timer};
-use embedded_io_async::{BufRead, Write};
+use embedded_io::Error;
+use embedded_io_async::{BufRead, Read, Write};
 use runner::Runner;
 
 use self::control::Control;
@@ -42,17 +45,17 @@ pub type Resources<
     const CMD_BUF_SIZE: usize,
     const INGRESS_BUF_SIZE: usize,
     const URC_CAPACITY: usize,
-> = Resources<
+> = UbxResources<
     embassy_at_cmux::ChannelTx<'static, 256>,
     CMD_BUF_SIZE,
     INGRESS_BUF_SIZE,
     URC_CAPACITY,
 >;
 
-// #[cfg(not(feature = "ppp"))]
-// pub use self::Resources;
+#[cfg(feature = "internal-network-stack")]
+pub use self::UbxResources as Resources;
 
-pub struct Resources<
+pub struct UbxResources<
     W: Write,
     const CMD_BUF_SIZE: usize,
     const INGRESS_BUF_SIZE: usize,
@@ -79,7 +82,7 @@ impl<
         const CMD_BUF_SIZE: usize,
         const INGRESS_BUF_SIZE: usize,
         const URC_CAPACITY: usize,
-    > Resources<W, CMD_BUF_SIZE, INGRESS_BUF_SIZE, URC_CAPACITY>
+    > UbxResources<W, CMD_BUF_SIZE, INGRESS_BUF_SIZE, URC_CAPACITY>
 {
     pub fn new() -> Self {
         Self {
@@ -101,7 +104,8 @@ impl<
     }
 }
 
-pub fn new<
+#[cfg(feature = "internal-network-stack")]
+pub fn new_internal<
     'a,
     R: embedded_io_async::Read,
     W: embedded_io_async::Write,
@@ -117,7 +121,7 @@ pub fn new<
 ) -> (
     state::Device<'a, Client<'a, W, INGRESS_BUF_SIZE>, URC_CAPACITY>,
     Control<'a, Client<'a, W, INGRESS_BUF_SIZE>>,
-    UbloxRunner<'a, R, W, C, INGRESS_BUF_SIZE, URC_CAPACITY>,
+    InternalRunner<'a, R, W, C, INGRESS_BUF_SIZE, URC_CAPACITY>,
 ) {
     // safety: this is a self-referential struct, however:
     // - it can't move while the `'a` borrow is active.
@@ -158,7 +162,7 @@ pub fn new<
         &resources.urc_channel,
     );
 
-    let runner = UbloxRunner {
+    let runner = InternalRunner {
         cellular_runner: runner,
         ingress,
         reader,
@@ -167,7 +171,8 @@ pub fn new<
     (net_device, control, runner)
 }
 
-pub struct UbloxRunner<
+#[cfg(feature = "internal-network-stack")]
+pub struct InternalRunner<
     'a,
     R: embedded_io_async::Read,
     W: embedded_io_async::Write,
@@ -180,6 +185,7 @@ pub struct UbloxRunner<
     pub reader: R,
 }
 
+#[cfg(feature = "internal-network-stack")]
 impl<
         'a,
         R: embedded_io_async::Read,
@@ -187,7 +193,7 @@ impl<
         C: CellularConfig<'a>,
         const INGRESS_BUF_SIZE: usize,
         const URC_CAPACITY: usize,
-    > UbloxRunner<'a, R, W, C, INGRESS_BUF_SIZE, URC_CAPACITY>
+    > InternalRunner<'a, R, W, C, INGRESS_BUF_SIZE, URC_CAPACITY>
 {
     pub async fn run(&mut self) -> ! {
         embassy_futures::join::join(
@@ -273,6 +279,28 @@ pub fn new_ppp<
     (net_device, control, runner)
 }
 
+pub struct ReadWriteAdapter<R, W>(pub R, pub W);
+
+impl<R, W> embedded_io_async::ErrorType for ReadWriteAdapter<R, W> {
+    type Error = embedded_io::ErrorKind;
+}
+
+impl<R: Read, W> Read for ReadWriteAdapter<R, W> {
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        self.0.read(buf).await.map_err(|e| e.kind())
+    }
+}
+
+impl<R, W: Write> Write for ReadWriteAdapter<R, W> {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        self.1.write(buf).await.map_err(|e| e.kind())
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        self.1.flush().await.map_err(|e| e.kind())
+    }
+}
+
 #[cfg(feature = "ppp")]
 pub struct PPPRunner<
     'a,
@@ -327,7 +355,45 @@ impl<'a, C: CellularConfig<'a>, const INGRESS_BUF_SIZE: usize, const URC_CAPACIT
         Ok(())
     }
 
-    pub async fn run<R: BufRead, W: Write>(
+    async fn init<R: Read, W: Write>(rx: &mut R, tx: &mut W) -> Result<(), atat::Error> {
+        let mut buf = [0u8; 64];
+        let mut at_client = SimpleClient::new(
+            ReadWriteAdapter(rx, tx),
+            atat::AtDigester::<Urc>::new(),
+            &mut buf,
+            atat::Config::default(),
+        );
+
+        at_client
+            .send(&SetReportMobileTerminationError {
+                n: TerminationErrorMode::Enabled,
+            })
+            .await?;
+
+        at_client
+            .send(&SetFlowControl {
+                value: FlowControl::RtsCts,
+            })
+            .await?;
+
+        at_client
+            .send(&SetMultiplexing {
+                mode: 0,
+                subset: None,
+                port_speed: None,
+                n1: None,
+                t1: None,
+                n2: None,
+                t2: None,
+                t3: None,
+                k: None,
+            })
+            .await?;
+
+        Ok(())
+    }
+
+    pub async fn run<R: BufRead + Read, W: Write>(
         &mut self,
         mut rx: R,
         mut tx: W,
@@ -335,8 +401,20 @@ impl<'a, C: CellularConfig<'a>, const INGRESS_BUF_SIZE: usize, const URC_CAPACIT
     ) -> ! {
         loop {
             // Reset modem
+            // if self.cellular_runner.init().await.is_err() {
+            //     Timer::after(Duration::from_secs(5)).await;
+            //     continue;
+            // }
+
+            // Timer::after(Duration::from_secs(5)).await;
 
             // Do AT init and enter CMUX mode using interface
+            if Self::init(&mut rx, &mut tx).await.is_err() {
+                Timer::after(Duration::from_secs(5)).await;
+                continue;
+            };
+
+            Timer::after(Duration::from_secs(1)).await;
 
             let ppp_fut = async {
                 let mut fails = 0;

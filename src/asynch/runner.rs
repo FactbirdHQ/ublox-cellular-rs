@@ -14,8 +14,6 @@ use crate::command::device_lock::GetPinStatus;
 use crate::command::general::{GetCCID, GetFirmwareVersion, GetModelId};
 use crate::command::gpio::types::{GpioInPull, GpioMode, GpioOutValue};
 use crate::command::gpio::SetGpioConfiguration;
-use crate::command::ip_transport_layer::types::HexMode;
-use crate::command::ip_transport_layer::SetHexMode;
 use crate::command::mobile_control::types::{Functionality, ResetMode, TerminationErrorMode};
 use crate::command::mobile_control::{SetModuleFunctionality, SetReportMobileTerminationError};
 use crate::command::psn::responses::GPRSAttached;
@@ -74,7 +72,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
             self.power_up().await?;
         };
         self.reset().await?;
-        self.is_alive().await?;
+        // self.is_alive().await?;
 
         Ok(())
     }
@@ -205,16 +203,17 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
             })
             .await?;
 
+        #[cfg(feature = "internal-network-stack")]
         if C::HEX_MODE {
             self.at
-                .send(&SetHexMode {
-                    hex_mode_disable: HexMode::Enabled,
+                .send(&crate::command::ip_transport_layer::SetHexMode {
+                    hex_mode_disable: crate::command::ip_transport_layer::types::HexMode::Enabled,
                 })
                 .await?;
         } else {
             self.at
-                .send(&SetHexMode {
-                    hex_mode_disable: HexMode::Disabled,
+                .send(&crate::command::ip_transport_layer::SetHexMode {
+                    hex_mode_disable: crate::command::ip_transport_layer::types::HexMode::Disabled,
                 })
                 .await?;
         }
@@ -379,7 +378,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
             Timer::after(reset_time()).await;
             pin.set_high().ok();
             Timer::after(boot_time()).await;
-            self.is_alive().await?;
+            // self.is_alive().await?;
         } else {
             warn!("No reset pin configured");
         }
@@ -617,10 +616,13 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
             Urc::MobileStationDeactivate => warn!("Mobile station deactivated"),
             Urc::NetworkPDNDeactivate => warn!("Network PDN deactivated"),
             Urc::MobileStationPDNDeactivate => warn!("Mobile station PDN deactivated"),
+            #[cfg(feature = "internal-network-stack")]
             Urc::SocketDataAvailable(_) => warn!("Socket data available"),
+            #[cfg(feature = "internal-network-stack")]
             Urc::SocketDataAvailableUDP(_) => warn!("Socket data available UDP"),
             Urc::DataConnectionActivated(_) => warn!("Data connection activated"),
             Urc::DataConnectionDeactivated(_) => warn!("Data connection deactivated"),
+            #[cfg(feature = "internal-network-stack")]
             Urc::SocketClosed(_) => warn!("Socket closed"),
             Urc::MessageWaitingIndication(_) => warn!("Message waiting indication"),
             Urc::ExtendedPSNetworkRegistration(_) => warn!("Extended PS network registration"),
