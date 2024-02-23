@@ -31,11 +31,11 @@ defmt = { version = "^0.3", optional = true }
 
 futures-util = { version = "0.3.29", default-features = false }
 
-embassy-futures = { version = "0.1", optional = true }
+embassy-futures = { version = "0.1" }
 
 embedded-hal = "1.0.0"
 embedded-nal = "0.8"
-embedded-nal-async = { version = "0.7", optional = true }
+embedded-nal-async = { version = "0.7" }
 
 embassy-at-cmux = { path = "../embassy/embassy-at-cmux", optional = true }
 embassy-net-ppp = { version = "0.1", optional = true }
@@ -52,29 +52,30 @@ atat = { version = "*", features = ["heapless"] }
 
 
 [features]
-default = ["socket-udp", "socket-tcp", "async", "ppp"]
+default = ["socket-udp", "socket-tcp", "ppp"]
 
-ppp = ["dep:embassy-at-cmux", "dep:embassy-net-ppp", "dep:embassy-net"]
 internal-network-stack = ["dep:ublox-sockets"]
+ppp = ["dep:embassy-at-cmux", "dep:embassy-net-ppp", "dep:embassy-net"]
 
-async = ["dep:embedded-nal-async", "dep:embassy-futures"]
+automatic-apn = []
+upsd-context-activation = []
+
+socket-tcp = ["ublox-sockets?/socket-tcp", "embassy-net?/tcp"]
+socket-udp = ["ublox-sockets?/socket-udp", "embassy-net?/udp"]
 
 defmt = [
     "dep:defmt",
-    "ublox-sockets?/defmt",
     "atat/defmt",
     "heapless/defmt-03",
     "embassy-time/defmt",
     "embassy-sync/defmt",
-    "embassy-futures?/defmt",
+    "embassy-futures/defmt",
+    "ublox-sockets?/defmt",
     "embassy-net-ppp?/defmt",
     "embassy-net?/defmt",
     "embassy-at-cmux?/defmt",
 ]
-
 log = ["dep:log", "ublox-sockets?/log", "atat/log"]
-
-automatic-apn = []
 
 lara-r2 = []
 lara-r6 = []
@@ -89,11 +90,6 @@ sara-u2 = ["upsd-context-activation"]
 toby-l2 = []
 toby-r2 = []
 toby-l4 = []
-
-upsd-context-activation = []
-
-socket-tcp = ["ublox-sockets?/socket-tcp", "embassy-net?/tcp"]
-socket-udp = ["ublox-sockets?/socket-udp", "embassy-net?/udp"]
 
 [workspace]
 members = []

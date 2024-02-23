@@ -29,7 +29,7 @@ panic-probe = { version = "0.3.1", features = ["print-defmt"] }
 static_cell = { version = "2.0", features = []}
 
 atat = { version = "0.21.0", features = ["derive", "bytes", "defmt"] }
-ublox-cellular-rs = {version = "0.4.0", path = "../..", features = ["lara-r6", "defmt", "async"]}
+ublox-cellular-rs = {version = "0.4.0", path = "../..", features = ["lara-r6", "defmt"]}
 
 [features]
 ppp = ["ublox-cellular-rs/ppp"]
