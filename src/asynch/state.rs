@@ -23,15 +23,13 @@ pub enum LinkState {
 }
 
 /// If the celular modem is up and responding to AT.
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum OperationState {
     PowerDown = 0,
     PowerUp,
-    Alive,
     Initialized,
     Connected,
-    #[cfg(not(feature = "ppp"))]
     DataEstablished,
 }
 
@@ -40,11 +38,9 @@ impl TryFrom<isize> for OperationState {
         match state {
             0 => Ok(OperationState::PowerDown),
             1 => Ok(OperationState::PowerUp),
-            2 => Ok(OperationState::Alive),
-            3 => Ok(OperationState::Initialized),
-            4 => Ok(OperationState::Connected),
-            #[cfg(not(feature = "ppp"))]
-            5 => Ok(OperationState::DataEstablished),
+            2 => Ok(OperationState::Initialized),
+            3 => Ok(OperationState::Connected),
+            4 => Ok(OperationState::DataEstablished),
             _ => Err(()),
         }
     }

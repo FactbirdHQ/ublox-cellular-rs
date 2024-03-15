@@ -2,16 +2,12 @@ use core::mem::MaybeUninit;
 
 use crate::{
     command::{
-        control::{types::FlowControl, SetFlowControl},
         ipc::SetMultiplexing,
-        mobile_control::{
-            types::{Functionality, ResetMode, TerminationErrorMode},
-            SetModuleFunctionality, SetReportMobileTerminationError,
-        },
-        psn::{DeactivatePDPContext, EnterPPP, SetPDPContextDefinition},
+        psn::{DeactivatePDPContext, EnterPPP},
         Urc,
     },
-    config::{Apn, CellularConfig},
+    config::CellularConfig,
+    module_timing::boot_time,
 };
 use atat::{
     asynch::{AtatClient, Client, SimpleClient},
@@ -19,17 +15,25 @@ use atat::{
 };
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 use embassy_time::{Duration, Instant, Timer};
-use embedded_io::Error;
-use embedded_io_async::{BufRead, Read, Write};
+use embedded_io_async::{BufRead, Error, ErrorKind, Read, Write};
 
-use super::{control::Control, resources::UbxResources, runner::Runner, state, AtHandle};
+use super::{
+    control::Control,
+    resources::UbxResources,
+    runner::{Runner, URC_SUBSCRIBERS},
+    state, AtHandle,
+};
+
+pub const CMUX_MAX_FRAME_SIZE: usize = 512;
+pub const CMUX_CHANNEL_SIZE: usize = CMUX_MAX_FRAME_SIZE * 2;
+pub const CMUX_CHANNELS: usize = 2; // AT Control + PPP data
 
 pub type Resources<
     const CMD_BUF_SIZE: usize,
     const INGRESS_BUF_SIZE: usize,
     const URC_CAPACITY: usize,
 > = UbxResources<
-    embassy_at_cmux::ChannelTx<'static, 256>,
+    embassy_at_cmux::ChannelTx<'static, CMUX_CHANNEL_SIZE>,
     CMD_BUF_SIZE,
     INGRESS_BUF_SIZE,
     URC_CAPACITY,
@@ -46,25 +50,32 @@ pub fn new_ppp<
     config: C,
 ) -> (
     embassy_net_ppp::Device<'a>,
-    Control<'a, Client<'a, embassy_at_cmux::ChannelTx<'a, 256>, INGRESS_BUF_SIZE>>,
+    Control<'a, Client<'a, embassy_at_cmux::ChannelTx<'a, CMUX_CHANNEL_SIZE>, INGRESS_BUF_SIZE>>,
     PPPRunner<'a, C, INGRESS_BUF_SIZE, URC_CAPACITY>,
 ) {
     let ch_runner = state::new_ppp(&mut resources.ch);
     let state_ch = ch_runner.state_runner();
 
-    let (mux_runner, [ppp_channel, control_channel]) = resources.mux.start();
+    let (mux_runner, [control_channel, ppp_channel]) = resources.mux.start();
     let (control_rx, control_tx, _) = control_channel.split();
 
     // safety: this is a self-referential struct, however:
     // - it can't move while the `'a` borrow is active.
     // - when the borrow ends, the dangling references inside the MaybeUninit will never be used again.
     let at_client_uninit: *mut MaybeUninit<
-        Mutex<NoopRawMutex, Client<'a, embassy_at_cmux::ChannelTx<'a, 256>, INGRESS_BUF_SIZE>>,
+        Mutex<
+            NoopRawMutex,
+            Client<'a, embassy_at_cmux::ChannelTx<'a, CMUX_CHANNEL_SIZE>, INGRESS_BUF_SIZE>,
+        >,
     > = (&mut resources.at_client
         as *mut MaybeUninit<
             Mutex<
                 NoopRawMutex,
-                Client<'static, embassy_at_cmux::ChannelTx<'static, 256>, INGRESS_BUF_SIZE>,
+                Client<
+                    'static,
+                    embassy_at_cmux::ChannelTx<'static, CMUX_CHANNEL_SIZE>,
+                    INGRESS_BUF_SIZE,
+                >,
             >,
         >)
         .cast();
@@ -97,6 +108,7 @@ pub fn new_ppp<
     let (net_device, ppp_runner) = embassy_net_ppp::new(&mut resources.ppp_state);
 
     let runner = PPPRunner {
+        powered: false,
         ppp_runner,
         cellular_runner,
         ingress,
@@ -114,86 +126,68 @@ pub struct PPPRunner<
     const INGRESS_BUF_SIZE: usize,
     const URC_CAPACITY: usize,
 > {
+    pub powered: bool,
     pub ppp_runner: embassy_net_ppp::Runner<'a>,
     pub cellular_runner: Runner<
         'a,
-        Client<'a, embassy_at_cmux::ChannelTx<'a, 256>, INGRESS_BUF_SIZE>,
+        Client<'a, embassy_at_cmux::ChannelTx<'a, CMUX_CHANNEL_SIZE>, INGRESS_BUF_SIZE>,
         C,
         URC_CAPACITY,
     >,
-    pub ingress: atat::Ingress<'a, atat::AtDigester<Urc>, Urc, INGRESS_BUF_SIZE, URC_CAPACITY, 2>,
-    pub ppp_channel: embassy_at_cmux::Channel<'a, 256>,
-    pub control_rx: embassy_at_cmux::ChannelRx<'a, 256>,
-    pub mux_runner: embassy_at_cmux::Runner<'a, 2, 256>,
+    pub ingress: atat::Ingress<
+        'a,
+        atat::AtDigester<Urc>,
+        Urc,
+        INGRESS_BUF_SIZE,
+        URC_CAPACITY,
+        URC_SUBSCRIBERS,
+    >,
+    pub ppp_channel: embassy_at_cmux::Channel<'a, CMUX_CHANNEL_SIZE>,
+    pub control_rx: embassy_at_cmux::ChannelRx<'a, CMUX_CHANNEL_SIZE>,
+    pub mux_runner: embassy_at_cmux::Runner<'a, CMUX_CHANNELS, CMUX_CHANNEL_SIZE>,
 }
 
 impl<'a, C: CellularConfig<'a>, const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize>
     PPPRunner<'a, C, INGRESS_BUF_SIZE, URC_CAPACITY>
 {
-    async fn configure_apn<A: AtatClient>(at_client: &mut A) -> Result<(), atat::Error> {
-        at_client
-            .send(&SetModuleFunctionality {
-                fun: Functionality::Minimum,
-                rst: Some(ResetMode::DontReset),
-            })
-            .await?;
-
-        let apn = match C::APN {
-            Apn::None => "",
-            Apn::Given { name, .. } => name,
-        };
-
-        at_client
-            .send(&SetPDPContextDefinition {
-                cid: C::CONTEXT_ID,
-                pdp_type: "IP",
-                apn,
-            })
-            .await?;
-
-        at_client
-            .send(&SetModuleFunctionality {
-                fun: Functionality::Full,
-                rst: Some(ResetMode::DontReset),
-            })
-            .await?;
-        Ok(())
-    }
-
-    async fn init<R: Read, W: Write>(rx: &mut R, tx: &mut W) -> Result<(), atat::Error> {
+    async fn init_multiplexer<R: Read, W: Write>(
+        rx: &mut R,
+        tx: &mut W,
+    ) -> Result<(), crate::error::Error> {
         let mut buf = [0u8; 64];
+        let mut interface = ReadWriteAdapter(rx, tx);
         let mut at_client = SimpleClient::new(
-            ReadWriteAdapter(rx, tx),
+            &mut interface,
             atat::AtDigester::<Urc>::new(),
             &mut buf,
             atat::Config::default(),
         );
 
-        at_client
-            .send(&SetReportMobileTerminationError {
-                n: TerminationErrorMode::Enabled,
-            })
-            .await?;
-
-        at_client
-            .send(&SetFlowControl {
-                value: FlowControl::RtsCts,
-            })
-            .await?;
+        super::runner::init_at(&mut at_client, C::FLOW_CONTROL).await?;
 
         at_client
             .send(&SetMultiplexing {
                 mode: 0,
-                subset: None,
-                port_speed: None,
-                n1: None,
-                t1: None,
-                n2: None,
-                t2: None,
-                t3: None,
-                k: None,
+                subset: Some(0),
+                port_speed: Some(5),
+                n1: Some(CMUX_MAX_FRAME_SIZE as u16),
+                t1: None, //Some(10),
+                n2: None, //Some(3),
+                t2: None, //Some(30),
+                t3: None, //Some(10),
+                k: None,  //Some(2),
             })
             .await?;
+
+        drop(at_client);
+
+        // Drain the UART of any leftover AT stuff before setting up multiplexer
+        let _ = embassy_time::with_timeout(Duration::from_millis(100), async {
+            loop {
+                let _ = interface.read(&mut buf).await;
+            }
+        })
+        .await;
 
         Ok(())
     }
@@ -202,32 +196,36 @@ impl<'a, C: CellularConfig<'a>, const INGRESS_BUF_SIZE: usize, const URC_CAPACIT
         &mut self,
         mut rx: R,
         mut tx: W,
-        stack: &embassy_net::Stack<embassy_net_ppp::Device<'a>>,
+        on_ipv4_up: impl FnMut(embassy_net_ppp::Ipv4Status) + Copy,
     ) -> ! {
         loop {
-            // Reset modem
-            // if self.cellular_runner.init().await.is_err() {
-            //     Timer::after(Duration::from_secs(5)).await;
-            //     continue;
-            // }
+            if !self.powered {
+                // Reset modem
+                self.cellular_runner
+                    .change_state_to_desired_state(state::OperationState::PowerDown)
+                    .await;
+                self.cellular_runner
+                    .change_state_to_desired_state(state::OperationState::PowerUp)
+                    .await;
 
-            // Timer::after(Duration::from_secs(5)).await;
+                Timer::after(boot_time()).await;
+            }
 
             // Do AT init and enter CMUX mode using interface
-            if Self::init(&mut rx, &mut tx).await.is_err() {
+            if Self::init_multiplexer(&mut rx, &mut tx).await.is_err() {
                 Timer::after(Duration::from_secs(5)).await;
                 continue;
             };
 
-            Timer::after(Duration::from_secs(1)).await;
+            self.cellular_runner
+                .change_state_to_desired_state(state::OperationState::DataEstablished)
+                .await;
 
             let ppp_fut = async {
                 let mut fails = 0;
                 let mut last_start = None;
 
                 loop {
-                    Timer::after(Duration::from_secs(15)).await;
-
                     if let Some(last_start) = last_start {
                         Timer::at(last_start + Duration::from_secs(10)).await;
                         // Do not attempt to start too fast.
@@ -245,63 +243,37 @@ impl<'a, C: CellularConfig<'a>, const INGRESS_BUF_SIZE: usize, const URC_CAPACIT
                     }
                     last_start = Some(Instant::now());
 
-                    let mut buf = [0u8; 64];
-                    let mut at_client = SimpleClient::new(
-                        &mut self.ppp_channel,
-                        atat::AtDigester::<Urc>::new(),
-                        &mut buf,
-                        atat::Config::default(),
-                    );
+                    {
+                        let mut buf = [0u8; 16]; // Enough room for "ATD*99***1#\r\n"
+                        let mut at_client = SimpleClient::new(
+                            &mut self.ppp_channel,
+                            atat::AtDigester::<Urc>::new(),
+                            &mut buf,
+                            atat::Config::default(),
+                        );
 
-                    if let Err(e) = Self::configure_apn(&mut at_client).await {
-                        warn!("modem: configure failed {:?}", e);
-                        continue;
+                        // hangup just in case a call was already in progress.
+                        // Ignore errors because this fails if it wasn't.
+                        let _ = at_client.send(&DeactivatePDPContext).await;
+
+                        // Send AT command to enter PPP mode
+                        let res = at_client.send(&EnterPPP { cid: C::CONTEXT_ID }).await;
+
+                        if let Err(e) = res {
+                            warn!("ppp dial failed {:?}", e);
+                            continue;
+                        }
+
+                        Timer::after(Duration::from_millis(100)).await;
                     }
-
-                    Timer::after(Duration::from_secs(2)).await;
-
-                    // hangup just in case a call was already in progress.
-                    // Ignore errors because this fails if it wasn't.
-                    let _ = at_client.send(&DeactivatePDPContext).await;
-
-                    // Send AT command to enter PPP mode
-                    let res = at_client.send(&EnterPPP { cid: C::CONTEXT_ID }).await;
-
-                    if let Err(e) = res {
-                        warn!("ppp dial failed {:?}", e);
-                        continue;
-                    }
-
-                    drop(at_client);
 
                     // Check for CTS low (bit 2)
-                    self.ppp_channel.set_hangup_detection(0x04, 0x00);
+                    // self.ppp_channel.set_hangup_detection(0x04, 0x00);
 
                     info!("RUNNING PPP");
                     let res = self
                         .ppp_runner
-                        .run(&mut self.ppp_channel, C::PPP_CONFIG, |ipv4| {
-                            let Some(addr) = ipv4.address else {
-                                warn!("PPP did not provide an IP address.");
-                                return;
-                            };
-                            let mut dns_servers = heapless::Vec::new();
-                            for s in ipv4.dns_servers.iter().flatten() {
-                                let _ =
-                                    dns_servers.push(embassy_net::Ipv4Address::from_bytes(&s.0));
-                            }
-                            let config =
-                                embassy_net::ConfigV4::Static(embassy_net::StaticConfigV4 {
-                                    address: embassy_net::Ipv4Cidr::new(
-                                        embassy_net::Ipv4Address::from_bytes(&addr.0),
-                                        0,
-                                    ),
-                                    gateway: None,
-                                    dns_servers,
-                                });
-
-                            stack.set_config_v4(config);
-                        })
+                        .run(&mut self.ppp_channel, C::PPP_CONFIG, on_ipv4_up)
                         .await;
 
                     info!("ppp failed: {:?}", res);
@@ -309,27 +281,25 @@ impl<'a, C: CellularConfig<'a>, const INGRESS_BUF_SIZE: usize, const URC_CAPACIT
                     self.ppp_channel.clear_hangup_detection();
 
                     // escape back to data mode.
-                    self.ppp_channel.set_lines(0x44);
+                    self.ppp_channel
+                        .set_lines(embassy_at_cmux::Control::from_bits(0x44 << 1), None);
                     Timer::after(Duration::from_millis(100)).await;
-                    self.ppp_channel.set_lines(0x46);
+                    self.ppp_channel
+                        .set_lines(embassy_at_cmux::Control::from_bits(0x46 << 1), None);
                 }
             };
 
-            let ingress_fut = async {
-                self.ingress.read_from(&mut self.control_rx).await;
-            };
-
-            let mux_fut = async {
-                self.mux_runner.run(&mut rx, &mut tx).await;
-            };
+            self.ingress.clear();
 
             embassy_futures::select::select4(
+                self.mux_runner.run(&mut rx, &mut tx, CMUX_MAX_FRAME_SIZE),
                 ppp_fut,
-                ingress_fut,
+                self.ingress.read_from(&mut self.control_rx),
                 self.cellular_runner.run(),
-                mux_fut,
             )
             .await;
+
+            self.powered = false;
         }
     }
 }
@@ -337,7 +307,7 @@ impl<'a, C: CellularConfig<'a>, const INGRESS_BUF_SIZE: usize, const URC_CAPACIT
 pub struct ReadWriteAdapter<R, W>(pub R, pub W);
 
 impl<R, W> embedded_io_async::ErrorType for ReadWriteAdapter<R, W> {
-    type Error = embedded_io::ErrorKind;
+    type Error = ErrorKind;
 }
 
 impl<R: Read, W> Read for ReadWriteAdapter<R, W> {

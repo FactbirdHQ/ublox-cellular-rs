@@ -1,3 +1,5 @@
+use crate::command::control::types::Echo;
+use crate::command::control::SetEcho;
 use crate::command::psn::GetGPRSAttached;
 use crate::command::psn::GetPDPContextState;
 use crate::command::psn::SetPDPContextState;
@@ -34,6 +36,12 @@ use embassy_futures::select::Either;
 
 use super::AtHandle;
 
+#[cfg(feature = "ppp")]
+pub(crate) const URC_SUBSCRIBERS: usize = 2;
+
+#[cfg(feature = "internal-network-stack")]
+pub(crate) const URC_SUBSCRIBERS: usize = 2;
+
 /// Background runner for the Ublox Module.
 ///
 /// You must call `.run()` in a background task for the Ublox Module to operate.
@@ -41,7 +49,7 @@ pub struct Runner<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY:
     ch: state::Runner<'d>,
     at: AtHandle<'d, AT>,
     config: C,
-    urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
+    urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, URC_SUBSCRIBERS>,
 }
 
 impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
@@ -51,7 +59,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
         ch: state::Runner<'d>,
         at: AtHandle<'d, AT>,
         config: C,
-        urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
+        urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, URC_SUBSCRIBERS>,
     ) -> Self {
         Self {
             ch,
@@ -71,7 +79,6 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
             self.power_up().await?;
         };
         self.reset().await?;
-        // self.is_alive().await?;
 
         Ok(())
     }
@@ -119,6 +126,13 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
         }
     }
 
+    pub async fn wait_for_desired_state(
+        &mut self,
+        ps: OperationState,
+    ) -> Result<OperationState, Error> {
+        self.ch.state_runner().wait_for_desired_state(ps).await
+    }
+
     pub async fn power_down(&mut self) -> Result<(), Error> {
         if self.has_power().await? {
             if let Some(pin) = self.config.power_pin() {
@@ -127,6 +141,10 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
                 pin.set_high().map_err(|_| Error::IoPin)?;
                 self.ch.set_power_state(OperationState::PowerDown);
                 debug!("Powered down");
+
+                // FIXME: Is this needed?
+                Timer::after(Duration::from_millis(1000)).await;
+
                 Ok(())
             } else {
                 warn!("No power pin configured");
@@ -137,103 +155,6 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
         }
     }
 
-    pub async fn init_at(&mut self) -> Result<(), Error> {
-        if !self.is_alive().await? {
-            return Err(Error::PoweredDown);
-        }
-
-        // Extended errors on
-        self.at
-            .send(&SetReportMobileTerminationError {
-                n: TerminationErrorMode::Enabled,
-            })
-            .await?;
-
-        // Select SIM
-        self.at
-            .send(&SetGpioConfiguration {
-                gpio_id: 25,
-                gpio_mode: GpioMode::Output(GpioOutValue::High),
-            })
-            .await?;
-
-        #[cfg(any(feature = "lara-r6"))]
-        self.at
-            .send(&SetGpioConfiguration {
-                gpio_id: 42,
-                gpio_mode: GpioMode::Input(GpioInPull::NoPull),
-            })
-            .await?;
-
-        let _model_id = self.at.send(&GetModelId).await?;
-
-        // self.at.send(
-        //     &IdentificationInformation {
-        //         n: 9
-        //     },
-        // ).await?;
-
-        self.at.send(&GetFirmwareVersion).await?;
-
-        self.select_sim_card().await?;
-
-        let ccid = self.at.send(&GetCCID).await?;
-        info!("CCID: {}", ccid.ccid);
-
-        // DCD circuit (109) changes in accordance with the carrier
-        self.at
-            .send(&SetCircuit109Behaviour {
-                value: Circuit109Behaviour::ChangesWithCarrier,
-            })
-            .await?;
-
-        // Ignore changes to DTR
-        self.at
-            .send(&SetCircuit108Behaviour {
-                value: Circuit108Behaviour::Ignore,
-            })
-            .await?;
-
-        // Switch off UART power saving until it is integrated into this API
-        self.at
-            .send(&SetPowerSavingControl {
-                mode: PowerSavingMode::Disabled,
-                timeout: None,
-            })
-            .await?;
-
-        #[cfg(feature = "internal-network-stack")]
-        if C::HEX_MODE {
-            self.at
-                .send(&crate::command::ip_transport_layer::SetHexMode {
-                    hex_mode_disable: crate::command::ip_transport_layer::types::HexMode::Enabled,
-                })
-                .await?;
-        } else {
-            self.at
-                .send(&crate::command::ip_transport_layer::SetHexMode {
-                    hex_mode_disable: crate::command::ip_transport_layer::types::HexMode::Disabled,
-                })
-                .await?;
-        }
-
-        // Tell module whether we support flow control
-        // FIXME: Use AT+IFC=2,2 instead of AT&K here
-        if C::FLOW_CONTROL {
-            self.at
-                .send(&SetFlowControl {
-                    value: FlowControl::RtsCts,
-                })
-                .await?;
-        } else {
-            self.at
-                .send(&SetFlowControl {
-                    value: FlowControl::Disabled,
-                })
-                .await?;
-        }
-        Ok(())
-    }
     /// Initializes the network only valid after `init_at`.
     ///
     /// # Errors
@@ -325,42 +246,6 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
         self.at
             .send(&crate::command::psn::SetEPSNetworkRegistrationStatus {
                 n: crate::command::psn::types::EPSNetworkRegistrationUrcConfig::UrcDisabled,
-            })
-            .await?;
-
-        Ok(())
-    }
-
-    pub async fn select_sim_card(&mut self) -> Result<(), Error> {
-        for _ in 0..2 {
-            match self.at.send(&GetPinStatus).await {
-                Ok(PinStatus { code }) if code == PinStatusCode::Ready => {
-                    debug!("SIM is ready");
-                    return Ok(());
-                }
-                _ => {}
-            }
-
-            Timer::after(Duration::from_secs(1)).await;
-        }
-
-        // There was an error initializing the SIM
-        // We've seen issues on uBlox-based devices, as a precation, we'll cycle
-        // the modem here through minimal/full functional state.
-        self.at
-            .send(&SetModuleFunctionality {
-                fun: Functionality::Minimum,
-                // SARA-R5 This parameter can be used only when <fun> is 1, 4 or 19
-                #[cfg(feature = "sara-r5")]
-                rst: None,
-                #[cfg(not(feature = "sara-r5"))]
-                rst: Some(ResetMode::DontReset),
-            })
-            .await?;
-        self.at
-            .send(&SetModuleFunctionality {
-                fun: Functionality::Full,
-                rst: Some(ResetMode::DontReset),
             })
             .await?;
 
@@ -460,13 +345,10 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
 
     pub async fn run(&mut self) -> ! {
         match self.has_power().await.ok() {
-            Some(false) => {
-                self.ch.set_power_state(OperationState::PowerDown);
-            }
             Some(true) => {
                 self.ch.set_power_state(OperationState::PowerUp);
             }
-            None => {
+            Some(false) | None => {
                 self.ch.set_power_state(OperationState::PowerDown);
             }
         }
@@ -493,7 +375,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
         }
     }
 
-    async fn change_state_to_desired_state(
+    pub async fn change_state_to_desired_state(
         &mut self,
         desired_state: OperationState,
     ) -> Result<(), Error> {
@@ -527,26 +409,9 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
                         return Err(err);
                     }
                 },
-                Ok(OperationState::Alive) => {
-                    match with_timeout(boot_time() * 2, self.check_is_alive_loop()).await {
-                        Ok(true) => {
-                            debug!("Will set Alive");
-                            self.ch.set_power_state(OperationState::Alive);
-                            debug!("Set Alive");
-                        }
-                        Ok(false) => {
-                            error!("Error in is_alive: {:?}", Error::PoweredDown);
-                            return Err(Error::PoweredDown);
-                        }
-                        Err(err) => {
-                            error!("Error in is_alive: {:?}", err);
-                            return Err(Error::StateTimeout);
-                        }
-                    }
-                }
                 Ok(OperationState::Initialized) => {
                     #[cfg(not(feature = "ppp"))]
-                    match self.init_at().await {
+                    match init_at(&mut self.at, C::FLOW_CONTROL).await {
                         Ok(_) => {
                             self.ch.set_power_state(OperationState::Initialized);
                         }
@@ -585,7 +450,6 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
                         return Err(err);
                     }
                 },
-                #[cfg(not(feature = "ppp"))]
                 Ok(OperationState::DataEstablished) => {
                     match self.connect(C::APN, C::PROFILE_ID, C::CONTEXT_ID).await {
                         Ok(_) => {
@@ -631,7 +495,6 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
     }
 
     #[allow(unused_variables)]
-    #[cfg(not(feature = "ppp"))]
     async fn connect(
         &mut self,
         apn_info: crate::config::Apn<'_>,
@@ -668,7 +531,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
     // Make sure we are attached to the cellular network.
     async fn is_network_attached(&mut self) -> Result<bool, Error> {
         // Check for AT+CGATT to return 1
-        let GPRSAttached { state } = self.at.send(&GetGPRSAttached).await.map_err(Error::from)?;
+        let GPRSAttached { state } = self.at.send(&GetGPRSAttached).await?;
 
         if state == GPRSAttachedState::Attached {
             return Ok(true);
@@ -896,4 +759,143 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
         }
         return Err(Error::ContextActivationTimeout);
     }
+}
+
+pub(crate) async fn init_at<A: AtatClient>(
+    at_client: &mut A,
+    enable_flow_control: bool,
+) -> Result<(), Error> {
+    // Allow auto bauding to kick in
+    embassy_time::with_timeout(boot_time() * 2, async {
+        loop {
+            if let Ok(alive) = at_client.send(&AT).await {
+                break alive;
+            }
+            Timer::after(Duration::from_millis(100)).await;
+        }
+    })
+    .await
+    .map_err(|_| Error::PoweredDown)?;
+
+    // Extended errors on
+    at_client
+        .send(&SetReportMobileTerminationError {
+            n: TerminationErrorMode::Enabled,
+        })
+        .await?;
+
+    // Echo off
+    at_client.send(&SetEcho { enabled: Echo::Off }).await?;
+
+    // Select SIM
+    at_client
+        .send(&SetGpioConfiguration {
+            gpio_id: 25,
+            gpio_mode: GpioMode::Output(GpioOutValue::High),
+        })
+        .await?;
+
+    #[cfg(any(feature = "lara-r6"))]
+    at_client
+        .send(&SetGpioConfiguration {
+            gpio_id: 42,
+            gpio_mode: GpioMode::Input(GpioInPull::NoPull),
+        })
+        .await?;
+
+    let _model_id = at_client.send(&GetModelId).await?;
+
+    // at_client.send(
+    //     &IdentificationInformation {
+    //         n: 9
+    //     },
+    // ).await?;
+
+    at_client.send(&GetFirmwareVersion).await?;
+
+    select_sim_card(at_client).await?;
+
+    let ccid = at_client.send(&GetCCID).await?;
+    info!("CCID: {}", ccid.ccid);
+
+    // DCD circuit (109) changes in accordance with the carrier
+    at_client
+        .send(&SetCircuit109Behaviour {
+            value: Circuit109Behaviour::ChangesWithCarrier,
+        })
+        .await?;
+
+    // Ignore changes to DTR
+    at_client
+        .send(&SetCircuit108Behaviour {
+            value: Circuit108Behaviour::Ignore,
+        })
+        .await?;
+
+    // Switch off UART power saving until it is integrated into this API
+    at_client
+        .send(&SetPowerSavingControl {
+            mode: PowerSavingMode::Disabled,
+            timeout: None,
+        })
+        .await?;
+
+    #[cfg(feature = "internal-network-stack")]
+    if C::HEX_MODE {
+        at_client
+            .send(&crate::command::ip_transport_layer::SetHexMode {
+                hex_mode_disable: crate::command::ip_transport_layer::types::HexMode::Enabled,
+            })
+            .await?;
+    } else {
+        at_client
+            .send(&crate::command::ip_transport_layer::SetHexMode {
+                hex_mode_disable: crate::command::ip_transport_layer::types::HexMode::Disabled,
+            })
+            .await?;
+    }
+
+    // Tell module whether we support flow control
+    if enable_flow_control {
+        at_client.send(&SetFlowControl).await?;
+    } else {
+        at_client.send(&SetFlowControl).await?;
+    }
+    Ok(())
+}
+
+pub(crate) async fn select_sim_card<A: AtatClient>(at_client: &mut A) -> Result<(), Error> {
+    for _ in 0..2 {
+        match at_client.send(&GetPinStatus).await {
+            Ok(PinStatus { code }) if code == PinStatusCode::Ready => {
+                debug!("SIM is ready");
+                return Ok(());
+            }
+            _ => {}
+        }
+
+        Timer::after(Duration::from_secs(1)).await;
+    }
+
+    // There was an error initializing the SIM
+    // We've seen issues on uBlox-based devices, as a precation, we'll cycle
+    // the modem here through minimal/full functional state.
+    at_client
+        .send(&SetModuleFunctionality {
+            fun: Functionality::Minimum,
+            // SARA-R5 This parameter can be used only when <fun> is 1, 4 or 19
+            #[cfg(feature = "sara-r5")]
+            rst: None,
+            #[cfg(not(feature = "sara-r5"))]
+            rst: Some(ResetMode::DontReset),
+        })
+        .await?;
+    at_client
+        .send(&SetModuleFunctionality {
+            fun: Functionality::Full,
+            rst: Some(ResetMode::DontReset),
+        })
+        .await?;
+
+    Ok(())
 }

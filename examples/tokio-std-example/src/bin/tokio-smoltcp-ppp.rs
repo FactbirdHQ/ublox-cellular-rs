@@ -1,25 +1,18 @@
 #![cfg(feature = "ppp")]
-#![no_std]
-#![no_main]
-#![allow(stable_features)]
-#![feature(type_alias_impl_trait)]
 
-use defmt::*;
-use embassy_executor::Spawner;
+use atat::asynch::AtatClient as _;
+use atat::asynch::SimpleClient;
+use atat::AtatIngress as _;
 use embassy_net::dns::DnsSocket;
 use embassy_net::tcp::client::TcpClient;
 use embassy_net::tcp::client::TcpClientState;
 use embassy_net::tcp::TcpSocket;
 use embassy_net::Stack;
 use embassy_net::StackResources;
-use embassy_rp::gpio;
-use embassy_rp::gpio::Input;
 
-use embassy_rp::gpio::OutputOpenDrain;
-use embassy_rp::uart::BufferedUart;
-use embassy_rp::{bind_interrupts, peripherals::UART0, uart::BufferedInterruptHandler};
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_time::Duration;
+use embassy_time::Instant;
 use embassy_time::Timer;
 use embedded_mqtt::transport::embedded_tls::TlsNalTransport;
 use embedded_mqtt::transport::embedded_tls::TlsState;
@@ -30,6 +23,7 @@ use embedded_tls::TlsConfig;
 use embedded_tls::TlsConnection;
 use embedded_tls::TlsContext;
 use embedded_tls::UnsecureProvider;
+use log::*;
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha8Rng;
 use reqwless::headers::ContentType;
@@ -37,32 +31,32 @@ use reqwless::request::Request;
 use reqwless::request::RequestBuilder as _;
 use reqwless::response::Response;
 use static_cell::StaticCell;
+use tokio_serial::SerialPort;
+use tokio_serial::SerialPortBuilderExt;
 use ublox_cellular::asynch::state::OperationState;
-use ublox_cellular::asynch::PPPRunner;
 use ublox_cellular::asynch::Resources;
+
+use ublox_cellular::command::control::SetDataRate;
+use ublox_cellular::command::control::SetFlowControl;
+use ublox_cellular::command::general::GetModelId;
+use ublox_cellular::command::ipc::SetMultiplexing;
+use ublox_cellular::command::psn::DeactivatePDPContext;
+use ublox_cellular::command::psn::EnterPPP;
+use ublox_cellular::command::Urc;
+use ublox_cellular::command::AT;
 use ublox_cellular::config::NoPin;
-use {defmt_rtt as _, panic_probe as _};
-
 use ublox_cellular::config::{Apn, CellularConfig};
-
-bind_interrupts!(struct Irqs {
-    UART0_IRQ => BufferedInterruptHandler<UART0>;
-});
 
 const CMD_BUF_SIZE: usize = 128;
 const INGRESS_BUF_SIZE: usize = 512;
 const URC_CAPACITY: usize = 2;
 
-struct MyCelullarConfig {
-    reset_pin: Option<OutputOpenDrain<'static>>,
-    power_pin: Option<OutputOpenDrain<'static>>,
-    vint_pin: Option<Input<'static>>,
-}
+struct MyCelullarConfig;
 
 impl<'a> CellularConfig<'a> for MyCelullarConfig {
-    type ResetPin = OutputOpenDrain<'static>;
-    type PowerPin = OutputOpenDrain<'static>;
-    type VintPin = Input<'static>;
+    type ResetPin = NoPin;
+    type PowerPin = NoPin;
+    type VintPin = NoPin;
 
     const FLOW_CONTROL: bool = true;
 
@@ -76,58 +70,26 @@ impl<'a> CellularConfig<'a> for MyCelullarConfig {
         username: b"",
         password: b"",
     };
-
-    fn reset_pin(&mut self) -> Option<&mut Self::ResetPin> {
-        info!("reset_pin");
-        self.reset_pin.as_mut()
-    }
-
-    fn power_pin(&mut self) -> Option<&mut Self::PowerPin> {
-        info!("power_pin");
-        self.power_pin.as_mut()
-    }
-
-    fn vint_pin(&mut self) -> Option<&mut Self::VintPin> {
-        info!("vint_pin = {}", self.vint_pin.as_mut()?.is_high());
-        self.vint_pin.as_mut()
-    }
 }
 
-#[embassy_executor::main]
-async fn main(spawner: Spawner) {
-    let p = {
-        let config =
-            embassy_rp::config::Config::new(embassy_rp::clocks::ClockConfig::crystal(12_000_000));
-        embassy_rp::init(config)
-    };
+const TTY: &str = "/dev/ttyUSB0";
 
-    static TX_BUF: StaticCell<[u8; 256]> = StaticCell::new();
-    static RX_BUF: StaticCell<[u8; 256]> = StaticCell::new();
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
 
-    let cell_uart = BufferedUart::new_with_rtscts(
-        p.UART0,
-        Irqs,
-        p.PIN_0,
-        p.PIN_1,
-        p.PIN_3,
-        p.PIN_2,
-        TX_BUF.init([0; 256]),
-        RX_BUF.init([0; 256]),
-        embassy_rp::uart::Config::default(),
-    );
+    info!("HELLO");
 
-    let cell_nrst = gpio::OutputOpenDrain::new(p.PIN_4, gpio::Level::High);
-    let cell_pwr = gpio::OutputOpenDrain::new(p.PIN_5, gpio::Level::High);
-    let cell_vint = gpio::Input::new(p.PIN_6, gpio::Pull::None);
+    let mut ppp_iface = tokio_serial::new(TTY, 115200).open_native_async()?;
+    ppp_iface
+        .set_flow_control(tokio_serial::FlowControl::Hardware)
+        .unwrap();
 
     static RESOURCES: StaticCell<Resources<CMD_BUF_SIZE, INGRESS_BUF_SIZE, URC_CAPACITY>> =
         StaticCell::new();
+
     let (net_device, mut cell_control, mut runner) =
-        ublox_cellular::asynch::new_ppp(RESOURCES.init(Resources::new()), MyCelullarConfig {
-            reset_pin: Some(cell_nrst),
-            power_pin: Some(cell_pwr),
-            vint_pin: Some(cell_vint)
-        });
+        ublox_cellular::asynch::new_ppp(RESOURCES.init(Resources::new()), MyCelullarConfig);
 
     // Generate random seed
     let seed = 0x0123_4567_89ab_cdef; // chosen by fair dice roll. guarenteed to be random.
@@ -142,7 +104,6 @@ async fn main(spawner: Spawner) {
         STACK_RESOURCES.init(StackResources::new()),
         seed,
     ));
-
 
     let http_fut = async {
         stack.wait_config_up().await;
@@ -194,17 +155,19 @@ async fn main(spawner: Spawner) {
             .await
             .unwrap();
 
-        // let mut buf = vec![0; 16384];
-        // let len = response
-        //     .body()
-        //     .reader()
-        //     .read_to_end(&mut buf)
-        //     .await
-        //     .unwrap();
-        // info!("{:?}", core::str::from_utf8(&buf[..len]));
+        let mut buf = vec![0; 16384];
+        let len = response
+            .body()
+            .reader()
+            .read_to_end(&mut buf)
+            .await
+            .unwrap();
+        info!("{:?}", core::str::from_utf8(&buf[..len]));
     };
 
-    let (rx, tx) = cell_uart.split();
+    let (rx, tx) = tokio::io::split(ppp_iface);
+    let rx = embedded_io_adapters::tokio_1::FromTokio::new(tokio::io::BufReader::new(rx));
+    let tx = embedded_io_adapters::tokio_1::FromTokio::new(tx);
     embassy_futures::join::join3(
         stack.run(),
         runner.run(rx, tx, |ipv4| {
@@ -231,5 +194,5 @@ async fn main(spawner: Spawner) {
     )
     .await;
 
-    core::unreachable!();
+    unreachable!();
 }

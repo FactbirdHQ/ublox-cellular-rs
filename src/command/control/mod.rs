@@ -2,13 +2,15 @@
 //! These commands, unless specifically stated, do not implement set syntax using "=", read ("?"), or test ("=?").
 //! If such commands are used, the "+CME ERROR: unknown" or "+CME ERROR: 100" error result code is provided
 //! (depending on the +CMEE AT command setting).
-// pub mod responses;
+pub mod responses;
 pub mod types;
 
-use atat::atat_derive::AtatCmd;
-use types::{BaudRate, Circuit108Behaviour, Circuit109Behaviour, FlowControl, SoftwareFlowControl};
-
 use super::NoResponse;
+use atat::atat_derive::AtatCmd;
+use responses::DataRate;
+use types::{
+    BaudRate, Circuit108Behaviour, Circuit109Behaviour, Echo, FlowControl, SoftwareFlowControl,
+};
 
 /// 15.2 Circuit 109 behavior &C
 ///
@@ -44,11 +46,8 @@ pub struct SetCircuit108Behaviour {
 /// - HW flow control also referred with RTS / CTS flow control
 /// - SW flow control also referred with XON / XOFF flow control
 #[derive(Clone, AtatCmd)]
-#[at_cmd("&K", NoResponse, value_sep = false)]
-pub struct SetFlowControl {
-    #[at_arg(position = 0)]
-    pub value: FlowControl,
-}
+#[at_cmd("+IFC=2,2", NoResponse, value_sep = false)]
+pub struct SetFlowControl;
 
 /// 15.8 Set flow control \Q
 ///
@@ -81,6 +80,14 @@ pub struct SetDataRate {
     pub rate: BaudRate,
 }
 
+/// 15.9 UART data rate configuration +IPR
+///
+/// Specifies the data rate at which the DCE accepts commands on the UART
+/// interface. The full range of data rates depends on HW or other criteria.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+IPR?", DataRate)]
+pub struct GetDataRate;
+
 /// 15.25 Set to factory defined configuration &F
 ///
 /// Resets the current profile to factory-programmed setting. Other NVM
@@ -92,3 +99,18 @@ pub struct SetDataRate {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("&F", NoResponse)]
 pub struct FactoryResetConfig;
+
+/// 15.25 Set to factory defined configuration &F
+///
+/// Resets the current profile to factory-programmed setting. Other NVM
+/// settings, not included in the profiles, are not affected. In case of
+/// success, the response is issued using the configuration of the result codes
+/// format (Q, V, S3, S4 AT commands) loaded from the factory-programmed
+/// profile. The other DCE settings are applied after the response has been
+/// sent.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("E", NoResponse, value_sep = false)]
+pub struct SetEcho {
+    #[at_arg(position = 0)]
+    pub enabled: Echo,
+}

@@ -3,17 +3,16 @@
     // "can't find crate for `test`" when the default compilation target is a no_std target
     // with these changes RA will call `cargo check --bins` on save
     "rust-analyzer.checkOnSave.allTargets": false,
-    "rust-analyzer.checkOnSave.extraArgs": [
-        "--bins",
-        "--target",
-        "x86_64-unknown-linux-gnu"
-    ],
+    "rust-analyzer.procMacro.enable": true,
+    "rust-analyzer.cargo.target": "thumbv6m-none-eabi",
+    // "rust-analyzer.cargo.target": "thumbv7em-none-eabihf",
     "rust-analyzer.cargo.features": [
-        "lara-r6",
-        "embassy-embedded-hal"
+        "ppp",
     ],
-    "rust-analyzer.cargo.target": "thumbv7em-none-eabihf",
+    "rust-analyzer.checkOnSave.command": "clippy",
+    "rust-analyzer.cargoRunner": null,
+    "rust-analyzer.experimental.procAttrMacros": false,
     "rust-analyzer.diagnostics.disabled": [
-        "unresolved-import"
-    ]
+        "macro-error"
+    ],
 }

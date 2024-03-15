@@ -6,7 +6,7 @@ use embedded_io_async::Write;
 
 use crate::command::Urc;
 
-use super::state;
+use super::{runner::URC_SUBSCRIBERS, state};
 
 pub struct UbxResources<
     W: Write,
@@ -17,7 +17,7 @@ pub struct UbxResources<
     pub(crate) ch: state::State,
 
     pub(crate) res_slot: ResponseSlot<INGRESS_BUF_SIZE>,
-    pub(crate) urc_channel: UrcChannel<Urc, URC_CAPACITY, 2>,
+    pub(crate) urc_channel: UrcChannel<Urc, URC_CAPACITY, URC_SUBSCRIBERS>,
     pub(crate) cmd_buf: [u8; CMD_BUF_SIZE],
     pub(crate) ingress_buf: [u8; INGRESS_BUF_SIZE],
 
@@ -27,7 +27,8 @@ pub struct UbxResources<
     pub(crate) ppp_state: embassy_net_ppp::State<2, 2>,
 
     #[cfg(feature = "ppp")]
-    pub(crate) mux: embassy_at_cmux::Mux<2, 256>,
+    pub(crate) mux:
+        embassy_at_cmux::Mux<{ super::ppp::CMUX_CHANNELS }, { super::ppp::CMUX_CHANNEL_SIZE }>,
 }
 
 impl<

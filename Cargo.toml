@@ -43,13 +43,9 @@ embassy-net = { version = "0.4", features = [
     "proto-ipv4",
     "medium-ip",
 ], optional = true }
+embassy-embedded-hal = { version = "0.1", optional = true }
 
-embedded-io = "0.6"
 embedded-io-async = "0.6"
-
-[dev-dependencies]
-atat = { version = "*", features = ["heapless"] }
-
 
 [features]
 default = ["socket-udp", "socket-tcp", "ppp"]

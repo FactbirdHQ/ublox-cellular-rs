@@ -292,23 +292,22 @@ impl<'d> TcpIo<'d> {
     }
 }
 
-// #[cfg(feature = "nightly")]
 mod embedded_io_impls {
     use super::*;
 
-    impl embedded_io::Error for ConnectError {
-        fn kind(&self) -> embedded_io::ErrorKind {
-            embedded_io::ErrorKind::Other
+    impl embedded_io_async::Error for ConnectError {
+        fn kind(&self) -> embedded_io_async::ErrorKind {
+            embedded_io_async::ErrorKind::Other
         }
     }
 
-    impl embedded_io::Error for Error {
-        fn kind(&self) -> embedded_io::ErrorKind {
-            embedded_io::ErrorKind::Other
+    impl embedded_io_async::Error for Error {
+        fn kind(&self) -> embedded_io_async::ErrorKind {
+            embedded_io_async::ErrorKind::Other
         }
     }
 
-    impl<'d> embedded_io::ErrorType for TcpSocket<'d> {
+    impl<'d> embedded_io_async::ErrorType for TcpSocket<'d> {
         type Error = Error;
     }
 
@@ -328,7 +327,7 @@ mod embedded_io_impls {
         }
     }
 
-    impl<'d> embedded_io::ErrorType for TcpReader<'d> {
+    impl<'d> embedded_io_async::ErrorType for TcpReader<'d> {
         type Error = Error;
     }
 
@@ -338,7 +337,7 @@ mod embedded_io_impls {
         }
     }
 
-    impl<'d> embedded_io::ErrorType for TcpWriter<'d> {
+    impl<'d> embedded_io_async::ErrorType for TcpWriter<'d> {
         type Error = Error;
     }
 
@@ -459,7 +458,7 @@ pub mod client {
         }
     }
 
-    impl<'d, const N: usize, const TX_SZ: usize, const RX_SZ: usize> embedded_io::ErrorType
+    impl<'d, const N: usize, const TX_SZ: usize, const RX_SZ: usize> embedded_io_async::ErrorType
         for TcpConnection<'d, N, TX_SZ, RX_SZ>
     {
         type Error = Error;

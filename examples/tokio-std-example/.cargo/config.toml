@@ -1,0 +1,5 @@
+[build]
+target = "x86_64-unknown-linux-gnu"
+
+[env]
+RUST_LOG = "trace,embassy_hal_internal=error"

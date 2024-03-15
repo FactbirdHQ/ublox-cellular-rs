@@ -1,32 +1,18 @@
 [package]
-name = "embassy-rp2040-example"
+name = "tokio-std-example"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-embassy-rp = { version = "0.1.0", features = [
-    "defmt",
-    "time-driver",
-    "unstable-pac",
-    "rom-v2-intrinsics",
-    "critical-section-impl",
-] }
-embassy-executor = { version = "0.5.0", features = [
-    "arch-cortex-m",
-    "executor-thread",
-    "defmt",
-    "integrated-timers",
-    "nightly",
-] }
-embassy-time = { version = "0.3", features = [
-    "defmt",
-    "defmt-timestamp-uptime",
-] }
-embassy-futures = { version = "0.1", features = ["defmt"] }
-embassy-sync = { version = "0.5", features = ["defmt"] }
+tokio = { version = "1", features = ["full"] }
+tokio-serial = "5.4.1"
+
+embassy-time = { version = "0.3", features = ["std", "generic-queue"] }
+embassy-futures = { version = "0.1", features = ["log"] }
+embassy-sync = { version = "0.5", features = ["log"] }
 
 embassy-net = { version = "0.4", features = [
-    "defmt",
+    "log",
     "packet-trace",
     "proto-ipv4",
     "medium-ip",
@@ -34,41 +20,36 @@ embassy-net = { version = "0.4", features = [
     "udp",
     "dns",
 ] }
-embassy-net-ppp = { version = "0.1", features = ["defmt"] }
+embassy-net-ppp = { version = "0.1", features = ["log"] }
 embassy-at-cmux = { path = "../../../embassy/embassy-at-cmux", features = [
-    "defmt",
+    "log",
 ] }
 
-embedded-tls = { path = "https://github.com/drogue-iot/embedded-tls", rev = "f788e02", default-features = false, features = [
-    "defmt",
+embedded-tls = { git = "https://github.com/drogue-iot/embedded-tls", rev = "f788e02", default-features = false, features = [
+    "log",
 ] }
 
+embedded-io-adapters = { version = "0.6", features = ["tokio-1"] }
 embedded-io-async = { version = "0.6" }
 heapless = "0.8"
-portable-atomic = { version = "1.5.1", features = ["critical-section"] }
 
-cortex-m = { version = "0.7.7", features = ["inline-asm"] }
-cortex-m-rt = "0.7.3"
+env_logger = "0.11"
+log = "0.4.21"
 
-defmt = "0.3.5"
-defmt-rtt = "0.4.0"
-panic-probe = { version = "0.3.1", features = ["print-defmt"] }
+static_cell = { version = "2.0" }
 
-static_cell = { version = "2.0", features = [] }
-
-atat = { version = "0.21.0", features = ["derive", "bytes", "defmt"] }
+atat = { version = "0.21.0", features = ["derive", "bytes", "log"] }
 ublox-cellular-rs = { version = "0.4.0", path = "../..", features = [
     "lara-r6",
-    "defmt",
+    "log",
 ] }
 reqwless = { git = "https://github.com/drogue-iot/reqwless", features = [
-    "defmt",
+    "log",
 ] }
 smoltcp = { version = "*", default-features = false, features = [
     "dns-max-server-count-4",
 ] }
 rand_chacha = { version = "0.3", default-features = false }
-
 
 [features]
 ppp = ["ublox-cellular-rs/ppp"]
@@ -79,21 +60,17 @@ ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", branch =
 # atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
 
 no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
-# embassy-rp = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 # embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 # embassy-sync = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 # embassy-net = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 # embassy-net-ppp = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 # embassy-futures = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
-# embassy-executor = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 
-embassy-rp = { path = "../../../embassy/embassy-rp" }
 embassy-time = { path = "../../../embassy/embassy-time" }
 embassy-sync = { path = "../../../embassy/embassy-sync" }
 embassy-net = { path = "../../../embassy/embassy-net" }
 embassy-net-ppp = { path = "../../../embassy/embassy-net-ppp" }
 embassy-futures = { path = "../../../embassy/embassy-futures" }
-embassy-executor = { path = "../../../embassy/embassy-executor" }
 
 atat = { path = "../../../atat/atat" }
 

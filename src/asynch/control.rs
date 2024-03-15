@@ -37,6 +37,13 @@ impl<'a, AT: AtatClient> Control<'a, AT> {
         self.state_ch.set_desired_state(ps).await;
     }
 
+    pub async fn wait_for_desired_state(
+        &mut self,
+        ps: OperationState,
+    ) -> Result<OperationState, Error> {
+        self.state_ch.wait_for_desired_state(ps).await
+    }
+
     pub async fn get_signal_quality(
         &mut self,
     ) -> Result<crate::command::network_service::responses::SignalQuality, Error> {

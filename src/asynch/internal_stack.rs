@@ -10,7 +10,11 @@ use crate::{command::Urc, config::CellularConfig};
 
 pub use super::resources::UbxResources as Resources;
 
-use super::{control::Control, runner::Runner, state, AtHandle};
+use super::{
+    control::Control,
+    runner::{Runner, URC_SUBSCRIBERS},
+    state, AtHandle,
+};
 
 pub fn new_internal<
     'a,
@@ -87,7 +91,14 @@ pub struct InternalRunner<
     const URC_CAPACITY: usize,
 > {
     pub cellular_runner: Runner<'a, Client<'a, W, INGRESS_BUF_SIZE>, C, URC_CAPACITY>,
-    pub ingress: atat::Ingress<'a, atat::AtDigester<Urc>, Urc, INGRESS_BUF_SIZE, URC_CAPACITY, 2>,
+    pub ingress: atat::Ingress<
+        'a,
+        atat::AtDigester<Urc>,
+        Urc,
+        INGRESS_BUF_SIZE,
+        URC_CAPACITY,
+        URC_SUBSCRIBERS,
+    >,
     pub reader: R,
 }
 

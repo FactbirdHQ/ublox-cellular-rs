@@ -13,6 +13,14 @@ pub enum Circuit109Behaviour {
     ChangesWithCarrier = 1,
 }
 
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
+pub enum Echo {
+    /// 0: Echo off
+    Off = 0,
+    /// 1 (default value and factory-programmed value): Echo on
+    On = 1,
+}
+
 /// Indicates the behavior of circuit 108
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum Circuit108Behaviour {
@@ -51,7 +59,8 @@ pub enum SoftwareFlowControl {
     Circuit105_106 = 3,
 }
 
-#[derive(Clone, PartialEq, Eq, AtatEnum)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[at_enum(u32)]
 pub enum BaudRate {
     #[cfg(any(
@@ -100,6 +109,7 @@ pub enum BaudRate {
         feature = "sara-u2",
         feature = "toby-r2",
         feature = "lara-r2",
+        feature = "lara-r6",
         feature = "toby-l4",
     ))]
     B230400 = 230_400,
@@ -111,6 +121,7 @@ pub enum BaudRate {
         feature = "sara-u2",
         feature = "toby-r2",
         feature = "lara-r2",
+        feature = "lara-r6",
         feature = "toby-l4",
     ))]
     B460800 = 460_800,
@@ -122,10 +133,11 @@ pub enum BaudRate {
         feature = "sara-u2",
         feature = "toby-r2",
         feature = "lara-r2",
+        feature = "lara-r6",
         feature = "toby-l4",
     ))]
     B921600 = 921_600,
-    #[cfg(any(feature = "toby-r2", feature = "lara-r2",))]
+    #[cfg(any(feature = "toby-r2", feature = "lara-r2", feature = "lara-r6"))]
     B3000000 = 3_000_000,
     #[cfg(any(feature = "toby-r2", feature = "lara-r2",))]
     B3250000 = 3_250_000,

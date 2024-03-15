@@ -13,6 +13,16 @@ mod ppp;
 #[cfg(feature = "ppp")]
 pub use ppp::{new_ppp, PPPRunner, Resources};
 
+#[cfg(feature = "ppp")]
+pub type Control<'d, const INGRESS_BUF_SIZE: usize> = control::Control<
+    'd,
+    atat::asynch::Client<
+        'd,
+        embassy_at_cmux::ChannelTx<'d, { ppp::CMUX_CHANNEL_SIZE }>,
+        INGRESS_BUF_SIZE,
+    >,
+>;
+
 use atat::asynch::AtatClient;
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
 

@@ -73,9 +73,6 @@ pub trait CellularConfig<'a> {
     type PowerPin: OutputPin;
     type VintPin: InputPin;
 
-    // const INGRESS_BUF_SIZE: usize;
-    // const URC_CAPACITY: usize;
-
     const FLOW_CONTROL: bool = false;
 
     #[cfg(feature = "internal-network-stack")]
@@ -84,7 +81,6 @@ pub trait CellularConfig<'a> {
     const OPERATOR_FORMAT: OperatorFormat = OperatorFormat::Long;
 
     const PROFILE_ID: ProfileId = ProfileId(1);
-    // #[cfg(not(feature = "upsd-context-activation"))]
     const CONTEXT_ID: ContextId = ContextId(1);
 
     const APN: Apn<'a> = Apn::None;
@@ -92,9 +88,15 @@ pub trait CellularConfig<'a> {
     #[cfg(feature = "ppp")]
     const PPP_CONFIG: embassy_net_ppp::Config<'a>;
 
-    fn reset_pin(&mut self) -> Option<&mut Self::ResetPin>;
-    fn power_pin(&mut self) -> Option<&mut Self::PowerPin>;
-    fn vint_pin(&mut self) -> Option<&mut Self::VintPin>;
+    fn reset_pin(&mut self) -> Option<&mut Self::ResetPin> {
+        None
+    }
+    fn power_pin(&mut self) -> Option<&mut Self::PowerPin> {
+        None
+    }
+    fn vint_pin(&mut self) -> Option<&mut Self::VintPin> {
+        None
+    }
 }
 
 #[repr(u8)]
