@@ -3,7 +3,7 @@ use core::mem::MaybeUninit;
 use crate::{
     command::{
         ipc::SetMultiplexing,
-        psn::{DeactivatePDPContext, EnterPPP},
+        psn::{types::ContextId, EnterPPP},
         Urc,
     },
     config::CellularConfig,
@@ -217,13 +217,11 @@ impl<'a, C: CellularConfig<'a>, const INGRESS_BUF_SIZE: usize, const URC_CAPACIT
                 continue;
             };
 
-            self.cellular_runner
-                .change_state_to_desired_state(state::OperationState::DataEstablished)
-                .await;
-
             let ppp_fut = async {
                 let mut fails = 0;
                 let mut last_start = None;
+
+                Timer::after(Duration::from_secs(10)).await;
 
                 loop {
                     if let Some(last_start) = last_start {
@@ -295,7 +293,13 @@ impl<'a, C: CellularConfig<'a>, const INGRESS_BUF_SIZE: usize, const URC_CAPACIT
                 self.mux_runner.run(&mut rx, &mut tx, CMUX_MAX_FRAME_SIZE),
                 ppp_fut,
                 self.ingress.read_from(&mut self.control_rx),
-                self.cellular_runner.run(),
+                async {
+                    self.cellular_runner
+                        .change_state_to_desired_state(state::OperationState::DataEstablished)
+                        .await;
+
+                    self.cellular_runner.run().await
+                },
             )
             .await;
 

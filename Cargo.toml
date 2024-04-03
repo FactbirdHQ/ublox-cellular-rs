@@ -15,7 +15,7 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.21.0", features = ["derive", "bytes"] }
+atat = { version = "0.22", features = ["derive", "bytes"] }
 heapless = { version = "^0.8", features = ["serde"] }
 nb = "^1"
 serde = { version = "^1", default-features = false, features = ["derive"] }
@@ -50,11 +50,55 @@ embedded-io-async = "0.6"
 [features]
 default = ["socket-udp", "socket-tcp", "ppp"]
 
-internal-network-stack = ["dep:ublox-sockets"]
-ppp = ["dep:embassy-at-cmux", "dep:embassy-net-ppp", "dep:embassy-net"]
+
+### Cellular feature list from ubxlib:
+use-upsd-context-activation = []
+# mno-profile = []
+# cscon = []
+# root-of-trust = []
+# async-sock-close = []
+# data-counters = []
+# security-tls-iana-numbering = []
+# security-tls-server-name-indication = []
+# security-tls-psk-as-hex = []
+# mqtt = []
+# mqtt-sara-r4-old-syntax = []
+# mqtt-set-local-port = []
+# mqtt-session-retain = []
+# mqtt-binary-publish = []
+# mqtt-will = []
+# mqtt-keep-alive = []
+# mqtt-security = []
+# ucged5 = []
+# context-mapping-required = []
+# security-tls-cipher-list = []
+# auto-bauding = []
+# at-profiles = []
+# security-ztp = []
+# file-system-tag = []
+# dtr-power-saving = []
+# 3gpp-power-saving = []
+# 3gpp-power-saving-paging-window-set = []
+# deep-sleep-urc = []
+# edrx = []
+# mqttsn = []
+# mqttsn-security = []
+# cts-control = []
+# sock-set-local-port = []
+# fota = []
+# uart-power-saving = []
+cmux = ["dep:embassy-at-cmux"]
+# cmux-channel-close = []
+# snr-reported = []
+# authentication-mode-automatic = []
+# lwm2m = []
+# ucged = []
+# http = []
+ppp = ["cmux", "dep:embassy-net-ppp", "dep:embassy-net"]
+
 
 automatic-apn = []
-upsd-context-activation = []
+internal-network-stack = ["dep:ublox-sockets"]
 
 socket-tcp = ["ublox-sockets?/socket-tcp", "embassy-net?/tcp"]
 socket-udp = ["ublox-sockets?/socket-udp", "embassy-net?/udp"]
@@ -73,6 +117,7 @@ defmt = [
 ]
 log = ["dep:log", "ublox-sockets?/log", "atat/log"]
 
+# Modules
 lara-r2 = []
 lara-r6 = []
 leon-g1 = []
@@ -80,9 +125,9 @@ lisa-u2 = []
 mpci-l2 = []
 sara-g3 = []
 sara-g4 = []
-sara-r5 = ["upsd-context-activation"]
+sara-r5 = ["use-upsd-context-activation"]
 sara-u1 = []
-sara-u2 = ["upsd-context-activation"]
+sara-u2 = ["use-upsd-context-activation"]
 toby-l2 = []
 toby-r2 = []
 toby-l4 = []
@@ -96,7 +141,6 @@ exclude = ["examples"]
 #ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", branch = "feature/async-borrowed-sockets" }
 no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
 #ublox-sockets = { path = "../ublox-sockets" }
-# atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
 embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 embassy-sync = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 embassy-futures = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
@@ -106,4 +150,3 @@ embassy-net = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 #embassy-time = { path = "../embassy/embassy-time" }
 #embassy-sync = { path = "../embassy/embassy-sync" }
 #embassy-futures = { path = "../embassy/embassy-futures" }
-atat = { path = "../atat/atat" }

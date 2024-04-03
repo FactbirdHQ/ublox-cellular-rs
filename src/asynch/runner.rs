@@ -519,14 +519,64 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
             return Err(Error::AttachTimeout);
         }
 
+        #[cfg(not(feature = "use-upsd-context-activation"))]
+        self.define_context(context_id, apn_info).await?;
+
         // Activate the context
-        #[cfg(feature = "upsd-context-activation")]
+        #[cfg(feature = "use-upsd-context-activation")]
         self.activate_context_upsd(profile_id, apn_info).await?;
-        #[cfg(not(feature = "upsd-context-activation"))]
+        #[cfg(not(feature = "use-upsd-context-activation"))]
         self.activate_context(context_id, profile_id).await?;
 
         Ok(())
     }
+
+    /// Define a PDP context
+    #[cfg(not(feature = "use-upsd-context-activation"))]
+    async fn define_context(&mut self, cid: ContextId, apn_info: crate::config::Apn<'_>) -> Result<(), Error> {
+        use crate::command::psn::SetPDPContextDefinition;
+
+        self.at.send(
+            &SetModuleFunctionality {
+                fun: Functionality::Minimum,
+                // SARA-R5: this parameter can be used only when <fun> is 1, 4 or 19
+                #[cfg(feature = "sara-r5")]
+                rst: None,
+                #[cfg(not(feature = "sara-r5"))]
+                rst: Some(ResetMode::DontReset),
+            },
+        ).await?;
+
+        if let crate::config::Apn::Given { name, .. } = apn_info {
+            self.at.send(
+                &SetPDPContextDefinition {
+                    cid,
+                    pdp_type: "IP",
+                    apn: name,
+                },
+            ).await?;
+        }
+
+        // self.at.send(
+        //     &SetAuthParameters {
+        //         cid,
+        //         auth_type: AuthenticationType::Auto,
+        //         username: &apn_info.clone().user_name.unwrap_or_default(),
+        //         password: &apn_info.clone().password.unwrap_or_default(),
+        //     },
+        //     true,
+        // ).await?;
+
+        self.at.send(
+            &SetModuleFunctionality {
+                fun: Functionality::Full,
+                rst: Some(ResetMode::DontReset),
+            },
+        ).await?;
+
+        Ok(())
+    }
+
 
     // Make sure we are attached to the cellular network.
     async fn is_network_attached(&mut self) -> Result<bool, Error> {
@@ -544,7 +594,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
 
     /// Activate context using AT+UPSD commands
     /// Required for SARA-G3, SARA-U2 SARA-R5 modules.
-    #[cfg(feature = "upsd-context-activation")]
+    #[cfg(feature = "use-upsd-context-activation")]
     async fn activate_context_upsd(
         &mut self,
         profile_id: ProfileId,
@@ -664,7 +714,7 @@ impl<'d, AT: AtatClient, C: CellularConfig<'d>, const URC_CAPACITY: usize>
 
     /// Activate context using 3GPP commands
     /// Required for SARA-R4 and TOBY modules.
-    #[cfg(not(feature = "upsd-context-activation"))]
+    #[cfg(not(feature = "use-upsd-context-activation"))]
     async fn activate_context(
         &mut self,
         cid: ContextId,

@@ -38,7 +38,7 @@ log = "0.4.21"
 
 static_cell = { version = "2.0" }
 
-atat = { version = "0.21.0", features = ["derive", "bytes", "log"] }
+atat = { version = "0.22", features = ["derive", "bytes", "log"] }
 ublox-cellular-rs = { version = "0.4.0", path = "../..", features = [
     "lara-r6",
     "log",
@@ -57,7 +57,6 @@ internal-network-stack = ["ublox-cellular-rs/internal-network-stack"]
 
 [patch.crates-io]
 ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", branch = "feature/async-borrowed-sockets" }
-# atat = { git = "https://github.com/BlackbirdHQ/atat", branch = "master" }
 
 no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
 # embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
@@ -71,8 +70,6 @@ embassy-sync = { path = "../../../embassy/embassy-sync" }
 embassy-net = { path = "../../../embassy/embassy-net" }
 embassy-net-ppp = { path = "../../../embassy/embassy-net-ppp" }
 embassy-futures = { path = "../../../embassy/embassy-futures" }
-
-atat = { path = "../../../atat/atat" }
 
 [profile.dev]
 opt-level = "s"

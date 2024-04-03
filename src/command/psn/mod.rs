@@ -93,6 +93,11 @@ pub struct SetPDPContextDefinition<'a> {
     pub apn: &'a str,
 }
 
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+CGDCONT?", NoResponse)]
+pub struct GetPDPContextDefinition;
+
+
 /// 18.7 Set Packet switched data configuration +UPSD
 ///
 /// Sets all the parameters in a specific packet switched data (PSD) profile.
