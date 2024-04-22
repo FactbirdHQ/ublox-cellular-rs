@@ -1,15 +1,13 @@
-use core::mem::MaybeUninit;
-
-use atat::{asynch::Client, ResponseSlot, UrcChannel};
-use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
-use embedded_io_async::Write;
+use atat::{ResponseSlot, UrcChannel};
 
 use crate::command::Urc;
 
 use super::{runner::URC_SUBSCRIBERS, state};
 
-pub struct UbxResources<
-    W: Write,
+#[cfg(feature = "cmux")]
+use super::runner::{CMUX_CHANNELS, CMUX_CHANNEL_SIZE};
+
+pub struct Resources<
     const CMD_BUF_SIZE: usize,
     const INGRESS_BUF_SIZE: usize,
     const URC_CAPACITY: usize,
@@ -21,22 +19,20 @@ pub struct UbxResources<
     pub(crate) cmd_buf: [u8; CMD_BUF_SIZE],
     pub(crate) ingress_buf: [u8; INGRESS_BUF_SIZE],
 
-    pub(crate) at_client: MaybeUninit<Mutex<NoopRawMutex, Client<'static, W, INGRESS_BUF_SIZE>>>,
-
-    #[cfg(feature = "ppp")]
-    pub(crate) ppp_state: embassy_net_ppp::State<2, 2>,
-
-    #[cfg(feature = "ppp")]
-    pub(crate) mux:
-        embassy_at_cmux::Mux<{ super::ppp::CMUX_CHANNELS }, { super::ppp::CMUX_CHANNEL_SIZE }>,
+    #[cfg(feature = "cmux")]
+    pub(crate) mux: embassy_at_cmux::Mux<CMUX_CHANNELS, CMUX_CHANNEL_SIZE>,
 }
 
-impl<
-        W: Write,
-        const CMD_BUF_SIZE: usize,
-        const INGRESS_BUF_SIZE: usize,
-        const URC_CAPACITY: usize,
-    > UbxResources<W, CMD_BUF_SIZE, INGRESS_BUF_SIZE, URC_CAPACITY>
+impl<const CMD_BUF_SIZE: usize, const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize> Default
+    for Resources<CMD_BUF_SIZE, INGRESS_BUF_SIZE, URC_CAPACITY>
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl<const CMD_BUF_SIZE: usize, const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize>
+    Resources<CMD_BUF_SIZE, INGRESS_BUF_SIZE, URC_CAPACITY>
 {
     pub fn new() -> Self {
         Self {
@@ -47,12 +43,7 @@ impl<
             cmd_buf: [0; CMD_BUF_SIZE],
             ingress_buf: [0; INGRESS_BUF_SIZE],
 
-            at_client: MaybeUninit::uninit(),
-
-            #[cfg(feature = "ppp")]
-            ppp_state: embassy_net_ppp::State::new(),
-
-            #[cfg(feature = "ppp")]
+            #[cfg(feature = "cmux")]
             mux: embassy_at_cmux::Mux::new(),
         }
     }

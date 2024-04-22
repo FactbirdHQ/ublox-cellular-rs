@@ -51,6 +51,9 @@ smoltcp = { version = "*", default-features = false, features = [
 ] }
 rand_chacha = { version = "0.3", default-features = false }
 
+embedded-mqtt = { path = "../../../embedded-mqtt", features = ["log", "embedded-tls"] }
+
+
 [features]
 ppp = ["ublox-cellular-rs/ppp"]
 internal-network-stack = ["ublox-cellular-rs/internal-network-stack"]
@@ -70,6 +73,10 @@ embassy-sync = { path = "../../../embassy/embassy-sync" }
 embassy-net = { path = "../../../embassy/embassy-net" }
 embassy-net-ppp = { path = "../../../embassy/embassy-net-ppp" }
 embassy-futures = { path = "../../../embassy/embassy-futures" }
+atat = { path = "../../../atat/atat" }
+
+[patch."https://github.com/drogue-iot/embedded-tls"]
+embedded-tls = { path = "../../../embedded-tls" }
 
 [profile.dev]
 opt-level = "s"

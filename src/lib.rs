@@ -10,6 +10,7 @@ pub(crate) mod fmt;
 pub mod command;
 pub mod config;
 pub mod error;
-mod module_timing;
+mod modules;
+mod registration;
 
 pub mod asynch;

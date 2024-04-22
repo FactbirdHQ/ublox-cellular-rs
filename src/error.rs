@@ -39,6 +39,12 @@ pub enum Error {
     SubscriberOverflow(embassy_sync::pubsub::Error),
 }
 
+impl From<embassy_time::TimeoutError> for Error {
+    fn from(_value: embassy_time::TimeoutError) -> Self {
+        Error::Generic(GenericError::Timeout)
+    }
+}
+
 #[cfg(feature = "defmt")]
 impl defmt::Format for Error {
     fn format(&self, f: defmt::Formatter<'_>) {

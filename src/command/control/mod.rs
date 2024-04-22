@@ -46,8 +46,11 @@ pub struct SetCircuit108Behaviour {
 /// - HW flow control also referred with RTS / CTS flow control
 /// - SW flow control also referred with XON / XOFF flow control
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+IFC=2,2", NoResponse, value_sep = false)]
-pub struct SetFlowControl;
+#[at_cmd("&K", NoResponse, value_sep = false)]
+pub struct SetFlowControl {
+    #[at_arg(position = 0)]
+    pub value: FlowControl,
+}
 
 /// 15.8 Set flow control \Q
 ///

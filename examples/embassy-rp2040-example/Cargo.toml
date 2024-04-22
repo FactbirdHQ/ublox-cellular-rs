@@ -39,7 +39,7 @@ embassy-at-cmux = { path = "../../../embassy/embassy-at-cmux", features = [
     "defmt",
 ] }
 
-embedded-tls = { path = "https://github.com/drogue-iot/embedded-tls", rev = "f788e02", default-features = false, features = [
+embedded-tls = { git = "https://github.com/drogue-iot/embedded-tls", rev = "f788e02", default-features = false, features = [
     "defmt",
 ] }
 
@@ -65,7 +65,7 @@ reqwless = { git = "https://github.com/drogue-iot/reqwless", features = [
     "defmt",
 ] }
 smoltcp = { version = "*", default-features = false, features = [
-    "dns-max-server-count-4",
+    "dns-max-server-count-4"
 ] }
 rand_chacha = { version = "0.3", default-features = false }
 
@@ -94,6 +94,7 @@ embassy-net = { path = "../../../embassy/embassy-net" }
 embassy-net-ppp = { path = "../../../embassy/embassy-net-ppp" }
 embassy-futures = { path = "../../../embassy/embassy-futures" }
 embassy-executor = { path = "../../../embassy/embassy-executor" }
+atat = { path = "../../../atat/atat" }
 
 
 [profile.dev]

@@ -91,9 +91,11 @@ pub trait CellularConfig<'a> {
     fn reset_pin(&mut self) -> Option<&mut Self::ResetPin> {
         None
     }
+
     fn power_pin(&mut self) -> Option<&mut Self::PowerPin> {
         None
     }
+
     fn vint_pin(&mut self) -> Option<&mut Self::VintPin> {
         None
     }

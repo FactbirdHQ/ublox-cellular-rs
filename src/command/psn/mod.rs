@@ -97,7 +97,6 @@ pub struct SetPDPContextDefinition<'a> {
 #[at_cmd("+CGDCONT?", NoResponse)]
 pub struct GetPDPContextDefinition;
 
-
 /// 18.7 Set Packet switched data configuration +UPSD
 ///
 /// Sets all the parameters in a specific packet switched data (PSD) profile.
@@ -464,6 +463,7 @@ pub struct GetEPSNetworkRegistrationStatus;
 /// - **TOBY-L4 / TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 /
 ///   SARA-G4 / SARA-G3** - The command returns an error result code if the
 ///   input <cid> is already active or not yet defined.
+
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+UAUTHREQ", NoResponse)]
 pub struct SetAuthParameters<'a> {
@@ -471,8 +471,43 @@ pub struct SetAuthParameters<'a> {
     pub cid: ContextId,
     #[at_arg(position = 1)]
     pub auth_type: AuthenticationType,
-    #[at_arg(position = 2, len = 64)]
+    // For SARA-R4 and LARA-R6 modules the username and parameters are reversed
+    #[cfg_attr(
+        any(
+            feature = "sara_r410m",
+            feature = "sara_r412m",
+            feature = "sara_r422",
+            feature = "lara_r6"
+        ),
+        at_arg(position = 3, len = 64)
+    )]
+    #[cfg_attr(
+        not(any(
+            feature = "sara_r410m",
+            feature = "sara_r412m",
+            feature = "sara_r422",
+            feature = "lara_r6"
+        )),
+        at_arg(position = 2, len = 64)
+    )]
     pub username: &'a str,
-    #[at_arg(position = 3, len = 64)]
+    #[cfg_attr(
+        any(
+            feature = "sara_r410m",
+            feature = "sara_r412m",
+            feature = "sara_r422",
+            feature = "lara_r6"
+        ),
+        at_arg(position = 3, len = 64)
+    )]
+    #[cfg_attr(
+        not(any(
+            feature = "sara_r410m",
+            feature = "sara_r412m",
+            feature = "sara_r422",
+            feature = "lara_r6"
+        )),
+        at_arg(position = 2, len = 64)
+    )]
     pub password: &'a str,
 }

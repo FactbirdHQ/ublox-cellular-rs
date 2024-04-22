@@ -69,8 +69,8 @@ use-upsd-context-activation = []
 # mqtt-will = []
 # mqtt-keep-alive = []
 # mqtt-security = []
-# ucged5 = []
-# context-mapping-required = []
+ucged5 = []
+context-mapping-required = []
 # security-tls-cipher-list = []
 # auto-bauding = []
 # at-profiles = []
@@ -88,11 +88,10 @@ use-upsd-context-activation = []
 # fota = []
 # uart-power-saving = []
 cmux = ["dep:embassy-at-cmux"]
-# cmux-channel-close = []
 # snr-reported = []
-# authentication-mode-automatic = []
+authentication-mode-automatic = []
 # lwm2m = []
-# ucged = []
+ucged = []
 # http = []
 ppp = ["cmux", "dep:embassy-net-ppp", "dep:embassy-net"]
 
@@ -117,20 +116,23 @@ defmt = [
 ]
 log = ["dep:log", "ublox-sockets?/log", "atat/log"]
 
-# Modules
-lara-r2 = []
-lara-r6 = []
-leon-g1 = []
-lisa-u2 = []
-mpci-l2 = []
-sara-g3 = []
-sara-g4 = []
-sara-r5 = ["use-upsd-context-activation"]
-sara-u1 = []
-sara-u2 = ["use-upsd-context-activation"]
-toby-l2 = []
+# The supported list of cellular modules.
+#
+# Note: if you add a new module type here, you also need to add it in
+# `modules.rs`
+lara-r6 = ["ucged"]
+lena-r8 = []
+sara-r410m = ["ucged", "ucged5"]
+sara-r412m = ["ucged", "ucged5"]
+sara-r422 = ["context-mapping-required", "ucged"]
+sara-r5 = ["context-mapping-required", "ucged", "authentication-mode-automatic"]
+sara-u201 = [
+    "use-upsd-context-activation",
+    "context-mapping-required",
+    "ucged",
+    "authentication-mode-automatic",
+]
 toby-r2 = []
-toby-l4 = []
 
 [workspace]
 members = []
@@ -150,3 +152,5 @@ embassy-net = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
 #embassy-time = { path = "../embassy/embassy-time" }
 #embassy-sync = { path = "../embassy/embassy-sync" }
 #embassy-futures = { path = "../embassy/embassy-futures" }
+
+atat = { path = "../atat/atat" }

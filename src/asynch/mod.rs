@@ -1,35 +1,44 @@
-pub mod control;
+// pub mod control;
+mod network;
 mod resources;
 pub mod runner;
 pub mod state;
+mod urc_handler;
 
+use embedded_io_async::{BufRead, Error as _, ErrorKind, Read, Write};
+pub use resources::Resources;
+pub use runner::Runner;
 #[cfg(feature = "internal-network-stack")]
-mod internal_stack;
-#[cfg(feature = "internal-network-stack")]
-pub use internal_stack::{new_internal, InternalRunner, Resources};
+pub use state::Device;
 
-#[cfg(feature = "ppp")]
-mod ppp;
-#[cfg(feature = "ppp")]
-pub use ppp::{new_ppp, PPPRunner, Resources};
+pub struct ReadWriteAdapter<R, W>(pub R, pub W);
 
-#[cfg(feature = "ppp")]
-pub type Control<'d, const INGRESS_BUF_SIZE: usize> = control::Control<
-    'd,
-    atat::asynch::Client<
-        'd,
-        embassy_at_cmux::ChannelTx<'d, { ppp::CMUX_CHANNEL_SIZE }>,
-        INGRESS_BUF_SIZE,
-    >,
->;
+impl<R, W> embedded_io_async::ErrorType for ReadWriteAdapter<R, W> {
+    type Error = ErrorKind;
+}
 
-use atat::asynch::AtatClient;
-use embassy_sync::{blocking_mutex::raw::NoopRawMutex, mutex::Mutex};
+impl<R: Read, W> Read for ReadWriteAdapter<R, W> {
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        self.0.read(buf).await.map_err(|e| e.kind())
+    }
+}
 
-pub struct AtHandle<'d, AT: AtatClient>(&'d Mutex<NoopRawMutex, AT>);
+impl<R: BufRead, W> BufRead for ReadWriteAdapter<R, W> {
+    async fn fill_buf(&mut self) -> Result<&[u8], Self::Error> {
+        self.0.fill_buf().await.map_err(|e| e.kind())
+    }
 
-impl<'d, AT: AtatClient> AtHandle<'d, AT> {
-    async fn send<Cmd: atat::AtatCmd>(&mut self, cmd: &Cmd) -> Result<Cmd::Response, atat::Error> {
-        self.0.lock().await.send_retry::<Cmd>(cmd).await
+    fn consume(&mut self, amt: usize) {
+        self.0.consume(amt)
+    }
+}
+
+impl<R, W: Write> Write for ReadWriteAdapter<R, W> {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        self.1.write(buf).await.map_err(|e| e.kind())
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        self.1.flush().await.map_err(|e| e.kind())
     }
 }

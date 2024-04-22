@@ -1,22 +1,24 @@
 #![cfg(feature = "ppp")]
 
-use embassy_net::tcp::TcpSocket;
+use embassy_net::dns::DnsSocket;
+use embassy_net::tcp::client::TcpClient;
+use embassy_net::tcp::client::TcpClientState;
 use embassy_net::Stack;
 use embassy_net::StackResources;
 
+use embassy_net_ppp::Device;
+use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_time::Duration;
+use embedded_mqtt::transport::embedded_tls::TlsNalTransport;
+use embedded_mqtt::transport::embedded_tls::TlsState;
+use embedded_mqtt::DomainBroker;
 use embedded_tls::Aes128GcmSha256;
+use embedded_tls::Certificate;
 use embedded_tls::TlsConfig;
-use embedded_tls::TlsConnection;
-use embedded_tls::TlsContext;
 use embedded_tls::UnsecureProvider;
 use log::*;
 use rand_chacha::rand_core::SeedableRng;
 use rand_chacha::ChaCha8Rng;
-use reqwless::headers::ContentType;
-use reqwless::request::Request;
-use reqwless::request::RequestBuilder as _;
-use reqwless::response::Response;
 use static_cell::StaticCell;
 use tokio_serial::SerialPort;
 use tokio_serial::SerialPortBuilderExt;
@@ -51,6 +53,8 @@ impl<'a> CellularConfig<'a> for MyCelullarConfig {
 }
 
 const TTY: &str = "/dev/ttyUSB0";
+const HOSTNAME: &str = "a2twqv2u8qs5xt-ats.iot.eu-west-1.amazonaws.com";
+const MQTT_MAX_SUBSCRIBERS: usize = 2;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -83,7 +87,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Init network stack
     static STACK: StaticCell<Stack<embassy_net_ppp::Device<'static>>> = StaticCell::new();
-    static STACK_RESOURCES: StaticCell<StackResources<2>> = StaticCell::new();
+    static STACK_RESOURCES: StaticCell<StackResources<4>> = StaticCell::new();
 
     let stack = &*STACK.init(Stack::new(
         net_device,
@@ -92,64 +96,46 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         seed,
     ));
 
-    let http_fut = async {
+    let mqtt_fut = async {
         stack.wait_config_up().await;
 
         info!("We have network!");
 
-        let mut rx_buffer = [0; 4096];
-        let mut tx_buffer = [0; 4096];
-        let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
-        socket.set_timeout(Some(Duration::from_secs(10)));
+        static DNS: StaticCell<DnsSocket<Device>> = StaticCell::new();
+        let broker = DomainBroker::<_, 64>::new(HOSTNAME, DNS.init(DnsSocket::new(stack))).unwrap();
 
-        let hostname = "ecdsa-test.germancoding.com";
+        static MQTT_STATE: StaticCell<
+            embedded_mqtt::State<NoopRawMutex, 4096, 4096, MQTT_MAX_SUBSCRIBERS>,
+        > = StaticCell::new();
 
-        let mut remote = stack
-            .dns_query(hostname, smoltcp::wire::DnsQueryType::A)
-            .await
-            .unwrap();
-        let remote_endpoint = (remote.pop().unwrap(), 443);
-        info!("connecting to {:?}...", remote_endpoint);
-        let r = socket.connect(remote_endpoint).await;
-        if let Err(e) = r {
-            warn!("connect error: {:?}", e);
-            return;
-        }
-        info!("TCP connected!");
+        let (mut mqtt_stack, mqtt_client) = embedded_mqtt::new(
+            MQTT_STATE.init(embedded_mqtt::State::new()),
+            embedded_mqtt::Config::new("csr_test", broker)
+                .keepalive_interval(Duration::from_secs(50)),
+        );
 
-        let mut read_record_buffer = [0; 16384];
-        let mut write_record_buffer = [0; 16384];
-        let config = TlsConfig::new().with_server_name(hostname);
-        let mut tls = TlsConnection::new(socket, &mut read_record_buffer, &mut write_record_buffer);
+        let mqtt_tcp_state = TcpClientState::<1, 4096, 4096>::new();
+        let mqtt_tcp_client = TcpClient::new(stack, &mqtt_tcp_state);
 
-        tls.open(TlsContext::new(
-            &config,
-            UnsecureProvider::new::<Aes128GcmSha256>(ChaCha8Rng::seed_from_u64(seed)),
-        ))
-        .await
-        .expect("error establishing TLS connection");
+        let provider = UnsecureProvider::new::<Aes128GcmSha256>(ChaCha8Rng::seed_from_u64(seed));
 
-        info!("TLS Established!");
+        let tls_config = TlsConfig::new()
+            .with_server_name(HOSTNAME)
+            // .with_ca(Certificate::X509(include_bytes!(
+            //     "/home/mathias/Downloads/AmazonRootCA3.cer"
+            // )))
+            .with_cert(Certificate::X509(include_bytes!(
+                "/home/mathias/Downloads/embedded-tls-test-certs/cert.der"
+            )))
+            .with_priv_key(include_bytes!(
+                "/home/mathias/Downloads/embedded-tls-test-certs/private.der"
+            ));
 
-        let request = Request::get("/")
-            .host(hostname)
-            .content_type(ContentType::TextPlain)
-            .build();
-        request.write(&mut tls).await.unwrap();
+        let tls_state = TlsState::<16640, 16640>::new();
+        let mut transport =
+            TlsNalTransport::new(&mqtt_tcp_client, &tls_state, &tls_config, provider);
 
-        let mut rx_buf = [0; 4096];
-        let response = Response::read(&mut tls, reqwless::request::Method::GET, &mut rx_buf)
-            .await
-            .unwrap();
-
-        let mut buf = vec![0; 16384];
-        let len = response
-            .body()
-            .reader()
-            .read_to_end(&mut buf)
-            .await
-            .unwrap();
-        info!("{:?}", core::str::from_utf8(&buf[..len]));
+        mqtt_stack.run(&mut transport).await;
     };
 
     embassy_futures::join::join3(
@@ -174,7 +160,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
             stack.set_config_v4(config);
         }),
-        http_fut,
+        mqtt_fut,
     )
     .await;
 
