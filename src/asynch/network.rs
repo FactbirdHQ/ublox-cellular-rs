@@ -6,7 +6,9 @@ use crate::command::control::types::FlowControl;
 use crate::command::control::SetEcho;
 
 use crate::command::dns::ResolveNameIp;
+use crate::command::general::responses::FirmwareVersion;
 use crate::command::general::GetCIMI;
+use crate::command::general::GetFirmwareVersion;
 use crate::command::general::IdentificationInformation;
 use crate::command::mobile_control::responses::ModuleFunctionality;
 use crate::command::mobile_control::types::PowerMode;
@@ -436,7 +438,10 @@ where
         .map_err(|_| Error::PoweredDown)?;
 
         let model_id = self.at_client.send(&GetModelId).await?;
-        self.ch.set_module(Module::from_model_id(model_id));
+        self.ch.set_module(Module::from_model_id(&model_id));
+        
+        let FirmwareVersion { version } = self.at_client.send(&GetFirmwareVersion).await?;
+        info!("Found module to be: {=[u8]:a}, {=[u8]:a}", model_id.model.as_slice(), version.as_slice());
 
         // Echo off
         self.at_client.send(&SetEcho { enabled: Echo::Off }).await?;
