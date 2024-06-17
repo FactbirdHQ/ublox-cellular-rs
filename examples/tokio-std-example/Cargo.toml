@@ -9,7 +9,7 @@ tokio-serial = "5.4.1"
 
 embassy-time = { version = "0.3", features = ["std", "generic-queue"] }
 embassy-futures = { version = "0.1", features = ["log"] }
-embassy-sync = { version = "0.5", features = ["log"] }
+embassy-sync = { version = "0.6", features = ["log"] }
 
 embassy-net = { version = "0.4", features = [
     "log",

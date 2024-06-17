@@ -142,7 +142,7 @@ where
         }
     }
 
-    pub async fn run(mut self, on_ipv4_up: impl FnMut(embassy_net_ppp::Ipv4Status) + Copy) -> ! {
+    pub async fn run<D: embassy_net::driver::Driver>(mut self, stack: &embassy_net::Stack<D>) -> ! {
         #[cfg(feature = "ppp")]
         let mut ppp_runner = self.ppp_runner.take().unwrap();
 
@@ -262,7 +262,28 @@ where
 
                     info!("RUNNING PPP");
                     let res = ppp_runner
-                        .run(&mut self.data_channel, C::PPP_CONFIG, on_ipv4_up)
+                        .run(&mut self.data_channel, C::PPP_CONFIG, |ipv4| {
+                            let Some(addr) = ipv4.address else {
+                                warn!("PPP did not provide an IP address.");
+                                return;
+                            };
+                            let mut dns_servers = heapless::Vec::new();
+                            for s in ipv4.dns_servers.iter().flatten() {
+                                let _ =
+                                    dns_servers.push(embassy_net::Ipv4Address::from_bytes(&s.0));
+                            }
+                            let config =
+                                embassy_net::ConfigV4::Static(embassy_net::StaticConfigV4 {
+                                    address: embassy_net::Ipv4Cidr::new(
+                                        embassy_net::Ipv4Address::from_bytes(&addr.0),
+                                        0,
+                                    ),
+                                    gateway: None,
+                                    dns_servers,
+                                });
+
+                            stack.set_config_v4(config);
+                        })
                         .await;
 
                     info!("ppp failed: {:?}", res);

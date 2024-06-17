@@ -10,8 +10,6 @@ use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::pubsub::PubSubChannel;
 use embassy_sync::waitqueue::WakerRegistration;
 
-const MAX_STATE_LISTENERS: usize = 5;
-
 /// The link state of a network device.
 #[derive(PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]

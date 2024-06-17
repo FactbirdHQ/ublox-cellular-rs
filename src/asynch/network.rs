@@ -317,7 +317,7 @@ where
     pub async fn factory_reset(&mut self) -> Result<(), Error> {
         self.at_client
             .send(&crate::command::system_features::SetFactoryConfiguration {
-                fs_op: crate::command::system_features::types::FSFactoryRestoreType::AllFiles,
+                fs_op: crate::command::system_features::types::FSFactoryRestoreType::NoRestore,
                 nvm_op:
                     crate::command::system_features::types::NVMFactoryRestoreType::NVMFlashSectors,
             })
@@ -439,9 +439,13 @@ where
 
         let model_id = self.at_client.send(&GetModelId).await?;
         self.ch.set_module(Module::from_model_id(&model_id));
-        
+
         let FirmwareVersion { version } = self.at_client.send(&GetFirmwareVersion).await?;
-        info!("Found module to be: {=[u8]:a}, {=[u8]:a}", model_id.model.as_slice(), version.as_slice());
+        info!(
+            "Found module to be: {=[u8]:a}, {=[u8]:a}",
+            model_id.model.as_slice(),
+            version.as_slice()
+        );
 
         // Echo off
         self.at_client.send(&SetEcho { enabled: Echo::Off }).await?;
