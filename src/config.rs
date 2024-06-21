@@ -1,7 +1,10 @@
 use core::convert::Infallible;
 use embedded_hal::digital::{ErrorType, InputPin, OutputPin, PinState};
 
-use crate::command::psn::types::{ContextId, ProfileId};
+use crate::command::{
+    networking::types::EmbeddedPortFilteringMode,
+    psn::types::{ContextId, ProfileId},
+};
 
 pub struct NoPin;
 
@@ -77,6 +80,9 @@ pub trait CellularConfig<'a> {
 
     #[cfg(feature = "internal-network-stack")]
     const HEX_MODE: bool = true;
+
+    const EMBEDDED_PORT_FILTERING: EmbeddedPortFilteringMode =
+        EmbeddedPortFilteringMode::Enable(6000, 6200);
 
     const OPERATOR_FORMAT: OperatorFormat = OperatorFormat::Long;
 

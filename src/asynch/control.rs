@@ -1,47 +1,36 @@
-use atat::asynch::AtatClient;
+use super::state::{self, LinkState, OperationState};
 
-use crate::error::Error;
-
-use super::state::{LinkState, OperationState};
-use super::{state, AtHandle};
-
-pub struct Control<'a, AT: AtatClient> {
+pub struct Control<'a> {
     state_ch: state::Runner<'a>,
-    at: AtHandle<'a, AT>,
 }
 
-impl<'a, AT: AtatClient> Control<'a, AT> {
-    pub(crate) fn new(state_ch: state::Runner<'a>, at: AtHandle<'a, AT>) -> Self {
-        Self { state_ch, at }
-    }
-
-    pub(crate) async fn init(&mut self) -> Result<(), Error> {
-        debug!("Initalizing ublox control");
-
-        Ok(())
+impl<'a> Control<'a> {
+    pub(crate) fn new(state_ch: state::Runner<'a>) -> Self {
+        Self { state_ch }
     }
 
     pub fn link_state(&mut self) -> LinkState {
-        self.state_ch.link_state()
+        self.state_ch.link_state(None)
     }
 
     pub fn operation_state(&mut self) -> OperationState {
-        self.state_ch.operation_state()
+        self.state_ch.operation_state(None)
     }
 
     pub fn desired_state(&mut self) -> OperationState {
-        self.state_ch.desired_state()
+        self.state_ch.desired_state(None)
     }
 
-    pub async fn set_desired_state(&mut self, ps: OperationState) {
-        self.state_ch.set_desired_state(ps).await;
+    pub fn set_desired_state(&mut self, ps: OperationState) {
+        self.state_ch.set_desired_state(ps);
     }
 
-    pub async fn wait_for_desired_state(
-        &mut self,
-        ps: OperationState,
-    ) -> Result<OperationState, Error> {
+    pub async fn wait_for_desired_state(&mut self, ps: OperationState) {
         self.state_ch.wait_for_desired_state(ps).await
+    }
+
+    pub async fn wait_for_operation_state(&mut self, ps: OperationState) {
+        self.state_ch.wait_for_operation_state(ps).await
     }
 
     // pub async fn get_signal_quality(

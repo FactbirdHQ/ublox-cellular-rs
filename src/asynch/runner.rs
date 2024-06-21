@@ -7,6 +7,7 @@ use crate::command::psn::EnterPPP;
 use crate::command::AT;
 use crate::{command::Urc, config::CellularConfig};
 
+use super::control::Control;
 use super::state;
 use super::urc_handler::UrcHandler;
 use super::Resources;
@@ -63,7 +64,11 @@ pub struct Runner<'a, R, W, C, const INGRESS_BUF_SIZE: usize, const URC_CAPACITY
     pub mux_runner: embassy_at_cmux::Runner<'a, CMUX_CHANNELS, CMUX_CHANNEL_SIZE>,
 
     #[cfg(feature = "cmux")]
-    network_channel: embassy_at_cmux::Channel<'a, CMUX_CHANNEL_SIZE>,
+    network_channel: (
+        embassy_at_cmux::ChannelRx<'a, CMUX_CHANNEL_SIZE>,
+        embassy_at_cmux::ChannelTx<'a, CMUX_CHANNEL_SIZE>,
+        embassy_at_cmux::ChannelLines<'a, CMUX_CHANNEL_SIZE>,
+    ),
 
     #[cfg(feature = "cmux")]
     data_channel: embassy_at_cmux::Channel<'a, CMUX_CHANNEL_SIZE>,
@@ -113,7 +118,7 @@ where
             mux_runner,
 
             #[cfg(feature = "cmux")]
-            network_channel: channel_iter.next().unwrap(),
+            network_channel: channel_iter.next().unwrap().split(),
 
             #[cfg(feature = "cmux")]
             data_channel: channel_iter.next().unwrap(),
@@ -142,13 +147,14 @@ where
         }
     }
 
-    pub async fn run<D: embassy_net::driver::Driver>(mut self, stack: &embassy_net::Stack<D>) -> ! {
-        #[cfg(feature = "ppp")]
-        let mut ppp_runner = self.ppp_runner.take().unwrap();
+    pub fn control(&self) -> Control<'a> {
+        Control::new(self.ch.clone())
+    }
 
-        #[cfg(feature = "cmux")]
-        let (mut at_rx, mut at_tx, _) = self.network_channel.split();
-
+    pub async fn run<D: embassy_net::driver::Driver>(
+        &mut self,
+        stack: &embassy_net::Stack<D>,
+    ) -> ! {
         let at_config = atat::Config::default();
         loop {
             // Run the cellular device from full power down to the
@@ -167,15 +173,20 @@ where
                 );
                 let mut cell_device = NetDevice::new(&self.ch, &mut self.config, at_client);
                 let mut urc_handler = UrcHandler::new(&self.ch, self.urc_channel);
-
                 // Clean up and start from completely powered off state. Ignore URCs in the process.
                 self.ingress.clear();
-                if cell_device
-                    .run_to_state(OperationState::PowerDown)
-                    .await
-                    .is_err()
-                {
-                    continue;
+
+                warn!("STARTING CELLULAR MODULE!");
+                if self.ch.desired_state(None) != OperationState::DataEstablished {
+                    self.ch.wait_for_desired_state_change().await;
+                } else {
+                    if cell_device
+                        .run_to_state(OperationState::PowerDown)
+                        .await
+                        .is_err()
+                    {
+                        continue;
+                    }
                 }
 
                 match embassy_futures::select::select3(
@@ -209,6 +220,13 @@ where
                 let mut last_start = None;
 
                 loop {
+                    if self.ch.desired_state(None) != OperationState::DataEstablished {
+                        break;
+                    }
+                    self.ch
+                        .wait_for_operation_state(OperationState::DataEstablished)
+                        .await;
+
                     if let Some(last_start) = last_start {
                         Timer::at(last_start + Duration::from_secs(10)).await;
                         // Do not attempt to start too fast.
@@ -261,7 +279,10 @@ where
                     // self.data_channel.set_hangup_detection(0x04, 0x00);
 
                     info!("RUNNING PPP");
-                    let res = ppp_runner
+                    let res = self
+                        .ppp_runner
+                        .as_mut()
+                        .unwrap()
                         .run(&mut self.data_channel, C::PPP_CONFIG, |ipv4| {
                             let Some(addr) = ipv4.address else {
                                 warn!("PPP did not provide an IP address.");
@@ -304,6 +325,10 @@ where
 
             #[cfg(feature = "cmux")]
             let mux_fut = async {
+                self.ch
+                    .wait_for_operation_state(OperationState::DataEstablished)
+                    .await;
+
                 // Must be large enough to hold 'AT+CMUX=0,0,5,512,10,3,40,10,2\r\n'
                 let mut buf = [0u8; 32];
                 let mut interface = super::ReadWriteAdapter(&mut self.iface.0, &mut self.iface.1);
@@ -354,8 +379,11 @@ where
                 #[cfg(not(feature = "cmux"))]
                 let (mut at_rx, mut at_tx) = self.iface;
 
+                #[cfg(feature = "cmux")]
+                let (at_rx, at_tx, _) = &mut self.network_channel;
+
                 let at_client =
-                    atat::asynch::Client::new(&mut at_tx, self.res_slot, self.cmd_buf, at_config);
+                    atat::asynch::Client::new(at_tx, self.res_slot, self.cmd_buf, at_config);
                 let mut cell_device = NetDevice::new(&self.ch, &mut self.config, at_client);
 
                 let mut urc_handler = UrcHandler::new(&self.ch, self.urc_channel);
@@ -363,7 +391,7 @@ where
                 // TODO: Should we set ATE0 and CMEE=1 here, again?
 
                 embassy_futures::join::join3(
-                    self.ingress.read_from(&mut at_rx),
+                    self.ingress.read_from(at_rx),
                     cell_device.run(),
                     urc_handler.run(),
                 )

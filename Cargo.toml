@@ -36,7 +36,8 @@ embedded-hal = "1.0.0"
 embedded-nal = "0.8"
 embedded-nal-async = { version = "0.7" }
 
-embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "5fa7b8f4a", optional = true }
+# embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "5fa7b8f4a", optional = true }
+embassy-at-cmux = { path = "../embassy/embassy-at-cmux", optional = true }
 embassy-net-ppp = { version = "0.1", optional = true }
 embassy-net = { version = "0.4", features = [
     "proto-ipv4",
@@ -119,6 +120,7 @@ log = ["dep:log", "ublox-sockets?/log", "atat/log"]
 #
 # Note: if you add a new module type here, you also need to add it in
 # `modules.rs`
+any-module = []
 lara-r6 = ["ucged"]
 lena-r8 = []
 sara-r410m = ["ucged", "ucged5"]

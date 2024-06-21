@@ -15,6 +15,7 @@ pub mod ip_transport_layer;
 pub mod ipc;
 pub mod mobile_control;
 pub mod network_service;
+pub mod networking;
 pub mod psn;
 pub mod sms;
 pub mod system_features;

@@ -19,6 +19,8 @@ use crate::command::network_service::GetNetworkRegistrationStatus;
 use crate::command::network_service::GetOperatorSelection;
 use crate::command::network_service::SetChannelAndNetworkEnvDesc;
 use crate::command::network_service::SetOperatorSelection;
+use crate::command::networking::types::EmbeddedPortFilteringMode;
+use crate::command::networking::SetEmbeddedPortFiltering;
 use crate::command::psn;
 use crate::command::psn::GetEPSNetworkRegistrationStatus;
 use crate::command::psn::GetGPRSAttached;
@@ -437,44 +439,25 @@ where
         .await
         .map_err(|_| Error::PoweredDown)?;
 
-        let model_id = self.at_client.send(&GetModelId).await?;
+        let model_id = self.at_client.send_retry(&GetModelId).await?;
         self.ch.set_module(Module::from_model_id(&model_id));
 
-        let FirmwareVersion { version } = self.at_client.send(&GetFirmwareVersion).await?;
+        let FirmwareVersion { version } = self.at_client.send_retry(&GetFirmwareVersion).await?;
         info!(
             "Found module to be: {=[u8]:a}, {=[u8]:a}",
             model_id.model.as_slice(),
             version.as_slice()
         );
 
-        // Echo off
-        self.at_client.send(&SetEcho { enabled: Echo::Off }).await?;
-
-        // Extended errors on
         self.at_client
-            .send(&SetReportMobileTerminationError {
-                n: TerminationErrorMode::Enabled,
+            .send_retry(&SetEmbeddedPortFiltering {
+                mode: C::EMBEDDED_PORT_FILTERING,
             })
             .await?;
 
-        #[cfg(feature = "internal-network-stack")]
-        if C::HEX_MODE {
-            self.at_client
-                .send(&crate::command::ip_transport_layer::SetHexMode {
-                    hex_mode_disable: crate::command::ip_transport_layer::types::HexMode::Enabled,
-                })
-                .await?;
-        } else {
-            self.at_client
-                .send(&crate::command::ip_transport_layer::SetHexMode {
-                    hex_mode_disable: crate::command::ip_transport_layer::types::HexMode::Disabled,
-                })
-                .await?;
-        }
-
         // FIXME: The following three GPIO settings should not be here!
         self.at_client
-            .send(&SetGpioConfiguration {
+            .send_retry(&SetGpioConfiguration {
                 gpio_id: 23,
                 gpio_mode: GpioMode::NetworkStatus,
             })
@@ -482,7 +465,7 @@ where
 
         // Select SIM
         self.at_client
-            .send(&SetGpioConfiguration {
+            .send_retry(&SetGpioConfiguration {
                 gpio_id: 25,
                 gpio_mode: GpioMode::Output(GpioOutValue::Low),
             })
@@ -490,33 +473,71 @@ where
 
         #[cfg(feature = "lara-r6")]
         self.at_client
-            .send(&SetGpioConfiguration {
+            .send_retry(&SetGpioConfiguration {
                 gpio_id: 42,
                 gpio_mode: GpioMode::Input(GpioInPull::NoPull),
             })
             .await?;
 
+        // self.soft_reset(true).await?;
+
+        // self.wait_alive(
+        //     self.ch
+        //         .module()
+        //         .map(|m| m.boot_wait())
+        //         .unwrap_or(Generic.boot_wait())
+        //         * 2,
+        // )
+        // .await?;
+
+        // Echo off
+        self.at_client
+            .send_retry(&SetEcho { enabled: Echo::Off })
+            .await?;
+
+        // Extended errors on
+        self.at_client
+            .send_retry(&SetReportMobileTerminationError {
+                n: TerminationErrorMode::Enabled,
+            })
+            .await?;
+
+        #[cfg(feature = "internal-network-stack")]
+        if C::HEX_MODE {
+            self.at_client
+                .send_retry(&crate::command::ip_transport_layer::SetHexMode {
+                    hex_mode_disable: crate::command::ip_transport_layer::types::HexMode::Enabled,
+                })
+                .await?;
+        } else {
+            self.at_client
+                .send_retry(&crate::command::ip_transport_layer::SetHexMode {
+                    hex_mode_disable: crate::command::ip_transport_layer::types::HexMode::Disabled,
+                })
+                .await?;
+        }
+
         // self.at_client
-        //     .send(&IdentificationInformation { n: 9 })
+        //     .send_retry(&IdentificationInformation { n: 9 })
         //     .await?;
 
         // DCD circuit (109) changes in accordance with the carrier
         self.at_client
-            .send(&SetCircuit109Behaviour {
+            .send_retry(&SetCircuit109Behaviour {
                 value: Circuit109Behaviour::AlwaysPresent,
             })
             .await?;
 
         // Ignore changes to DTR
         self.at_client
-            .send(&SetCircuit108Behaviour {
+            .send_retry(&SetCircuit108Behaviour {
                 value: Circuit108Behaviour::Ignore,
             })
             .await?;
 
         self.check_sim_status().await?;
 
-        let ccid = self.at_client.send(&GetCCID).await?;
+        let ccid = self.at_client.send_retry(&GetCCID).await?;
         info!("CCID: {}", ccid.ccid);
 
         #[cfg(all(
@@ -529,7 +550,7 @@ where
             )
         ))]
         self.at_client
-            .send(&SetChannelAndNetworkEnvDesc {
+            .send_retry(&SetChannelAndNetworkEnvDesc {
                 mode: if cfg!(feature = "ucged5") { 5 } else { 2 },
             })
             .await?;
@@ -537,13 +558,13 @@ where
         // Tell module whether we support flow control
         if C::FLOW_CONTROL {
             self.at_client
-                .send(&SetFlowControl {
+                .send_retry(&SetFlowControl {
                     value: FlowControl::RtsCts,
                 })
                 .await?;
         } else {
             self.at_client
-                .send(&SetFlowControl {
+                .send_retry(&SetFlowControl {
                     value: FlowControl::Disabled,
                 })
                 .await?;
@@ -551,7 +572,7 @@ where
 
         // Switch off UART power saving until it is integrated into this API
         self.at_client
-            .send(&SetPowerSavingControl {
+            .send_retry(&SetPowerSavingControl {
                 mode: PowerSavingMode::Disabled,
                 timeout: None,
             })
@@ -559,7 +580,7 @@ where
 
         if !self.ch.is_registered(None) {
             self.at_client
-                .send(&SetModuleFunctionality {
+                .send_retry(&SetModuleFunctionality {
                     fun: self
                         .ch
                         .module()

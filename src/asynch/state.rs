@@ -61,7 +61,7 @@ impl State {
                 link_state: LinkState::Down,
                 operation_state: OperationState::PowerDown,
                 module: None,
-                desired_state: OperationState::PowerDown,
+                desired_state: OperationState::DataEstablished,
                 registration_state: RegistrationState::new(),
                 state_waker: WakerRegistration::new(),
                 registration_waker: WakerRegistration::new(),
@@ -164,7 +164,7 @@ impl<'d> Runner<'d> {
         });
     }
 
-    pub fn operation_state(&mut self, cx: Option<&mut Context>) -> OperationState {
+    pub fn operation_state(&self, cx: Option<&mut Context>) -> OperationState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             if let Some(cx) = cx {
@@ -193,6 +193,10 @@ impl<'d> Runner<'d> {
     }
 
     pub async fn wait_for_desired_state(&mut self, ps: OperationState) {
+        if self.desired_state(None) == ps {
+            return;
+        }
+
         poll_fn(|cx| {
             if self.desired_state(Some(cx)) == ps {
                 return Poll::Ready(());
@@ -202,7 +206,21 @@ impl<'d> Runner<'d> {
         .await
     }
 
-    pub async fn wait_for_desired_state_change(&mut self) -> OperationState {
+    pub async fn wait_for_operation_state(&self, ps: OperationState) {
+        if self.operation_state(None) == ps {
+            return;
+        }
+
+        poll_fn(|cx| {
+            if self.operation_state(Some(cx)) == ps {
+                return Poll::Ready(());
+            }
+            Poll::Pending
+        })
+        .await
+    }
+
+    pub async fn wait_for_desired_state_change(&self) -> OperationState {
         let old_desired = self.shared.lock(|s| s.borrow().desired_state);
 
         poll_fn(|cx| {
@@ -215,7 +233,7 @@ impl<'d> Runner<'d> {
         .await
     }
 
-    pub async fn wait_registration_change(&mut self) -> bool {
+    pub async fn wait_registration_change(&self) -> bool {
         let old_state = self
             .shared
             .lock(|s| s.borrow().registration_state.is_registered());

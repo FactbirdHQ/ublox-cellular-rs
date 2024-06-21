@@ -474,38 +474,38 @@ pub struct SetAuthParameters<'a> {
     // For SARA-R4 and LARA-R6 modules the username and parameters are reversed
     #[cfg_attr(
         any(
-            feature = "sara_r410m",
-            feature = "sara_r412m",
-            feature = "sara_r422",
-            feature = "lara_r6"
+            feature = "sara-r410m",
+            feature = "sara-r412m",
+            feature = "sara-r422",
+            feature = "lara-r6"
         ),
         at_arg(position = 3, len = 64)
     )]
     #[cfg_attr(
         not(any(
-            feature = "sara_r410m",
-            feature = "sara_r412m",
-            feature = "sara_r422",
-            feature = "lara_r6"
+            feature = "sara-r410m",
+            feature = "sara-r412m",
+            feature = "sara-r422",
+            feature = "lara-r6"
         )),
         at_arg(position = 2, len = 64)
     )]
     pub username: &'a str,
     #[cfg_attr(
         any(
-            feature = "sara_r410m",
-            feature = "sara_r412m",
-            feature = "sara_r422",
-            feature = "lara_r6"
+            feature = "sara-r410m",
+            feature = "sara-r412m",
+            feature = "sara-r422",
+            feature = "lara-r6"
         ),
         at_arg(position = 3, len = 64)
     )]
     #[cfg_attr(
         not(any(
-            feature = "sara_r410m",
-            feature = "sara_r412m",
-            feature = "sara_r422",
-            feature = "lara_r6"
+            feature = "sara-r410m",
+            feature = "sara-r412m",
+            feature = "sara-r422",
+            feature = "lara-r6"
         )),
         at_arg(position = 2, len = 64)
     )]
