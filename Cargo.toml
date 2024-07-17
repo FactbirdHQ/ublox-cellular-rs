@@ -15,7 +15,7 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.22", features = ["derive", "bytes"] }
+atat = { version = "0.23", features = ["derive", "bytes"] }
 heapless = { version = "^0.8", features = ["serde"] }
 serde = { version = "^1", default-features = false, features = ["derive"] }
 #ublox-sockets = { version = "0.5", optional = true }
@@ -37,7 +37,7 @@ embedded-nal = "0.8"
 embedded-nal-async = { version = "0.7" }
 
 # embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "5fa7b8f4a", optional = true }
-embassy-at-cmux = { path = "../embassy/embassy-at-cmux", optional = true }
+embassy-at-cmux = { path = "../embassy/embassy-at-cmux" }
 embassy-net-ppp = { version = "0.1", optional = true }
 embassy-net = { version = "0.4", features = [
     "proto-ipv4",
@@ -87,13 +87,12 @@ context-mapping-required = []
 # sock-set-local-port = []
 # fota = []
 # uart-power-saving = []
-cmux = ["dep:embassy-at-cmux"]
 # snr-reported = []
 authentication-mode-automatic = []
 # lwm2m = []
 ucged = []
 # http = []
-ppp = ["cmux", "dep:embassy-net-ppp", "dep:embassy-net"]
+ppp = ["dep:embassy-net-ppp", "dep:embassy-net"]
 
 
 automatic-apn = []
@@ -108,11 +107,11 @@ defmt = [
     "heapless/defmt-03",
     "embassy-time/defmt",
     "embassy-sync/defmt",
+    "embassy-at-cmux/defmt",
     "embassy-futures/defmt",
     "ublox-sockets?/defmt",
     "embassy-net-ppp?/defmt",
     "embassy-net?/defmt",
-    "embassy-at-cmux?/defmt",
 ]
 log = ["dep:log", "ublox-sockets?/log", "atat/log"]
 
@@ -153,5 +152,5 @@ embassy-net = { git = "https://github.com/MathiasKoch/embassy", rev = "5fa7b8f4a
 #embassy-time = { path = "../embassy/embassy-time" }
 #embassy-sync = { path = "../embassy/embassy-sync" }
 #embassy-futures = { path = "../embassy/embassy-futures" }
-
-atat = { path = "../atat/atat" }
+atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "a466836" }
+# atat = { path = "../atat/atat" }

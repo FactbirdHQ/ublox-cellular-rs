@@ -1,6 +1,5 @@
 //! Responses for Networking Commands
 use atat::atat_derive::AtatResp;
-use heapless::String;
 
 /// 34.4 Configure port filtering for embedded applications +UEMBPF
 #[derive(Debug, Clone, AtatResp)]

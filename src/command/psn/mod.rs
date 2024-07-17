@@ -288,7 +288,6 @@ pub struct GetPDPContextState;
     "D*99***",
     NoResponse,
     value_sep = false,
-    timeout_ms = 180000,
     abortable = true,
     termination = "#\r\n"
 )]

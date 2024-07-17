@@ -1,5 +1,4 @@
 use super::ModuleParams;
-use crate::command::mobile_control::types::Functionality;
 use embassy_time::Duration;
 
 #[derive(Debug, Clone, Copy)]

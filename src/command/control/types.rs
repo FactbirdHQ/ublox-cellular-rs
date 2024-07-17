@@ -21,6 +21,14 @@ pub enum Echo {
     On = 1,
 }
 
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
+pub enum ResultCodeSelection {
+    /// 0: CONNECT result code is given upon entering online data state;
+    ConnectOnly = 0,
+    /// 1-4: CONNECT <speed> result code is given upon entering online data state;
+    ConnectSpeed = 1,
+}
+
 /// Indicates the behavior of circuit 108
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum Circuit108Behaviour {
@@ -74,7 +82,7 @@ pub enum BaudRate {
         feature = "sara-g3",
         feature = "sara-g4"
     ))]
-    B0 = 0,
+    Auto = 0,
     #[cfg(any(feature = "lisa-u1", feature = "lisa-u2", feature = "sara-u2",))]
     B1200 = 1200,
     #[cfg(any(

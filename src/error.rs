@@ -13,6 +13,7 @@ pub enum GenericError {
 pub enum Error {
     // General device errors
     BaudDetection,
+    SimCard,
     Busy,
     Uninitialized,
     StateTimeout,

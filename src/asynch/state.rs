@@ -4,10 +4,8 @@ use core::cell::RefCell;
 use core::future::poll_fn;
 use core::task::{Context, Poll};
 
-use atat::UrcSubscription;
 use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_sync::blocking_mutex::Mutex;
-use embassy_sync::pubsub::PubSubChannel;
 use embassy_sync::waitqueue::WakerRegistration;
 
 /// The link state of a network device.
@@ -21,37 +19,26 @@ pub enum LinkState {
 }
 
 /// If the celular modem is up and responding to AT.
-#[derive(Debug, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy, PartialOrd, Ord)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum OperationState {
     PowerDown = 0,
-    PowerUp,
-    Initialized,
-    Connected,
-    DataEstablished,
+    Initialized = 1,
+    Connected = 2,
+    DataEstablished = 3,
 }
 
-impl TryFrom<isize> for OperationState {
-    fn try_from(state: isize) -> Result<Self, ()> {
-        match state {
-            0 => Ok(OperationState::PowerDown),
-            1 => Ok(OperationState::PowerUp),
-            2 => Ok(OperationState::Initialized),
-            3 => Ok(OperationState::Connected),
-            4 => Ok(OperationState::DataEstablished),
-            _ => Err(()),
-        }
-    }
-    type Error = ();
-}
-
-use crate::command::Urc;
-use crate::error::Error;
 use crate::modules::Module;
 use crate::registration::{ProfileState, RegistrationState};
 
 pub struct State {
     shared: Mutex<NoopRawMutex, RefCell<Shared>>,
+}
+
+impl Default for State {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl State {
@@ -61,7 +48,7 @@ impl State {
                 link_state: LinkState::Down,
                 operation_state: OperationState::PowerDown,
                 module: None,
-                desired_state: OperationState::DataEstablished,
+                desired_state: OperationState::Initialized,
                 registration_state: RegistrationState::new(),
                 state_waker: WakerRegistration::new(),
                 registration_waker: WakerRegistration::new(),
@@ -93,11 +80,11 @@ impl<'d> Runner<'d> {
         }
     }
 
-    pub fn module(&self) -> Option<Module> {
+    pub(crate) fn module(&self) -> Option<Module> {
         self.shared.lock(|s| s.borrow().module)
     }
 
-    pub fn set_module(&self, module: Module) {
+    pub(crate) fn set_module(&self, module: Module) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.module.replace(module);
@@ -126,6 +113,7 @@ impl<'d> Runner<'d> {
         })
     }
 
+    #[cfg(not(feature = "use-upsd-context-activation"))]
     pub fn set_profile_state(&self, state: ProfileState) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
@@ -133,6 +121,7 @@ impl<'d> Runner<'d> {
         })
     }
 
+    #[cfg(not(feature = "use-upsd-context-activation"))]
     pub fn get_profile_state(&self) -> ProfileState {
         self.shared
             .lock(|s| s.borrow().registration_state.profile_state)
@@ -146,7 +135,7 @@ impl<'d> Runner<'d> {
         });
     }
 
-    pub fn link_state(&mut self, cx: Option<&mut Context>) -> LinkState {
+    pub fn link_state(&self, cx: Option<&mut Context>) -> LinkState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             if let Some(cx) = cx {
@@ -174,7 +163,7 @@ impl<'d> Runner<'d> {
         })
     }
 
-    pub fn set_desired_state(&mut self, ps: OperationState) {
+    pub fn set_desired_state(&self, ps: OperationState) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.desired_state = ps;
@@ -192,7 +181,7 @@ impl<'d> Runner<'d> {
         })
     }
 
-    pub async fn wait_for_desired_state(&mut self, ps: OperationState) {
+    pub async fn wait_for_desired_state(&self, ps: OperationState) {
         if self.desired_state(None) == ps {
             return;
         }
@@ -221,7 +210,7 @@ impl<'d> Runner<'d> {
     }
 
     pub async fn wait_for_desired_state_change(&self) -> OperationState {
-        let old_desired = self.shared.lock(|s| s.borrow().desired_state);
+        let old_desired = self.desired_state(None);
 
         poll_fn(|cx| {
             let current_desired = self.desired_state(Some(cx));
@@ -234,9 +223,7 @@ impl<'d> Runner<'d> {
     }
 
     pub async fn wait_registration_change(&self) -> bool {
-        let old_state = self
-            .shared
-            .lock(|s| s.borrow().registration_state.is_registered());
+        let old_state = self.is_registered(None);
 
         poll_fn(|cx| {
             let current_state = self.is_registered(Some(cx));
@@ -258,7 +245,7 @@ pub struct Device<'d, const URC_CAPACITY: usize> {
 
 #[cfg(feature = "internal-network-stack")]
 impl<'d, const URC_CAPACITY: usize> Device<'d, URC_CAPACITY> {
-    pub fn link_state(&mut self, cx: &mut Context) -> LinkState {
+    pub fn link_state(&self, cx: &mut Context) -> LinkState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.state_waker.register(cx.waker());
@@ -266,7 +253,7 @@ impl<'d, const URC_CAPACITY: usize> Device<'d, URC_CAPACITY> {
         })
     }
 
-    pub fn operation_state(&mut self, cx: &mut Context) -> OperationState {
+    pub fn operation_state(&self, cx: &mut Context) -> OperationState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.state_waker.register(cx.waker());
@@ -274,14 +261,14 @@ impl<'d, const URC_CAPACITY: usize> Device<'d, URC_CAPACITY> {
         })
     }
 
-    pub fn link_state(&mut self) -> LinkState {
+    pub fn link_state(&self) -> LinkState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.link_state
         })
     }
 
-    pub fn operation_state(&mut self) -> OperationState {
+    pub fn operation_state(&self) -> OperationState {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.operation_state
@@ -296,7 +283,7 @@ impl<'d, const URC_CAPACITY: usize> Device<'d, URC_CAPACITY> {
         })
     }
 
-    pub fn set_desired_state(&mut self, ps: OperationState) {
+    pub fn set_desired_state(&self, ps: OperationState) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.desired_state = ps;
@@ -304,7 +291,7 @@ impl<'d, const URC_CAPACITY: usize> Device<'d, URC_CAPACITY> {
         });
     }
 
-    pub async fn wait_for_desired_state(&mut self, ps: OperationState) {
+    pub async fn wait_for_desired_state(&self, ps: OperationState) {
         poll_fn(|cx| {
             if self.desired_state(cx) == ps {
                 return Poll::Ready(());
@@ -314,7 +301,7 @@ impl<'d, const URC_CAPACITY: usize> Device<'d, URC_CAPACITY> {
         .await
     }
 
-    pub async fn wait_for_desired_state_change(&mut self) -> OperationState {
+    pub async fn wait_for_desired_state_change(&self) -> OperationState {
         let current_desired = self.shared.lock(|s| s.borrow().desired_state);
 
         poll_fn(|cx| {

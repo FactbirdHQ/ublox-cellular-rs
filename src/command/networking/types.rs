@@ -30,7 +30,7 @@ impl Serialize for EmbeddedPortFilteringMode {
                     atat::serde_at::serde::ser::Serializer::serialize_tuple_variant(
                         serializer,
                         "EmbeddedPortFilteringMode",
-                        1 as u32,
+                        1_u32,
                         "Enable",
                         0,
                     )?;

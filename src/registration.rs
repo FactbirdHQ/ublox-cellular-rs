@@ -1,5 +1,3 @@
-use core::default;
-
 use crate::command::{
     network_service::{
         responses::NetworkRegistrationStatus,
@@ -208,6 +206,12 @@ pub struct RegistrationState {
 
     #[cfg(not(feature = "use-upsd-context-activation"))]
     pub(crate) profile_state: ProfileState,
+}
+
+impl Default for RegistrationState {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RegistrationState {

@@ -1,78 +1,48 @@
-use core::future::poll_fn;
-use core::task::Poll;
+use core::{cmp::Ordering, future::poll_fn, marker::PhantomData, task::Poll};
 
-use crate::command::control::types::Echo;
-use crate::command::control::types::FlowControl;
-use crate::command::control::SetEcho;
-
-use crate::command::dns::ResolveNameIp;
-use crate::command::general::responses::FirmwareVersion;
-use crate::command::general::GetCIMI;
-use crate::command::general::GetFirmwareVersion;
-use crate::command::general::IdentificationInformation;
-use crate::command::mobile_control::responses::ModuleFunctionality;
-use crate::command::mobile_control::types::PowerMode;
-use crate::command::mobile_control::GetModuleFunctionality;
-use crate::command::network_service::responses::OperatorSelection;
-use crate::command::network_service::types::OperatorSelectionMode;
-use crate::command::network_service::GetNetworkRegistrationStatus;
-use crate::command::network_service::GetOperatorSelection;
-use crate::command::network_service::SetChannelAndNetworkEnvDesc;
-use crate::command::network_service::SetOperatorSelection;
-use crate::command::networking::types::EmbeddedPortFilteringMode;
-use crate::command::networking::SetEmbeddedPortFiltering;
-use crate::command::psn;
-use crate::command::psn::GetEPSNetworkRegistrationStatus;
-use crate::command::psn::GetGPRSAttached;
-use crate::command::psn::GetGPRSNetworkRegistrationStatus;
-use crate::command::psn::GetPDPContextDefinition;
-use crate::command::psn::GetPDPContextState;
-use crate::command::psn::SetPDPContextState;
-
-use crate::error::GenericError;
-use crate::modules::Generic;
-use crate::modules::Module;
-use crate::modules::ModuleParams;
-use crate::{command::Urc, config::CellularConfig};
+use crate::{
+    asynch::state::OperationState,
+    command::{
+        general::GetCIMI,
+        mobile_control::{
+            responses::ModuleFunctionality,
+            types::{Functionality, PowerMode},
+            GetModuleFunctionality, SetModuleFunctionality,
+        },
+        network_service::{
+            responses::OperatorSelection,
+            types::{NetworkRegistrationUrcConfig, OperatorSelectionMode},
+            GetNetworkRegistrationStatus, GetOperatorSelection, SetNetworkRegistrationStatus,
+            SetOperatorSelection,
+        },
+        psn::{
+            responses::GPRSAttached,
+            types::{
+                ContextId, EPSNetworkRegistrationUrcConfig, GPRSAttachedState,
+                GPRSNetworkRegistrationUrcConfig, PDPContextStatus, ProfileId,
+            },
+            GetEPSNetworkRegistrationStatus, GetGPRSAttached, GetGPRSNetworkRegistrationStatus,
+            GetPDPContextState, SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
+            SetPDPContextState,
+        },
+    },
+    config::CellularConfig,
+    error::Error,
+    modules::ModuleParams,
+    registration::ProfileState,
+};
 
 use super::state;
-use crate::asynch::state::OperationState;
-use crate::command::control::types::{Circuit108Behaviour, Circuit109Behaviour};
-use crate::command::control::{SetCircuit108Behaviour, SetCircuit109Behaviour, SetFlowControl};
-use crate::command::device_lock::responses::PinStatus;
-use crate::command::device_lock::types::PinStatusCode;
-use crate::command::device_lock::GetPinStatus;
-use crate::command::general::{GetCCID, GetModelId};
-use crate::command::gpio::types::{GpioInPull, GpioMode, GpioOutValue};
-use crate::command::gpio::SetGpioConfiguration;
-use crate::command::mobile_control::types::{Functionality, TerminationErrorMode};
-use crate::command::mobile_control::{SetModuleFunctionality, SetReportMobileTerminationError};
-use crate::command::psn::responses::GPRSAttached;
-use crate::command::psn::types::GPRSAttachedState;
-use crate::command::psn::types::PDPContextStatus;
-use crate::command::system_features::types::PowerSavingMode;
-use crate::command::system_features::SetPowerSavingControl;
-use crate::command::AT;
-use crate::error::Error;
 
-use atat::UrcChannel;
-use atat::{asynch::AtatClient, UrcSubscription};
-use embassy_futures::select::select;
+use atat::asynch::AtatClient;
+use embassy_futures::select::{select, Either};
 
-use embassy_futures::select::Either3;
-use embassy_time::{with_timeout, Duration, Timer};
-use embedded_hal::digital::{InputPin, OutputPin};
-use futures_util::FutureExt;
-
-use crate::command::psn::types::{ContextId, ProfileId};
-use embassy_futures::select::Either;
-
-const GENERIC_PWR_ON_TIMES: [u16; 2] = [300, 2000];
+use embassy_time::{Duration, Timer};
 
 pub struct NetDevice<'a, 'b, C, A> {
     ch: &'b state::Runner<'a>,
-    config: &'b mut C,
     at_client: A,
+    _config: PhantomData<C>,
 }
 
 impl<'a, 'b, C, A> NetDevice<'a, 'b, C, A>
@@ -80,109 +50,11 @@ where
     C: CellularConfig<'a>,
     A: AtatClient,
 {
-    pub fn new(ch: &'b state::Runner<'a>, config: &'b mut C, at_client: A) -> Self {
+    pub fn new(ch: &'b state::Runner<'a>, at_client: A) -> Self {
         Self {
             ch,
-            config,
             at_client,
-        }
-    }
-
-    pub async fn is_alive(&mut self) -> Result<bool, Error> {
-        if !self.has_power().await? {
-            return Err(Error::PoweredDown);
-        }
-
-        match self.at_client.send(&AT).await {
-            Ok(_) => Ok(true),
-            Err(err) => Err(Error::Atat(err)),
-        }
-    }
-
-    pub async fn has_power(&mut self) -> Result<bool, Error> {
-        if let Some(pin) = self.config.vint_pin() {
-            if pin.is_high().map_err(|_| Error::IoPin)? {
-                Ok(true)
-            } else {
-                Ok(false)
-            }
-        } else {
-            info!("No VInt pin configured");
-            Ok(true)
-        }
-    }
-
-    pub async fn power_up(&mut self) -> Result<(), Error> {
-        if !self.has_power().await? {
-            for generic_time in GENERIC_PWR_ON_TIMES {
-                let pull_time = self
-                    .ch
-                    .module()
-                    .map(|m| m.power_on_pull_time())
-                    .unwrap_or(Generic.power_on_pull_time())
-                    .unwrap_or(Duration::from_millis(generic_time as _));
-                if let Some(pin) = self.config.power_pin() {
-                    pin.set_low().map_err(|_| Error::IoPin)?;
-                    Timer::after(pull_time).await;
-                    pin.set_high().map_err(|_| Error::IoPin)?;
-
-                    Timer::after(
-                        self.ch
-                            .module()
-                            .map(|m| m.boot_wait())
-                            .unwrap_or(Generic.boot_wait()),
-                    )
-                    .await;
-
-                    if !self.has_power().await? {
-                        if self.ch.module().is_some() {
-                            return Err(Error::PoweredDown);
-                        }
-                        continue;
-                    }
-
-                    self.ch.set_operation_state(OperationState::PowerUp);
-                    debug!("Powered up");
-                    return Ok(());
-                } else {
-                    warn!("No power pin configured");
-                    return Ok(());
-                }
-            }
-            Err(Error::PoweredDown)
-        } else {
-            Ok(())
-        }
-    }
-
-    pub async fn wait_for_desired_state(&mut self, ps: OperationState) {
-        self.ch.clone().wait_for_desired_state(ps).await
-    }
-
-    pub async fn power_down(&mut self) -> Result<(), Error> {
-        if self.has_power().await? {
-            if let Some(pin) = self.config.power_pin() {
-                pin.set_low().map_err(|_| Error::IoPin)?;
-                Timer::after(
-                    self.ch
-                        .module()
-                        .map(|m| m.power_off_pull_time())
-                        .unwrap_or(Generic.power_off_pull_time()),
-                )
-                .await;
-                pin.set_high().map_err(|_| Error::IoPin)?;
-                self.ch.set_operation_state(OperationState::PowerDown);
-                debug!("Powered down");
-
-                Timer::after(Duration::from_secs(1)).await;
-
-                Ok(())
-            } else {
-                warn!("No power pin configured");
-                Ok(())
-            }
-        } else {
-            Ok(())
+            _config: PhantomData,
         }
     }
 
@@ -192,7 +64,7 @@ where
     ///
     /// Returns an error if any of the internal network operations fail.
     ///
-    pub async fn register_network(&mut self, mcc_mnc: Option<()>) -> Result<(), Error> {
+    async fn register_network(&mut self, mcc_mnc: Option<()>) -> Result<(), Error> {
         self.prepare_connect().await?;
 
         if mcc_mnc.is_none() {
@@ -226,7 +98,7 @@ where
             })
             .await?;
 
-        if let Some(_) = mcc_mnc {
+        if mcc_mnc.is_some() {
             // TODO: If MCC & MNC is set, register with manual operator selection.
             // This is currently not supported!
 
@@ -254,24 +126,25 @@ where
         Ok(())
     }
 
-    pub(crate) async fn prepare_connect(&mut self) -> Result<(), Error> {
+    async fn prepare_connect(&mut self) -> Result<(), Error> {
         // CREG URC
-        self.at_client.send(
-            &crate::command::network_service::SetNetworkRegistrationStatus {
-                n: crate::command::network_service::types::NetworkRegistrationUrcConfig::UrcEnabled,
-            }).await?;
+        self.at_client
+            .send(&SetNetworkRegistrationStatus {
+                n: NetworkRegistrationUrcConfig::UrcEnabled,
+            })
+            .await?;
 
         // CGREG URC
         self.at_client
-            .send(&crate::command::psn::SetGPRSNetworkRegistrationStatus {
-                n: crate::command::psn::types::GPRSNetworkRegistrationUrcConfig::UrcEnabled,
+            .send(&SetGPRSNetworkRegistrationStatus {
+                n: GPRSNetworkRegistrationUrcConfig::UrcEnabled,
             })
             .await?;
 
         // CEREG URC
         self.at_client
-            .send(&crate::command::psn::SetEPSNetworkRegistrationStatus {
-                n: crate::command::psn::types::EPSNetworkRegistrationUrcConfig::UrcEnabled,
+            .send(&SetEPSNetworkRegistrationStatus {
+                n: EPSNetworkRegistrationUrcConfig::UrcEnabled,
             })
             .await?;
 
@@ -280,62 +153,33 @@ where
                 break;
             }
 
-            Timer::after(Duration::from_secs(1)).await;
+            Timer::after_secs(1).await;
         }
 
         Ok(())
     }
 
-    /// Reset the module by driving it's `RESET_N` pin low for 50 ms
-    ///
-    /// **NOTE** This function will reset NVM settings!
-    pub async fn reset(&mut self) -> Result<(), Error> {
-        warn!("Hard resetting Ublox Cellular Module");
-        if let Some(pin) = self.config.reset_pin() {
-            pin.set_low().ok();
-            Timer::after(
-                self.ch
-                    .module()
-                    .map(|m| m.reset_hold())
-                    .unwrap_or(Generic.reset_hold()),
-            )
-            .await;
-            pin.set_high().ok();
-            Timer::after(
-                self.ch
-                    .module()
-                    .map(|m| m.boot_wait())
-                    .unwrap_or(Generic.boot_wait()),
-            )
-            .await;
-            // self.is_alive().await?;
-        } else {
-            warn!("No reset pin configured");
-        }
-        Ok(())
-    }
+    // Perform at full factory reset of the module, clearing all NVM sectors in the process
+    // TODO: Should this be moved to control?
+    // async fn factory_reset(&mut self) -> Result<(), Error> {
+    //     self.at_client
+    //         .send(&SetFactoryConfiguration {
+    //             fs_op: FSFactoryRestoreType::NoRestore,
+    //             nvm_op: NVMFactoryRestoreType::NVMFlashSectors,
+    //         })
+    //         .await?;
 
-    /// Perform at full factory reset of the module, clearing all NVM sectors in the process
-    pub async fn factory_reset(&mut self) -> Result<(), Error> {
-        self.at_client
-            .send(&crate::command::system_features::SetFactoryConfiguration {
-                fs_op: crate::command::system_features::types::FSFactoryRestoreType::NoRestore,
-                nvm_op:
-                    crate::command::system_features::types::NVMFactoryRestoreType::NVMFlashSectors,
-            })
-            .await?;
+    //     info!("Successfully factory reset modem!");
 
-        info!("Successfully factory reset modem!");
+    //     if self.soft_reset(true).await.is_err() {
+    //         self.pwr.reset().await?;
+    //     }
 
-        if self.soft_reset(true).await.is_err() {
-            self.reset().await?;
-        }
+    //     Ok(())
+    // }
 
-        Ok(())
-    }
-
-    /// Reset the module by sending AT CFUN command
-    pub async fn soft_reset(&mut self, sim_reset: bool) -> Result<(), Error> {
+    // /// Reset the module by sending AT CFUN command
+    async fn soft_reset(&mut self, sim_reset: bool) -> Result<(), Error> {
         trace!(
             "Attempting to soft reset of the modem with sim reset: {}.",
             sim_reset
@@ -363,19 +207,6 @@ where
         }
     }
 
-    /// Wait until module is alive (uses `Vint` & `AT` command)
-    async fn wait_alive(&mut self, timeout: Duration) -> Result<bool, Error> {
-        let fut = async {
-            loop {
-                if let Ok(alive) = self.is_alive().await {
-                    return alive;
-                }
-                Timer::after(Duration::from_millis(100)).await;
-            }
-        };
-        Ok(embassy_time::with_timeout(timeout, fut).await?)
-    }
-
     /// Check if we are registered to a network technology (uses +CxREG family
     /// commands)
     async fn wait_network_registered(&mut self, timeout: Duration) -> Result<(), Error> {
@@ -384,7 +215,7 @@ where
             loop {
                 self.update_registration().await;
 
-                Timer::after(Duration::from_millis(300)).await;
+                Timer::after_millis(300).await;
             }
         };
 
@@ -419,185 +250,9 @@ where
         }
     }
 
-    async fn init_at(&mut self) -> Result<(), Error> {
-        // Allow auto bauding to kick in
-        embassy_time::with_timeout(
-            self.ch
-                .module()
-                .map(|m| m.boot_wait())
-                .unwrap_or(Generic.boot_wait())
-                * 2,
-            async {
-                loop {
-                    if let Ok(alive) = self.at_client.send(&AT).await {
-                        break alive;
-                    }
-                    Timer::after(Duration::from_millis(100)).await;
-                }
-            },
-        )
-        .await
-        .map_err(|_| Error::PoweredDown)?;
-
-        let model_id = self.at_client.send_retry(&GetModelId).await?;
-        self.ch.set_module(Module::from_model_id(&model_id));
-
-        let FirmwareVersion { version } = self.at_client.send_retry(&GetFirmwareVersion).await?;
-        info!(
-            "Found module to be: {=[u8]:a}, {=[u8]:a}",
-            model_id.model.as_slice(),
-            version.as_slice()
-        );
-
-        self.at_client
-            .send_retry(&SetEmbeddedPortFiltering {
-                mode: C::EMBEDDED_PORT_FILTERING,
-            })
-            .await?;
-
-        // FIXME: The following three GPIO settings should not be here!
-        self.at_client
-            .send_retry(&SetGpioConfiguration {
-                gpio_id: 23,
-                gpio_mode: GpioMode::NetworkStatus,
-            })
-            .await;
-
-        // Select SIM
-        self.at_client
-            .send_retry(&SetGpioConfiguration {
-                gpio_id: 25,
-                gpio_mode: GpioMode::Output(GpioOutValue::Low),
-            })
-            .await?;
-
-        #[cfg(feature = "lara-r6")]
-        self.at_client
-            .send_retry(&SetGpioConfiguration {
-                gpio_id: 42,
-                gpio_mode: GpioMode::Input(GpioInPull::NoPull),
-            })
-            .await?;
-
-        // self.soft_reset(true).await?;
-
-        // self.wait_alive(
-        //     self.ch
-        //         .module()
-        //         .map(|m| m.boot_wait())
-        //         .unwrap_or(Generic.boot_wait())
-        //         * 2,
-        // )
-        // .await?;
-
-        // Echo off
-        self.at_client
-            .send_retry(&SetEcho { enabled: Echo::Off })
-            .await?;
-
-        // Extended errors on
-        self.at_client
-            .send_retry(&SetReportMobileTerminationError {
-                n: TerminationErrorMode::Enabled,
-            })
-            .await?;
-
-        #[cfg(feature = "internal-network-stack")]
-        if C::HEX_MODE {
-            self.at_client
-                .send_retry(&crate::command::ip_transport_layer::SetHexMode {
-                    hex_mode_disable: crate::command::ip_transport_layer::types::HexMode::Enabled,
-                })
-                .await?;
-        } else {
-            self.at_client
-                .send_retry(&crate::command::ip_transport_layer::SetHexMode {
-                    hex_mode_disable: crate::command::ip_transport_layer::types::HexMode::Disabled,
-                })
-                .await?;
-        }
-
-        // self.at_client
-        //     .send_retry(&IdentificationInformation { n: 9 })
-        //     .await?;
-
-        // DCD circuit (109) changes in accordance with the carrier
-        self.at_client
-            .send_retry(&SetCircuit109Behaviour {
-                value: Circuit109Behaviour::AlwaysPresent,
-            })
-            .await?;
-
-        // Ignore changes to DTR
-        self.at_client
-            .send_retry(&SetCircuit108Behaviour {
-                value: Circuit108Behaviour::Ignore,
-            })
-            .await?;
-
-        self.check_sim_status().await?;
-
-        let ccid = self.at_client.send_retry(&GetCCID).await?;
-        info!("CCID: {}", ccid.ccid);
-
-        #[cfg(all(
-            feature = "ucged",
-            any(
-                feature = "sara-r410m",
-                feature = "sara-r412m",
-                feature = "sara-r422",
-                feature = "lara-r6"
-            )
-        ))]
-        self.at_client
-            .send_retry(&SetChannelAndNetworkEnvDesc {
-                mode: if cfg!(feature = "ucged5") { 5 } else { 2 },
-            })
-            .await?;
-
-        // Tell module whether we support flow control
-        if C::FLOW_CONTROL {
-            self.at_client
-                .send_retry(&SetFlowControl {
-                    value: FlowControl::RtsCts,
-                })
-                .await?;
-        } else {
-            self.at_client
-                .send_retry(&SetFlowControl {
-                    value: FlowControl::Disabled,
-                })
-                .await?;
-        }
-
-        // Switch off UART power saving until it is integrated into this API
-        self.at_client
-            .send_retry(&SetPowerSavingControl {
-                mode: PowerSavingMode::Disabled,
-                timeout: None,
-            })
-            .await?;
-
-        if !self.ch.is_registered(None) {
-            self.at_client
-                .send_retry(&SetModuleFunctionality {
-                    fun: self
-                        .ch
-                        .module()
-                        .ok_or(Error::Uninitialized)?
-                        .radio_off_cfun(),
-                    rst: None,
-                })
-                .await?;
-        }
-
-        Ok(())
-    }
-
     async fn radio_off(&mut self) -> Result<(), Error> {
         #[cfg(not(feature = "use-upsd-context-activation"))]
-        self.ch
-            .set_profile_state(crate::registration::ProfileState::ShouldBeDown);
+        self.ch.set_profile_state(ProfileState::ShouldBeDown);
 
         let module_cfun = self
             .ch
@@ -640,71 +295,23 @@ where
         Err(last_err.unwrap().into())
     }
 
-    async fn check_sim_status(&mut self) -> Result<(), Error> {
-        for _ in 0..2 {
-            match self.at_client.send(&GetPinStatus).await {
-                Ok(PinStatus { code }) if code == PinStatusCode::Ready => {
-                    debug!("SIM is ready");
-                    return Ok(());
-                }
-                _ => {}
-            }
-
-            Timer::after(Duration::from_secs(1)).await;
-        }
-
-        // There was an error initializing the SIM
-        // We've seen issues on uBlox-based devices, as a precation, we'll cycle
-        // the modem here through minimal/full functional state.
-        self.at_client
-            .send(&SetModuleFunctionality {
-                fun: self
-                    .ch
-                    .module()
-                    .ok_or(Error::Uninitialized)?
-                    .radio_off_cfun(),
-                rst: None,
-            })
-            .await?;
-        self.at_client
-            .send(&SetModuleFunctionality {
-                fun: Functionality::Full,
-                rst: None,
-            })
-            .await?;
-
-        Ok(())
-    }
-
-    pub async fn run(&mut self) -> ! {
-        match self.has_power().await {
-            Ok(true) => {
-                self.ch.set_operation_state(OperationState::PowerUp);
-            }
-            Ok(false) | Err(_) => {
-                self.ch.set_operation_state(OperationState::PowerDown);
-            }
-        }
+    pub async fn run(&mut self) -> Result<(), Error> {
+        self.run_to_desired().await?;
 
         loop {
-            // FIXME: This does not seem to work as expected?
-            match embassy_futures::select::select(
-                self.ch.clone().wait_for_desired_state_change(),
-                self.ch.clone().wait_registration_change(),
+            match select(
+                self.ch.wait_for_desired_state_change(),
+                self.ch.wait_registration_change(),
             )
             .await
             {
-                Either::First(desired_state) => {
-                    info!("Desired state: {:?}", desired_state);
-                    let _ = self.run_to_state(desired_state).await;
+                Either::First(_) => {
+                    self.run_to_desired().await?;
                 }
                 Either::Second(false) => {
                     warn!("Lost network registration. Setting operating state back to initialized");
-
                     self.ch.set_operation_state(OperationState::Initialized);
-                    let _ = self
-                        .run_to_state(self.ch.clone().operation_state(None))
-                        .await;
+                    self.run_to_desired().await?;
                 }
                 Either::Second(true) => {
                     // This flag will be set if we had been knocked out
@@ -713,77 +320,32 @@ where
                     // queue before any user registratioon status callback
                     // so that everything is sorted for them
                     #[cfg(not(feature = "use-upsd-context-activation"))]
-                    if self.ch.get_profile_state()
-                        == crate::registration::ProfileState::RequiresReactivation
-                    {
-                        self.activate_context(C::CONTEXT_ID, C::PROFILE_ID)
-                            .await
-                            .unwrap();
-                        self.ch
-                            .set_profile_state(crate::registration::ProfileState::ShouldBeUp);
+                    if self.ch.get_profile_state() == ProfileState::RequiresReactivation {
+                        self.activate_context(C::CONTEXT_ID, C::PROFILE_ID).await?;
+                        self.ch.set_profile_state(ProfileState::ShouldBeUp);
                     }
                 }
-                _ => {}
             }
         }
     }
 
-    pub async fn run_to_state(&mut self, desired_state: OperationState) -> Result<(), Error> {
-        if 0 >= desired_state as isize - self.ch.clone().operation_state(None) as isize {
-            debug!(
-                "Power steps was negative, power down: {}",
-                desired_state as isize - self.ch.clone().operation_state(None) as isize
-            );
-            self.power_down().await.ok();
-            self.ch.set_operation_state(OperationState::PowerDown);
-        }
-        let start_state = self.ch.clone().operation_state(None) as isize;
-        let steps = desired_state as isize - start_state;
-        for step in 0..=steps {
-            debug!(
-                "State transition {} steps: {} -> {}, {}",
-                steps,
-                start_state,
-                start_state + step,
-                step
-            );
-            let next_state = start_state + step;
-            match OperationState::try_from(next_state) {
-                Ok(OperationState::PowerDown) => {}
-                Ok(OperationState::PowerUp) => match self.power_up().await {
-                    Ok(_) => {
-                        self.ch.set_operation_state(OperationState::PowerUp);
-                    }
-                    Err(err) => {
-                        error!("Error in power_up: {:?}", err);
-                        return Err(err);
-                    }
-                },
-                Ok(OperationState::Initialized) => match self.init_at().await {
-                    Ok(_) => {
-                        self.ch.set_operation_state(OperationState::Initialized);
-                    }
-                    Err(err) => {
-                        error!("Error in init_at: {:?}", err);
-                        return Err(err);
-                    }
-                },
-                Ok(OperationState::Connected) => match self.register_network(None).await {
-                    Ok(_) => match self.wait_network_registered(Duration::from_secs(180)).await {
-                        Ok(_) => {
-                            self.ch.set_operation_state(OperationState::Connected);
-                        }
-                        Err(err) => {
-                            error!("Timeout waiting for network attach: {:?}", err);
-                            return Err(err);
-                        }
-                    },
-                    Err(err) => {
-                        error!("Error in register_network: {:?}", err);
-                        return Err(err);
-                    }
-                },
-                Ok(OperationState::DataEstablished) => {
+    async fn run_to_desired(&mut self) -> Result<(), Error> {
+        loop {
+            let current_state = self.ch.operation_state(None);
+            let desired_state = self.ch.desired_state(None);
+
+            info!("State transition: {} -> {}", current_state, desired_state);
+
+            match (current_state, desired_state.cmp(&current_state)) {
+                (_, Ordering::Equal) => break,
+
+                (OperationState::Initialized, Ordering::Greater) => {
+                    self.register_network(None).await?;
+                    self.wait_network_registered(Duration::from_secs(180))
+                        .await?;
+                    self.ch.set_operation_state(OperationState::Connected);
+                }
+                (OperationState::Connected, Ordering::Greater) => {
                     match self.connect(C::APN, C::PROFILE_ID, C::CONTEXT_ID).await {
                         Ok(_) => {
                             #[cfg(not(feature = "use-upsd-context-activation"))]
@@ -791,21 +353,27 @@ where
                                 .set_profile_state(crate::registration::ProfileState::ShouldBeUp);
 
                             self.ch.set_operation_state(OperationState::DataEstablished);
-                            Timer::after(Duration::from_secs(5)).await;
+                            Timer::after_secs(1).await;
                         }
                         Err(err) => {
                             // Switch radio off after failure
                             let _ = self.radio_off().await;
-
-                            error!("Error in connect: {:?}", err);
                             return Err(err);
                         }
                     }
                 }
-                Err(_) => {
-                    error!("State transition next_state not valid: start_state={}, next_state={}, steps={} ", start_state, next_state, steps);
-                    return Err(Error::InvalidStateTransition);
+
+                // TODO: do proper backwards "single stepping"
+                (OperationState::Connected, Ordering::Less) => {
+                    self.ch.set_operation_state(OperationState::Initialized);
                 }
+                (OperationState::DataEstablished, Ordering::Less) => {
+                    self.ch.set_operation_state(OperationState::Connected);
+                }
+
+                (OperationState::DataEstablished, Ordering::Greater) => unreachable!(),
+                (OperationState::Initialized, Ordering::Less) => return Err(Error::PoweredDown),
+                (OperationState::PowerDown, _) => return Err(Error::PoweredDown),
             }
         }
         Ok(())
@@ -834,7 +402,7 @@ where
                 attached = true;
                 break;
             };
-            Timer::after(Duration::from_secs(1)).await;
+            Timer::after_secs(1).await;
         }
         if !attached {
             return Err(Error::AttachTimeout);

@@ -1,4 +1,5 @@
 //! Responses for General Commands
+use super::types;
 use atat::atat_derive::AtatResp;
 use atat::heapless_bytes::Bytes;
 
@@ -23,7 +24,7 @@ pub struct ModelId {
 #[derive(Clone, Debug, AtatResp)]
 pub struct FirmwareVersion {
     #[at_arg(position = 0)]
-    pub version: Bytes<10>,
+    pub version: types::FirmwareVersion,
 }
 
 /// 4.7 IMEI identification +CGSN

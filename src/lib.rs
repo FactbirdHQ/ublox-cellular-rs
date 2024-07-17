@@ -14,3 +14,6 @@ mod modules;
 mod registration;
 
 pub mod asynch;
+
+use command::control::types::BaudRate;
+pub const DEFAULT_BAUD_RATE: BaudRate = BaudRate::B115200;

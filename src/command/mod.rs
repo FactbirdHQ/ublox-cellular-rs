@@ -29,7 +29,7 @@ use atat::{
 pub struct NoResponse;
 
 #[derive(Clone, AtatCmd)]
-#[at_cmd("", NoResponse)]
+#[at_cmd("", NoResponse, attempts = 3)]
 pub struct AT;
 
 #[derive(Debug, Clone, AtatUrc)]

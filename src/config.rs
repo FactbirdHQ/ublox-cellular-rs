@@ -1,9 +1,14 @@
 use core::convert::Infallible;
 use embedded_hal::digital::{ErrorType, InputPin, OutputPin, PinState};
+use embedded_io_async::{BufRead, Read, Write};
 
-use crate::command::{
-    networking::types::EmbeddedPortFilteringMode,
-    psn::types::{ContextId, ProfileId},
+use crate::{
+    command::{
+        control::types::BaudRate,
+        networking::types::EmbeddedPortFilteringMode,
+        psn::types::{ContextId, ProfileId},
+    },
+    DEFAULT_BAUD_RATE,
 };
 
 pub struct NoPin;
@@ -76,7 +81,11 @@ pub trait CellularConfig<'a> {
     type PowerPin: OutputPin;
     type VintPin: InputPin;
 
+    const AT_CONFIG: atat::Config = atat::Config::new();
+
+    // Transport settings
     const FLOW_CONTROL: bool = false;
+    const BAUD_RATE: BaudRate = DEFAULT_BAUD_RATE;
 
     #[cfg(feature = "internal-network-stack")]
     const HEX_MODE: bool = true;
@@ -105,6 +114,11 @@ pub trait CellularConfig<'a> {
     fn vint_pin(&mut self) -> Option<&mut Self::VintPin> {
         None
     }
+}
+
+pub trait Transport: Write + Read + BufRead {
+    fn set_baudrate(&mut self, baudrate: u32);
+    fn split_ref(&mut self) -> (impl Write, impl Read + BufRead);
 }
 
 #[repr(u8)]

@@ -9,7 +9,8 @@ use super::NoResponse;
 use atat::atat_derive::AtatCmd;
 use responses::DataRate;
 use types::{
-    BaudRate, Circuit108Behaviour, Circuit109Behaviour, Echo, FlowControl, SoftwareFlowControl,
+    BaudRate, Circuit108Behaviour, Circuit109Behaviour, Echo, FlowControl, ResultCodeSelection,
+    SoftwareFlowControl,
 };
 
 /// 15.2 Circuit 109 behavior &C
@@ -116,4 +117,15 @@ pub struct FactoryResetConfig;
 pub struct SetEcho {
     #[at_arg(position = 0)]
     pub enabled: Echo,
+}
+
+/// 14.21 Result code selection and call progress monitoring control X
+///
+/// In a CS data call, determines how the DCE transmits to the DTE the CONNECT
+/// result code.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("X", NoResponse, value_sep = false)]
+pub struct SetResultCodeSelection {
+    #[at_arg(position = 0)]
+    pub value: ResultCodeSelection,
 }

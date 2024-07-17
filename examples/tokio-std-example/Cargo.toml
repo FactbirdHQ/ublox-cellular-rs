@@ -38,7 +38,7 @@ log = "0.4.21"
 
 static_cell = { version = "2.0" }
 
-atat = { version = "0.22", features = ["derive", "bytes", "log"] }
+atat = { version = "0.23", features = ["derive", "bytes", "log"] }
 ublox-cellular-rs = { version = "0.4.0", path = "../..", features = [
     "lara-r6",
     "log",
