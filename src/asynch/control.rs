@@ -1,12 +1,10 @@
-use atat::{
-    asynch::{AtatClient, SimpleClient},
-    AtDigester,
-};
+use atat::asynch::{AtatClient, SimpleClient};
+use embassy_sync::{blocking_mutex::raw::RawMutex, mutex::Mutex};
 
 use crate::{
     command::{
         general::{types::FirmwareVersion, GetFirmwareVersion},
-        gpio::{types::GpioMode, GetGpioConfiguration, SetGpioConfiguration},
+        gpio::{types::GpioMode, SetGpioConfiguration},
         network_service::{
             responses::{OperatorSelection, SignalQuality},
             GetOperatorSelection, GetSignalQuality,
@@ -21,13 +19,15 @@ use super::{
     state::{self, LinkState, OperationState},
 };
 
-pub struct Control<'a> {
+pub struct Control<'a, M: RawMutex> {
     state_ch: state::Runner<'a>,
-    at_client:
+    at_client: Mutex<
+        M,
         SimpleClient<'a, embassy_at_cmux::Channel<'a, CMUX_CHANNEL_SIZE>, atat::AtDigester<Urc>>,
+    >,
 }
 
-impl<'a> Control<'a> {
+impl<'a, M: RawMutex> Control<'a, M> {
     pub(crate) fn new(
         state_ch: state::Runner<'a>,
         at_client: SimpleClient<
@@ -38,7 +38,7 @@ impl<'a> Control<'a> {
     ) -> Self {
         Self {
             state_ch,
-            at_client,
+            at_client: Mutex::new(at_client),
         }
     }
 
@@ -66,28 +66,43 @@ impl<'a> Control<'a> {
         self.state_ch.wait_for_operation_state(ps).await
     }
 
-    pub async fn get_signal_quality(&mut self) -> Result<SignalQuality, Error> {
+    pub async fn get_signal_quality(&self) -> Result<SignalQuality, Error> {
         if self.operation_state() == OperationState::PowerDown {
             return Err(Error::Uninitialized);
         }
 
-        Ok(self.at_client.send_retry(&GetSignalQuality).await?)
+        Ok(self
+            .at_client
+            .lock()
+            .await
+            .send_retry(&GetSignalQuality)
+            .await?)
     }
 
-    pub async fn get_operator(&mut self) -> Result<OperatorSelection, Error> {
+    pub async fn get_operator(&self) -> Result<OperatorSelection, Error> {
         if self.operation_state() == OperationState::PowerDown {
             return Err(Error::Uninitialized);
         }
 
-        Ok(self.at_client.send_retry(&GetOperatorSelection).await?)
+        Ok(self
+            .at_client
+            .lock()
+            .await
+            .send_retry(&GetOperatorSelection)
+            .await?)
     }
 
-    pub async fn get_version(&mut self) -> Result<FirmwareVersion, Error> {
+    pub async fn get_version(&self) -> Result<FirmwareVersion, Error> {
         if self.operation_state() == OperationState::PowerDown {
             return Err(Error::Uninitialized);
         }
 
-        let res = self.at_client.send_retry(&GetFirmwareVersion).await?;
+        let res = self
+            .at_client
+            .lock()
+            .await
+            .send_retry(&GetFirmwareVersion)
+            .await?;
         Ok(res.version)
     }
 
@@ -101,6 +116,8 @@ impl<'a> Control<'a> {
         }
 
         self.at_client
+            .lock()
+            .await
             .send_retry(&SetGpioConfiguration { gpio_id, gpio_mode })
             .await?;
         Ok(())
@@ -109,7 +126,7 @@ impl<'a> Control<'a> {
     /// Send an AT command to the modem This is usefull if you have special
     /// configuration but might break the drivers functionality if your settings
     /// interfere with the drivers settings
-    pub async fn send<Cmd: atat::AtatCmd>(&mut self, cmd: &Cmd) -> Result<Cmd::Response, Error> {
-        Ok(self.at_client.send_retry::<Cmd>(cmd).await?)
+    pub async fn send<Cmd: atat::AtatCmd>(&self, cmd: &Cmd) -> Result<Cmd::Response, Error> {
+        Ok(self.at_client.lock().await.send_retry::<Cmd>(cmd).await?)
     }
 }

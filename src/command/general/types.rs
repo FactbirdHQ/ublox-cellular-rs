@@ -1,6 +1,9 @@
 //! Argument and parameter types used by General Commands and Responses
 
+use core::fmt::Write as _;
+
 use atat::atat_derive::AtatEnum;
+use serde::{Deserialize, Deserializer, Serialize};
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum Snt {
     /// (default value): International Mobile station Equipment Identity (IMEI)
@@ -75,7 +78,7 @@ impl Serialize for FirmwareVersion {
         let mut str = heapless::String::<7>::new();
         str.write_fmt(format_args!("{}.{}", self.major, self.minor))
             .map_err(serde::ser::Error::custom)?;
-        serializer.serialize_str(&str)
+        serializer.serialize_bytes(str.as_bytes())
     }
 }
 
@@ -84,7 +87,10 @@ impl<'de> Deserialize<'de> for FirmwareVersion {
     where
         D: Deserializer<'de>,
     {
-        let s = heapless::String::<7>::deserialize(deserializer)?;
-        core::str::FromStr::from_str(&s).map_err(serde::de::Error::custom)
+        let s = atat::heapless_bytes::Bytes::<7>::deserialize(deserializer)?;
+        core::str::FromStr::from_str(
+            &core::str::from_utf8(s.as_slice()).map_err(serde::de::Error::custom)?,
+        )
+        .map_err(serde::de::Error::custom)
     }
 }

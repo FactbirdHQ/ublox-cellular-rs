@@ -12,10 +12,6 @@ use crate::{
         },
         device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
         general::{responses::FirmwareVersion, GetCCID, GetFirmwareVersion, GetModelId},
-        gpio::{
-            types::{GpioInPull, GpioMode, GpioOutValue},
-            SetGpioConfiguration,
-        },
         ipc::SetMultiplexing,
         mobile_control::{
             types::{Functionality, TerminationErrorMode},
@@ -41,6 +37,7 @@ use atat::{
 };
 
 use embassy_futures::select::{select3, Either3};
+use embassy_sync::blocking_mutex::raw::NoopRawMutex;
 use embassy_time::{with_timeout, Duration, Instant, Timer};
 
 pub(crate) const URC_SUBSCRIBERS: usize = 2;
@@ -98,7 +95,7 @@ where
         transport: T,
         resources: &'a mut Resources<CMD_BUF_SIZE, INGRESS_BUF_SIZE, URC_CAPACITY>,
         config: C,
-    ) -> (Self, Control<'a>) {
+    ) -> (Self, Control<'a, NoopRawMutex>) {
         let ch_runner = state::Runner::new(&mut resources.ch);
 
         let ingress = atat::Ingress::new(
@@ -311,9 +308,9 @@ where
 
         let FirmwareVersion { version } = at_client.send_retry(&GetFirmwareVersion).await?;
         info!(
-            "Found module to be: {=[u8]:a}, {=[u8]:a}",
+            "Found module to be: {=[u8]:a}, {}",
             model_id.model.as_slice(),
-            version.as_slice()
+            version
         );
 
         at_client
@@ -321,41 +318,6 @@ where
                 mode: C::EMBEDDED_PORT_FILTERING,
             })
             .await?;
-
-        // // FIXME: The following three GPIO settings should not be here!
-        let _ = at_client
-            .send_retry(&SetGpioConfiguration {
-                gpio_id: 23,
-                gpio_mode: GpioMode::NetworkStatus,
-            })
-            .await;
-
-        // Select SIM
-        at_client
-            .send_retry(&SetGpioConfiguration {
-                gpio_id: 25,
-                gpio_mode: GpioMode::Output(GpioOutValue::High),
-            })
-            .await?;
-
-        #[cfg(feature = "lara-r6")]
-        at_client
-            .send_retry(&SetGpioConfiguration {
-                gpio_id: 42,
-                gpio_mode: GpioMode::Input(GpioInPull::NoPull),
-            })
-            .await?;
-
-        // self.soft_reset(true).await?;
-
-        // self.wait_alive(
-        //     self.ch
-        //         .module()
-        //         .map(|m| m.boot_wait())
-        //         .unwrap_or(Generic.boot_wait())
-        //         * 2,
-        // )
-        // .await?;
 
         // Echo off
         at_client
