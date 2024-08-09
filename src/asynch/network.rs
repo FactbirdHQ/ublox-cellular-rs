@@ -334,7 +334,10 @@ where
             let current_state = self.ch.operation_state(None);
             let desired_state = self.ch.desired_state(None);
 
-            info!("State transition: {} -> {}", current_state, desired_state);
+            info!(
+                "State transition: {:?} -> {:?}",
+                current_state, desired_state
+            );
 
             match (current_state, desired_state.cmp(&current_state)) {
                 (_, Ordering::Equal) => break,

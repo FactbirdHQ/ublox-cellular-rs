@@ -94,11 +94,15 @@ impl<'d> Runner<'d> {
     pub fn update_registration_with(&self, f: impl FnOnce(&mut RegistrationState)) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
+            let prev = s.registration_state.is_registered();
             f(&mut s.registration_state);
-            info!(
-                "Registration status changed! Registered: {:?}",
-                s.registration_state.is_registered()
-            );
+            if prev != s.registration_state.is_registered() {
+                info!(
+                    "Cellular registration status changed! Registered: {:?} -> {:?}",
+                    prev,
+                    s.registration_state.is_registered()
+                );
+            }
             s.registration_waker.wake();
         })
     }

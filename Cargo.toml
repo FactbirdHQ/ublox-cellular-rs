@@ -36,7 +36,9 @@ embedded-hal = "1.0.0"
 embedded-nal = "0.8"
 embedded-nal-async = { version = "0.7" }
 
-embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "e9ce1e2", optional = true }
+embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "e2f4365", optional = true }
+# embassy-at-cmux = { path = "../embassy/embassy-at-cmux" }
+
 embassy-net-ppp = { version = "0.1", optional = true }
 embassy-net = { version = "0.4", features = [
     "proto-ipv4",

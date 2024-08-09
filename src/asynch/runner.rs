@@ -307,11 +307,7 @@ where
         self.ch.set_module(Module::from_model_id(&model_id));
 
         let FirmwareVersion { version } = at_client.send_retry(&GetFirmwareVersion).await?;
-        info!(
-            "Found module to be: {=[u8]:a}, {}",
-            model_id.model.as_slice(),
-            version
-        );
+        info!("Found module to be: {:?}, {:?}", self.ch.module(), version);
 
         at_client
             .send_retry(&SetEmbeddedPortFiltering {

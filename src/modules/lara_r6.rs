@@ -2,6 +2,7 @@ use super::ModuleParams;
 use embassy_time::Duration;
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct LaraR6;
 
 impl ModuleParams for LaraR6 {

@@ -3,6 +3,7 @@ use crate::command::mobile_control::types::Functionality;
 use embassy_time::Duration;
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct SaraR412m;
 
 impl ModuleParams for SaraR412m {

@@ -75,6 +75,7 @@ pub trait ModuleParams: Copy {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub(crate) enum Module {
     #[cfg(any(feature = "any-module", feature = "lara-r6"))]
     LaraR6(lara_r6::LaraR6),
@@ -100,6 +101,9 @@ impl Module {
         match model_id.model.as_slice() {
             b"LARA-R6001D" => Self::LaraR6(lara_r6::LaraR6),
             id => {
+                #[cfg(feature = "defmt")]
+                warn!("Attempting to run {=[u8]:a} using generic module parameters! This may or may not work.", id);
+                #[cfg(feature = "log")]
                 warn!("Attempting to run {:?} using generic module parameters! This may or may not work.", id);
                 Self::Generic(Generic)
             }
@@ -174,6 +178,7 @@ impl ModuleParams for Module {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Generic;
 
 impl ModuleParams for Generic {}
