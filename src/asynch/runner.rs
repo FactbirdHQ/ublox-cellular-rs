@@ -29,27 +29,64 @@ use crate::{
     DEFAULT_BAUD_RATE,
 };
 
-use super::{control::Control, pwr::PwrCtrl, state, urc_handler::UrcHandler, Resources};
+use super::{
+    control::{Control, ProxyClient},
+    pwr::PwrCtrl,
+    state,
+    urc_handler::UrcHandler,
+    Resources,
+};
 
 use atat::{
     asynch::{AtatClient, SimpleClient},
     AtatIngress as _, UrcChannel,
 };
 
-use embassy_futures::select::{select3, Either3};
-use embassy_sync::blocking_mutex::raw::NoopRawMutex;
+use embassy_futures::{
+    join::join,
+    select::{select3, Either3},
+};
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel};
 use embassy_time::{with_timeout, Duration, Instant, Timer};
+use embedded_io_async::Write as _;
 
 pub(crate) const URC_SUBSCRIBERS: usize = 2;
+
+pub(crate) const MAX_CMD_LEN: usize = 128;
 
 pub const CMUX_MAX_FRAME_SIZE: usize = 128;
 pub const CMUX_CHANNEL_SIZE: usize = CMUX_MAX_FRAME_SIZE * 4;
 
-#[cfg(any(feature = "internal-network-stack", feature = "ppp"))]
-pub const CMUX_CHANNELS: usize = 3;
-
-#[cfg(not(any(feature = "internal-network-stack", feature = "ppp")))]
 pub const CMUX_CHANNELS: usize = 2;
+
+async fn at_bridge<'a, const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize>(
+    (rx, tx): (
+        &mut embassy_at_cmux::ChannelRx<'a, CMUX_CHANNEL_SIZE>,
+        &mut embassy_at_cmux::ChannelTx<'a, CMUX_CHANNEL_SIZE>,
+    ),
+    req_slot: &Channel<NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>,
+    ingress: &mut atat::Ingress<
+        'a,
+        atat::AtDigester<Urc>,
+        Urc,
+        INGRESS_BUF_SIZE,
+        URC_CAPACITY,
+        URC_SUBSCRIBERS,
+    >,
+) -> ! {
+    ingress.clear();
+
+    let tx_fut = async {
+        loop {
+            let msg = req_slot.receive().await;
+            let _ = tx.write_all(&msg).await;
+        }
+    };
+
+    embassy_futures::join::join(tx_fut, ingress.read_from(rx)).await;
+
+    unreachable!()
+}
 
 /// Background runner for the Ublox Module.
 ///
@@ -69,12 +106,12 @@ pub struct Runner<'a, T, C, const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: u
         URC_CAPACITY,
         URC_SUBSCRIBERS,
     >,
-    pub cmd_buf: &'a mut [u8],
     pub res_slot: &'a atat::ResponseSlot<INGRESS_BUF_SIZE>,
+    pub req_slot: &'a Channel<NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>,
 
     pub mux_runner: embassy_at_cmux::Runner<'a, CMUX_CHANNELS, CMUX_CHANNEL_SIZE>,
 
-    network_channel: (
+    at_channel: (
         embassy_at_cmux::ChannelRx<'a, CMUX_CHANNEL_SIZE>,
         embassy_at_cmux::ChannelTx<'a, CMUX_CHANNEL_SIZE>,
         embassy_at_cmux::ChannelLines<'a, CMUX_CHANNEL_SIZE>,
@@ -91,11 +128,11 @@ where
     T: Transport,
     C: CellularConfig<'a> + 'a,
 {
-    pub fn new<const CMD_BUF_SIZE: usize>(
+    pub fn new(
         transport: T,
-        resources: &'a mut Resources<CMD_BUF_SIZE, INGRESS_BUF_SIZE, URC_CAPACITY>,
+        resources: &'a mut Resources<INGRESS_BUF_SIZE, URC_CAPACITY>,
         config: C,
-    ) -> (Self, Control<'a, NoopRawMutex>) {
+    ) -> (Self, Control<'a, INGRESS_BUF_SIZE>) {
         let ch_runner = state::Runner::new(&mut resources.ch);
 
         let ingress = atat::Ingress::new(
@@ -108,17 +145,14 @@ where
         let (mux_runner, channels) = resources.mux.start();
         let mut channel_iter = channels.into_iter();
 
-        let network_channel = channel_iter.next().unwrap().split();
+        let at_channel = channel_iter.next().unwrap().split();
         let data_channel = channel_iter.next().unwrap();
-        let control_channel = channel_iter.next().unwrap();
 
-        let control_client = SimpleClient::new(
-            control_channel,
-            atat::AtDigester::new(),
-            &mut resources.control_cmd_buf,
-            C::AT_CONFIG,
+        let control = Control::new(
+            ch_runner.clone(),
+            resources.req_slot.sender(),
+            &resources.res_slot,
         );
-        let control = Control::new(ch_runner.clone(), control_client);
 
         (
             Self {
@@ -129,12 +163,12 @@ where
                 urc_channel: &resources.urc_channel,
 
                 ingress,
-                cmd_buf: &mut resources.cmd_buf,
                 res_slot: &resources.res_slot,
+                req_slot: &resources.req_slot,
 
                 mux_runner,
 
-                network_channel,
+                at_channel,
                 data_channel,
 
                 #[cfg(feature = "ppp")]
@@ -173,12 +207,13 @@ where
             baudrate as u32
         );
         self.transport.set_baudrate(baudrate as u32);
+        let mut cmd_buf = [0u8; 16];
 
         {
             let mut at_client = SimpleClient::new(
                 &mut self.transport,
                 atat::AtDigester::<Urc>::new(),
-                self.cmd_buf,
+                &mut cmd_buf,
                 C::AT_CONFIG,
             );
 
@@ -216,7 +251,7 @@ where
         SimpleClient::new(
             &mut self.transport,
             atat::AtDigester::<Urc>::new(),
-            self.cmd_buf,
+            &mut cmd_buf,
             C::AT_CONFIG,
         )
         .send_retry(&AT)
@@ -282,10 +317,11 @@ where
             return Err(Error::BaudDetection);
         }
 
+        let mut cmd_buf = [0u8; 64];
         let mut at_client = SimpleClient::new(
             &mut self.transport,
             atat::AtDigester::<Urc>::new(),
-            self.cmd_buf,
+            &mut cmd_buf,
             C::AT_CONFIG,
         );
 
@@ -439,8 +475,6 @@ where
                 })
                 .await?;
         }
-
-        self.ch.set_operation_state(OperationState::Initialized);
 
         Ok(())
     }
@@ -608,22 +642,32 @@ where
                 .await;
 
                 let (mut tx, mut rx) = self.transport.split_ref();
-                self.mux_runner
-                    .run(&mut rx, &mut tx, CMUX_MAX_FRAME_SIZE)
-                    .await
+
+                // Signal to the rest of the driver, that the MUX is operational and running
+                let fut = async {
+                    // TODO: It should be possible to check on ChannelLines,
+                    // when the MUX is opened successfully, instead of waiting a fixed time
+                    Timer::after_secs(3).await;
+                    self.ch.set_operation_state(OperationState::Initialized);
+                };
+
+                join(
+                    self.mux_runner.run(&mut rx, &mut tx, CMUX_MAX_FRAME_SIZE),
+                    fut,
+                )
+                .await
             };
 
             let device_fut = async {
-                let (at_rx, at_tx, _) = &mut self.network_channel;
-                let mut cell_device = NetDevice::<C, _>::new(
-                    &self.ch,
-                    atat::asynch::Client::new(at_tx, self.res_slot, self.cmd_buf, C::AT_CONFIG),
-                );
+                let (at_rx, at_tx, _) = &mut self.at_channel;
+
+                let at_client = ProxyClient::new(self.req_slot.sender(), self.res_slot);
+                let mut cell_device = NetDevice::<C, _>::new(&self.ch, &at_client);
 
                 let mut urc_handler = UrcHandler::new(&self.ch, self.urc_channel);
 
                 select3(
-                    self.ingress.read_from(at_rx),
+                    at_bridge((at_rx, at_tx), self.req_slot, &mut self.ingress),
                     urc_handler.run(),
                     cell_device.run(),
                 )

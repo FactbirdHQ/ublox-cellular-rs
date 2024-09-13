@@ -178,7 +178,7 @@ where
     //     Ok(())
     // }
 
-    // /// Reset the module by sending AT CFUN command
+    /// Reset the module by sending AT CFUN command
     async fn soft_reset(&mut self, sim_reset: bool) -> Result<(), Error> {
         trace!(
             "Attempting to soft reset of the modem with sim reset: {}.",
@@ -334,7 +334,7 @@ where
             let current_state = self.ch.operation_state(None);
             let desired_state = self.ch.desired_state(None);
 
-            info!(
+            debug!(
                 "State transition: {:?} -> {:?}",
                 current_state, desired_state
             );
@@ -342,6 +342,11 @@ where
             match (current_state, desired_state.cmp(&current_state)) {
                 (_, Ordering::Equal) => break,
 
+                (OperationState::PowerDown, Ordering::Greater) => {
+                    self.ch
+                        .wait_for_operation_state(OperationState::Initialized)
+                        .await
+                }
                 (OperationState::Initialized, Ordering::Greater) => {
                     self.register_network(None).await?;
                     self.wait_network_registered(Duration::from_secs(180))
@@ -356,7 +361,6 @@ where
                                 .set_profile_state(crate::registration::ProfileState::ShouldBeUp);
 
                             self.ch.set_operation_state(OperationState::DataEstablished);
-                            Timer::after_secs(1).await;
                         }
                         Err(err) => {
                             // Switch radio off after failure
