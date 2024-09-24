@@ -479,10 +479,7 @@ where
         Ok(())
     }
 
-    pub async fn run<D: embassy_net::driver::Driver>(
-        &mut self,
-        stack: &embassy_net::Stack<D>,
-    ) -> ! {
+    pub async fn run(&mut self, stack: embassy_net::Stack<'_>) -> ! {
         loop {
             let _ = PwrCtrl::new(&self.ch, &mut self.config).power_down().await;
 

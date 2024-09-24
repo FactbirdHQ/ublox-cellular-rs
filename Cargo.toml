@@ -36,7 +36,7 @@ embedded-hal = "1.0.0"
 embedded-nal = "0.8"
 embedded-nal-async = { version = "0.7" }
 
-embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "e2f4365" }
+embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "c83b7a052" }
 # embassy-at-cmux = { path = "../embassy/embassy-at-cmux" }
 
 embassy-net-ppp = { version = "0.1", optional = true }
@@ -145,11 +145,11 @@ exclude = ["examples"]
 no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
 #ublox-sockets = { path = "../ublox-sockets" }
 
-embassy-time = { git = "https://github.com/MathiasKoch/embassy", rev = "e9ce1e2" }
-embassy-sync = { git = "https://github.com/MathiasKoch/embassy", rev = "e9ce1e2" }
-embassy-futures = { git = "https://github.com/MathiasKoch/embassy", rev = "e9ce1e2" }
-embassy-net-ppp = { git = "https://github.com/MathiasKoch/embassy", rev = "e9ce1e2" }
-embassy-net = { git = "https://github.com/MathiasKoch/embassy", rev = "e9ce1e2" }
+embassy-time = { git = "https://github.com/MathiasKoch/embassy", rev = "84dba2941" }
+embassy-sync = { git = "https://github.com/MathiasKoch/embassy", rev = "84dba2941" }
+embassy-futures = { git = "https://github.com/MathiasKoch/embassy", rev = "84dba2941" }
+embassy-net-ppp = { git = "https://github.com/MathiasKoch/embassy", rev = "84dba2941" }
+embassy-net = { git = "https://github.com/MathiasKoch/embassy", rev = "84dba2941" }
 
 #embassy-time = { path = "../embassy/embassy-time" }
 #embassy-sync = { path = "../embassy/embassy-sync" }

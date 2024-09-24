@@ -78,7 +78,7 @@ impl Serialize for FirmwareVersion {
         let mut str = heapless::String::<7>::new();
         str.write_fmt(format_args!("{}.{}", self.major, self.minor))
             .map_err(serde::ser::Error::custom)?;
-        serializer.serialize_bytes(str.as_bytes())
+        serializer.serialize_str(&str)
     }
 }
 
