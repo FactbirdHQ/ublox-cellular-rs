@@ -93,6 +93,10 @@ pub struct SetPDPContextDefinition<'a> {
     pub apn: &'a str,
 }
 
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+CGDCONT?", NoResponse)]
+pub struct GetPDPContextDefinition;
+
 /// 18.7 Set Packet switched data configuration +UPSD
 ///
 /// Sets all the parameters in a specific packet switched data (PSD) profile.
@@ -265,6 +269,33 @@ pub struct SetPDPContextState {
 #[at_cmd("+CGACT?", heapless::Vec<PDPContextState, 7>, attempts = 1, timeout_ms = 150000, abortable = true)]
 pub struct GetPDPContextState;
 
+/// 18.21 Enter PPP state/GPRS dial-up D*
+///
+/// The V.24 dial command "D", similar to the command with the syntax
+/// AT+CGDATA="PPP",<cid>, causes the MT to perform the necessary actions to
+/// establish the communication between the DTE and the external PDP network
+/// through the PPP protocol. This can include performing a PS attach and, if
+/// the PPP server on the DTE side starts communication, PDP context activation
+/// on the specified PDP context identifier (if not already requested by means
+/// of +CGATT and +CGACT commands).
+///
+/// If the command is accepted and the preliminary PS procedures have succeeded,
+/// the "CONNECT" intermediate result code is returned, the MT enters the
+/// V.25ter online data state and the PPP L2 protocol between the MT and the DTE
+/// is started.
+#[derive(Clone, AtatCmd)]
+#[at_cmd(
+    "D*99***",
+    NoResponse,
+    value_sep = false,
+    abortable = true,
+    termination = "#\r\n"
+)]
+pub struct EnterPPP {
+    #[at_arg(position = 0)]
+    pub cid: ContextId,
+}
+
 /// 18.26 Packet switched event reporting +CGEREP
 ///
 /// Configures sending of URCs from MT to the DTE, in case of certain events
@@ -347,6 +378,22 @@ pub struct SetExtendedPSNetworkRegistrationStatus {
 #[at_cmd("+UREG?", ExtendedPSNetworkRegistrationStatus)]
 pub struct GetExtendedPSNetworkRegistrationStatus;
 
+/// 18.29 Manual deactivation of a PDP context H
+///
+/// Deactivates an active PDP context with PPP L2 protocol in online command
+/// mode. The MT responds with a final result code. For a detailed description,
+/// see the H command description. For additional information about OLCM, see
+/// the AT command settings.
+///
+/// **NOTES**:
+/// - In GPRS online command mode, entered by typing the escape sequence "+++"
+///   or "~+++" (see &D), the ATH command is needed to terminate the connection.
+///   Alternatively, in data transfer mode, DTE originated DTR toggling or PPP
+///   disconnection may be used.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("H", NoResponse)]
+pub struct DeactivatePDPContext;
+
 /// 18.36 EPS network registration status +CEREG
 ///
 /// Configures the network registration URC related to EPS domain. The URC
@@ -415,6 +462,7 @@ pub struct GetEPSNetworkRegistrationStatus;
 /// - **TOBY-L4 / TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 /
 ///   SARA-G4 / SARA-G3** - The command returns an error result code if the
 ///   input <cid> is already active or not yet defined.
+
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+UAUTHREQ", NoResponse)]
 pub struct SetAuthParameters<'a> {
@@ -422,8 +470,43 @@ pub struct SetAuthParameters<'a> {
     pub cid: ContextId,
     #[at_arg(position = 1)]
     pub auth_type: AuthenticationType,
-    #[at_arg(position = 2, len = 64)]
+    // For SARA-R4 and LARA-R6 modules the username and parameters are reversed
+    #[cfg_attr(
+        any(
+            feature = "sara-r410m",
+            feature = "sara-r412m",
+            feature = "sara-r422",
+            feature = "lara-r6"
+        ),
+        at_arg(position = 3, len = 64)
+    )]
+    #[cfg_attr(
+        not(any(
+            feature = "sara-r410m",
+            feature = "sara-r412m",
+            feature = "sara-r422",
+            feature = "lara-r6"
+        )),
+        at_arg(position = 2, len = 64)
+    )]
     pub username: &'a str,
-    #[at_arg(position = 3, len = 64)]
+    #[cfg_attr(
+        any(
+            feature = "sara-r410m",
+            feature = "sara-r412m",
+            feature = "sara-r422",
+            feature = "lara-r6"
+        ),
+        at_arg(position = 3, len = 64)
+    )]
+    #[cfg_attr(
+        not(any(
+            feature = "sara-r410m",
+            feature = "sara-r412m",
+            feature = "sara-r422",
+            feature = "lara-r6"
+        )),
+        at_arg(position = 2, len = 64)
+    )]
     pub password: &'a str,
 }

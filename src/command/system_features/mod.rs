@@ -12,6 +12,37 @@ use types::{FSFactoryRestoreType, NVMFactoryRestoreType, PowerSavingMode, Second
 
 use super::NoResponse;
 
+/// Serial interfaces configuration selection +USIO
+///
+/// Selects the serial interfaces' configuration. The configuration affects how
+/// an available (either physical or logical) serial interface is used, i.e. the
+/// meaning of the data flowing over it.
+///
+/// Possible usages are:
+/// - Modem interface (AT command)
+/// - Trace interface (diagnostic log)
+/// - Raw interface (e.g. GPS/GNSS tunneling or SAP)
+/// - Digital audio interface
+/// - None
+///
+/// A set of configurations, that considers all the available serial interfaces'
+/// and their associated usage, is called +USIO's configuration variant.
+///
+/// **NOTE**
+/// - The serial interfaces' configuration switch is not performed run-time. The
+/// settings are saved in NVM; the new configuration will be effective at the
+/// subsequent module reboot.
+/// - A serial interface might not support all the usages. For instance, UART
+/// cannot be used as digital audio interface.
+/// - For the complete list of allowed USIO variants supported by each series
+/// modules, see Notes.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+USIO", NoResponse)]
+pub struct SetSerialInterfaceConfig {
+    #[at_arg(position = 0)]
+    pub variant: u8,
+}
+
 /// 19.8 Power saving control (Power Saving) +UPSV
 ///
 /// Sets the UART power saving configuration, but it has a global effect on the

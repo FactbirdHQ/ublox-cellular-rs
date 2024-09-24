@@ -139,3 +139,20 @@ pub struct SetNetworkRegistrationStatus {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+CREG?", NetworkRegistrationStatus)]
 pub struct GetNetworkRegistrationStatus;
+
+/// 7.15 Channel and network environment description +UCGED
+///
+/// Enables the protocol stack and network environment information collection.
+/// The information text response of the read command reports only the current
+/// RAT (if any) parameters, determined by the <rat> parameter value.
+///
+/// **NOTES**
+/// - LARA-R6: The command provides only the information on the serving cell,
+/// unless <mode>=2 (short form reporting enabled) and <rat>=2 (2G). If <mode>=2
+/// (short form reporting enabled) and <rat>=2 (2G), where supported, the module
+/// returns also the information on the neighbor cells.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+UCGED", NoResponse)]
+pub struct SetChannelAndNetworkEnvDesc {
+    pub mode: u8,
+}

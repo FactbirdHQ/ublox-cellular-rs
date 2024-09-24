@@ -80,7 +80,7 @@ pub enum NetworkRegistrationStat {
     /// • 3: registration denied
     RegistrationDenied = 3,
     /// • 4: unknown (e.g. out of GERAN/UTRAN/E-UTRAN coverage)
-    Unknown = 4,
+    OutOfCoverage = 4,
     /// • 5: registered, roaming
     RegisteredRoaming = 5,
     /// • 6: registered for "SMS only", home network (applicable only when <AcTStatus>

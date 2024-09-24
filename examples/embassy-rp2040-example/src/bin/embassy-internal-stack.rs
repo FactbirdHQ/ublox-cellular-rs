@@ -1,15 +1,10 @@
 #![no_std]
 #![no_main]
 #![allow(stable_features)]
+#![feature(type_alias_impl_trait)]
 
-use atat::asynch::Client;
-
-use atat::ResponseSlot;
-use atat::UrcChannel;
-
-use cortex_m_rt::entry;
 use defmt::*;
-use embassy_executor::{Executor, Spawner};
+use embassy_executor::Spawner;
 use embassy_rp::gpio;
 use embassy_rp::gpio::Input;
 
@@ -20,24 +15,21 @@ use embassy_rp::uart::BufferedUartTx;
 use embassy_rp::{bind_interrupts, peripherals::UART0, uart::BufferedInterruptHandler};
 use embassy_time::{Duration, Timer};
 use static_cell::StaticCell;
+use ublox_cellular::asynch::InternalRunner;
+use ublox_cellular::asynch::Resources;
 use {defmt_rtt as _, panic_probe as _};
 
 use ublox_cellular::config::{Apn, CellularConfig};
 
-use atat::{AtatIngress, DefaultDigester, Ingress};
-use ublox_cellular::asynch::runner::Runner;
 use ublox_cellular::asynch::state::OperationState;
-use ublox_cellular::asynch::State;
-use ublox_cellular::command;
-use ublox_cellular::command::Urc;
 
 bind_interrupts!(struct Irqs {
     UART0_IRQ => BufferedInterruptHandler<UART0>;
 });
 
+const CMD_BUF_SIZE: usize = 128;
 const INGRESS_BUF_SIZE: usize = 1024;
 const URC_CAPACITY: usize = 2;
-const URC_SUBSCRIBERS: usize = 2;
 
 struct MyCelullarConfig {
     reset_pin: Option<OutputOpenDrain<'static>>,
@@ -71,8 +63,8 @@ impl<'a> CellularConfig<'a> for MyCelullarConfig {
     }
 }
 
-#[embassy_executor::task]
-async fn main_task(spawner: Spawner) {
+#[embassy_executor::main]
+async fn main(spawner: Spawner) {
     let p = {
         let config =
             embassy_rp::config::Config::new(embassy_rp::clocks::ClockConfig::crystal(12_000_000));
@@ -81,10 +73,6 @@ async fn main_task(spawner: Spawner) {
 
     static TX_BUF: StaticCell<[u8; 16]> = StaticCell::new();
     static RX_BUF: StaticCell<[u8; 16]> = StaticCell::new();
-    static INGRESS_BUF: StaticCell<[u8; INGRESS_BUF_SIZE]> = StaticCell::new();
-
-    let mut cell_uart_config = embassy_rp::uart::Config::default();
-    cell_uart_config.baudrate = 115200;
 
     let cell_uart = BufferedUart::new_with_rtscts(
         p.UART0,
@@ -95,7 +83,7 @@ async fn main_task(spawner: Spawner) {
         p.PIN_2,
         TX_BUF.init([0; 16]),
         RX_BUF.init([0; 16]),
-        cell_uart_config,
+        embassy_rp::uart::Config::default(),
     );
 
     let (uart_rx, uart_tx) = cell_uart.split();
@@ -103,38 +91,21 @@ async fn main_task(spawner: Spawner) {
     let cell_pwr = gpio::OutputOpenDrain::new(p.PIN_5, gpio::Level::High);
     let cell_vint = gpio::Input::new(p.PIN_6, gpio::Pull::None);
 
-    let celullar_config = MyCelullarConfig {
-        reset_pin: Some(cell_nrst),
-        power_pin: Some(cell_pwr),
-        vint_pin: Some(cell_vint),
-    };
+    static RESOURCES: StaticCell<
+        Resources<BufferedUartTx<UART0>, CMD_BUF_SIZE, INGRESS_BUF_SIZE, URC_CAPACITY>,
+    > = StaticCell::new();
 
-    static RES_SLOT: ResponseSlot<INGRESS_BUF_SIZE> = ResponseSlot::new();
-    static URC_CHANNEL: UrcChannel<command::Urc, URC_CAPACITY, URC_SUBSCRIBERS> = UrcChannel::new();
-    let ingress = Ingress::new(
-        DefaultDigester::<command::Urc>::default(),
-        INGRESS_BUF.init([0; INGRESS_BUF_SIZE]),
-        &RES_SLOT,
-        &URC_CHANNEL,
-    );
-    static BUF: StaticCell<[u8; INGRESS_BUF_SIZE]> = StaticCell::new();
-    let client = Client::new(
+    let (_net_device, mut control, runner) = ublox_cellular::asynch::new_internal(
+        uart_rx,
         uart_tx,
-        &RES_SLOT,
-        BUF.init([0; INGRESS_BUF_SIZE]),
-        atat::Config::default(),
+        RESOURCES.init(Resources::new()),
+        MyCelullarConfig {
+            reset_pin: Some(cell_nrst),
+            power_pin: Some(cell_pwr),
+            vint_pin: Some(cell_vint),
+        },
     );
 
-    spawner.spawn(ingress_task(ingress, uart_rx)).unwrap();
-
-    static STATE: StaticCell<State<Client<BufferedUartTx<UART0>, INGRESS_BUF_SIZE>>> =
-        StaticCell::new();
-    let (_device, mut control, runner) = ublox_cellular::asynch::new(
-        STATE.init(State::new(client)),
-        &URC_CHANNEL,
-        celullar_config,
-    )
-    .await;
     // defmt::info!("{:?}", runner.init().await);
     // control.set_desired_state(PowerState::Connected).await;
     // control
@@ -144,14 +115,15 @@ async fn main_task(spawner: Spawner) {
     //     })
     //     .await;
 
-    defmt::unwrap!(spawner.spawn(cellular_task(runner)));
+    defmt::unwrap!(spawner.spawn(cell_task(runner)));
+
     Timer::after(Duration::from_millis(1000)).await;
     loop {
         control
             .set_desired_state(OperationState::DataEstablished)
             .await;
         info!("set_desired_state(PowerState::Alive)");
-        while control.power_state() != OperationState::DataEstablished {
+        while control.operation_state() != OperationState::DataEstablished {
             Timer::after(Duration::from_millis(1000)).await;
         }
         Timer::after(Duration::from_millis(10000)).await;
@@ -188,7 +160,7 @@ async fn main_task(spawner: Spawner) {
         Timer::after(Duration::from_millis(10000)).await;
         control.set_desired_state(OperationState::PowerDown).await;
         info!("set_desired_state(PowerState::PowerDown)");
-        while control.power_state() != OperationState::PowerDown {
+        while control.operation_state() != OperationState::PowerDown {
             Timer::after(Duration::from_millis(1000)).await;
         }
 
@@ -196,42 +168,21 @@ async fn main_task(spawner: Spawner) {
     }
 }
 
-#[embassy_executor::task]
-async fn ingress_task(
-    mut ingress: Ingress<
-        'static,
-        DefaultDigester<Urc>,
-        ublox_cellular::command::Urc,
-        { INGRESS_BUF_SIZE },
-        { URC_CAPACITY },
-        { URC_SUBSCRIBERS },
-    >,
-    mut reader: BufferedUartRx<'static, UART0>,
-) -> ! {
-    ingress.read_from(&mut reader).await
-}
+// #[embassy_executor::task]
+// async fn net_task(stack: &'static Stack<embassy_net_ppp::Device<'static>>) -> ! {
+//     stack.run().await
+// }
 
 #[embassy_executor::task]
-async fn cellular_task(
-    runner: Runner<
+async fn cell_task(
+    mut runner: InternalRunner<
         'static,
-        atat::asynch::Client<'_, BufferedUartTx<'static, UART0>, { INGRESS_BUF_SIZE }>,
+        BufferedUartRx<'static, UART0>,
+        BufferedUartTx<'static, UART0>,
         MyCelullarConfig,
-        { URC_CAPACITY },
+        INGRESS_BUF_SIZE,
+        URC_CAPACITY,
     >,
 ) -> ! {
     runner.run().await
-}
-
-static EXECUTOR: StaticCell<Executor> = StaticCell::new();
-
-#[entry]
-fn main() -> ! {
-    info!("Hello World!");
-
-    let executor = EXECUTOR.init(Executor::new());
-
-    executor.run(|spawner| {
-        unwrap!(spawner.spawn(main_task(spawner)));
-    })
 }

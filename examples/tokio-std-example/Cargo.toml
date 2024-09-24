@@ -1,0 +1,85 @@
+[package]
+name = "tokio-std-example"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1", features = ["full"] }
+tokio-serial = "5.4.1"
+
+embassy-time = { version = "0.3", features = ["std", "generic-queue"] }
+embassy-futures = { version = "0.1", features = ["log"] }
+embassy-sync = { version = "0.6", features = ["log"] }
+
+embassy-net = { version = "0.4", features = [
+    "log",
+    "packet-trace",
+    "proto-ipv4",
+    "medium-ip",
+    "tcp",
+    "udp",
+    "dns",
+] }
+embassy-net-ppp = { version = "0.1", features = ["log"] }
+embassy-at-cmux = { path = "../../../embassy/embassy-at-cmux", features = [
+    "log",
+] }
+
+embedded-tls = { git = "https://github.com/drogue-iot/embedded-tls", rev = "f788e02", default-features = false, features = [
+    "log",
+] }
+
+embedded-io-adapters = { version = "0.6", features = ["tokio-1"] }
+embedded-io-async = { version = "0.6" }
+heapless = "0.8"
+
+env_logger = "0.11"
+log = "0.4.21"
+
+static_cell = { version = "2.0" }
+
+atat = { version = "0.23", features = ["derive", "bytes", "log"] }
+ublox-cellular-rs = { version = "0.4.0", path = "../..", features = [
+    "lara-r6",
+    "log",
+] }
+reqwless = { git = "https://github.com/drogue-iot/reqwless", features = [
+    "log",
+] }
+smoltcp = { version = "*", default-features = false, features = [
+    "dns-max-server-count-4",
+] }
+rand_chacha = { version = "0.3", default-features = false }
+
+embedded-mqtt = { path = "../../../embedded-mqtt", features = ["log", "embedded-tls"] }
+
+
+[features]
+ppp = ["ublox-cellular-rs/ppp"]
+internal-network-stack = ["ublox-cellular-rs/internal-network-stack"]
+
+[patch.crates-io]
+ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", branch = "feature/async-borrowed-sockets" }
+
+no-std-net = { git = "https://github.com/rushmorem/no-std-net", branch = "issue-15" }
+# embassy-time = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+# embassy-sync = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+# embassy-net = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+# embassy-net-ppp = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+# embassy-futures = { git = "https://github.com/embassy-rs/embassy", branch = "main" }
+
+embassy-time = { path = "../../../embassy/embassy-time" }
+embassy-sync = { path = "../../../embassy/embassy-sync" }
+embassy-net = { path = "../../../embassy/embassy-net" }
+embassy-net-ppp = { path = "../../../embassy/embassy-net-ppp" }
+embassy-futures = { path = "../../../embassy/embassy-futures" }
+atat = { path = "../../../atat/atat" }
+
+[patch."https://github.com/drogue-iot/embedded-tls"]
+embedded-tls = { path = "../../../embedded-tls" }
+
+[profile.dev]
+opt-level = "s"
+
+[profile.release]
+opt-level = "s"

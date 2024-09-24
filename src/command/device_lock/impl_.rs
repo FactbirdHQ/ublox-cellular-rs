@@ -137,8 +137,7 @@ mod test {
     use super::*;
     use crate::command::device_lock::responses::PinStatus;
     use atat::serde_at::de::from_str;
-    use atat::serde_at::ser::to_string;
-    use heapless::String;
+    use atat::serde_at::ser::to_slice;
 
     #[test]
     fn serialize_pin_status() {
@@ -146,9 +145,10 @@ mod test {
             value_sep: false,
             ..atat::serde_at::SerializeOptions::default()
         };
-        let s = to_string::<_, 32>(&PinStatusCode::PhNetSubPin, "", options).unwrap();
+        let mut buf = [0u8; 32];
+        let s = to_slice(&PinStatusCode::PhNetSubPin, "", &mut buf, options).unwrap();
 
-        assert_eq!(s, String::<32>::try_from("PH-NETSUB PIN").unwrap())
+        assert_eq!(&buf[..s], b"PH-NETSUB PIN")
     }
 
     #[test]

@@ -191,7 +191,7 @@ async fn main_task(spawner: Spawner) {
             .set_desired_state(OperationState::DataEstablished)
             .await;
         info!("set_desired_state(PowerState::Alive)");
-        while control.power_state() != OperationState::DataEstablished {
+        while control.operation_state() != OperationState::DataEstablished {
             Timer::after(Duration::from_millis(1000)).await;
         }
         Timer::after(Duration::from_millis(10000)).await;
@@ -228,7 +228,7 @@ async fn main_task(spawner: Spawner) {
         Timer::after(Duration::from_millis(10000)).await;
         control.set_desired_state(OperationState::PowerDown).await;
         info!("set_desired_state(PowerState::PowerDown)");
-        while control.power_state() != OperationState::PowerDown {
+        while control.operation_state() != OperationState::PowerDown {
             Timer::after(Duration::from_millis(1000)).await;
         }
 
