@@ -10,6 +10,7 @@
     ],
     "rust-analyzer.cargo.features": [
         "lara-r6",
+        "embassy-embedded-hal"
     ],
     "rust-analyzer.cargo.target": "thumbv7em-none-eabihf",
     "rust-analyzer.diagnostics.disabled": [

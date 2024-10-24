@@ -13,6 +13,7 @@ pub enum GenericError {
 pub enum Error {
     // General device errors
     BaudDetection,
+    SimCard,
     Busy,
     Uninitialized,
     StateTimeout,
@@ -37,6 +38,12 @@ pub enum Error {
     IoPin,
 
     SubscriberOverflow(embassy_sync::pubsub::Error),
+}
+
+impl From<embassy_time::TimeoutError> for Error {
+    fn from(_value: embassy_time::TimeoutError) -> Self {
+        Error::Generic(GenericError::Timeout)
+    }
 }
 
 #[cfg(feature = "defmt")]

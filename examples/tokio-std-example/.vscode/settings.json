@@ -1,0 +1,17 @@
+{
+    // override the default setting (`cargo check --all-targets`) which produces the following error
+    // "can't find crate for `test`" when the default compilation target is a no_std target
+    // with these changes RA will call `cargo check --bins` on save
+    "rust-analyzer.checkOnSave.allTargets": false,
+    "rust-analyzer.procMacro.enable": true,
+    "rust-analyzer.cargo.target": "x86_64-unknown-linux-gnu",
+    "rust-analyzer.cargo.features": [
+        "ppp",
+    ],
+    "rust-analyzer.checkOnSave.command": "clippy",
+    "rust-analyzer.cargoRunner": null,
+    "rust-analyzer.experimental.procAttrMacros": false,
+    "rust-analyzer.diagnostics.disabled": [
+        "macro-error"
+    ],
+}

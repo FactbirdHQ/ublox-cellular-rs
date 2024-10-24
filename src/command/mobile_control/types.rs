@@ -1,7 +1,7 @@
 //! Argument and parameter types used by Mobile equipment control and status Commands and Responses
 use atat::atat_derive::AtatEnum;
 
-#[derive(Clone, PartialEq, Eq, AtatEnum)]
+#[derive(Clone, Copy, PartialEq, Eq, AtatEnum)]
 pub enum Functionality {
     /// 0: Sets the MT to minimum functionality (disable both transmit and receive RF
     /// circuits by deactivating both CS and PS services)
@@ -206,7 +206,7 @@ pub enum TerminationErrorMode {
     Verbose = 2,
 }
 
-#[derive(Clone, PartialEq, Eq, AtatEnum)]
+#[derive(Clone, Copy, PartialEq, Eq, AtatEnum)]
 pub enum PowerMode {
     ///MT is switched on with minimum functionality
     Minimum = 0,

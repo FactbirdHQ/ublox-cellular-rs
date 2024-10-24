@@ -1,6 +1,15 @@
 use core::convert::Infallible;
 use embedded_hal::digital::{ErrorType, InputPin, OutputPin, PinState};
-use heapless::String;
+use embedded_io_async::{BufRead, Read, Write};
+
+use crate::{
+    command::{
+        control::types::BaudRate,
+        networking::types::EmbeddedPortFilteringMode,
+        psn::types::{ContextId, ProfileId},
+    },
+    DEFAULT_BAUD_RATE,
+};
 
 pub struct NoPin;
 
@@ -72,19 +81,44 @@ pub trait CellularConfig<'a> {
     type PowerPin: OutputPin;
     type VintPin: InputPin;
 
+    const AT_CONFIG: atat::Config = atat::Config::new();
+
+    // Transport settings
     const FLOW_CONTROL: bool = false;
+    const BAUD_RATE: BaudRate = DEFAULT_BAUD_RATE;
+
+    #[cfg(feature = "internal-network-stack")]
     const HEX_MODE: bool = true;
+
+    const EMBEDDED_PORT_FILTERING: EmbeddedPortFilteringMode =
+        EmbeddedPortFilteringMode::Enable(6000, 6200);
+
     const OPERATOR_FORMAT: OperatorFormat = OperatorFormat::Long;
 
-    const PROFILE_ID: u8 = 1;
-    // #[cfg(not(feature = "upsd-context-activation"))]
-    const CONTEXT_ID: u8 = 1;
+    const PROFILE_ID: ProfileId = ProfileId(1);
+    const CONTEXT_ID: ContextId = ContextId(1);
 
     const APN: Apn<'a> = Apn::None;
 
-    fn reset_pin(&mut self) -> Option<&mut Self::ResetPin>;
-    fn power_pin(&mut self) -> Option<&mut Self::PowerPin>;
-    fn vint_pin(&mut self) -> Option<&mut Self::VintPin>;
+    #[cfg(feature = "ppp")]
+    const PPP_CONFIG: embassy_net_ppp::Config<'a>;
+
+    fn reset_pin(&mut self) -> Option<&mut Self::ResetPin> {
+        None
+    }
+
+    fn power_pin(&mut self) -> Option<&mut Self::PowerPin> {
+        None
+    }
+
+    fn vint_pin(&mut self) -> Option<&mut Self::VintPin> {
+        None
+    }
+}
+
+pub trait Transport: Write + Read + BufRead {
+    fn set_baudrate(&mut self, baudrate: u32);
+    fn split_ref(&mut self) -> (impl Write, impl Read + BufRead);
 }
 
 #[repr(u8)]

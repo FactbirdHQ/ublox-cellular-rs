@@ -20,13 +20,6 @@ pub enum GpioInPull {
     PullDown = 2,
 }
 
-// #[derive(Clone, PartialEq, AtatEnum)]
-// pub enum GpioNumber {
-//     #[cfg(feature = "toby-r2")]
-//     Gpio1,
-
-// }
-
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
 pub enum GpioMode {
     /// • 0: output
