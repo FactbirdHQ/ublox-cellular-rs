@@ -154,7 +154,6 @@ async fn main(spawner: Spawner) {
     let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
     socket.set_timeout(Some(Duration::from_secs(20)));
 
-   
     let hostname = "ecdsa-test.germancoding.com";
     // let hostname = "eohkv57m7xxdr4m.m.pipedream.net";
     info!("looking up {:?}...", hostname);
@@ -198,9 +197,8 @@ async fn main(spawner: Spawner) {
         .unwrap();
 
     {
-            info!("Got resp! {=[u8]:a}", &rx_buf[..512]);
-
-        }
+        info!("Got resp! {=[u8]:a}", &rx_buf[..512]);
+    }
 
     // let mut buf = [0; 16384];
     // let len = response

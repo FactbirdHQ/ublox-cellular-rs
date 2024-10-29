@@ -1,56 +1,92 @@
+name: CI
+
 on:
   push:
     branches:
       - master
   pull_request:
 
-name: CI
-
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  test:
-    name: Build & Test
+  build:
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+
       - uses: dsherret/rust-toolchain-file@v1
-      - name: Build
-        uses: actions-rs/cargo@v1
-        with:
-          command: build
-          args: --all --features "defmt,lara-r6" --target thumbv7em-none-eabihf
+
+      - name: Build (library)
+        run: cargo build --all --target thumbv7em-none-eabihf --features "lara-r6"
+
+      # - name: Build (examples)
+      #   run: |
+      #     for EXAMPLE in $(ls examples);
+      #     do
+      #       (cd examples/$EXAMPLE && cargo build)
+      #     done
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - uses: dsherret/rust-toolchain-file@v1
 
       - name: Test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
-          args: --lib --features "log,lara-r6"
-        env: 
-          DEFMT_LOG: off
+        run: cargo test --features "lara-r6"
+
+      - name: Install Miri
+        run: |
+          rustup toolchain install nightly --component miri
+          rustup override set nightly
+          cargo miri setup
+
+      - name: Test (Miri)
+        run: cargo miri test --lib --features "lara-r6"
 
   rustfmt:
-    name: rustfmt
+    name: Rustfmt
     runs-on: ubuntu-latest
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v3
+
+        uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
-      - name: Rustfmt
-        run: cargo fmt -- --check
+
+      - name: Run rustfmt (library)
+        run: cargo fmt --all -- --check --verbose
+
+      - name: Run rustfmt (examples)
+        run: |
+          for EXAMPLE in $(ls examples);
+          do
+            (cd examples/$EXAMPLE && cargo fmt --all -- --check --verbose)
+          done
 
   clippy:
-    name: clippy
+    name: Clippy
     runs-on: ubuntu-latest
+    env:
+      CLIPPY_PARAMS: -W clippy::all -W clippy::pedantic -W clippy::nursery -W clippy::cargo
     steps:
       - name: Checkout source code
-        uses: actions/checkout@v3
+
+        uses: actions/checkout@v4
       - uses: dsherret/rust-toolchain-file@v1
-      - name: Run clippy
-        uses: actions-rs/clippy-check@v1
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --features "lara-r6" -- ${{ env.CLIPPY_PARAMS }}
+
+      - name: Run clippy (library)
+        run: cargo clippy --features "lara-r6" -- ${{ env.CLIPPY_PARAMS }}
+
+      # - name: Run clippy (examples)
+      #   run: |
+      #     for EXAMPLE in $(ls examples);
+      #     do
+      #       (cd examples/$EXAMPLE && cargo clippy -- ${{ env.CLIPPY_PARAMS }})
+      #     done

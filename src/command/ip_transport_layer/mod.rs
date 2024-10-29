@@ -6,7 +6,7 @@ pub mod types;
 pub mod urc;
 
 use atat::atat_derive::AtatCmd;
-use embedded_nal::IpAddr;
+use core::net::IpAddr;
 use responses::{
     CreateSocketResponse, SocketControlResponse, SocketData, SocketErrorResponse,
     UDPSendToDataResponse, UDPSocketData, WriteSocketDataResponse,
