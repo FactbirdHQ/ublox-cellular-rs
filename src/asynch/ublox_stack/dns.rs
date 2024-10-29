@@ -3,8 +3,8 @@
 use core::{cell::RefCell, future::poll_fn, task::Poll};
 
 use atat::asynch::AtatClient;
+use core::net::IpAddr;
 use embedded_nal_async::AddrType;
-use no_std_net::IpAddr;
 
 use crate::asynch::ublox_stack::DnsState;
 

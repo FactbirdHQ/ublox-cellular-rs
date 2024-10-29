@@ -4,7 +4,7 @@ use super::types::{
 };
 use crate::{command::network_service::types::RatAct, command::psn::types::ProfileId};
 use atat::atat_derive::AtatResp;
-use embedded_nal::IpAddr;
+use core::net::IpAddr;
 use heapless::String;
 
 /// +UUPSDA

@@ -31,12 +31,12 @@ use super::AtHandle;
 
 use atat::asynch::AtatClient;
 use atomic_polyfill::{AtomicBool, AtomicU8, Ordering};
+use core::net::IpAddr;
 use embassy_futures::select::{select4, Either4};
 use embassy_sync::waitqueue::WakerRegistration;
 use embassy_time::{Duration, Ticker};
 use embedded_nal_async::SocketAddr;
 use futures::pin_mut;
-use no_std_net::IpAddr;
 use ublox_sockets::{
     AnySocket, ChannelId, PeerHandle, Socket, SocketHandle, SocketSet, SocketStorage,
 };

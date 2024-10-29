@@ -1,5 +1,5 @@
 use atat::atat_derive::{AtatEnum, AtatLen};
-use embedded_nal::IpAddr;
+use core::net::IpAddr;
 use heapless::String;
 use serde::{Deserialize, Serialize};
 

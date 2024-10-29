@@ -1,7 +1,7 @@
 //! Responses for Internet protocol transport layer Commands
 use super::types::SocketControlParam;
 use atat::atat_derive::AtatResp;
-use embedded_nal::IpAddr;
+use core::net::IpAddr;
 use heapless::String;
 use ublox_sockets::SocketHandle;
 

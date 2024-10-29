@@ -1,7 +1,4 @@
 [toolchain]
-channel = "1.75"
-components = [ "rust-src", "rustfmt", "llvm-tools", "clippy" ]
-targets = [
-    "x86_64-unknown-linux-gnu",
-    "thumbv7em-none-eabihf"
-]
+channel = "1.80"
+components = ["rust-src", "rustfmt", "llvm-tools", "clippy"]
+targets = ["x86_64-unknown-linux-gnu", "thumbv7em-none-eabihf"]
