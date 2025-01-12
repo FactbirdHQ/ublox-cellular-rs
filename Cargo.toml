@@ -1,13 +1,13 @@
 [package]
 name = "ublox-cellular-rs"
 version = "0.4.0"
-authors = ["Mathias Koch <mk@blackbird.online>"]
+authors = ["Mathias Koch <mk@Factbird.online>"]
 description = "Driver crate for u-blox cellular devices, implementation follows 'UBX-13002752 - R65'"
 readme = "../README.md"
 keywords = ["arm", "cortex-m", "ublox", "cellular", "embedded-hal-driver"]
 categories = ["embedded", "no-std"]
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/BlackbirdHQ/ublox-cellular-rs"
+repository = "https://github.com/FactbirdHQ/ublox-cellular-rs"
 edition = "2021"
 
 [lib]
@@ -18,9 +18,8 @@ doctest = false
 atat = { version = "0.23", features = ["derive", "bytes"] }
 heapless = { version = "^0.8", features = ["serde"] }
 serde = { version = "^1", default-features = false, features = ["derive"] }
-#ublox-sockets = { version = "0.5", optional = true }
-ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", branch = "feature/async-borrowed-sockets", optional = true }
-embassy-time = "0.3"
+ublox-sockets = { git = "https://github.com/FactbirdHQ/ublox-sockets", rev = "0b0d186", optional = true }
+embassy-time = "0.4"
 embassy-sync = "0.6"
 
 log = { version = "^0.4", default-features = false, optional = true }
@@ -33,15 +32,14 @@ embassy-futures = { version = "0.1" }
 embedded-hal = "1.0.0"
 embedded-nal-async = { version = "0.8" }
 
-embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "c83b7a052" }
-# embassy-at-cmux = { path = "../embassy/embassy-at-cmux" }
+embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "66d78d425" }
 
-embassy-net-ppp = { version = "0.1", optional = true }
-embassy-net = { version = "0.4", features = [
+embassy-net-ppp = { version = "0.2", optional = true }
+embassy-net = { version = "0.6", features = [
     "proto-ipv4",
     "medium-ip",
 ], optional = true }
-embassy-embedded-hal = { version = "0.1", optional = true }
+embassy-embedded-hal = { version = "0.3", optional = true }
 
 embedded-io-async = "0.6"
 
@@ -138,19 +136,7 @@ default-members = ["."]
 exclude = ["examples"]
 
 [patch.crates-io]
-#ublox-sockets = { git = "https://github.com/BlackbirdHQ/ublox-sockets", branch = "feature/async-borrowed-sockets" }
-#ublox-sockets = { path = "../ublox-sockets" }
-
-embassy-time = { git = "https://github.com/MathiasKoch/embassy", rev = "49e44344e" }
-embassy-sync = { git = "https://github.com/MathiasKoch/embassy", rev = "49e44344e" }
-embassy-futures = { git = "https://github.com/MathiasKoch/embassy", rev = "49e44344e" }
-embassy-net-ppp = { git = "https://github.com/MathiasKoch/embassy", rev = "49e44344e" }
-embassy-net = { git = "https://github.com/MathiasKoch/embassy", rev = "49e44344e" }
-
-#embassy-time = { path = "../embassy/embassy-time" }
-#embassy-sync = { path = "../embassy/embassy-sync" }
-#embassy-futures = { path = "../embassy/embassy-futures" }
-atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "a466836" }
+atat = { git = "https://github.com/FactbirdHQ/atat", rev = "c31f700" }
 # atat = { path = "../atat/atat" }
 
 # [patch."https://github.com/MathiasKoch/embassy"]
