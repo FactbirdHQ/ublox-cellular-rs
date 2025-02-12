@@ -34,7 +34,7 @@ pub trait ModuleParams: Copy {
         Duration::from_secs(5)
     }
 
-    /// How long to wait for a organised power-down in the ansence of VInt
+    /// How long to wait for an organised power-down in the absence of VInt
     fn power_down_wait(&self) -> Duration {
         Duration::from_secs(35)
     }

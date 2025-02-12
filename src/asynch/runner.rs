@@ -266,7 +266,9 @@ where
 
         let mut pwr = PwrCtrl::new(&self.ch, &mut self.config);
         if let Err(e) = pwr.power_up().await {
+            Timer::after_millis(10).await;
             pwr.power_down().await?;
+            Timer::after_millis(100).await;
             return Err(e);
         };
 
@@ -290,8 +292,8 @@ where
             BaudRate::B921600,
             BaudRate::B3000000,
         ] {
-            match with_timeout(Duration::from_secs(6), self.probe_baud(baudrate)).await {
-                Ok(Ok(_)) => {
+            match self.probe_baud(baudrate).await {
+                Ok(_) => {
                     if baudrate != C::BAUD_RATE {
                         // Attempt to store the desired baudrate, so we can shortcut
                         // this probing next time. Ignore any potential failures, as

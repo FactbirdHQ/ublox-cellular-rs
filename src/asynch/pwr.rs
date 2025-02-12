@@ -1,4 +1,4 @@
-use embassy_time::{Duration, Timer};
+use embassy_time::{with_timeout, Duration, Timer};
 use embedded_hal::digital::{InputPin as _, OutputPin as _};
 
 use crate::{
@@ -107,6 +107,7 @@ where
             }
             Err(Error::PoweredDown)
         } else {
+            debug!("Device already powered up");
             Ok(())
         }
     }
@@ -126,11 +127,26 @@ where
                 self.ch.set_operation_state(OperationState::PowerDown);
                 debug!("Powered down");
 
-                Timer::after_secs(1).await;
+                // Wait for up to `power_down_wait` time, while checking `has_power` continuously
+                with_timeout(
+                    self.ch
+                        .module()
+                        .map(|m| m.power_down_wait())
+                        .unwrap_or(Generic.power_down_wait()),
+                    async {
+                        while self.has_power()? {
+                            Timer::after(Duration::from_millis(100)).await;
+                        }
+                        Ok::<(), Error>(())
+                    },
+                )
+                .await
+                .map_err(|_| Error::Generic(crate::error::GenericError::Timeout))??;
             } else {
                 warn!("No power pin configured");
             }
         } else {
+            debug!("Device already powered down");
             self.ch.set_operation_state(OperationState::PowerDown);
         }
         Ok(())
