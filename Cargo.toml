@@ -15,7 +15,7 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.23", features = ["derive", "bytes"] }
+atat = { version = "0.24", features = ["derive", "bytes"] }
 heapless = { version = "^0.8", features = ["serde"] }
 serde = { version = "^1", default-features = false, features = ["derive"] }
 ublox-sockets = { git = "https://github.com/FactbirdHQ/ublox-sockets", rev = "0b0d186", optional = true }
@@ -135,8 +135,8 @@ members = []
 default-members = ["."]
 exclude = ["examples"]
 
-[patch.crates-io]
-atat = { git = "https://github.com/FactbirdHQ/atat", rev = "c31f700" }
+# [patch.crates-io]
+# atat = { git = "https://github.com/FactbirdHQ/atat", rev = "2f55331" }
 # atat = { path = "../atat/atat" }
 
 # [patch."https://github.com/MathiasKoch/embassy"]
