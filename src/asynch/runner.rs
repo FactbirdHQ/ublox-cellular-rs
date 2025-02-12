@@ -272,6 +272,20 @@ where
             return Err(e);
         };
 
+        // Rid the transport of garbage bytes from powercycle
+        loop {
+            let len = self
+                .transport
+                .fill_buf()
+                .await
+                .map(|s| s.len())
+                .unwrap_or_default();
+            self.transport.consume(len);
+            if len == 0 {
+                break;
+            }
+        }
+
         // Probe all possible baudrates with the goal of establishing initial
         // communication with the module, so we can reconfigure it for desired
         // baudrate.
@@ -292,21 +306,18 @@ where
             BaudRate::B921600,
             BaudRate::B3000000,
         ] {
-            match self.probe_baud(baudrate).await {
-                Ok(_) => {
-                    if baudrate != C::BAUD_RATE {
-                        // Attempt to store the desired baudrate, so we can shortcut
-                        // this probing next time. Ignore any potential failures, as
-                        // this is purely an optimization.
+            if let Ok(_) = self.probe_baud(baudrate).await {
+                if baudrate != C::BAUD_RATE {
+                    // Attempt to store the desired baudrate, so we can shortcut
+                    // this probing next time. Ignore any potential failures, as
+                    // this is purely an optimization.
 
-                        // TODO: Is this correct?
-                        // Some modules seem to persist baud rates by themselves.
-                        // Nothing to do here for now.
-                    }
-                    found_baudrate = true;
-                    break;
+                    // TODO: Is this correct?
+                    // Some modules seem to persist baud rates by themselves.
+                    // Nothing to do here for now.
                 }
-                _ => {}
+                found_baudrate = true;
+                break;
             }
         }
 
@@ -319,7 +330,7 @@ where
             return Err(Error::BaudDetection);
         }
 
-        let mut cmd_buf = [0u8; 64];
+        let mut cmd_buf = [0u8; 128];
         let mut at_client = SimpleClient::new(
             &mut self.transport,
             atat::AtDigester::<Urc>::new(),
