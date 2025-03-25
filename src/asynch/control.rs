@@ -118,7 +118,7 @@ impl<'a, const INGRESS_BUF_SIZE: usize> Control<'a, INGRESS_BUF_SIZE> {
     }
 
     pub fn is_connected(&self) -> bool {
-        self.state_ch.operation_state(None) == OperationState::DataEstablished
+        self.link_state() == LinkState::Up
     }
 
     pub fn desired_state(&self) -> OperationState {

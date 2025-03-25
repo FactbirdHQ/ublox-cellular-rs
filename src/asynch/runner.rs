@@ -585,13 +585,13 @@ where
                                     gateway: None,
                                     dns_servers,
                                 });
-
+                            self.ch.set_link_state(state::LinkState::Up);
                             stack.set_config_v4(config);
                         })
                         .await;
 
                     info!("ppp failed: {:?}", res);
-
+                    self.ch.set_link_state(state::LinkState::Down);
                     self.data_channel.clear_hangup_detection();
 
                     // escape back to data mode.
