@@ -185,6 +185,20 @@ impl<'d> Runner<'d> {
         })
     }
 
+    pub async fn wait_for_link_state(&self, ls: LinkState) {
+        if self.link_state(None) == ls {
+            return;
+        }
+
+        poll_fn(|cx| {
+            if self.link_state(Some(cx)) == ls {
+                return Poll::Ready(());
+            }
+            Poll::Pending
+        })
+        .await
+    }
+
     pub async fn wait_for_desired_state(&self, ps: OperationState) {
         if self.desired_state(None) == ps {
             return;
