@@ -538,7 +538,7 @@ where
 
                     {
                         // Must be large enough to hold 'ATD*99***1#\r\n'
-                        let mut buf = [0u8; 16];
+                        let mut buf = [0u8; 19];
 
                         let mut at_client = SimpleClient::new(
                             &mut self.data_channel,
@@ -547,7 +547,12 @@ where
                             C::AT_CONFIG,
                         );
 
-                        // let _ = at_client.send(&DeactivatePDPContext).await;
+                        //This is need as a workaround for lara r6 firmware 0.13.
+                        let _ = at_client
+                            .send(
+                                &heapless::String::<19>::try_from("AT+USOCR=17,1,0,1\r\n").unwrap(),
+                            )
+                            .await;
 
                         // Send AT command to enter PPP mode
                         let res = at_client.send(&EnterPPP { cid: C::CONTEXT_ID }).await;
