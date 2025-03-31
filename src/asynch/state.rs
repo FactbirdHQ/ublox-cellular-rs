@@ -9,7 +9,7 @@ use embassy_sync::blocking_mutex::Mutex;
 use embassy_sync::waitqueue::WakerRegistration;
 
 /// The link state of a network device.
-#[derive(PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum LinkState {
     /// The link is down.
@@ -183,6 +183,20 @@ impl<'d> Runner<'d> {
             }
             s.desired_state
         })
+    }
+
+    pub async fn wait_for_link_state(&self, ls: LinkState) {
+        if self.link_state(None) == ls {
+            return;
+        }
+
+        poll_fn(|cx| {
+            if self.link_state(Some(cx)) == ls {
+                return Poll::Ready(());
+            }
+            Poll::Pending
+        })
+        .await
     }
 
     pub async fn wait_for_desired_state(&self, ps: OperationState) {

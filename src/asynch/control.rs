@@ -117,12 +117,20 @@ impl<'a, const INGRESS_BUF_SIZE: usize> Control<'a, INGRESS_BUF_SIZE> {
         self.state_ch.operation_state(None)
     }
 
+    pub fn is_connected(&self) -> bool {
+        self.link_state() == LinkState::Up
+    }
+
     pub fn desired_state(&self) -> OperationState {
         self.state_ch.desired_state(None)
     }
 
     pub fn set_desired_state(&self, ps: OperationState) {
         self.state_ch.set_desired_state(ps);
+    }
+
+    pub async fn wait_for_link_state(&self, link_state: LinkState) {
+        self.state_ch.wait_for_link_state(link_state).await;
     }
 
     pub async fn wait_for_desired_state(&self, ps: OperationState) {
