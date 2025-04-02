@@ -1,5 +1,7 @@
 //! Responses for Internet protocol transport layer Commands
-use super::types::SocketControlParam;
+use crate::command::ip_transport_layer::types::AoNState;
+
+use super::types::{SocketControlParam, SocketProtocol};
 use atat::atat_derive::AtatResp;
 use core::net::IpAddr;
 use heapless::String;
@@ -12,6 +14,10 @@ pub const INGRESS_CHUNK_SIZE: usize = 256;
 pub struct CreateSocketResponse {
     #[at_arg(position = 0)]
     pub socket: SocketHandle,
+    #[at_arg(position = 1)]
+    pub protocol: SocketProtocol,
+    #[at_arg(position = 2)]
+    pub aon_state: AoNState,
 }
 
 /// 25.8 Get Socket Error +USOER

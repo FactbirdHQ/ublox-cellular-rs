@@ -2,7 +2,7 @@
 use crate::command::device_data_security::types::SecurityProfileId;
 use atat::atat_derive::AtatEnum;
 
-#[derive(Clone, PartialEq, Eq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 pub enum SocketProtocol {
     TCP = 6,
     UDP = 17,
@@ -48,4 +48,17 @@ pub enum SocketControlParam {
     /// 11: query for TCP outgoing unacknowledged data (only TCP sockets)
     OutgoingUnackData = 11,
     // /// 5-9, 12-99: RFU
+}
+
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
+#[repr(u8)]
+pub enum PreferredProtocolType {
+    Ipv4 = 0,
+    Ipv6 = 1,
+}
+
+#[derive(Clone, PartialEq, Eq, AtatEnum)]
+pub enum AoNState {
+    DoNotReport = 0,
+    Report = 1,
 }

@@ -10,7 +10,6 @@ pub mod file_system;
 pub mod general;
 pub mod gpio;
 pub mod http;
-#[cfg(feature = "internal-network-stack")]
 pub mod ip_transport_layer;
 pub mod ipc;
 pub mod mobile_control;
@@ -126,6 +125,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use atat::AtatCmd;
+
+    use crate::command::ip_transport_layer::CreateSocket;
+
     use super::*;
 
     #[test]
@@ -146,5 +149,19 @@ mod tests {
             custom_cxreg_parse::<&[u8], nom::error::Error<&[u8]>>(&b"+CREG"[..])(creg_urc_full)
                 .is_ok()
         );
+    }
+
+    #[test]
+    fn test_create_socket() {
+        let cmd = ip_transport_layer::CreateSocket {
+            protocol: ip_transport_layer::types::SocketProtocol::UDP,
+            local_port: Some(1),
+            preferred_protocol_type: Some(ip_transport_layer::types::PreferredProtocolType::Ipv4),
+            cid: Some(1),
+            report_aon: Some(ip_transport_layer::types::AoNState::DoNotReport),
+        };
+        let mut buf = [0u8; 26];
+
+        let s = cmd.write(&mut buf);
     }
 }

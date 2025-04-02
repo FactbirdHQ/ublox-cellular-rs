@@ -12,6 +12,10 @@ use crate::{
         },
         device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
         general::{responses::FirmwareVersion, GetCCID, GetFirmwareVersion, GetModelId},
+        ip_transport_layer::{
+            types::{AoNState, PreferredProtocolType, SocketProtocol},
+            CreateSocket,
+        },
         ipc::SetMultiplexing,
         mobile_control::{
             types::{Functionality, TerminationErrorMode},
@@ -537,8 +541,8 @@ where
                     last_start = Some(Instant::now());
 
                     {
-                        // Must be large enough to hold 'ATD*99***1#\r\n'
-                        let mut buf = [0u8; 19];
+                        // Must be large enough to hold CreateSocket cmd
+                        let mut buf = [0u8; 25];
 
                         let mut at_client = SimpleClient::new(
                             &mut self.data_channel,
@@ -547,11 +551,18 @@ where
                             C::AT_CONFIG,
                         );
 
-                        //This is need as a workaround for lara r6 firmware 0.13.
+                        #[cfg(feature = "lara-r6")]
+                        //This is needed as a workaround for lara r6 firmware 0.13.
+                        // Documentation for workaround: https://content.u-blox.com/sites/default/files/documents/LARA-R6001D-00B-IP_IN_UBX-22008409.pdf
+                        // In section B.1.2 Dial-up
                         let _ = at_client
-                            .send(
-                                &heapless::String::<19>::try_from("AT+USOCR=17,1,0,1\r\n").unwrap(),
-                            )
+                            .send(&CreateSocket {
+                                protocol: SocketProtocol::UDP,
+                                local_port: Some(1),
+                                preferred_protocol_type: Some(PreferredProtocolType::Ipv4),
+                                cid: Some(1),
+                                report_aon: None,
+                            })
                             .await;
 
                         // Send AT command to enter PPP mode
