@@ -1,8 +1,10 @@
 //! ### 25 - Internet protocol transport layer Commands
 //!
+pub mod responses;
 pub mod types;
 use super::NoResponse;
 use atat::atat_derive::AtatCmd;
+use responses::CreateSocketResponse;
 use types::{AoNState, PreferredProtocolType, SocketProtocol};
 
 /// 25.3 Create Socket +USOCR
@@ -16,11 +18,7 @@ use types::{AoNState, PreferredProtocolType, SocketProtocol};
 /// It is possible to specify the local port to bind within the socket in order to send data from a specific port. The
 /// bind functionality is supported for both TCP and UDP sockets.
 #[derive(Clone, AtatCmd)]
-#[cfg_attr(
-    feature = "internal-network-stack",
-    at_cmd("+USOCR", CreateSocketResponse)
-)]
-#[cfg_attr(not(feature = "internal-network-stack"), at_cmd("+USOCR", NoResponse))]
+#[at_cmd("+USOCR", CreateSocketResponse)]
 pub struct CreateSocket {
     #[at_arg(position = 0)]
     pub protocol: SocketProtocol,
@@ -34,12 +32,21 @@ pub struct CreateSocket {
     pub report_aon: Option<AoNState>,
 }
 
+#[derive(Clone, AtatCmd)]
+#[cfg_attr(
+    not(feature = "internal-network-stack"),
+    at_cmd("+USOCL", NoResponse, attempts = 1, timeout_ms = 120000)
+)]
+pub struct CloseSocket {
+    #[at_arg(position = 0)]
+    pub socket: u8,
+}
+
 #[cfg(feature = "internal-network-stack")]
 pub use internal_network_stack::*;
 #[cfg(feature = "internal-network-stack")]
 mod internal_network_stack {
-    #[path = "../responses.rs"]
-    pub mod responses;
+
     #[path = "../urc.rs"]
     pub mod urc;
 
