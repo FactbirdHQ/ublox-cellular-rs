@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::command::Urc;
 use core::cell::RefCell;
 use core::future::poll_fn;
 use core::task::{Context, Poll};
@@ -258,7 +259,7 @@ impl<'d> Runner<'d> {
 pub struct Device<'d, const URC_CAPACITY: usize> {
     pub(crate) shared: &'d Mutex<NoopRawMutex, RefCell<Shared>>,
     // pub(crate) at: AtHandle<'d, AT>,
-    pub(crate) urc_subscription: UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
+    pub(crate) urc_subscription: atat::UrcSubscription<'d, Urc, URC_CAPACITY, 2>,
 }
 
 #[cfg(feature = "internal-network-stack")]
@@ -275,20 +276,6 @@ impl<'d, const URC_CAPACITY: usize> Device<'d, URC_CAPACITY> {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.state_waker.register(cx.waker());
-            s.operation_state
-        })
-    }
-
-    pub fn link_state(&self) -> LinkState {
-        self.shared.lock(|s| {
-            let s = &mut *s.borrow_mut();
-            s.link_state
-        })
-    }
-
-    pub fn operation_state(&self) -> OperationState {
-        self.shared.lock(|s| {
-            let s = &mut *s.borrow_mut();
             s.operation_state
         })
     }
@@ -320,11 +307,12 @@ impl<'d, const URC_CAPACITY: usize> Device<'d, URC_CAPACITY> {
     }
 
     pub async fn wait_for_desired_state_change(&self) -> OperationState {
-        let current_desired = self.shared.lock(|s| s.borrow().desired_state);
+        let old_desired = self.shared.lock(|s| s.borrow().desired_state);
 
         poll_fn(|cx| {
-            if self.desired_state(cx) != current_desired {
-                return Poll::Ready(ps);
+            let current_desired = self.desired_state(cx);
+            if current_desired != old_desired {
+                return Poll::Ready(current_desired);
             }
             Poll::Pending
         })

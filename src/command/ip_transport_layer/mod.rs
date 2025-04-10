@@ -4,6 +4,8 @@ pub mod responses;
 pub mod types;
 use super::NoResponse;
 use atat::atat_derive::AtatCmd;
+#[cfg(feature = "internal-network-stack")]
+pub use internal_network_stack::*;
 use responses::CreateSocketResponse;
 use types::{AoNState, PreferredProtocolType, SocketProtocol};
 
@@ -33,32 +35,26 @@ pub struct CreateSocket {
 }
 
 #[derive(Clone, AtatCmd)]
-#[cfg_attr(
-    not(feature = "internal-network-stack"),
-    at_cmd("+USOCL", NoResponse, attempts = 1, timeout_ms = 120000)
-)]
+#[at_cmd("+USOCL", NoResponse, attempts = 1, timeout_ms = 120000)]
 pub struct CloseSocket {
     #[at_arg(position = 0)]
     pub socket: u8,
 }
 
 #[cfg(feature = "internal-network-stack")]
-pub use internal_network_stack::*;
-#[cfg(feature = "internal-network-stack")]
 mod internal_network_stack {
-
     #[path = "../urc.rs"]
     pub mod urc;
 
+    use super::responses::{
+        CreateSocketResponse, SocketControlResponse, SocketData, SocketErrorResponse,
+        UDPSendToDataResponse, UDPSocketData, WriteSocketDataResponse,
+    };
     use super::types::{
         HexMode, PreferredProtocolType, SocketControlParam, SocketProtocol, SslTlsStatus,
     };
     use atat::atat_derive::AtatCmd;
     use core::net::IpAddr;
-    use responses::{
-        CreateSocketResponse, SocketControlResponse, SocketData, SocketErrorResponse,
-        UDPSendToDataResponse, UDPSocketData, WriteSocketDataResponse,
-    };
 
     use super::NoResponse;
     use ublox_sockets::SocketHandle;

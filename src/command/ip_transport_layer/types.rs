@@ -57,7 +57,7 @@ pub enum PreferredProtocolType {
     Ipv6 = 1,
 }
 
-#[derive(Clone, PartialEq, Eq, AtatEnum)]
+#[derive(Debug, Clone, PartialEq, Eq, AtatEnum)]
 pub enum AoNState {
     DoNotReport = 0,
     Report = 1,

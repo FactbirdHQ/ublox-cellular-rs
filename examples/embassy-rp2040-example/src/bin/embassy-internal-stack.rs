@@ -1,7 +1,9 @@
 #![no_std]
 #![no_main]
+#![cfg(feature = "internal-network-stack")]
 #![allow(stable_features)]
 #![feature(type_alias_impl_trait)]
+#![feature(impl_trait_in_assoc_type)]
 
 use defmt::*;
 use embassy_executor::Spawner;
@@ -10,13 +12,13 @@ use embassy_rp::gpio::Input;
 
 use embassy_rp::gpio::OutputOpenDrain;
 use embassy_rp::uart::BufferedUart;
-use embassy_rp::uart::BufferedUartRx;
-use embassy_rp::uart::BufferedUartTx;
 use embassy_rp::{bind_interrupts, peripherals::UART0, uart::BufferedInterruptHandler};
+use embassy_rp2040_example::cell_transport::CellTransport;
+
 use embassy_time::{Duration, Timer};
 use static_cell::StaticCell;
-use ublox_cellular::asynch::InternalRunner;
 use ublox_cellular::asynch::Resources;
+use ublox_cellular::asynch::Runner;
 use {defmt_rtt as _, panic_probe as _};
 
 use ublox_cellular::config::{Apn, CellularConfig};
@@ -86,18 +88,14 @@ async fn main(spawner: Spawner) {
         embassy_rp::uart::Config::default(),
     );
 
-    let (uart_rx, uart_tx) = cell_uart.split();
     let cell_nrst = gpio::OutputOpenDrain::new(p.PIN_4, gpio::Level::High);
     let cell_pwr = gpio::OutputOpenDrain::new(p.PIN_5, gpio::Level::High);
     let cell_vint = gpio::Input::new(p.PIN_6, gpio::Pull::None);
 
-    static RESOURCES: StaticCell<
-        Resources<BufferedUartTx<UART0>, CMD_BUF_SIZE, INGRESS_BUF_SIZE, URC_CAPACITY>,
-    > = StaticCell::new();
+    static RESOURCES: StaticCell<Resources<INGRESS_BUF_SIZE, URC_CAPACITY>> = StaticCell::new();
 
-    let (_net_device, mut control, runner) = ublox_cellular::asynch::new_internal(
-        uart_rx,
-        uart_tx,
+    let (runner, control) = ublox_cellular::asynch::Runner::new(
+        CellTransport(cell_uart),
         RESOURCES.init(Resources::new()),
         MyCelullarConfig {
             reset_pin: Some(cell_nrst),
@@ -119,9 +117,8 @@ async fn main(spawner: Spawner) {
 
     Timer::after(Duration::from_millis(1000)).await;
     loop {
-        control
-            .set_desired_state(OperationState::DataEstablished)
-            .await;
+        control.set_desired_state(OperationState::DataEstablished);
+
         info!("set_desired_state(PowerState::Alive)");
         while control.operation_state() != OperationState::DataEstablished {
             Timer::after(Duration::from_millis(1000)).await;
@@ -136,7 +133,7 @@ async fn main(spawner: Spawner) {
             info!("{}", signal_quality);
             if signal_quality.is_err() {
                 let desired_state = control.desired_state();
-                control.set_desired_state(desired_state).await
+                control.set_desired_state(desired_state);
             }
             if let Ok(sq) = signal_quality {
                 if let Ok(op) = operator {
@@ -158,7 +155,7 @@ async fn main(spawner: Spawner) {
             .await;
         info!("dns: {:?}", dns);
         Timer::after(Duration::from_millis(10000)).await;
-        control.set_desired_state(OperationState::PowerDown).await;
+        control.set_desired_state(OperationState::PowerDown);
         info!("set_desired_state(PowerState::PowerDown)");
         while control.operation_state() != OperationState::PowerDown {
             Timer::after(Duration::from_millis(1000)).await;
@@ -175,14 +172,7 @@ async fn main(spawner: Spawner) {
 
 #[embassy_executor::task]
 async fn cell_task(
-    mut runner: InternalRunner<
-        'static,
-        BufferedUartRx<'static, UART0>,
-        BufferedUartTx<'static, UART0>,
-        MyCelullarConfig,
-        INGRESS_BUF_SIZE,
-        URC_CAPACITY,
-    >,
+    mut runner: Runner<'static, CellTransport, MyCelullarConfig, INGRESS_BUF_SIZE, URC_CAPACITY>,
 ) -> ! {
     runner.run().await
 }

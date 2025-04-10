@@ -198,7 +198,6 @@ where
         // let data_channel = self.data_channel;
         state::Device {
             shared: &self.ch.shared,
-            desired_state_pub_sub: &self.ch.desired_state_pub_sub,
             urc_subscription: self.urc_channel.subscribe().unwrap(),
         }
     }
@@ -497,7 +496,7 @@ where
         Ok(())
     }
 
-    pub async fn run(&mut self, stack: embassy_net::Stack<'_>) -> ! {
+    pub async fn run(&mut self, #[cfg(feature = "ppp")] stack: embassy_net::Stack<'_>) -> ! {
         loop {
             let _ = PwrCtrl::new(&self.ch, &mut self.config).power_down().await;
 

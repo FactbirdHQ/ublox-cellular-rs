@@ -13,8 +13,7 @@ pub struct CreateSocketResponse {
 pub use internal_network_stack_respones::*;
 #[cfg(feature = "internal-network-stack")]
 pub mod internal_network_stack_respones {
-    use super::types::{SocketControlParam, SocketProtocol};
-    use crate::command::ip_transport_layer::types::AoNState;
+    use crate::command::ip_transport_layer::types::{AoNState, SocketControlParam, SocketProtocol};
     use atat::atat_derive::AtatResp;
     use core::net::IpAddr;
     use heapless::String;
