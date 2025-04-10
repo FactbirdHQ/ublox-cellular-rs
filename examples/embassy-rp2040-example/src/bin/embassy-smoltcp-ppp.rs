@@ -1,7 +1,7 @@
-#![cfg(feature = "ppp")]
 #![no_std]
 #![no_main]
 #![allow(stable_features)]
+#![cfg(feature = "ppp")]
 #![feature(type_alias_impl_trait)]
 #![feature(impl_trait_in_assoc_type)]
 
@@ -15,9 +15,8 @@ use embassy_rp::gpio::Input;
 
 use embassy_rp::gpio::OutputOpenDrain;
 use embassy_rp::uart::BufferedUart;
-use embassy_rp::uart::BufferedUartRx;
-use embassy_rp::uart::BufferedUartTx;
 use embassy_rp::{bind_interrupts, peripherals::UART0, uart::BufferedInterruptHandler};
+use embassy_rp2040_example::cell_transport::CellTransport;
 use embassy_time::Duration;
 use embedded_tls::Aes128GcmSha256;
 use embedded_tls::TlsConfig;
@@ -32,6 +31,7 @@ use reqwless::request::RequestBuilder as _;
 use reqwless::response::Response;
 use static_cell::StaticCell;
 use ublox_cellular::asynch::Resources;
+use ublox_cellular::asynch::Runner;
 use {defmt_rtt as _, panic_probe as _};
 
 use ublox_cellular::config::{Apn, CellularConfig};
@@ -40,7 +40,6 @@ bind_interrupts!(struct Irqs {
     UART0_IRQ => BufferedInterruptHandler<UART0>;
 });
 
-const CMD_BUF_SIZE: usize = 128;
 const INGRESS_BUF_SIZE: usize = 512;
 const URC_CAPACITY: usize = 16;
 
@@ -111,10 +110,10 @@ async fn main(spawner: Spawner) {
     let cell_pwr = gpio::OutputOpenDrain::new(p.PIN_5, gpio::Level::High);
     let cell_vint = gpio::Input::new(p.PIN_6, gpio::Pull::None);
 
-    static RESOURCES: StaticCell<Resources<CMD_BUF_SIZE, INGRESS_BUF_SIZE, URC_CAPACITY>> =
-        StaticCell::new();
-    let mut runner = ublox_cellular::asynch::Runner::new(
-        cell_uart.split(),
+    static RESOURCES: StaticCell<Resources<INGRESS_BUF_SIZE, URC_CAPACITY>> = StaticCell::new();
+
+    let (mut cell_runner, control) = ublox_cellular::asynch::Runner::new(
+        CellTransport(cell_uart),
         RESOURCES.init(Resources::new()),
         MyCelullarConfig {
             reset_pin: Some(cell_nrst),
@@ -124,24 +123,27 @@ async fn main(spawner: Spawner) {
     );
 
     static PPP_STATE: StaticCell<embassy_net_ppp::State<2, 2>> = StaticCell::new();
-    let net_device = runner.ppp_stack(PPP_STATE.init(embassy_net_ppp::State::new()));
+    let net_device = cell_runner.ppp_stack(PPP_STATE.init(embassy_net_ppp::State::new()));
 
     // Generate random seed
     let seed = 0x0123_4567_89ab_cdef; // chosen by fair dice roll. guarenteed to be random.
 
     // Init network stack
-    static STACK: StaticCell<Stack<embassy_net_ppp::Device<'static>>> = StaticCell::new();
+    static STACK: StaticCell<Stack<'_>> = StaticCell::new();
     static STACK_RESOURCES: StaticCell<StackResources<2>> = StaticCell::new();
 
-    let stack = &*STACK.init(Stack::new(
+    let (stack, stack_runner) = embassy_net::new(
         net_device,
         embassy_net::Config::default(),
         STACK_RESOURCES.init(StackResources::new()),
         seed,
-    ));
+    );
 
-    spawner.spawn(net_task(stack)).unwrap();
-    spawner.spawn(cell_task(runner, stack)).unwrap();
+    let stack = &*STACK.init(stack);
+
+    spawner.spawn(net_task(stack_runner)).unwrap();
+
+    spawner.spawn(cell_task_ppp(cell_runner, stack)).unwrap();
 
     stack.wait_config_up().await;
 
@@ -151,7 +153,9 @@ async fn main(spawner: Spawner) {
 
     let mut rx_buffer = [0; 4096];
     let mut tx_buffer = [0; 4096];
-    let mut socket = TcpSocket::new(stack, &mut rx_buffer, &mut tx_buffer);
+
+    let mut socket = TcpSocket::new(*stack, &mut rx_buffer, &mut tx_buffer);
+
     socket.set_timeout(Some(Duration::from_secs(20)));
 
     let hostname = "ecdsa-test.germancoding.com";
@@ -189,7 +193,7 @@ async fn main(spawner: Spawner) {
         .host(hostname)
         .content_type(ContentType::TextPlain)
         .build();
-    request.write(&mut tls).await.unwrap();
+    request.write_header(&mut tls).await.unwrap();
 
     let mut rx_buf = [0; 4096];
     let response = Response::read(&mut tls, reqwless::request::Method::GET, &mut rx_buf)
@@ -215,42 +219,22 @@ async fn main(spawner: Spawner) {
 }
 
 #[embassy_executor::task]
-async fn net_task(stack: &'static Stack<embassy_net_ppp::Device<'static>>) -> ! {
-    stack.run().await
+async fn net_task(
+    mut stack_runner: embassy_net::Runner<'static, embassy_net_ppp::Device<'static>>,
+) -> ! {
+    stack_runner.run().await
 }
 
 #[embassy_executor::task]
-async fn cell_task(
-    runner: ublox_cellular::asynch::Runner<
+async fn cell_task_ppp(
+    mut ppp_runner: Runner<
         'static,
-        BufferedUartRx<'static, UART0>,
-        BufferedUartTx<'static, UART0>,
+        CellTransport,
         MyCelullarConfig,
         INGRESS_BUF_SIZE,
         URC_CAPACITY,
     >,
-    stack: &'static embassy_net::Stack<embassy_net_ppp::Device<'static>>,
+    stack: &'static embassy_net::Stack<'static>,
 ) -> ! {
-    runner
-        .run(|ipv4| {
-            let Some(addr) = ipv4.address else {
-                defmt::warn!("PPP did not provide an IP address.");
-                return;
-            };
-            let mut dns_servers = heapless::Vec::new();
-            for s in ipv4.dns_servers.iter().flatten() {
-                let _ = dns_servers.push(embassy_net::Ipv4Address::from_bytes(&s.0));
-            }
-            let config = embassy_net::ConfigV4::Static(embassy_net::StaticConfigV4 {
-                address: embassy_net::Ipv4Cidr::new(
-                    embassy_net::Ipv4Address::from_bytes(&addr.0),
-                    0,
-                ),
-                gateway: None,
-                dns_servers,
-            });
-
-            stack.set_config_v4(config);
-        })
-        .await
+    ppp_runner.run(*stack).await
 }

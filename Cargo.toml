@@ -44,7 +44,7 @@ embassy-embedded-hal = { version = "0.3", optional = true }
 embedded-io-async = "0.6"
 
 [features]
-default = ["socket-udp", "socket-tcp", "ppp"]
+default = ["socket-udp", "socket-tcp"]
 
 
 ### Cellular feature list from ubxlib:

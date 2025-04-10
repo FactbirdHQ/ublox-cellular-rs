@@ -1,4 +1,4 @@
-use core::{future::poll_fn, task::Poll};
+use core::{default, future::poll_fn, task::Poll};
 
 use crate::{
     asynch::{network::NetDevice, state::OperationState},
@@ -13,8 +13,9 @@ use crate::{
         device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
         general::{responses::FirmwareVersion, GetCCID, GetFirmwareVersion, GetModelId},
         ip_transport_layer::{
+            responses::CreateSocketResponse,
             types::{AoNState, PreferredProtocolType, SocketProtocol},
-            CreateSocket,
+            CloseSocket, CreateSocket,
         },
         ipc::SetMultiplexing,
         mobile_control::{
@@ -48,7 +49,7 @@ use atat::{
 
 use embassy_futures::{
     join::join,
-    select::{select3, Either3},
+    select::{select, select3, Either3},
 };
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel};
 use embassy_time::{with_timeout, Duration, Instant, Timer};
@@ -197,7 +198,6 @@ where
         // let data_channel = self.data_channel;
         state::Device {
             shared: &self.ch.shared,
-            desired_state_pub_sub: &self.ch.desired_state_pub_sub,
             urc_subscription: self.urc_channel.subscribe().unwrap(),
         }
     }
@@ -496,7 +496,7 @@ where
         Ok(())
     }
 
-    pub async fn run(&mut self, stack: embassy_net::Stack<'_>) -> ! {
+    pub async fn run(&mut self, #[cfg(feature = "ppp")] stack: embassy_net::Stack<'_>) -> ! {
         loop {
             let _ = PwrCtrl::new(&self.ch, &mut self.config).power_down().await;
 
@@ -513,16 +513,17 @@ where
 
             #[cfg(feature = "ppp")]
             let ppp_fut = async {
-                self.ch
-                    .wait_for_operation_state(OperationState::DataEstablished)
-                    .await;
-
-                Timer::after_secs(1).await;
-
                 let mut fails = 0;
                 let mut last_start = None;
 
+                #[cfg(feature = "lara-r6")]
+                let mut open_socket_id: Option<u8> = None;
+
                 loop {
+                    self.ch
+                        .wait_for_operation_state(OperationState::DataEstablished)
+                        .await;
+
                     if let Some(last_start) = last_start {
                         Timer::at(last_start + Duration::from_secs(10)).await;
                         // Do not attempt to start too fast.
@@ -555,15 +556,22 @@ where
                         //This is needed as a workaround for lara r6 firmware 0.13.
                         // Documentation for workaround: https://content.u-blox.com/sites/default/files/documents/LARA-R6001D-00B-IP_IN_UBX-22008409.pdf
                         // In section B.1.2 Dial-up
-                        let _ = at_client
-                            .send(&CreateSocket {
-                                protocol: SocketProtocol::UDP,
-                                local_port: Some(1),
-                                preferred_protocol_type: Some(PreferredProtocolType::Ipv4),
-                                cid: Some(1),
-                                report_aon: None,
-                            })
-                            .await;
+                        {
+                            let res = at_client
+                                .send(&CreateSocket {
+                                    protocol: SocketProtocol::UDP,
+                                    local_port: Some(1),
+                                    preferred_protocol_type: Some(PreferredProtocolType::Ipv4),
+                                    cid: Some(1),
+                                    report_aon: None,
+                                })
+                                .await;
+
+                            if let Ok(socket_id) = res {
+                                open_socket_id = Some(socket_id.socket);
+                                info!("Socket opened");
+                            }
+                        }
 
                         // Send AT command to enter PPP mode
                         let res = at_client.send(&EnterPPP { cid: C::CONTEXT_ID }).await;
@@ -578,6 +586,19 @@ where
 
                     // Check for CTS low (bit 2)
                     self.data_channel.set_hangup_detection(0x04, 0x00);
+
+                    // If we exit ppp_runner or ppp_fut is dropped we need to set the 3 state to
+                    // trigger correct behavior
+                    let ondrop = OnDrop::new(|| {
+                        // Set stack to None might not be needed, but it will just be set again
+                        // when we get a new connection
+                        stack.set_config_v4(embassy_net::ConfigV4::None);
+                        self.ch.set_link_state(state::LinkState::Down);
+                        // Setting desired state will trigger cell_device runner to run to desired state
+                        // If this is not changed when we lose connection it will
+                        // skip the wait_for_operation_state dataestablished
+                        self.ch.set_desired_state(OperationState::Initialized);
+                    });
 
                     info!("RUNNING PPP");
                     let res = self
@@ -607,18 +628,32 @@ where
                         .await;
 
                     info!("ppp failed: {:?}", res);
-                    self.ch.set_link_state(state::LinkState::Down);
+
+                    drop(ondrop);
                     self.data_channel.clear_hangup_detection();
 
-                    // escape back to data mode.
-                    self.data_channel
-                        .set_lines(embassy_at_cmux::Control::from_bits(0x44 << 1), None);
-                    Timer::after(Duration::from_millis(100)).await;
-                    self.data_channel
-                        .set_lines(embassy_at_cmux::Control::from_bits(0x46 << 1), None);
+                    // Must be large enough to hold CreateSocket cmd
+                    let mut buf = [0u8; 25];
 
-                    if self.ch.desired_state(None) != OperationState::DataEstablished {
-                        break;
+                    let mut at_client = SimpleClient::new(
+                        &mut self.data_channel,
+                        atat::AtDigester::<Urc>::new(),
+                        &mut buf,
+                        C::AT_CONFIG,
+                    );
+                    // Send AT command to exit PPP mode
+                    let _ = at_client
+                        .send(&heapless::String::<5>::try_from("+++\r\n").unwrap())
+                        .await;
+
+                    // Must be large enough to hold CreateSocket cmd
+                    #[cfg(feature = "lara-r6")]
+                    if let Some(socket_id) = open_socket_id {
+                        at_client
+                            .send(&CloseSocket { socket: socket_id })
+                            .await
+                            .ok();
+                        open_socket_id = None;
                     }
                 }
             };
@@ -719,5 +754,27 @@ where
                 }
             }
         }
+    }
+}
+
+struct OnDrop<F: FnOnce()> {
+    f: core::mem::MaybeUninit<F>,
+}
+
+impl<F: FnOnce()> OnDrop<F> {
+    fn new(f: F) -> Self {
+        Self {
+            f: core::mem::MaybeUninit::new(f),
+        }
+    }
+
+    fn defuse(self) {
+        core::mem::forget(self)
+    }
+}
+
+impl<F: FnOnce()> Drop for OnDrop<F> {
+    fn drop(&mut self) {
+        unsafe { self.f.as_ptr().read()() }
     }
 }
