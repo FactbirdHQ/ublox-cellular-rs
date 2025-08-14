@@ -14,6 +14,7 @@ use embassy_time::{Duration, Instant};
 use heapless::String;
 
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CellularRegistrationStatus {
     status: Status,
     updated: Option<Instant>,
@@ -173,6 +174,7 @@ impl From<RegType> for RadioAccessNetwork {
 }
 
 #[derive(Debug, Clone, Default)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct CellularGlobalIdentity {
     /// Registered network operator cell Id.
     cell_id: Option<String<8>>,
@@ -194,6 +196,7 @@ impl CellularGlobalIdentity {
 }
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RegistrationState {
     /// CSD (Circuit Switched Data) registration status (registered/searching/roaming etc.).
     pub(crate) csd: CellularRegistrationStatus,
@@ -232,6 +235,11 @@ impl RegistrationState {
     pub fn is_registered(&self) -> bool {
         // If PSD or EPS are registered, we are connected!
         self.psd.registered() || self.eps.registered()
+    }
+
+    /// Check if registration is denied by any of the network services
+    pub fn is_denied(&self) -> bool {
+        self.eps.get_status() == Status::Denied
     }
 
     pub fn reset(&mut self) {

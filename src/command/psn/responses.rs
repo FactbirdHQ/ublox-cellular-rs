@@ -64,6 +64,7 @@ pub struct PDPContextState {
 
 /// 18.27 GPRS network registration status +CGREG
 #[derive(Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct GPRSNetworkRegistrationStatus {
     #[at_arg(position = 0)]
     pub n: GPRSNetworkRegistrationUrcConfig,
@@ -81,6 +82,7 @@ pub struct GPRSNetworkRegistrationStatus {
 
 /// 18.28 Extended network registration status +UREG
 #[derive(Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ExtendedPSNetworkRegistrationStatus {
     #[at_arg(position = 0)]
     pub n: ExtendedPSNetworkRegistrationUrcConfig,
@@ -90,6 +92,7 @@ pub struct ExtendedPSNetworkRegistrationStatus {
 
 /// 18.36 EPS network registration status +CEREG
 #[derive(Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct EPSNetworkRegistrationStatus {
     #[at_arg(position = 0)]
     pub n: EPSNetworkRegistrationUrcConfig,

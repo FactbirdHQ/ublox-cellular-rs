@@ -1,6 +1,6 @@
 #![allow(dead_code)]
 
-use crate::command::Urc;
+use crate::config::Apn;
 use core::cell::RefCell;
 use core::future::poll_fn;
 use core::task::{Context, Poll};
@@ -53,6 +53,10 @@ impl State {
                 registration_state: RegistrationState::new(),
                 state_waker: WakerRegistration::new(),
                 registration_waker: WakerRegistration::new(),
+                #[cfg(not(feature = "automatic-apn"))]
+                apn_config: Apn::None,
+                #[cfg(any(feature = "automatic-apn"))]
+                apn_config: Apn::Automatic,
             })),
         }
     }
@@ -67,6 +71,7 @@ pub struct Shared {
     registration_state: RegistrationState,
     state_waker: WakerRegistration,
     registration_waker: WakerRegistration,
+    apn_config: Apn,
 }
 
 #[derive(Clone)]
@@ -95,15 +100,29 @@ impl<'d> Runner<'d> {
     pub fn update_registration_with(&self, f: impl FnOnce(&mut RegistrationState)) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
-            let prev = s.registration_state.is_registered();
+            let prev_registered = s.registration_state.is_registered();
+            let prev_state = s.registration_state.clone();
+
             f(&mut s.registration_state);
-            if prev != s.registration_state.is_registered() {
+
+            let new_registered = s.registration_state.is_registered();
+
+            if prev_registered != new_registered {
                 info!(
-                    "Cellular registration status changed! Registered: {:?} -> {:?}",
-                    prev,
-                    s.registration_state.is_registered()
+                    "🔄 Cellular registration status changed! Registered: {:?} -> {:?}",
+                    prev_registered, new_registered
+                );
+                debug!(
+                    "State: Registration state details changed: {:?} -> {:?}",
+                    prev_state, s.registration_state
+                );
+            } else {
+                trace!(
+                    "State: Registration state updated (no change in registered status): {:?}",
+                    s.registration_state
                 );
             }
+
             s.registration_waker.wake();
         })
     }
@@ -115,6 +134,16 @@ impl<'d> Runner<'d> {
                 s.registration_waker.register(cx.waker());
             }
             s.registration_state.is_registered()
+        })
+    }
+
+    pub fn is_denied(&self, cx: Option<&mut Context>) -> bool {
+        self.shared.lock(|s| {
+            let s = &mut *s.borrow_mut();
+            if let Some(cx) = cx {
+                s.registration_waker.register(cx.waker());
+            }
+            s.registration_state.is_denied()
         })
     }
 
@@ -153,9 +182,44 @@ impl<'d> Runner<'d> {
     pub fn set_operation_state(&self, state: OperationState) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
-            s.operation_state = state;
-            s.state_waker.wake();
+            let prev_state = s.operation_state;
+            if prev_state != state {
+                info!(
+                    "🔄 Operation state changed: {:?} -> {:?}",
+                    prev_state, state
+                );
+                s.operation_state = state;
+                s.state_waker.wake();
+            } else {
+                debug!("State: Operation state unchanged: {:?}", state);
+            }
         });
+    }
+
+    pub fn set_apn_config(&self, apn: Apn) {
+        self.shared.lock(|s| {
+            let s = &mut *s.borrow_mut();
+            let prev_apn = s.apn_config.clone();
+            let changed = match (&prev_apn, &apn) {
+                (Apn::Given { name: n1, .. }, Apn::Given { name: n2, .. }) => n1 != n2,
+                (Apn::None, Apn::None) => false,
+                _ => true,
+            };
+
+            if changed {
+                info!("🔄 APN configuration changed: {:?} -> {:?}", prev_apn, apn);
+            } else {
+                debug!("State: APN configuration unchanged");
+            }
+            s.apn_config = apn;
+        });
+    }
+
+    pub fn get_apn_config(&self) -> Apn {
+        self.shared.lock(|s| {
+            let s = &mut *s.borrow_mut();
+            s.apn_config.clone()
+        })
     }
 
     pub fn operation_state(&self, cx: Option<&mut Context>) -> OperationState {
@@ -169,6 +233,11 @@ impl<'d> Runner<'d> {
     }
 
     pub fn set_desired_state(&self, ps: OperationState) {
+        info!(
+            "🔄 Desired state changed: {:?} -> {:?}",
+            self.desired_state(None),
+            ps
+        );
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             s.desired_state = ps;

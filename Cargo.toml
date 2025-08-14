@@ -130,14 +130,16 @@ sara-u201 = [
 ]
 toby-r2 = []
 
+
 [workspace]
 members = []
 default-members = ["."]
 exclude = ["examples"]
 
-# [patch.crates-io]
+[patch.crates-io]
 # atat = { git = "https://github.com/FactbirdHQ/atat", rev = "2f55331" }
 # atat = { path = "../atat/atat" }
+embassy-time = { path = "../mathias_fork/embassy/embassy-time/" }
 
-# [patch."https://github.com/MathiasKoch/embassy"]
-# embassy-at-cmux = { path = "../embassy/embassy-at-cmux" }
+[patch."https://github.com/MathiasKoch/embassy"]
+embassy-at-cmux = { path = "../mathias_fork/embassy/embassy-at-cmux/" }

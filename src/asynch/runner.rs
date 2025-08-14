@@ -1,4 +1,4 @@
-use core::{default, future::poll_fn, task::Poll};
+use core::{future::poll_fn, task::Poll};
 
 use crate::{
     asynch::{network::NetDevice, state::OperationState},
@@ -13,8 +13,7 @@ use crate::{
         device_lock::{responses::PinStatus, types::PinStatusCode, GetPinStatus},
         general::{responses::FirmwareVersion, GetCCID, GetFirmwareVersion, GetModelId},
         ip_transport_layer::{
-            responses::CreateSocketResponse,
-            types::{AoNState, PreferredProtocolType, SocketProtocol},
+            types::{PreferredProtocolType, SocketProtocol},
             CloseSocket, CreateSocket,
         },
         ipc::SetMultiplexing,
@@ -49,10 +48,10 @@ use atat::{
 
 use embassy_futures::{
     join::join,
-    select::{select, select3, Either3},
+    select::{select3, Either3},
 };
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel};
-use embassy_time::{with_timeout, Duration, Instant, Timer};
+use embassy_time::{Duration, Instant, Timer};
 use embedded_io_async::Write as _;
 
 pub(crate) const URC_SUBSCRIBERS: usize = 2;
