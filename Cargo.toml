@@ -35,7 +35,7 @@ embedded-nal-async = { version = "0.8" }
 embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "66d78d425" }
 
 embassy-net-ppp = { version = "0.2", optional = true }
-embassy-net = { version = "0.6", features = [
+embassy-net = { version = "0.7", features = [
     "proto-ipv4",
     "medium-ip",
 ], optional = true }
@@ -139,7 +139,3 @@ exclude = ["examples"]
 [patch.crates-io]
 # atat = { git = "https://github.com/FactbirdHQ/atat", rev = "2f55331" }
 # atat = { path = "../atat/atat" }
-embassy-time = { path = "../mathias_fork/embassy/embassy-time/" }
-
-[patch."https://github.com/MathiasKoch/embassy"]
-embassy-at-cmux = { path = "../mathias_fork/embassy/embassy-at-cmux/" }
