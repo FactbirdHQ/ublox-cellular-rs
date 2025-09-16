@@ -1,17 +1,18 @@
 use core::cell::Cell;
 
 use atat::{asynch::AtatClient, response_slot::ResponseSlotGuard};
-use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Sender};
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Sender, mutex::Mutex};
 use embassy_time::{with_timeout, Duration, Timer};
 
 use crate::{
     command::{
-        general::{types::FirmwareVersion, GetFirmwareVersion},
-        gpio::{types::GpioMode, SetGpioConfiguration},
+        general::{types::FirmwareVersion, GetCCID, GetFirmwareVersion},
+        gpio::{types::GpioMode, ReadGpioPin, SetGpioConfiguration},
         network_service::{
             responses::{OperatorSelection, SignalQuality},
             GetOperatorSelection, GetSignalQuality,
         },
+        psn::GetPDPContextDefinition,
     },
     config::Apn,
     error::Error,
@@ -23,7 +24,8 @@ use super::{
 };
 
 pub(crate) struct ProxyClient<'a, const INGRESS_BUF_SIZE: usize> {
-    pub(crate) req_sender: Sender<'a, NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>,
+    pub(crate) req_sender:
+        Mutex<NoopRawMutex, Sender<'a, NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>>,
     pub(crate) res_slot: &'a atat::ResponseSlot<INGRESS_BUF_SIZE>,
     cooldown_timer: Cell<Option<Timer>>,
 }
@@ -34,7 +36,7 @@ impl<'a, const INGRESS_BUF_SIZE: usize> ProxyClient<'a, INGRESS_BUF_SIZE> {
         res_slot: &'a atat::ResponseSlot<INGRESS_BUF_SIZE>,
     ) -> Self {
         Self {
-            req_sender,
+            req_sender: Mutex::new(req_sender),
             res_slot,
             cooldown_timer: Cell::new(None),
         }
@@ -71,11 +73,11 @@ impl<'a, const INGRESS_BUF_SIZE: usize> atat::asynch::AtatClient
             cooldown.await
         }
 
-        // TODO: Guard against race condition!
+        let sender = self.req_sender.lock().await;
+
         with_timeout(
             Duration::from_secs(1),
-            self.req_sender
-                .send(heapless::Vec::try_from(&buf[..len]).unwrap()),
+            sender.send(heapless::Vec::try_from(&buf[..len]).unwrap()),
         )
         .await
         .map_err(|_| atat::Error::Timeout)?;
@@ -84,6 +86,7 @@ impl<'a, const INGRESS_BUF_SIZE: usize> atat::asynch::AtatClient
 
         if !Cmd::EXPECTS_RESPONSE_CODE {
             debug!("AT Command expects no response, parsing empty response");
+            drop(sender);
             cmd.parse(Ok(&[]))
         } else {
             debug!(
@@ -93,6 +96,10 @@ impl<'a, const INGRESS_BUF_SIZE: usize> atat::asynch::AtatClient
             let response = self
                 .wait_response(Duration::from_millis(Cmd::MAX_TIMEOUT_MS.into()))
                 .await?;
+
+            // Release sender lock after receiving response
+            drop(sender);
+
             let response: &atat::Response<INGRESS_BUF_SIZE> = &response.borrow();
             let response_result: Result<&[u8], _> = response.into();
             if let Ok(response_bytes) = &response_result {
@@ -210,11 +217,11 @@ impl<'a, const INGRESS_BUF_SIZE: usize> Control<'a, INGRESS_BUF_SIZE> {
     }
 
     pub async fn get_signal_quality(&self) -> Result<SignalQuality, Error> {
-        Ok(self.send(&GetSignalQuality).await?)
+        self.send(&GetSignalQuality).await
     }
 
     pub async fn get_operator(&self) -> Result<OperatorSelection, Error> {
-        Ok(self.send(&GetOperatorSelection).await?)
+        self.send(&GetOperatorSelection).await
     }
 
     pub async fn get_version(&self) -> Result<FirmwareVersion, Error> {
@@ -241,5 +248,26 @@ impl<'a, const INGRESS_BUF_SIZE: usize> Control<'a, INGRESS_BUF_SIZE> {
         }
 
         Ok((&self.at_client).send_retry::<Cmd>(cmd).await?)
+    }
+
+    pub async fn get_apn_info(&self) -> Result<heapless::String<62>, Error> {
+        let pdp_context = self.send(&GetPDPContextDefinition).await?;
+
+        if let Some(config) = pdp_context.first() {
+            Ok(config.apn.clone())
+        } else {
+            Err(Error::_Unknown)
+        }
+    }
+
+    pub async fn get_ccid(&self) -> Result<u128, Error> {
+        let ccid = self.send(&GetCCID).await?;
+
+        Ok(ccid.ccid)
+    }
+    pub async fn get_gpio_value(&self, gpio_id: u8) -> Result<u8, Error> {
+        let value = self.send(&ReadGpioPin { gpio_id }).await?;
+
+        Ok(value.gpio_val)
     }
 }
