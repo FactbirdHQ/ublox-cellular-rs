@@ -37,6 +37,8 @@ use types::{
     PacketSwitchedParam, PacketSwitchedParamReq, ProfileId,
 };
 
+use crate::command::psn::responses::PDPContextDefinition;
+
 use super::NoResponse;
 
 /// 18.4 PDP context definition +CGDCONT
@@ -94,7 +96,7 @@ pub struct SetPDPContextDefinition<'a> {
 }
 
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CGDCONT?", NoResponse)]
+#[at_cmd("+CGDCONT?", heapless::Vec<PDPContextDefinition, 16>)]
 pub struct GetPDPContextDefinition;
 
 /// 18.7 Set Packet switched data configuration +UPSD

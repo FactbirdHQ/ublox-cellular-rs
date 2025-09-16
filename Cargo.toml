@@ -20,7 +20,7 @@ heapless = { version = "^0.8", features = ["serde"] }
 serde = { version = "^1", default-features = false, features = ["derive"] }
 ublox-sockets = { git = "https://github.com/FactbirdHQ/ublox-sockets", rev = "0b0d186", optional = true }
 embassy-time = "0.4"
-embassy-sync = "0.6"
+embassy-sync = "0.6.2"
 
 log = { version = "^0.4", default-features = false, optional = true }
 defmt = { version = "^0.3", optional = true }
@@ -34,8 +34,8 @@ embedded-nal-async = { version = "0.8" }
 
 embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "66d78d425" }
 
-embassy-net-ppp = { version = "0.2", optional = true }
-embassy-net = { version = "0.7", features = [
+embassy-net-ppp = { version = "*", optional = true }
+embassy-net = { version = "*", features = [
     "proto-ipv4",
     "medium-ip",
 ], optional = true }
@@ -137,5 +137,10 @@ default-members = ["."]
 exclude = ["examples"]
 
 [patch.crates-io]
+embassy-time = { path = "../mathias_fork/embassy/embassy-time/" }
+# embassy-time-driver = { path = "../mathias_fork/embassy/embassy-time-driver/" }
+
+[patch."https://github.com/MathiasKoch/embassy"]
+embassy-at-cmux = { path = "../mathias_fork/embassy/embassy-at-cmux/" }
 # atat = { git = "https://github.com/FactbirdHQ/atat", rev = "2f55331" }
 # atat = { path = "../atat/atat" }

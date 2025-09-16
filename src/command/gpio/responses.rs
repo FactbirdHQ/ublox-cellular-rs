@@ -15,3 +15,14 @@ pub struct GpioConfiguration {
     #[at_arg(position = 1)]
     pub gpio_mode: GpioMode,
 }
+
+/// 20.3.3 Defined values
+#[derive(Clone, AtatResp)]
+pub struct GpioPinValue {
+    /// Number GPIO pin identifier: pin number
+    #[at_arg(position = 0)]
+    pub gpio_id: u8,
+    /// Number GPIO value. Allowed values are 0 and 1.
+    #[at_arg(position = 1)]
+    pub gpio_val: u8,
+}

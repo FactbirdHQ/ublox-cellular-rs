@@ -11,7 +11,7 @@ pub mod responses;
 pub mod types;
 
 use atat::atat_derive::AtatCmd;
-use responses::GpioConfiguration;
+use responses::{GpioConfiguration, GpioPinValue};
 use types::GpioMode;
 
 use super::NoResponse;
@@ -23,7 +23,7 @@ use super::NoResponse;
 /// The test command provides the list of the supported GPIOs, the supported functions and the status of all the
 /// GPIOs.
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+UGPIOC", NoResponse, timeout_ms = 3000)]
+#[at_cmd("+UGPIOC", NoResponse, timeout_ms = 10000)]
 pub struct SetGpioConfiguration {
     /// GPIO pin identifier: pin number
     /// See the GPIO mapping for the available GPIO pins, their mapping and factoryprogrammed values on different u-blox cellular modules series and product version.
@@ -45,3 +45,14 @@ pub struct SetGpioConfiguration {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+UGPIOC?", GpioConfiguration)]
 pub struct GetGpioConfiguration;
+
+/// 20.3.1 Description
+/// Reads the current value of the specified GPIO pin, no matter whether it is configured as input or output (see
+/// the +UGPIOC AT command to define the GPIO function). The parameters range is shown in the information
+/// text response to the test command.
+#[derive(Clone, AtatCmd)]
+#[at_cmd("+UGPIOR", GpioPinValue, timeout_ms = 10000)]
+pub struct ReadGpioPin {
+    #[at_arg(position = 0)]
+    pub gpio_id: u8,
+}

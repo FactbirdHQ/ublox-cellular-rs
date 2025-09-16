@@ -29,7 +29,7 @@ use crate::{
             SetPDPContextState,
         },
     },
-    config::CellularConfig,
+    config::{Apn, CellularConfig},
     error::Error,
     modules::ModuleParams,
     registration::ProfileState,
@@ -290,7 +290,7 @@ where
 
     /// Reset the module by sending AT CFUN command
     async fn soft_reset(&mut self, sim_reset: bool) -> Result<(), Error> {
-        trace!(
+        debug!(
             "Attempting to soft reset of the modem with sim reset: {}.",
             sim_reset
         );
@@ -327,44 +327,18 @@ where
 
         let state_runner = self.ch.clone();
 
-        // Denied counter is needed as ublox can sometimes send registrationDenied even tough we 1 sec later get registration success..
-        let mut denied_counter: u8 = 0;
         let wait_fut = async {
-            let mut update_count = 0;
             loop {
-                update_count += 1;
-                debug!(
-                    "NetDevice::wait_network_registered() - Registration update #{}",
-                    update_count
-                );
+                debug!("NetDevice::wait_network_registered()");
 
                 self.update_registration().await?;
-
-                // // Check state after each update
-                // if state_runner.is_denied(None) {
-                //     denied_counter += 1;
-
-                //     if denied_counter > 20 {
-                //         error!(
-                //             "NetDevice::wait_network_registered() - Registration denied by network"
-                //         );
-                //         return Err(Error::Network(
-                //             crate::command::network_service::types::Error::RegistrationDenied,
-                //         ));
-                //     }
-                // }
 
                 if state_runner.is_registered(None) {
                     info!("✅ NetDevice::wait_network_registered() - Successfully registered to network");
                     return Ok(());
                 }
 
-                // Log status periodically
-                if update_count % 10 == 0 {
-                    debug!("NetDevice::wait_network_registered() - Update #{}: Still waiting for registration", update_count);
-                }
-
-                Timer::after_millis(300).await;
+                Timer::after_secs(1).await;
             }
         };
 
@@ -405,11 +379,6 @@ where
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
             }
             Err(e) => {
-                if e == atat::Error::CmeError(atat::CmeError::SimBusy) {
-                    error!("Got error from CGREG: SIM busy, waiting 10 seconds before retrying");
-                    return Err(Error::Busy);
-                }
-
                 warn!(
                     "NetDevice::update_registration() - Failed to get CGREG status: {:?}",
                     e
@@ -669,11 +638,10 @@ where
                 }
             }
 
-            if attempt < 9 {
-                debug!("NetDevice::connect() - Waiting 1 second before next attachment check");
-                Timer::after_secs(1).await;
-            }
+            debug!("NetDevice::connect() - Waiting 1 second before next attachment check");
+            Timer::after_secs(2).await;
         }
+
         if !attached {
             error!("NetDevice::connect() - Failed to attach to network after 10 attempts!");
             return Err(Error::AttachTimeout);
