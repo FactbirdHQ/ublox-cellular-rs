@@ -276,18 +276,25 @@ where
         };
 
         // Rid the transport of garbage bytes from powercycle
-        loop {
-            let len = self
-                .transport
-                .fill_buf()
-                .await
-                .map(|s| s.len())
-                .unwrap_or_default();
-            self.transport.consume(len);
-            if len == 0 {
-                break;
+        embassy_time::with_timeout(Duration::from_millis(100), async {
+            loop {
+                let len = self
+                    .transport
+                    .fill_buf()
+                    .await
+                    .map(|s| s.len())
+                    .unwrap_or_default();
+                self.transport.consume(len);
+                info!("Flushed {} bytes from transport", len);
+                if len == 0 {
+                    break;
+                }
             }
-        }
+        })
+        .await
+        .unwrap_or_else(|_| {
+            warn!("Transport buffer drain timeout - continuing anyway");
+        });
 
         // Probe all possible baudrates with the goal of establishing initial
         // communication with the module, so we can reconfigure it for desired
@@ -411,50 +418,30 @@ where
         // Check sim status
         let sim_status = async {
             for _ in 0..2 {
-                if let Ok(PinStatus {
-                    code: PinStatusCode::Ready,
-                }) = at_client.send(&GetPinStatus).await
-                {
-                    debug!("SIM is ready");
-                    return Ok(());
+                if let Ok(res) = at_client.send_retry(&GetCCID).await {
+                    return Ok(res.ccid);
                 }
 
                 Timer::after_secs(1).await;
             }
-
-            // There was an error initializing the SIM
-            // We've seen issues on uBlox-based devices, as a precation, we'll cycle
-            // the modem here through minimal/full functional state.
-            at_client
-                .send(&SetModuleFunctionality {
-                    fun: self
-                        .ch
-                        .module()
-                        .ok_or(Error::Uninitialized)?
-                        .radio_off_cfun(),
-                    rst: None,
-                })
-                .await?;
-            at_client
-                .send(&SetModuleFunctionality {
-                    fun: Functionality::Full,
-                    rst: None,
-                })
-                .await?;
-
             Err(Error::SimCard)
         };
 
-        sim_status.await?;
-
-        let ccid = at_client.send_retry(&GetCCID).await?;
-        info!("CCID: {}", ccid.ccid);
+        match sim_status.await {
+            Ok(ccid) => {
+                info!("CCID: {}", ccid);
+            }
+            Err(_) => {
+                warn!("Faild to get CCID, SIM card missing or not ready. continuing anyway");
+            }
+        };
 
         at_client
             .send_retry(&SetResultCodeSelection {
                 value: ResultCodeSelection::ConnectOnly,
             })
-            .await?;
+            .await
+            .ok();
 
         #[cfg(all(
             feature = "ucged",
@@ -658,6 +645,8 @@ where
             };
 
             let mux_fut = async {
+                info!("initializing multiplexer");
+
                 // Must be large enough to hold 'AT+CMUX=0,0,5,512,10,3,40,10,2\r\n'
                 let mut buf = [0u8; 32];
                 {
@@ -667,6 +656,7 @@ where
                         &mut buf,
                         C::AT_CONFIG,
                     );
+                    debug!("sending cmux at command");
 
                     at_client
                         .send(&SetMultiplexing {
@@ -697,6 +687,7 @@ where
                 })
                 .await;
 
+                debug!("DONE flushing read channel will wait 3 sec now");
                 let (mut tx, mut rx) = self.transport.split_ref();
 
                 // Signal to the rest of the driver, that the MUX is operational and running
@@ -704,6 +695,7 @@ where
                     // TODO: It should be possible to check on ChannelLines,
                     // when the MUX is opened successfully, instead of waiting a fixed time
                     Timer::after_secs(3).await;
+                    debug!("DONE waiting 3 sec set operation state to initialized");
                     self.ch.set_operation_state(OperationState::Initialized);
                 };
 
