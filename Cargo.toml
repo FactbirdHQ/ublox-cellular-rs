@@ -16,10 +16,11 @@ doctest = false
 
 [dependencies]
 atat = { version = "0.24", features = ["derive", "bytes"] }
-heapless = { version = "^0.8", features = ["serde"] }
+heapless = { version = "^0.9", features = ["serde"] }
 serde = { version = "^1", default-features = false, features = ["derive"] }
 ublox-sockets = { git = "https://github.com/FactbirdHQ/ublox-sockets", rev = "5e252b8", optional = true }
 embassy-time = "0.5.0"
+
 embassy-sync = "0.7.2"
 
 log = { version = "^0.4", default-features = false, optional = true }
@@ -32,7 +33,7 @@ embassy-futures = { version = "0.1" }
 embedded-hal = "1.0.0"
 embedded-nal-async = { version = "0.8" }
 
-embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "5aedf7a" }
+embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "5010657" }
 
 embassy-net-ppp = { version = "0.2.1", optional = true }
 embassy-net = { version = "0.7.1", features = [
@@ -100,7 +101,7 @@ socket-udp = ["ublox-sockets?/socket-udp", "embassy-net?/udp"]
 defmt = [
     "dep:defmt",
     "atat/defmt",
-    "heapless/defmt-03",
+    "heapless/defmt",
     "embassy-time/defmt",
     "embassy-sync/defmt",
     "embassy-at-cmux/defmt",
@@ -137,8 +138,8 @@ default-members = ["."]
 exclude = ["examples"]
 
 [patch.crates-io]
-embassy-time = { git = "https://github.com/MathiasKoch/embassy", rev = "5aedf7a" }
-embassy-time-driver = { git = "https://github.com/MathiasKoch/embassy", rev = "5aedf7a" }
+embassy-time = { git = "https://github.com/MathiasKoch/embassy", rev = "5010657" }
+embassy-time-driver = { git = "https://github.com/MathiasKoch/embassy", rev = "5010657" }
 
 [patch."https://github.com/MathiasKoch/embassy"]
 # embassy-at-cmux = { path = "../mathias_fork/embassy/embassy-at-cmux/" }
