@@ -33,7 +33,7 @@ embassy-futures = { version = "0.1" }
 embedded-hal = "1.0.0"
 embedded-nal-async = { version = "0.8" }
 
-embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "5010657" }
+embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "a73ebde" }
 
 embassy-net-ppp = { version = "0.2.1", optional = true }
 embassy-net = { version = "0.7.1", features = [
@@ -138,10 +138,6 @@ default-members = ["."]
 exclude = ["examples"]
 
 [patch.crates-io]
-embassy-time = { git = "https://github.com/MathiasKoch/embassy", rev = "5010657" }
-embassy-time-driver = { git = "https://github.com/MathiasKoch/embassy", rev = "5010657" }
+embassy-time = { git = "https://github.com/MathiasKoch/embassy", rev = "a73ebde" }
+embassy-time-driver = { git = "https://github.com/MathiasKoch/embassy", rev = "a73ebde" }
 
-[patch."https://github.com/MathiasKoch/embassy"]
-# embassy-at-cmux = { path = "../mathias_fork/embassy/embassy-at-cmux/" }
-# atat = { git = "https://github.com/FactbirdHQ/atat", rev = "2f55331" }
-# atat = { path = "../atat/atat" }
