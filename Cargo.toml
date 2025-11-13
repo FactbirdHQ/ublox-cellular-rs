@@ -16,7 +16,7 @@ doctest = false
 
 [dependencies]
 atat = { version = "0.24", features = ["derive", "bytes"] }
-heapless = { version = "^0.9", features = ["serde"] }
+heapless = { version = "0.9", features = ["serde"] }
 serde = { version = "^1", default-features = false, features = ["derive"] }
 ublox-sockets = { git = "https://github.com/FactbirdHQ/ublox-sockets", rev = "5e252b8", optional = true }
 embassy-time = "0.5.0"
@@ -136,8 +136,4 @@ toby-r2 = []
 members = []
 default-members = ["."]
 exclude = ["examples"]
-
-[patch.crates-io]
-embassy-time = { git = "https://github.com/MathiasKoch/embassy", rev = "a73ebde" }
-embassy-time-driver = { git = "https://github.com/MathiasKoch/embassy", rev = "a73ebde" }
 
