@@ -58,7 +58,7 @@ pub(crate) const URC_SUBSCRIBERS: usize = 2;
 
 pub(crate) const MAX_CMD_LEN: usize = 128;
 
-pub const CMUX_MAX_FRAME_SIZE: usize = 128;
+pub const CMUX_MAX_FRAME_SIZE: usize = 256;
 pub const CMUX_CHANNEL_SIZE: usize = CMUX_MAX_FRAME_SIZE * 4;
 
 pub const CMUX_CHANNELS: usize = 2;
