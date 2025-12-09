@@ -142,3 +142,4 @@ default-members = ["."]
 exclude = ["examples"]
 [patch.crates-io]
 embassy-time ={ git = "https://github.com/MathiasKoch/embassy", rev = "e438b00"}
+embassy-net ={ git = "https://github.com/MathiasKoch/embassy", rev = "e438b00"}
