@@ -1,4 +1,4 @@
-use core::{cmp::Ordering, future::poll_fn, marker::PhantomData, task::Poll};
+use core::{ cmp::Ordering, future::poll_fn, marker::PhantomData, task::Poll };
 
 use crate::{
     asynch::state::OperationState,
@@ -6,23 +6,34 @@ use crate::{
         general::GetCIMI,
         mobile_control::{
             responses::ModuleFunctionality,
-            types::{Functionality, PowerMode},
-            GetModuleFunctionality, SetModuleFunctionality,
+            types::{ Functionality, PowerMode },
+            GetModuleFunctionality,
+            SetModuleFunctionality,
         },
         network_service::{
             responses::OperatorSelection,
-            types::{NetworkRegistrationUrcConfig, OperatorSelectionMode},
-            GetNetworkRegistrationStatus, GetOperatorSelection, SetNetworkRegistrationStatus,
+            types::{ NetworkRegistrationUrcConfig, OperatorSelectionMode },
+            GetNetworkRegistrationStatus,
+            GetOperatorSelection,
+            SetNetworkRegistrationStatus,
             SetOperatorSelection,
         },
         psn::{
             responses::GPRSAttached,
             types::{
-                ContextId, EPSNetworkRegistrationUrcConfig, GPRSAttachedState,
-                GPRSNetworkRegistrationUrcConfig, PDPContextStatus, ProfileId,
+                ContextId,
+                EPSNetworkRegistrationUrcConfig,
+                GPRSAttachedState,
+                GPRSNetworkRegistrationUrcConfig,
+                PDPContextStatus,
+                ProfileId,
             },
-            GetEPSNetworkRegistrationStatus, GetGPRSAttached, GetGPRSNetworkRegistrationStatus,
-            GetPDPContextState, SetEPSNetworkRegistrationStatus, SetGPRSNetworkRegistrationStatus,
+            GetEPSNetworkRegistrationStatus,
+            GetGPRSAttached,
+            GetGPRSNetworkRegistrationStatus,
+            GetPDPContextState,
+            SetEPSNetworkRegistrationStatus,
+            SetGPRSNetworkRegistrationStatus,
             SetPDPContextState,
         },
     },
@@ -35,9 +46,9 @@ use crate::{
 use super::state;
 
 use atat::asynch::AtatClient;
-use embassy_futures::select::{select, Either};
+use embassy_futures::select::{ select, Either };
 
-use embassy_time::{Duration, Timer};
+use embassy_time::{ Duration, Timer };
 
 pub struct NetDevice<'a, 'b, C, A> {
     ch: &'b state::Runner<'a>,
@@ -45,11 +56,7 @@ pub struct NetDevice<'a, 'b, C, A> {
     _config: PhantomData<C>,
 }
 
-impl<'a, 'b, C, A> NetDevice<'a, 'b, C, A>
-where
-    C: CellularConfig<'a>,
-    A: AtatClient,
-{
+impl<'a, 'b, C, A> NetDevice<'a, 'b, C, A> where C: CellularConfig<'a>, A: AtatClient {
     pub fn new(ch: &'b state::Runner<'a>, at_client: A) -> Self {
         Self {
             ch,
@@ -78,25 +85,24 @@ where
                 // Don't check error code here as some modules can
                 // return an error as we still have the radio off (but they still
                 // obey)
-                let _ = self
-                    .at_client
-                    .send(&SetOperatorSelection {
+                let _ = self.at_client.send(
+                    &(SetOperatorSelection {
                         mode: OperatorSelectionMode::Automatic,
                         format: None,
                     })
-                    .await;
+                ).await;
             }
         }
 
         // Reset the current registration status
         self.ch.update_registration_with(|f| f.reset());
 
-        self.at_client
-            .send(&SetModuleFunctionality {
+        self.at_client.send(
+            &(SetModuleFunctionality {
                 fun: Functionality::Full,
                 rst: None,
             })
-            .await?;
+        ).await?;
 
         if mcc_mnc.is_some() {
             // TODO: If MCC & MNC is set, register with manual operator selection.
@@ -120,7 +126,7 @@ where
             //         })
             //         .await?;
             // }
-            unimplemented!()
+            unimplemented!();
         }
 
         Ok(())
@@ -128,25 +134,25 @@ where
 
     async fn prepare_connect(&mut self) -> Result<(), Error> {
         // CREG URC
-        self.at_client
-            .send(&SetNetworkRegistrationStatus {
+        self.at_client.send(
+            &(SetNetworkRegistrationStatus {
                 n: NetworkRegistrationUrcConfig::UrcEnabled,
             })
-            .await?;
+        ).await?;
 
         // CGREG URC
-        self.at_client
-            .send(&SetGPRSNetworkRegistrationStatus {
+        self.at_client.send(
+            &(SetGPRSNetworkRegistrationStatus {
                 n: GPRSNetworkRegistrationUrcConfig::UrcEnabled,
             })
-            .await?;
+        ).await?;
 
         // CEREG URC
-        self.at_client
-            .send(&SetEPSNetworkRegistrationStatus {
+        self.at_client.send(
+            &(SetEPSNetworkRegistrationStatus {
                 n: EPSNetworkRegistrationUrcConfig::UrcEnabled,
             })
-            .await?;
+        ).await?;
 
         for _ in 0..10 {
             if self.at_client.send(&GetCIMI).await.is_ok() {
@@ -180,10 +186,7 @@ where
 
     /// Reset the module by sending AT CFUN command
     async fn soft_reset(&mut self, sim_reset: bool) -> Result<(), Error> {
-        trace!(
-            "Attempting to soft reset of the modem with sim reset: {}.",
-            sim_reset
-        );
+        trace!("Attempting to soft reset of the modem with sim reset: {}.", sim_reset);
 
         let fun = if sim_reset {
             Functionality::SilentResetWithSimReset
@@ -191,11 +194,7 @@ where
             Functionality::SilentReset
         };
 
-        match self
-            .at_client
-            .send(&SetModuleFunctionality { fun, rst: None })
-            .await
-        {
+        match self.at_client.send(&(SetModuleFunctionality { fun, rst: None })).await {
             Ok(_) => {
                 info!("Successfully soft reset modem!");
                 Ok(())
@@ -219,34 +218,35 @@ where
             }
         };
 
-        Ok(embassy_time::with_timeout(
-            timeout,
-            select(
-                update_fut,
-                poll_fn(|cx| match state_runner.is_registered(Some(cx)) {
-                    true => Poll::Ready(()),
-                    false => Poll::Pending,
-                }),
-            ),
+        Ok(
+            embassy_time
+                ::with_timeout(
+                    timeout,
+                    select(
+                        update_fut,
+                        poll_fn(|cx| {
+                            match state_runner.is_registered(Some(cx)) {
+                                true => Poll::Ready(()),
+                                false => Poll::Pending,
+                            }
+                        })
+                    )
+                ).await
+                .map(drop)?
         )
-        .await
-        .map(drop)?)
     }
 
     async fn update_registration(&mut self) {
         if let Ok(reg) = self.at_client.send(&GetNetworkRegistrationStatus).await {
-            self.ch
-                .update_registration_with(|state| state.compare_and_set(reg.into()));
+            self.ch.update_registration_with(|state| state.compare_and_set(reg.into()));
         }
 
         if let Ok(reg) = self.at_client.send(&GetGPRSNetworkRegistrationStatus).await {
-            self.ch
-                .update_registration_with(|state| state.compare_and_set(reg.into()));
+            self.ch.update_registration_with(|state| state.compare_and_set(reg.into()));
         }
 
         if let Ok(reg) = self.at_client.send(&GetEPSNetworkRegistrationStatus).await {
-            self.ch
-                .update_registration_with(|state| state.compare_and_set(reg.into()));
+            self.ch.update_registration_with(|state| state.compare_and_set(reg.into()));
         }
     }
 
@@ -254,33 +254,31 @@ where
         #[cfg(not(feature = "use-upsd-context-activation"))]
         self.ch.set_profile_state(ProfileState::ShouldBeDown);
 
-        let module_cfun = self
-            .ch
-            .module()
-            .ok_or(Error::Uninitialized)?
-            .radio_off_cfun();
+        let module_cfun = self.ch.module().ok_or(Error::Uninitialized)?.radio_off_cfun();
 
         let cfun_power_mode = PowerMode::try_from(module_cfun as u8).ok();
 
         let mut last_err = None;
         for _ in 0..3 {
-            match self
-                .at_client
-                .send(&SetModuleFunctionality {
-                    fun: module_cfun,
-                    rst: None,
-                })
-                .await
+            match
+                self.at_client.send(
+                    &(SetModuleFunctionality {
+                        fun: module_cfun,
+                        rst: None,
+                    })
+                ).await
             {
-                Ok(_) => return Ok(()),
+                Ok(_) => {
+                    return Ok(());
+                }
                 Err(e) => {
                     last_err.replace(e);
 
                     if let Some(expected_mode) = cfun_power_mode {
                         match self.at_client.send(&GetModuleFunctionality).await {
-                            Ok(ModuleFunctionality { power_mode, .. })
-                                if power_mode == expected_mode =>
-                            {
+                            Ok(ModuleFunctionality { power_mode, .. }) if
+                                power_mode == expected_mode
+                            => {
                                 // If we got no response, abort the command and
                                 // check the status
                                 return Ok(());
@@ -299,11 +297,11 @@ where
         self.run_to_desired().await?;
 
         loop {
-            match select(
-                self.ch.wait_for_desired_state_change(),
-                self.ch.wait_registration_change(),
-            )
-            .await
+            match
+                select(
+                    self.ch.wait_for_desired_state_change(),
+                    self.ch.wait_registration_change()
+                ).await
             {
                 Either::First(_) => {
                     self.run_to_desired().await?;
@@ -334,31 +332,28 @@ where
             let current_state = self.ch.operation_state(None);
             let desired_state = self.ch.desired_state(None);
 
-            debug!(
-                "State transition: {:?} -> {:?}",
-                current_state, desired_state
-            );
+            debug!("State transition: {:?} -> {:?}", current_state, desired_state);
 
             match (current_state, desired_state.cmp(&current_state)) {
-                (_, Ordering::Equal) => break,
+                (_, Ordering::Equal) => {
+                    break;
+                }
 
                 (OperationState::PowerDown, Ordering::Greater) => {
-                    self.ch
-                        .wait_for_operation_state(OperationState::Initialized)
-                        .await
+                    self.ch.wait_for_operation_state(OperationState::Initialized).await;
                 }
                 (OperationState::Initialized, Ordering::Greater) => {
                     self.register_network(None).await?;
-                    self.wait_network_registered(Duration::from_secs(180))
-                        .await?;
+                    self.wait_network_registered(Duration::from_secs(600)).await?;
                     self.ch.set_operation_state(OperationState::Connected);
                 }
                 (OperationState::Connected, Ordering::Greater) => {
                     match self.connect(C::APN, C::PROFILE_ID, C::CONTEXT_ID).await {
                         Ok(_) => {
                             #[cfg(not(feature = "use-upsd-context-activation"))]
-                            self.ch
-                                .set_profile_state(crate::registration::ProfileState::ShouldBeUp);
+                            self.ch.set_profile_state(
+                                crate::registration::ProfileState::ShouldBeUp
+                            );
 
                             self.ch.set_operation_state(OperationState::DataEstablished);
                         }
@@ -379,8 +374,12 @@ where
                 }
 
                 (OperationState::DataEstablished, Ordering::Greater) => unreachable!(),
-                (OperationState::Initialized, Ordering::Less) => return Err(Error::PoweredDown),
-                (OperationState::PowerDown, _) => return Err(Error::PoweredDown),
+                (OperationState::Initialized, Ordering::Less) => {
+                    return Err(Error::PoweredDown);
+                }
+                (OperationState::PowerDown, _) => {
+                    return Err(Error::PoweredDown);
+                }
             }
         }
         Ok(())
@@ -391,7 +390,7 @@ where
         &mut self,
         apn_info: crate::config::Apn<'_>,
         profile_id: ProfileId,
-        context_id: ContextId,
+        context_id: ContextId
     ) -> Result<(), Error> {
         #[cfg(not(feature = "use-upsd-context-activation"))]
         self.define_context(context_id, apn_info).await?;
@@ -408,7 +407,7 @@ where
             if let Ok(true) = self.is_network_attached().await {
                 attached = true;
                 break;
-            };
+            }
             Timer::after_secs(1).await;
         }
         if !attached {
@@ -429,55 +428,48 @@ where
     async fn define_context(
         &mut self,
         cid: ContextId,
-        apn_info: crate::config::Apn<'_>,
+        apn_info: crate::config::Apn<'_>
     ) -> Result<(), Error> {
         use crate::command::psn::{
-            types::AuthenticationType, SetAuthParameters, SetPDPContextDefinition,
+            types::AuthenticationType,
+            SetAuthParameters,
+            SetPDPContextDefinition,
         };
 
-        self.at_client
-            .send(&SetModuleFunctionality {
-                fun: self
-                    .ch
-                    .module()
-                    .ok_or(Error::Uninitialized)?
-                    .radio_off_cfun(),
+        self.at_client.send(
+            &(SetModuleFunctionality {
+                fun: self.ch.module().ok_or(Error::Uninitialized)?.radio_off_cfun(),
                 rst: None,
             })
-            .await?;
+        ).await?;
 
-        if let crate::config::Apn::Given {
-            name,
-            username,
-            password,
-        } = apn_info
-        {
-            self.at_client
-                .send(&SetPDPContextDefinition {
+        if let crate::config::Apn::Given { name, username, password } = apn_info {
+            self.at_client.send(
+                &(SetPDPContextDefinition {
                     cid,
                     pdp_type: "IP",
                     apn: name,
                 })
-                .await?;
+            ).await?;
 
             if let Some(username) = username {
-                self.at_client
-                    .send(&SetAuthParameters {
+                self.at_client.send(
+                    &(SetAuthParameters {
                         cid,
                         auth_type: AuthenticationType::Auto,
                         username,
                         password: password.unwrap_or_default(),
                     })
-                    .await?;
+                ).await?;
             }
         }
 
-        self.at_client
-            .send(&SetModuleFunctionality {
+        self.at_client.send(
+            &(SetModuleFunctionality {
                 fun: Functionality::Full,
                 rst: None,
             })
-            .await?;
+        ).await?;
 
         Ok(())
     }
@@ -494,71 +486,66 @@ where
     async fn activate_context_upsd(
         &mut self,
         profile_id: ProfileId,
-        apn_info: crate::config::Apn<'_>,
+        apn_info: crate::config::Apn<'_>
     ) -> Result<(), Error> {
         // SARA-U2 pattern: everything is done through AT+UPSD
         // Set up the APN
-        if let crate::config::Apn::Given {
-            name,
-            username,
-            password,
-        } = apn_info
-        {
-            self.at_client
-                .send(&psn::SetPacketSwitchedConfig {
+        if let crate::config::Apn::Given { name, username, password } = apn_info {
+            self.at_client.send(
+                &(psn::SetPacketSwitchedConfig {
                     profile_id,
                     param: psn::types::PacketSwitchedParam::APN(
-                        String::<99>::try_from(name).unwrap(),
+                        String::<99>::try_from(name).unwrap()
                     ),
                 })
-                .await?;
+            ).await?;
 
             // Set up the user name
             if let Some(user_name) = username {
-                self.at_client
-                    .send(&psn::SetPacketSwitchedConfig {
+                self.at_client.send(
+                    &(psn::SetPacketSwitchedConfig {
                         profile_id,
                         param: psn::types::PacketSwitchedParam::Username(
-                            String::<64>::try_from(user_name).unwrap(),
+                            String::<64>::try_from(user_name).unwrap()
                         ),
                     })
-                    .await?;
+                ).await?;
             }
 
             // Set up the password
             if let Some(password) = password {
-                self.at_client
-                    .send(&psn::SetPacketSwitchedConfig {
+                self.at_client.send(
+                    &(psn::SetPacketSwitchedConfig {
                         profile_id,
                         param: psn::types::PacketSwitchedParam::Password(
-                            String::<64>::try_from(password).unwrap(),
+                            String::<64>::try_from(password).unwrap()
                         ),
                     })
-                    .await?;
+                ).await?;
             }
         }
         // Set up the dynamic IP address assignment.
-        self.at_client
-            .send(&psn::SetPacketSwitchedConfig {
+        self.at_client.send(
+            &(psn::SetPacketSwitchedConfig {
                 profile_id,
                 param: psn::types::PacketSwitchedParam::IPAddress(Ipv4Addr::unspecified().into()),
             })
-            .await?;
+        ).await?;
 
         // Automatic authentication protocol selection
-        self.at_client
-            .send(&psn::SetPacketSwitchedConfig {
+        self.at_client.send(
+            &(psn::SetPacketSwitchedConfig {
                 profile_id,
                 param: psn::types::PacketSwitchedParam::Authentication(AuthenticationType::Auto),
             })
-            .await?;
+        ).await?;
 
-        self.at_client
-            .send(&psn::SetPacketSwitchedAction {
+        self.at_client.send(
+            &(psn::SetPacketSwitchedAction {
                 profile_id,
                 action: psn::types::PacketSwitchedAction::Activate,
             })
-            .await?;
+        ).await?;
 
         Ok(())
     }
@@ -568,7 +555,7 @@ where
     async fn activate_context(
         &mut self,
         cid: ContextId,
-        _profile_id: ProfileId,
+        _profile_id: ProfileId
     ) -> Result<(), Error> {
         for _ in 0..5 {
             #[cfg(feature = "sara-r422")]
@@ -581,12 +568,12 @@ where
                 // and MQTT), it was not.  Forcing with AT+CGACT=1,x has
                 // been shown to fix that.  We don't do it in all
                 // cases as SARA-R41x modules object to that.
-                self.at_client
-                    .send(&SetPDPContextState {
+                self.at_client.send(
+                    &(SetPDPContextState {
                         status: PDPContextStatus::Activated,
                         cid: Some(cid),
                     })
-                    .await?;
+                ).await?;
             }
 
             let context_states = self.at_client.send(&GetPDPContextState).await?;
@@ -606,43 +593,43 @@ where
                 // [Re]attach a PDP context to an internal module profile
                 #[cfg(feature = "context-mapping-required")]
                 {
-                    self.at_client
-                        .send(&psn::SetPacketSwitchedConfig {
+                    self.at_client.send(
+                        &(psn::SetPacketSwitchedConfig {
                             profile_id: _profile_id,
                             param: psn::types::PacketSwitchedParam::ProtocolType(
-                                psn::types::ProtocolType::IPv4,
+                                psn::types::ProtocolType::IPv4
                             ),
                         })
-                        .await?;
+                    ).await?;
 
-                    self.at_client
-                        .send(&psn::SetPacketSwitchedConfig {
+                    self.at_client.send(
+                        &(psn::SetPacketSwitchedConfig {
                             profile_id: _profile_id,
                             param: psn::types::PacketSwitchedParam::MapProfile(cid),
                         })
-                        .await?;
+                    ).await?;
 
                     // SARA-R5 pattern: the context also has to be
                     // activated and we're not actually done
                     // until the +UUPSDA URC comes back,
                     #[cfg(feature = "sara-r5")]
-                    self.at_client
-                        .send(&psn::SetPacketSwitchedAction {
+                    self.at_client.send(
+                        &(psn::SetPacketSwitchedAction {
                             profile_id,
                             action: psn::types::PacketSwitchedAction::Activate,
                         })
-                        .await?;
+                    ).await?;
                 }
 
                 return Ok(());
             } else {
                 #[cfg(not(feature = "sara-r422"))]
-                self.at_client
-                    .send(&SetPDPContextState {
+                self.at_client.send(
+                    &(SetPDPContextState {
                         status: PDPContextStatus::Activated,
                         cid: Some(cid),
                     })
-                    .await?;
+                ).await?;
             }
         }
         Err(Error::ContextActivationTimeout)
