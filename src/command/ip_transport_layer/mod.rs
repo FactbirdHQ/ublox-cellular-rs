@@ -2,13 +2,11 @@
 //!
 pub mod responses;
 pub mod types;
+pub mod urc;  // Always available so we can handle UUSOCL URC in PPP mode
 use super::NoResponse;
 use atat::atat_derive::AtatCmd;
 #[cfg(feature = "internal-network-stack")]
 pub use internal_network_stack::*;
-
-#[cfg(feature = "internal-network-stack")]
-pub use internal_network_stack::urc;
 
 use responses::CreateSocketResponse;
 use types::{AoNState, PreferredProtocolType, SocketProtocol};

@@ -213,6 +213,7 @@ impl<'d> Runner<'d> {
             }
             s.apn_config = apn;
         });
+        
     }
 
     pub fn get_apn_config(&self) -> Apn {

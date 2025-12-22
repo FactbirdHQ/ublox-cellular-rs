@@ -51,8 +51,33 @@ impl<'a, 'b, const URC_CAPACITY: usize> UrcHandler<'a, 'b, URC_CAPACITY> {
                         .set_profile_state(crate::registration::ProfileState::RequiresReactivation);
                 }
             }
-            #[cfg(feature = "internal-network-stack")]
-            Urc::SocketClosed(_) => warn!("Socket closed"),
+            Urc::SocketClosed(socket_info) => {
+                error!("⚠️  CRITICAL: Socket closed URC received: socket={}", socket_info.socket);
+
+                #[cfg(all(feature = "ppp", feature = "lara-r6"))]
+                {
+                    error!("⚠️  LARA-R6 workaround socket closed (socket 0 from PPP dial-up workaround)");
+                    error!("⚠️  This indicates the PPP connection is broken or the module is in a bad state");
+                    error!("⚠️  Triggering PPP reconnection by setting link state to Down");
+                    // self.ch.set_link_state(super::state::LinkState::Down);
+                }
+
+                #[cfg(all(feature = "ppp", not(feature = "lara-r6")))]
+                {
+                    error!("⚠️  Unexpected socket close in PPP mode without LARA-R6 workaround");
+                    error!("⚠️  The module shouldn't have internal sockets in pure PPP mode");
+                    error!("⚠️  Possible causes: Module state confusion, leftover sockets, or firmware issue");
+                    // Also trigger reconnection as a safety measure
+                    self.ch.set_link_state(super::state::LinkState::Down);
+                }
+
+                #[cfg(feature = "internal-network-stack")]
+                {
+                    // For internal network stack, socket closure means we need to reconnect
+                    self.ch.set_link_state(super::state::LinkState::Down);
+                    error!("⚠️  Link state set to Down due to socket closure - connection will be reset");
+                }
+            }
             Urc::MessageWaitingIndication(_) => warn!("Message waiting indication"),
             Urc::ExtendedPSNetworkRegistration(_) => warn!("Extended PS network registration"),
             Urc::HttpResponse(_) => warn!("HTTP response"),

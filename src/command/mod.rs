@@ -52,7 +52,7 @@ pub enum Urc {
     #[cfg(feature = "internal-network-stack")]
     #[at_urc("+UUSORF")]
     SocketDataAvailableUDP(ip_transport_layer::urc::SocketDataAvailable),
-    #[cfg(feature = "internal-network-stack")]
+    // UUSOCL can be sent even in PPP mode if there are leftover sockets or state confusion
     #[at_urc("+UUSOCL")]
     SocketClosed(ip_transport_layer::urc::SocketClosed),
 

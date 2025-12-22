@@ -52,7 +52,7 @@ use embassy_futures::{
 };
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel};
 use embassy_time::{Duration, Instant, Timer};
-use embedded_io_async::Write as _;
+use embedded_io_async::{Read as _, Write as _};
 
 pub(crate) const URC_SUBSCRIBERS: usize = 2;
 
@@ -83,11 +83,30 @@ async fn at_bridge<'a, const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize>
     let tx_fut = async {
         loop {
             let msg = req_slot.receive().await;
-            let _ = tx.write_all(&msg).await;
+            debug!("[CELLULAR UART TX] Sending {} bytes: {:?}", msg.len(), core::str::from_utf8(&msg).unwrap_or("<invalid UTF-8>"));
+            match tx.write_all(&msg).await {
+                Ok(_) => debug!("[CELLULAR UART TX] ✓ Sent successfully"),
+                Err(e) => warn!("[CELLULAR UART TX] ✗ Failed to send: {:?}", e),
+            }
         }
     };
 
-    embassy_futures::join::join(tx_fut, ingress.read_from(rx)).await;
+    let rx_fut = async {
+        let mut buf = [0u8; 256];
+        loop {
+            match rx.read(&mut buf).await {
+                Ok(n) => {
+                    debug!("[CELLULAR UART RX] Received {} bytes: {:?}", n, core::str::from_utf8(&buf[..n]).unwrap_or("<invalid UTF-8>"));
+                    ingress.write(&buf[..n]).await;
+                }
+                Err(e) => {
+                    warn!("[CELLULAR UART RX] Read error: {:?}", e);
+                }
+            }
+        }
+    };
+
+    embassy_futures::join::join(tx_fut, rx_fut).await;
 
     unreachable!()
 }
