@@ -115,7 +115,10 @@ where
 
         // Reset the current registration status
         info!("NetDevice::register_network() - Resetting registration status");
-        self.ch.update_registration_with(|f| f.reset());
+        self.ch.update_registration_with(|f| {
+            f.reset();
+            false // Reset doesn't constitute a RAT change
+        });
         debug!("NetDevice::register_network() - Registration status reset completed");
 
         info!("NetDevice::register_network() - Setting module functionality to Full");

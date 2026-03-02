@@ -207,6 +207,9 @@ pub struct RegistrationState {
 
     pub(crate) cgi: CellularGlobalIdentity,
 
+    /// Current Radio Access Technology (2G/3G/4G etc.)
+    pub(crate) current_act: Option<RatAct>,
+
     #[cfg(not(feature = "use-upsd-context-activation"))]
     pub(crate) profile_state: ProfileState,
 }
@@ -224,10 +227,16 @@ impl RegistrationState {
             psd: CellularRegistrationStatus::new(),
             eps: CellularRegistrationStatus::new(),
             cgi: CellularGlobalIdentity::new(),
+            current_act: None,
 
             #[cfg(not(feature = "use-upsd-context-activation"))]
             profile_state: ProfileState::Unknown,
         }
+    }
+
+    /// Get the current Radio Access Technology
+    pub fn current_act(&self) -> Option<RatAct> {
+        self.current_act
     }
 
     /// Determine if a given cellular network status value means that we're
@@ -248,7 +257,8 @@ impl RegistrationState {
         self.eps.reset();
     }
 
-    pub fn compare_and_set(&mut self, new_params: RegistrationParams) {
+    /// Compare and set registration state, returning true if RAT changed
+    pub fn compare_and_set(&mut self, new_params: RegistrationParams) -> bool {
         match new_params.reg_type {
             RegType::Creg => {
                 self.csd.set_status(new_params.status);
@@ -261,7 +271,7 @@ impl RegistrationState {
             }
             RegType::Unknown => {
                 error!("unknown reg type");
-                return;
+                return false;
             }
         }
 
@@ -270,6 +280,17 @@ impl RegistrationState {
             self.cgi.cell_id = new_params.cell_id.clone();
             self.cgi.lac = new_params.lac;
         }
+
+        // Track RAT changes
+        let rat_changed = self.current_act != Some(new_params.act);
+        if rat_changed {
+            info!(
+                "🔄 RAT changed: {:?} -> {:?}",
+                self.current_act, new_params.act
+            );
+            self.current_act = Some(new_params.act);
+        }
+        rat_changed
     }
 }
 
