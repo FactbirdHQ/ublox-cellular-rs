@@ -51,6 +51,19 @@ impl<'a, 'b, const URC_CAPACITY: usize> UrcHandler<'a, 'b, URC_CAPACITY> {
                         .set_profile_state(crate::registration::ProfileState::RequiresReactivation);
                 }
             }
+             #[cfg(feature = "lara-r6")]
+            Urc::SocketClosed(socket) => {
+                // FIXME: This is an over-aggressive approach. Setting LinkState::Down on any
+                // socket close treats a socket-level event as a link-level event. A proper
+                // implementation would use a SocketSet registry to track per-socket state,
+                // and only set LinkState::Down when the underlying data connectivity is lost
+                // (e.g., PDP context deactivation, network deregistration), not when individual
+                // sockets close. However, since the socket layer for internal-network-stack is
+                // not fully implemented yet, this is currently the most reliable way to trigger
+                // reconnection when the remote closes the connection.
+                warn!("Socket closed by remote: {:?} - triggering link down", socket.socket);
+                self.ch.set_link_state(state::LinkState::Down);
+            }
             #[cfg(feature = "internal-network-stack")]
             Urc::SocketClosed(_) => warn!("Socket closed"),
             Urc::MessageWaitingIndication(_) => warn!("Message waiting indication"),
