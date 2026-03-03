@@ -135,7 +135,8 @@ pub enum ProfileState {
 pub struct RegistrationParams {
     reg_type: RegType,
     pub(crate) status: Status,
-    act: RatAct,
+    /// RAT from the registration response. None means the response didn't include RAT info.
+    act: Option<RatAct>,
 
     cell_id: Option<String<8>>,
     lac: Option<String<4>>,
@@ -207,6 +208,9 @@ pub struct RegistrationState {
 
     pub(crate) cgi: CellularGlobalIdentity,
 
+    /// Current Radio Access Technology (2G/3G/4G etc.)
+    pub(crate) current_act: Option<RatAct>,
+
     #[cfg(not(feature = "use-upsd-context-activation"))]
     pub(crate) profile_state: ProfileState,
 }
@@ -224,10 +228,16 @@ impl RegistrationState {
             psd: CellularRegistrationStatus::new(),
             eps: CellularRegistrationStatus::new(),
             cgi: CellularGlobalIdentity::new(),
+            current_act: None,
 
             #[cfg(not(feature = "use-upsd-context-activation"))]
             profile_state: ProfileState::Unknown,
         }
+    }
+
+    /// Get the current Radio Access Technology
+    pub fn current_act(&self) -> Option<RatAct> {
+        self.current_act
     }
 
     /// Determine if a given cellular network status value means that we're
@@ -248,7 +258,8 @@ impl RegistrationState {
         self.eps.reset();
     }
 
-    pub fn compare_and_set(&mut self, new_params: RegistrationParams) {
+    /// Compare and set registration state, returning true if RAT changed
+    pub fn compare_and_set(&mut self, new_params: RegistrationParams) -> bool {
         match new_params.reg_type {
             RegType::Creg => {
                 self.csd.set_status(new_params.status);
@@ -261,7 +272,7 @@ impl RegistrationState {
             }
             RegType::Unknown => {
                 error!("unknown reg type");
-                return;
+                return false;
             }
         }
 
@@ -270,13 +281,30 @@ impl RegistrationState {
             self.cgi.cell_id = new_params.cell_id.clone();
             self.cgi.lac = new_params.lac;
         }
+
+        // Track RAT changes - only update if the response actually contains RAT info
+        let rat_changed = if let Some(new_act) = new_params.act {
+            let changed = self.current_act != Some(new_act);
+            if changed {
+                debug!(
+                    "🔄 RAT changed: {:?} -> {:?}",
+                    self.current_act, new_act
+                );
+                self.current_act = Some(new_act);
+            }
+            changed
+        } else {
+            false
+        };
+        rat_changed
     }
 }
 
 impl From<NetworkRegistration> for RegistrationParams {
     fn from(v: NetworkRegistration) -> Self {
         Self {
-            act: RatAct::Gsm,
+            // CREG doesn't provide RAT info, so we don't set it
+            act: None,
             reg_type: RegType::Creg,
             status: v.stat.into(),
             cell_id: None,
@@ -288,11 +316,12 @@ impl From<NetworkRegistration> for RegistrationParams {
 impl From<NetworkRegistrationStatus> for RegistrationParams {
     fn from(v: NetworkRegistrationStatus) -> Self {
         Self {
-            act: RatAct::Gsm,
+            // CREG doesn't typically provide RAT info in a usable format
+            act: None,
             reg_type: RegType::Creg,
             status: v.stat.into(),
-            cell_id: None,
-            lac: None,
+            cell_id: v.ci,
+            lac: v.lac,
         }
     }
 }
@@ -300,7 +329,7 @@ impl From<NetworkRegistrationStatus> for RegistrationParams {
 impl From<GPRSNetworkRegistration> for RegistrationParams {
     fn from(v: GPRSNetworkRegistration) -> Self {
         Self {
-            act: v.act.unwrap_or(RatAct::GsmGprsEdge),
+            act: v.act,
             reg_type: RegType::Cgreg,
             status: v.stat.into(),
             cell_id: v.ci,
@@ -316,7 +345,7 @@ impl From<GPRSNetworkRegistrationStatus> for RegistrationParams {
             status: v.stat.into(),
             cell_id: v.ci,
             lac: v.lac,
-            act: v.act.unwrap_or(RatAct::GsmGprsEdge),
+            act: v.act,
         }
     }
 }
@@ -328,7 +357,7 @@ impl From<EPSNetworkRegistration> for RegistrationParams {
             status: v.stat.into(),
             cell_id: v.ci,
             lac: v.tac,
-            act: v.act.unwrap_or(RatAct::Lte),
+            act: v.act,
         }
     }
 }
@@ -340,7 +369,7 @@ impl From<EPSNetworkRegistrationStatus> for RegistrationParams {
             status: v.stat.into(),
             cell_id: v.ci,
             lac: v.tac,
-            act: v.act.unwrap_or(RatAct::Lte),
+            act: v.act,
         }
     }
 }

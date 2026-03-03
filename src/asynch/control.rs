@@ -10,6 +10,7 @@ use crate::{
         gpio::{types::GpioMode, ReadGpioPin, SetGpioConfiguration},
         network_service::{
             responses::{OperatorSelection, SignalQuality},
+            types::RatAct,
             GetOperatorSelection, GetSignalQuality,
         },
         psn::GetPDPContextDefinition,
@@ -176,6 +177,17 @@ impl<'a, const INGRESS_BUF_SIZE: usize> Control<'a, INGRESS_BUF_SIZE> {
 
     pub async fn wait_for_operation_state(&self, ps: OperationState) {
         self.state_ch.wait_for_operation_state(ps).await
+    }
+
+    /// Get the current Radio Access Technology (2G/3G/4G etc.)
+    pub fn current_rat(&self) -> Option<RatAct> {
+        self.state_ch.current_rat(None)
+    }
+
+    /// Wait for the Radio Access Technology to change (e.g., 3G -> 4G)
+    /// Returns the new RAT value when it changes
+    pub async fn wait_rat_change(&self) -> Option<RatAct> {
+        self.state_ch.wait_rat_change().await
     }
 
     /// Wait for either DataEstablished state or powered down indicating something went bad.

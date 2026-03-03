@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use crate::command::network_service::types::RatAct;
 use crate::config::Apn;
 use core::cell::RefCell;
 use core::future::poll_fn;
@@ -53,6 +54,7 @@ impl State {
                 registration_state: RegistrationState::new(),
                 state_waker: WakerRegistration::new(),
                 registration_waker: WakerRegistration::new(),
+                rat_waker: WakerRegistration::new(),
                 #[cfg(not(feature = "automatic-apn"))]
                 apn_config: Apn::None,
                 #[cfg(any(feature = "automatic-apn"))]
@@ -71,6 +73,7 @@ pub struct Shared {
     registration_state: RegistrationState,
     state_waker: WakerRegistration,
     registration_waker: WakerRegistration,
+    rat_waker: WakerRegistration,
     apn_config: Apn,
 }
 
@@ -97,13 +100,13 @@ impl<'d> Runner<'d> {
         });
     }
 
-    pub fn update_registration_with(&self, f: impl FnOnce(&mut RegistrationState)) {
+    pub fn update_registration_with(&self, f: impl FnOnce(&mut RegistrationState) -> bool) {
         self.shared.lock(|s| {
             let s = &mut *s.borrow_mut();
             let prev_registered = s.registration_state.is_registered();
             let prev_state = s.registration_state.clone();
 
-            f(&mut s.registration_state);
+            let rat_changed = f(&mut s.registration_state);
 
             let new_registered = s.registration_state.is_registered();
 
@@ -124,6 +127,11 @@ impl<'d> Runner<'d> {
             }
 
             s.registration_waker.wake();
+
+            // Wake RAT waker if RAT changed
+            if rat_changed {
+                s.rat_waker.wake();
+            }
         })
     }
 
@@ -317,6 +325,32 @@ impl<'d> Runner<'d> {
             let current_state = self.is_registered(Some(cx));
             if current_state != old_state {
                 return Poll::Ready(current_state);
+            }
+            Poll::Pending
+        })
+        .await
+    }
+
+    /// Get the current Radio Access Technology (2G/3G/4G etc.)
+    pub fn current_rat(&self, cx: Option<&mut Context>) -> Option<RatAct> {
+        self.shared.lock(|s| {
+            let s = &mut *s.borrow_mut();
+            if let Some(cx) = cx {
+                s.rat_waker.register(cx.waker());
+            }
+            s.registration_state.current_act()
+        })
+    }
+
+    /// Wait for the Radio Access Technology to change (e.g., 3G -> 4G)
+    /// Returns the new RAT value
+    pub async fn wait_rat_change(&self) -> Option<RatAct> {
+        let old_rat = self.current_rat(None);
+
+        poll_fn(|cx| {
+            let current_rat = self.current_rat(Some(cx));
+            if current_rat != old_rat {
+                return Poll::Ready(current_rat);
             }
             Poll::Pending
         })
