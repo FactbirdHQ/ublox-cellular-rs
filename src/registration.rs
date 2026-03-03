@@ -135,7 +135,8 @@ pub enum ProfileState {
 pub struct RegistrationParams {
     reg_type: RegType,
     pub(crate) status: Status,
-    act: RatAct,
+    /// RAT from the registration response. None means the response didn't include RAT info.
+    act: Option<RatAct>,
 
     cell_id: Option<String<8>>,
     lac: Option<String<4>>,
@@ -281,15 +282,20 @@ impl RegistrationState {
             self.cgi.lac = new_params.lac;
         }
 
-        // Track RAT changes
-        let rat_changed = self.current_act != Some(new_params.act);
-        if rat_changed {
-            info!(
-                "🔄 RAT changed: {:?} -> {:?}",
-                self.current_act, new_params.act
-            );
-            self.current_act = Some(new_params.act);
-        }
+        // Track RAT changes - only update if the response actually contains RAT info
+        let rat_changed = if let Some(new_act) = new_params.act {
+            let changed = self.current_act != Some(new_act);
+            if changed {
+                info!(
+                    "🔄 RAT changed: {:?} -> {:?}",
+                    self.current_act, new_act
+                );
+                self.current_act = Some(new_act);
+            }
+            changed
+        } else {
+            false
+        };
         rat_changed
     }
 }
@@ -297,7 +303,8 @@ impl RegistrationState {
 impl From<NetworkRegistration> for RegistrationParams {
     fn from(v: NetworkRegistration) -> Self {
         Self {
-            act: RatAct::Gsm,
+            // CREG doesn't provide RAT info, so we don't set it
+            act: None,
             reg_type: RegType::Creg,
             status: v.stat.into(),
             cell_id: None,
@@ -309,11 +316,12 @@ impl From<NetworkRegistration> for RegistrationParams {
 impl From<NetworkRegistrationStatus> for RegistrationParams {
     fn from(v: NetworkRegistrationStatus) -> Self {
         Self {
-            act: RatAct::Gsm,
+            // CREG doesn't typically provide RAT info in a usable format
+            act: None,
             reg_type: RegType::Creg,
             status: v.stat.into(),
-            cell_id: None,
-            lac: None,
+            cell_id: v.ci,
+            lac: v.lac,
         }
     }
 }
@@ -321,7 +329,7 @@ impl From<NetworkRegistrationStatus> for RegistrationParams {
 impl From<GPRSNetworkRegistration> for RegistrationParams {
     fn from(v: GPRSNetworkRegistration) -> Self {
         Self {
-            act: v.act.unwrap_or(RatAct::GsmGprsEdge),
+            act: v.act,
             reg_type: RegType::Cgreg,
             status: v.stat.into(),
             cell_id: v.ci,
@@ -337,7 +345,7 @@ impl From<GPRSNetworkRegistrationStatus> for RegistrationParams {
             status: v.stat.into(),
             cell_id: v.ci,
             lac: v.lac,
-            act: v.act.unwrap_or(RatAct::GsmGprsEdge),
+            act: v.act,
         }
     }
 }
@@ -349,7 +357,7 @@ impl From<EPSNetworkRegistration> for RegistrationParams {
             status: v.stat.into(),
             cell_id: v.ci,
             lac: v.tac,
-            act: v.act.unwrap_or(RatAct::Lte),
+            act: v.act,
         }
     }
 }
@@ -361,7 +369,7 @@ impl From<EPSNetworkRegistrationStatus> for RegistrationParams {
             status: v.stat.into(),
             cell_id: v.ci,
             lac: v.tac,
-            act: v.act.unwrap_or(RatAct::Lte),
+            act: v.act,
         }
     }
 }
