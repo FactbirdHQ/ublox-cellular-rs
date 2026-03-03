@@ -61,13 +61,9 @@ impl<'a, const INGRESS_BUF_SIZE: usize> atat::asynch::AtatClient
         let len = cmd.write(&mut buf);
 
         if len < 50 {
-            info!("🔧 AT Command: {:?}", atat::helpers::LossyStr(&buf[..len]));
+            debug!("🔧 AT Command: {:?}", atat::helpers::LossyStr(&buf[..len]));
         } else {
-            info!("🔧 AT Command: Long payload ({} bytes)", len);
-            debug!(
-                "AT Command payload: {:?}",
-                atat::helpers::LossyStr(&buf[..len.min(200)])
-            );
+            debug!("🔧 AT Command: Long payload ({} bytes)", len);
         }
 
         if let Some(cooldown) = self.cooldown_timer.take() {

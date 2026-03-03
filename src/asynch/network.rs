@@ -332,12 +332,10 @@ where
 
         let wait_fut = async {
             loop {
-                debug!("NetDevice::wait_network_registered()");
-
                 self.update_registration().await?;
 
                 if state_runner.is_registered(None) {
-                    info!("✅ NetDevice::wait_network_registered() - Successfully registered to network");
+                    info!("✅ Successfully registered to network");
                     return Ok(());
                 }
 
@@ -349,26 +347,25 @@ where
             .await
             .map_err(|_| {
                 error!(
-                    "❌ NetDevice::wait_network_registered() - Failed to register within timeout"
+                    "❌Failed to register within timeout"
                 );
                 Error::Generic(crate::error::GenericError::Timeout)
             })?
     }
 
     async fn update_registration(&mut self) -> Result<(), Error> {
-        debug!("NetDevice::update_registration() - Checking all registration statuses");
-
         // Check Network Registration (CREG)
         match self.at_client.send(&GetNetworkRegistrationStatus).await {
             Ok(reg) => {
-                debug!("NetDevice::update_registration() - CREG status: {:?}", reg);
+                
+                debug!("CREG status: {:?}", reg.stat);
 
                 self.ch
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
             }
             Err(e) => {
                 warn!(
-                    "NetDevice::update_registration() - Failed to get CREG status: {:?}",
+                    "Failed to get CREG status: {:?}",
                     e
                 );
             }
@@ -377,13 +374,13 @@ where
         // Check GPRS Registration (CGREG)
         match self.at_client.send(&GetGPRSNetworkRegistrationStatus).await {
             Ok(reg) => {
-                debug!("NetDevice::update_registration() - CGREG status: {:?}", reg);
+                debug!("CGREG status: {:?}", reg.stat);
                 self.ch
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
             }
             Err(e) => {
                 warn!(
-                    "NetDevice::update_registration() - Failed to get CGREG status: {:?}",
+                    "Failed to get CGREG status: {:?}",
                     e
                 );
             }
@@ -392,19 +389,19 @@ where
         // Check EPS Registration (CEREG)
         match self.at_client.send(&GetEPSNetworkRegistrationStatus).await {
             Ok(reg) => {
-                debug!("NetDevice::update_registration() - CEREG status: {:?}", reg);
+                debug!("CEREG status: {:?}", reg.stat);
                 self.ch
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
             }
             Err(e) => {
                 warn!(
-                    "NetDevice::update_registration() - Failed to get CEREG status: {:?}",
+                    "Failed to get CEREG status: {:?}",
                     e
                 );
             }
         }
 
-        trace!("NetDevice::update_registration() - Registration update completed");
+        trace!("Registration update completed");
 
         Ok(())
     }
@@ -584,18 +581,13 @@ where
         profile_id: ProfileId,
         context_id: ContextId,
     ) -> Result<(), Error> {
-        info!("🔧 NetDevice::connect() - Starting data connection setup");
-        debug!(
-            "NetDevice::connect() - Profile ID: {:?}, Context ID: {:?}",
-            profile_id, context_id
-        );
         debug!("NetDevice::connect() - APN info: {:?}", apn_info);
 
         #[cfg(not(feature = "use-upsd-context-activation"))]
         {
-            info!("NetDevice::connect() - Defining PDP context");
+            debug!("NetDevice::connect() - Defining PDP context");
             match self.define_context(context_id, apn_info).await {
-                Ok(_) => info!("NetDevice::connect() - Successfully defined PDP context"),
+                Ok(_) => debug!("NetDevice::connect() - Successfully defined PDP context"),
                 Err(e) => {
                     error!(
                         "NetDevice::connect() - Failed to define PDP context: {:?}",
@@ -613,7 +605,7 @@ where
         // return 1 and then (c) check that a context is active with AT+CGACT or
         // using AT+UPSD (even for EUTRAN). Since this sequence works for both
         // RANs, it is best to be consistent.
-        info!("NetDevice::connect() - Waiting for network attachment (CGATT)");
+        debug!("NetDevice::connect() - Waiting for network attachment (CGATT)");
         let mut attached = false;
         for attempt in 0..10 {
             debug!(
@@ -650,14 +642,14 @@ where
             return Err(Error::AttachTimeout);
         }
 
-        info!("NetDevice::connect() - Network attached, now activating context");
+        debug!("NetDevice::connect() - Network attached, now activating context");
 
         // Activate the context
         #[cfg(feature = "use-upsd-context-activation")]
         {
-            info!("NetDevice::connect() - Using UPSD context activation");
+            debug!("NetDevice::connect() - Using UPSD context activation");
             match self.activate_context_upsd(profile_id, apn_info).await {
-                Ok(_) => info!("NetDevice::connect() - Successfully activated context via UPSD"),
+                Ok(_) => debug!("NetDevice::connect() - Successfully activated context via UPSD"),
                 Err(e) => {
                     error!(
                         "NetDevice::connect() - Failed to activate context via UPSD: {:?}",
@@ -669,9 +661,8 @@ where
         }
         #[cfg(not(feature = "use-upsd-context-activation"))]
         {
-            info!("NetDevice::connect() - Using 3GPP context activation");
             match self.activate_context(context_id, profile_id).await {
-                Ok(_) => info!("NetDevice::connect() - Successfully activated context via 3GPP"),
+                Ok(_) => debug!("NetDevice::connect() - Successfully activated context via 3GPP"),
                 Err(e) => {
                     error!(
                         "NetDevice::connect() - Failed to activate context via 3GPP: {:?}",
@@ -682,7 +673,7 @@ where
             }
         }
 
-        info!("✅ NetDevice::connect() - Data connection setup completed successfully");
+        debug!("✅ NetDevice::connect() - Data connection setup completed successfully");
         Ok(())
     }
 
