@@ -286,7 +286,7 @@ impl RegistrationState {
         let rat_changed = if let Some(new_act) = new_params.act {
             let changed = self.current_act != Some(new_act);
             if changed {
-                info!(
+                debug!(
                     "🔄 RAT changed: {:?} -> {:?}",
                     self.current_act, new_act
                 );
