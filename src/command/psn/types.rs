@@ -520,6 +520,7 @@ pub enum GPRSAttachedState {
 }
 
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum GPRSNetworkRegistrationUrcConfig {
     /// • 0 (default value and factory-programmed value): network registration
     /// URC disabled
@@ -569,6 +570,7 @@ pub enum GPRSNetworkRegistrationStat {
     AttachedEmergencyOnly = 8,
 }
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum ExtendedPSNetworkRegistrationUrcConfig {
     /// • 0: network registration attach status URC disabled
     UrcDisabled = 0,
@@ -603,6 +605,7 @@ pub enum ExtendedPSNetworkRegistrationState {
 
 /// Mode configuration
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum EPSNetworkRegistrationUrcConfig {
     /// • 0: network registration URC disabled
     UrcDisabled = 0,

@@ -25,6 +25,7 @@ pub struct DataConnectionDeactivated {
 
 /// 18.27 GPRS network registration status +CGREG
 #[derive(Debug, Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct GPRSNetworkRegistration {
     #[at_arg(position = 1)]
     pub stat: GPRSNetworkRegistrationStat,
