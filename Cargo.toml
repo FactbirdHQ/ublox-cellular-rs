@@ -15,12 +15,17 @@ name = "ublox_cellular"
 doctest = false
 
 [dependencies]
-atat = { version = "0.24", features = ["derive", "bytes"] }
-heapless = { version = "^0.8", features = ["serde"] }
+# atat = { version = "0.24", features = ["derive", "bytes"] }
+atat = { git = "ssh://git@github.com/FactbirdHQ/atat", rev = "b817747", features = [
+    "derive",
+    "bytes",
+] }
+heapless = { version = "0.9", features = ["serde"] }
 serde = { version = "^1", default-features = false, features = ["derive"] }
-ublox-sockets = { git = "https://github.com/FactbirdHQ/ublox-sockets", rev = "0b0d186", optional = true }
-embassy-time = "0.4"
-embassy-sync = "0.6"
+ublox-sockets = { git = "https://github.com/FactbirdHQ/ublox-sockets", rev = "5e252b8", optional = true }
+embassy-time = "0.5.0"
+
+embassy-sync = "0.7.2"
 
 log = { version = "^0.4", default-features = false, optional = true }
 defmt = { version = "^0.3", optional = true }
@@ -32,14 +37,14 @@ embassy-futures = { version = "0.1" }
 embedded-hal = "1.0.0"
 embedded-nal-async = { version = "0.8" }
 
-embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "66d78d425" }
+embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "e438b00" }
 
-embassy-net-ppp = { version = "0.2", optional = true }
-embassy-net = { version = "0.6", features = [
+embassy-net-ppp = { version = "0.2.1", optional = true }
+embassy-net = { version = "0.7.1", features = [
     "proto-ipv4",
     "medium-ip",
 ], optional = true }
-embassy-embedded-hal = { version = "0.3", optional = true }
+embassy-embedded-hal = { version = "0.5.0", optional = true }
 
 embedded-io-async = "0.6"
 
@@ -100,7 +105,7 @@ socket-udp = ["ublox-sockets?/socket-udp", "embassy-net?/udp"]
 defmt = [
     "dep:defmt",
     "atat/defmt",
-    "heapless/defmt-03",
+    "heapless/defmt",
     "embassy-time/defmt",
     "embassy-sync/defmt",
     "embassy-at-cmux/defmt",
@@ -130,14 +135,11 @@ sara-u201 = [
 ]
 toby-r2 = []
 
+
 [workspace]
 members = []
 default-members = ["."]
 exclude = ["examples"]
-
-# [patch.crates-io]
-# atat = { git = "https://github.com/FactbirdHQ/atat", rev = "2f55331" }
-# atat = { path = "../atat/atat" }
-
-# [patch."https://github.com/MathiasKoch/embassy"]
-# embassy-at-cmux = { path = "../embassy/embassy-at-cmux" }
+[patch.crates-io]
+embassy-time ={ git = "https://github.com/MathiasKoch/embassy", rev = "e438b00"}
+embassy-net ={ git = "https://github.com/MathiasKoch/embassy", rev = "e438b00"}
