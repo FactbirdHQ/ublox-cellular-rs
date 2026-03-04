@@ -38,6 +38,7 @@ pub struct OperatorSelection {
 
 /// 7.8 Radio Access Technology (RAT) selection +URAT
 #[derive(Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct RadioAccessTechnology {
     #[at_arg(position = 0)]
     pub act: RadioAccessTechnologySelected,
@@ -45,6 +46,7 @@ pub struct RadioAccessTechnology {
 
 /// 7.14 Network registration status +CREG
 #[derive(Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct NetworkRegistrationStatus {
     #[at_arg(position = 0)]
     pub n: NetworkRegistrationUrcConfig,

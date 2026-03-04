@@ -9,6 +9,27 @@ use crate::command::network_service::types::RatAct;
 use atat::atat_derive::AtatResp;
 use heapless::String;
 
+#[derive(AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub struct PDPContextDefinition {
+    #[at_arg(position = 0)]
+    pub cid: ContextId,
+    #[at_arg(position = 1)]
+    pub pdp_type: String<6>,
+    #[at_arg(position = 2)]
+    pub apn: String<62>,
+    #[at_arg(position = 3)]
+    pub pdp_addr: String<16>,
+    #[at_arg(position = 4)]
+    pub d_comp: u8,
+    #[at_arg(position = 5)]
+    pub h_comp: u8,
+    #[at_arg(position = 6)]
+    pub ipv4_addr_alloc: Option<u8>,
+    #[at_arg(position = 7)]
+    pub emergency_indication: Option<u8>,
+}
+
 // 18.7 Packet switched data configuration +UPSD Sets or reads all the
 //  parameters in a specific packet switched data (PSD) profile. The command is
 //  used to set up the PDP context parameters for an internal context, i.e. a
@@ -64,6 +85,7 @@ pub struct PDPContextState {
 
 /// 18.27 GPRS network registration status +CGREG
 #[derive(Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct GPRSNetworkRegistrationStatus {
     #[at_arg(position = 0)]
     pub n: GPRSNetworkRegistrationUrcConfig,
@@ -81,6 +103,7 @@ pub struct GPRSNetworkRegistrationStatus {
 
 /// 18.28 Extended network registration status +UREG
 #[derive(Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ExtendedPSNetworkRegistrationStatus {
     #[at_arg(position = 0)]
     pub n: ExtendedPSNetworkRegistrationUrcConfig,
@@ -90,6 +113,7 @@ pub struct ExtendedPSNetworkRegistrationStatus {
 
 /// 18.36 EPS network registration status +CEREG
 #[derive(Clone, AtatResp)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct EPSNetworkRegistrationStatus {
     #[at_arg(position = 0)]
     pub n: EPSNetworkRegistrationUrcConfig,

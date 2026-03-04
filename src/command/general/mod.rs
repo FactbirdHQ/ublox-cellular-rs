@@ -59,7 +59,7 @@ pub struct IdentificationInformation {
 ///
 /// Request the IMSI (International Mobile Subscriber Identity)
 #[derive(Clone, AtatCmd)]
-#[at_cmd("+CIMI", CIMI)]
+#[at_cmd("+CIMI", CIMI, timeout_ms = 180000)]
 pub struct GetCIMI;
 
 /// 4.12 Card identification +CCID
