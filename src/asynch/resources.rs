@@ -16,7 +16,7 @@ pub struct Resources<const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize> {
     pub(crate) urc_channel: UrcChannel<Urc, URC_CAPACITY, URC_SUBSCRIBERS>,
     pub(crate) ingress_buf: [u8; INGRESS_BUF_SIZE],
 
-    pub(crate) mux: embassy_at_cmux::Mux<CMUX_CHANNELS, CMUX_CHANNEL_SIZE>,
+    pub(crate) mux: at_cmux::Mux<CMUX_CHANNELS, CMUX_CHANNEL_SIZE>,
 }
 
 impl<const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize> Default
@@ -40,7 +40,7 @@ impl<const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize>
             urc_channel: UrcChannel::new(),
             ingress_buf: [0; INGRESS_BUF_SIZE],
 
-            mux: embassy_at_cmux::Mux::new(),
+            mux: at_cmux::Mux::new(),
         }
     }
 }

@@ -117,9 +117,9 @@ impl<'d> Runner<'d> {
                 );
                 debug!(
                     "State: Registration state details changed: {:?}",
-                     s.registration_state
+                    s.registration_state
                 );
-            } 
+            }
 
             s.registration_waker.wake();
 

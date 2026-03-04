@@ -346,9 +346,7 @@ where
         embassy_time::with_timeout(timeout, wait_fut)
             .await
             .map_err(|_| {
-                error!(
-                    "❌Failed to register within timeout"
-                );
+                error!("❌Failed to register within timeout");
                 Error::Generic(crate::error::GenericError::Timeout)
             })?
     }
@@ -357,17 +355,13 @@ where
         // Check Network Registration (CREG)
         match self.at_client.send(&GetNetworkRegistrationStatus).await {
             Ok(reg) => {
-                
                 debug!("CREG status: {:?}", reg.stat);
 
                 self.ch
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
             }
             Err(e) => {
-                warn!(
-                    "Failed to get CREG status: {:?}",
-                    e
-                );
+                warn!("Failed to get CREG status: {:?}", e);
             }
         }
 
@@ -379,10 +373,7 @@ where
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
             }
             Err(e) => {
-                warn!(
-                    "Failed to get CGREG status: {:?}",
-                    e
-                );
+                warn!("Failed to get CGREG status: {:?}", e);
             }
         }
 
@@ -394,10 +385,7 @@ where
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
             }
             Err(e) => {
-                warn!(
-                    "Failed to get CEREG status: {:?}",
-                    e
-                );
+                warn!("Failed to get CEREG status: {:?}", e);
             }
         }
 
