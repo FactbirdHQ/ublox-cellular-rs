@@ -16,6 +16,7 @@ pub enum EmbeddedPortFilteringMode {
 
 impl AtatLen for EmbeddedPortFilteringMode {
     const LEN: usize = 20;
+    const ESCAPED_LEN: usize = 20;
 }
 
 impl Serialize for EmbeddedPortFilteringMode {
