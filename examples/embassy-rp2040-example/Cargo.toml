@@ -43,7 +43,7 @@ embedded-tls = { git = "https://github.com/drogue-iot/embedded-tls", rev = "f788
 ] }
 
 embedded-io-async = { version = "0.6" }
-heapless = "0.8"
+heapless = "0.9"
 portable-atomic = { version = "1.5.1", features = ["critical-section"] }
 
 cortex-m = { version = "0.7.7", features = ["inline-asm"] }

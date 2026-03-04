@@ -31,7 +31,7 @@ embedded-tls = { git = "https://github.com/drogue-iot/embedded-tls", rev = "f788
 
 embedded-io-adapters = { version = "0.6", features = ["tokio-1"] }
 embedded-io-async = { version = "0.6" }
-heapless = "0.8"
+heapless = "0.9"
 
 env_logger = "0.11"
 log = "0.4.21"
