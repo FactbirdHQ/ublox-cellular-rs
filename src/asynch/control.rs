@@ -1,18 +1,21 @@
 use core::cell::Cell;
 
 use atat::{asynch::AtatClient, response_slot::ResponseSlotGuard};
-use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Sender};
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Sender, mutex::Mutex};
 use embassy_time::{with_timeout, Duration, Timer};
 
 use crate::{
     command::{
-        general::{types::FirmwareVersion, GetFirmwareVersion},
-        gpio::{types::GpioMode, SetGpioConfiguration},
+        general::{types::FirmwareVersion, GetCCID, GetFirmwareVersion},
+        gpio::{types::GpioMode, ReadGpioPin, SetGpioConfiguration},
         network_service::{
             responses::{OperatorSelection, SignalQuality},
+            types::RatAct,
             GetOperatorSelection, GetSignalQuality,
         },
+        psn::GetPDPContextDefinition,
     },
+    config::Apn,
     error::Error,
 };
 
@@ -22,7 +25,8 @@ use super::{
 };
 
 pub(crate) struct ProxyClient<'a, const INGRESS_BUF_SIZE: usize> {
-    pub(crate) req_sender: Sender<'a, NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>,
+    pub(crate) req_sender:
+        Mutex<NoopRawMutex, Sender<'a, NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>>,
     pub(crate) res_slot: &'a atat::ResponseSlot<INGRESS_BUF_SIZE>,
     cooldown_timer: Cell<Option<Timer>>,
 }
@@ -33,7 +37,7 @@ impl<'a, const INGRESS_BUF_SIZE: usize> ProxyClient<'a, INGRESS_BUF_SIZE> {
         res_slot: &'a atat::ResponseSlot<INGRESS_BUF_SIZE>,
     ) -> Self {
         Self {
-            req_sender,
+            req_sender: Mutex::new(req_sender),
             res_slot,
             cooldown_timer: Cell::new(None),
         }
@@ -57,23 +61,20 @@ impl<'a, const INGRESS_BUF_SIZE: usize> atat::asynch::AtatClient
         let len = cmd.write(&mut buf);
 
         if len < 50 {
-            trace!(
-                "Sending command: {:?}",
-                atat::helpers::LossyStr(&buf[..len])
-            );
+            debug!("🔧 AT Command: {:?}", atat::helpers::LossyStr(&buf[..len]));
         } else {
-            trace!("Sending command with long payload ({} bytes)", len);
+            debug!("🔧 AT Command: Long payload ({} bytes)", len);
         }
 
         if let Some(cooldown) = self.cooldown_timer.take() {
             cooldown.await
         }
 
-        // TODO: Guard against race condition!
+        let sender = self.req_sender.lock().await;
+
         with_timeout(
             Duration::from_secs(1),
-            self.req_sender
-                .send(heapless::Vec::try_from(&buf[..len]).unwrap()),
+            sender.send(heapless::Vec::try_from(&buf[..len]).unwrap()),
         )
         .await
         .map_err(|_| atat::Error::Timeout)?;
@@ -81,13 +82,38 @@ impl<'a, const INGRESS_BUF_SIZE: usize> atat::asynch::AtatClient
         self.cooldown_timer.set(Some(Timer::after_millis(20)));
 
         if !Cmd::EXPECTS_RESPONSE_CODE {
+            debug!("AT Command expects no response, parsing empty response");
+            drop(sender);
             cmd.parse(Ok(&[]))
         } else {
+            debug!(
+                "AT Command expects response, waiting up to {}ms",
+                Cmd::MAX_TIMEOUT_MS
+            );
             let response = self
                 .wait_response(Duration::from_millis(Cmd::MAX_TIMEOUT_MS.into()))
                 .await?;
+
+            // Release sender lock after receiving response
+            drop(sender);
+
             let response: &atat::Response<INGRESS_BUF_SIZE> = &response.borrow();
-            cmd.parse(response.into())
+            let response_result: Result<&[u8], _> = response.into();
+            if let Ok(response_bytes) = &response_result {
+                if response_bytes.len() < 200 {
+                    debug!(
+                        "📡 AT Response: {:?}",
+                        atat::helpers::LossyStr(response_bytes)
+                    );
+                } else {
+                    debug!(
+                        "📡 AT Response: Long response ({} bytes): {:?}",
+                        response_bytes.len(),
+                        atat::helpers::LossyStr(&response_bytes[..200.min(response_bytes.len())])
+                    );
+                }
+            }
+            cmd.parse(response_result)
         }
     }
 }
@@ -121,12 +147,20 @@ impl<'a, const INGRESS_BUF_SIZE: usize> Control<'a, INGRESS_BUF_SIZE> {
         self.link_state() == LinkState::Up
     }
 
+    pub async fn is_denied(&self) -> bool {
+        self.state_ch.is_denied(None)
+    }
+
     pub fn desired_state(&self) -> OperationState {
         self.state_ch.desired_state(None)
     }
 
     pub fn set_desired_state(&self, ps: OperationState) {
         self.state_ch.set_desired_state(ps);
+    }
+
+    pub fn set_apn_config(&self, apn: Apn) {
+        self.state_ch.set_apn_config(apn);
     }
 
     pub async fn wait_for_link_state(&self, link_state: LinkState) {
@@ -141,12 +175,61 @@ impl<'a, const INGRESS_BUF_SIZE: usize> Control<'a, INGRESS_BUF_SIZE> {
         self.state_ch.wait_for_operation_state(ps).await
     }
 
+    /// Get the current Radio Access Technology (2G/3G/4G etc.)
+    pub fn current_rat(&self) -> Option<RatAct> {
+        self.state_ch.current_rat(None)
+    }
+
+    /// Wait for the Radio Access Technology to change (e.g., 3G -> 4G)
+    /// Returns the new RAT value when it changes
+    pub async fn wait_rat_change(&self) -> Option<RatAct> {
+        self.state_ch.wait_rat_change().await
+    }
+
+    /// Wait for either DataEstablished state or powered down indicating something went bad.
+    /// Returns Ok(()) if DataEstablished is reached, or Error if registration is denied.
+    pub async fn wait_for_data_established_or_powered_down(&self) -> Result<(), Error> {
+        use core::task::Poll;
+        use embassy_futures::select::{select, Either};
+
+        let state_runner = self.state_ch.clone();
+
+        let wait_for_data_established = core::future::poll_fn(|cx| {
+            if state_runner.operation_state(Some(cx)) == OperationState::DataEstablished {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        });
+
+        let wait_for_powered_down = core::future::poll_fn(|cx| {
+            if state_runner.operation_state(Some(cx)) == OperationState::PowerDown {
+                Poll::Ready(())
+            } else {
+                Poll::Pending
+            }
+        });
+
+        match select(wait_for_data_established, wait_for_powered_down).await {
+            Either::First(_) => {
+                info!("✅ Data connection established successfully");
+                Ok(())
+            }
+            Either::Second(_) => {
+                error!("❌ Module powered down while waiting for data connection");
+                Err(Error::Network(
+                    crate::command::network_service::types::Error::RegistrationDenied,
+                ))
+            }
+        }
+    }
+
     pub async fn get_signal_quality(&self) -> Result<SignalQuality, Error> {
-        Ok(self.send(&GetSignalQuality).await?)
+        self.send(&GetSignalQuality).await
     }
 
     pub async fn get_operator(&self) -> Result<OperatorSelection, Error> {
-        Ok(self.send(&GetOperatorSelection).await?)
+        self.send(&GetOperatorSelection).await
     }
 
     pub async fn get_version(&self) -> Result<FirmwareVersion, Error> {
@@ -173,5 +256,26 @@ impl<'a, const INGRESS_BUF_SIZE: usize> Control<'a, INGRESS_BUF_SIZE> {
         }
 
         Ok((&self.at_client).send_retry::<Cmd>(cmd).await?)
+    }
+
+    pub async fn get_apn_info(&self) -> Result<heapless::String<62>, Error> {
+        let pdp_context = self.send(&GetPDPContextDefinition).await?;
+
+        if let Some(config) = pdp_context.first() {
+            Ok(config.apn.clone())
+        } else {
+            Err(Error::_Unknown)
+        }
+    }
+
+    pub async fn get_ccid(&self) -> Result<u128, Error> {
+        let ccid = self.send(&GetCCID).await?;
+
+        Ok(ccid.ccid)
+    }
+    pub async fn get_gpio_value(&self, gpio_id: u8) -> Result<u8, Error> {
+        let value = self.send(&ReadGpioPin { gpio_id }).await?;
+
+        Ok(value.gpio_val)
     }
 }
