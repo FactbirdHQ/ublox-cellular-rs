@@ -58,6 +58,7 @@ pub enum RatAct {
 }
 
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum NetworkRegistrationUrcConfig {
     /// • 0 (default value and factory-programmed value): network registration URC disabled
     UrcDisabled = 0,

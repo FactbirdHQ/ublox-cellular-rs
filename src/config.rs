@@ -98,8 +98,6 @@ pub trait CellularConfig<'a> {
     const PROFILE_ID: ProfileId = ProfileId(1);
     const CONTEXT_ID: ContextId = ContextId(1);
 
-    const APN: Apn<'a> = Apn::None;
-
     #[cfg(feature = "ppp")]
     const PPP_CONFIG: embassy_net_ppp::Config<'a>;
 
@@ -113,6 +111,10 @@ pub trait CellularConfig<'a> {
 
     fn vint_pin(&mut self) -> Option<&mut Self::VintPin> {
         None
+    }
+
+    fn apn_lookup(&mut self, _mcc_mnc: (u16, u16)) -> Apn {
+        Apn::None
     }
 }
 
@@ -129,18 +131,19 @@ pub enum OperatorFormat {
 }
 
 #[derive(Debug, Clone)]
-pub enum Apn<'a> {
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Apn {
     None,
     Given {
-        name: &'a str,
-        username: Option<&'a str>,
-        password: Option<&'a str>,
+        name: heapless::String<62>,
+        username: Option<heapless::String<10>>,
+        password: Option<heapless::String<10>>,
     },
     #[cfg(any(feature = "automatic-apn"))]
     Automatic,
 }
 
-impl Default for Apn<'_> {
+impl Default for Apn {
     fn default() -> Self {
         Self::None
     }

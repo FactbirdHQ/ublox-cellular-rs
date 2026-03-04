@@ -103,11 +103,11 @@ impl Module {
             b"LARA-R6001D" => Self::LaraR6(lara_r6::LaraR6),
             #[cfg(any(feature = "any-module", feature = "toby-r2"))]
             b"TOBY-R200" | b"TOBY-R201" | b"TOBY-R202" => Self::TobyR2(toby_r2::TobyR2),
-            id => {
+            _id => {
                 #[cfg(feature = "defmt")]
-                warn!("Attempting to run {=[u8]:a} using generic module parameters! This may or may not work.", id);
+                warn!("Attempting to run {=[u8]:a} using generic module parameters! This may or may not work.", _id);
                 #[cfg(feature = "log")]
-                warn!("Attempting to run {:?} using generic module parameters! This may or may not work.", id);
+                warn!("Attempting to run {:?} using generic module parameters! This may or may not work.", _id);
                 Self::Generic(Generic)
             }
         }
