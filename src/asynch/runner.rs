@@ -65,8 +65,8 @@ pub const CMUX_CHANNELS: usize = 2;
 
 async fn at_bridge<'a, const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize>(
     (rx, tx): (
-        &mut embassy_at_cmux::ChannelRx<'a, CMUX_CHANNEL_SIZE>,
-        &mut embassy_at_cmux::ChannelTx<'a, CMUX_CHANNEL_SIZE>,
+        &mut at_cmux::ChannelRx<'a, CMUX_CHANNEL_SIZE>,
+        &mut at_cmux::ChannelTx<'a, CMUX_CHANNEL_SIZE>,
     ),
     req_slot: &Channel<NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>,
     ingress: &mut atat::Ingress<
@@ -113,14 +113,14 @@ pub struct Runner<'a, T, C, const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: u
     pub res_slot: &'a atat::ResponseSlot<INGRESS_BUF_SIZE>,
     pub req_slot: &'a Channel<NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>,
 
-    pub mux_runner: embassy_at_cmux::Runner<'a, CMUX_CHANNELS, CMUX_CHANNEL_SIZE>,
+    pub mux_runner: at_cmux::Runner<'a, CMUX_CHANNELS, CMUX_CHANNEL_SIZE>,
 
     at_channel: (
-        embassy_at_cmux::ChannelRx<'a, CMUX_CHANNEL_SIZE>,
-        embassy_at_cmux::ChannelTx<'a, CMUX_CHANNEL_SIZE>,
-        embassy_at_cmux::ChannelLines<'a, CMUX_CHANNEL_SIZE>,
+        at_cmux::ChannelRx<'a, CMUX_CHANNEL_SIZE>,
+        at_cmux::ChannelTx<'a, CMUX_CHANNEL_SIZE>,
+        at_cmux::ChannelLines<'a, CMUX_CHANNEL_SIZE>,
     ),
-    data_channel: embassy_at_cmux::Channel<'a, CMUX_CHANNEL_SIZE>,
+    data_channel: at_cmux::Channel<'a, CMUX_CHANNEL_SIZE>,
 
     #[cfg(feature = "ppp")]
     pub ppp_runner: Option<embassy_net_ppp::Runner<'a>>,
