@@ -1,0 +1,150 @@
+use core::convert::Infallible;
+use embedded_hal::digital::{ErrorType, InputPin, OutputPin, PinState};
+use embedded_io_async::{BufRead, Read, Write};
+
+use crate::{
+    command::{
+        control::types::BaudRate,
+        networking::types::EmbeddedPortFilteringMode,
+        psn::types::{ContextId, ProfileId},
+    },
+    DEFAULT_BAUD_RATE,
+};
+
+pub struct NoPin;
+
+impl ErrorType for NoPin {
+    type Error = core::convert::Infallible;
+}
+
+impl InputPin for NoPin {
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
+        Ok(true)
+    }
+
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
+        Ok(false)
+    }
+}
+
+impl OutputPin for NoPin {
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        Ok(())
+    }
+}
+
+pub struct ReverseOutputPin<P: OutputPin<Error = Infallible>>(pub P);
+
+impl<P: OutputPin<Error = Infallible>> ErrorType for ReverseOutputPin<P> {
+    type Error = Infallible;
+}
+
+impl<P: OutputPin<Error = Infallible>> OutputPin for ReverseOutputPin<P> {
+    fn set_low(&mut self) -> Result<(), Self::Error> {
+        self.0.set_high()
+    }
+
+    fn set_high(&mut self) -> Result<(), Self::Error> {
+        self.0.set_low()
+    }
+
+    fn set_state(&mut self, state: PinState) -> Result<(), Self::Error> {
+        match state {
+            PinState::Low => self.0.set_state(PinState::High),
+            PinState::High => self.0.set_state(PinState::Low),
+        }
+    }
+}
+
+pub struct ReverseInputPin<P: InputPin<Error = Infallible>>(pub P);
+
+impl<P: InputPin<Error = Infallible>> ErrorType for ReverseInputPin<P> {
+    type Error = Infallible;
+}
+
+impl<P: InputPin<Error = Infallible>> InputPin for ReverseInputPin<P> {
+    fn is_high(&mut self) -> Result<bool, Self::Error> {
+        self.0.is_low()
+    }
+
+    fn is_low(&mut self) -> Result<bool, Self::Error> {
+        self.0.is_high()
+    }
+}
+
+pub trait CellularConfig<'a> {
+    type ResetPin: OutputPin;
+    type PowerPin: OutputPin;
+    type VintPin: InputPin;
+
+    const AT_CONFIG: atat::Config = atat::Config::new();
+
+    // Transport settings
+    const FLOW_CONTROL: bool = false;
+    const BAUD_RATE: BaudRate = DEFAULT_BAUD_RATE;
+
+    #[cfg(feature = "internal-network-stack")]
+    const HEX_MODE: bool = true;
+
+    const EMBEDDED_PORT_FILTERING: EmbeddedPortFilteringMode =
+        EmbeddedPortFilteringMode::Enable(6000, 6200);
+
+    const OPERATOR_FORMAT: OperatorFormat = OperatorFormat::Long;
+
+    const PROFILE_ID: ProfileId = ProfileId(1);
+    const CONTEXT_ID: ContextId = ContextId(1);
+
+    #[cfg(feature = "ppp")]
+    const PPP_CONFIG: embassy_net_ppp::Config<'a>;
+
+    fn reset_pin(&mut self) -> Option<&mut Self::ResetPin> {
+        None
+    }
+
+    fn power_pin(&mut self) -> Option<&mut Self::PowerPin> {
+        None
+    }
+
+    fn vint_pin(&mut self) -> Option<&mut Self::VintPin> {
+        None
+    }
+
+    fn apn_lookup(&mut self, _mcc_mnc: (u16, u16)) -> Apn {
+        Apn::None
+    }
+}
+
+pub trait Transport: Write + Read + BufRead {
+    fn set_baudrate(&mut self, baudrate: u32);
+    fn split_ref(&mut self) -> (impl Write, impl Read + BufRead);
+}
+
+#[repr(u8)]
+pub enum OperatorFormat {
+    Long = 0,
+    Short = 1,
+    Numeric = 2,
+}
+
+#[derive(Debug, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum Apn {
+    None,
+    Given {
+        name: heapless::String<62>,
+        username: Option<heapless::String<10>>,
+        password: Option<heapless::String<10>>,
+    },
+    #[cfg(any(feature = "automatic-apn"))]
+    Automatic,
+}
+
+impl Default for Apn {
+    fn default() -> Self {
+        Self::None
+    }
+}

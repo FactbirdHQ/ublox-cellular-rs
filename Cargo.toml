@@ -1,13 +1,142 @@
-[workspace]
-resolver = "2"
-members = [
-    "ublox-cellular",
-    # "examples/common_lib",
-    # "examples/linux",
-    # "examples/linux_mqtt",
-    # "examples/linux_jobs",
-]
+[package]
+name = "ublox-cellular-rs"
+version = "0.4.0"
+authors = ["Mathias Koch <mk@Factbird.online>"]
+description = "Driver crate for u-blox cellular devices, implementation follows 'UBX-13002752 - R65'"
+readme = "../README.md"
+keywords = ["arm", "cortex-m", "ublox", "cellular", "embedded-hal-driver"]
+categories = ["embedded", "no-std"]
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/FactbirdHQ/ublox-cellular-rs"
+edition = "2021"
 
-[patch.crates-io]
-atat = { git = "https://github.com/BlackbirdHQ/atat", rev = "c5caaf7" }
-# ublox-sockets = { path = "../ublox-sockets" }
+[lib]
+name = "ublox_cellular"
+doctest = false
+
+[dependencies]
+atat = { git = "https://github.com/FactbirdHQ/atat", rev = "832cda6", features = [
+    "derive",
+    "bytes",
+] }
+heapless = { version = "0.9", features = ["serde"] }
+serde = { version = "^1", default-features = false, features = ["derive"] }
+ublox-sockets = { git = "https://github.com/FactbirdHQ/ublox-sockets", rev = "5e252b8", optional = true }
+embassy-time = "0.5.0"
+
+embassy-sync = "0.7.2"
+
+log = { version = "^0.4", default-features = false, optional = true }
+defmt = { version = "^0.3", optional = true }
+
+futures-util = { version = "0.3.29", default-features = false }
+
+embassy-futures = { version = "0.1" }
+
+embedded-hal = "1.0.0"
+embedded-nal-async = { version = "0.8" }
+
+at-cmux = { git = "https://github.com/FactbirdHQ/at-cmux.git" }
+
+
+embassy-net-ppp = { version = "0.2.1", optional = true }
+embassy-net = { version = "0.7.1", features = [
+    "proto-ipv4",
+    "medium-ip",
+], optional = true }
+embassy-embedded-hal = { version = "0.5.0", optional = true }
+
+embedded-io-async = "0.6"
+
+[features]
+default = ["socket-udp", "socket-tcp"]
+
+
+### Cellular feature list from ubxlib:
+use-upsd-context-activation = []
+# mno-profile = []
+# cscon = []
+# root-of-trust = []
+# async-sock-close = []
+# data-counters = []
+# security-tls-iana-numbering = []
+# security-tls-server-name-indication = []
+# security-tls-psk-as-hex = []
+# mqtt = []
+# mqtt-sara-r4-old-syntax = []
+# mqtt-set-local-port = []
+# mqtt-session-retain = []
+# mqtt-binary-publish = []
+# mqtt-will = []
+# mqtt-keep-alive = []
+# mqtt-security = []
+ucged5 = []
+context-mapping-required = []
+# security-tls-cipher-list = []
+# auto-bauding = []
+# at-profiles = []
+# security-ztp = []
+# file-system-tag = []
+# dtr-power-saving = []
+# 3gpp-power-saving = []
+# 3gpp-power-saving-paging-window-set = []
+# deep-sleep-urc = []
+# edrx = []
+# mqttsn = []
+# mqttsn-security = []
+# cts-control = []
+# sock-set-local-port = []
+# fota = []
+# uart-power-saving = []
+# snr-reported = []
+authentication-mode-automatic = []
+# lwm2m = []
+ucged = []
+# http = []
+ppp = ["dep:embassy-net-ppp", "dep:embassy-net"]
+
+
+automatic-apn = []
+internal-network-stack = ["dep:ublox-sockets"]
+
+socket-tcp = ["ublox-sockets?/socket-tcp", "embassy-net?/tcp"]
+socket-udp = ["ublox-sockets?/socket-udp", "embassy-net?/udp"]
+
+defmt = [
+    "dep:defmt",
+    "atat/defmt",
+    "heapless/defmt",
+    "embassy-time/defmt",
+    "embassy-sync/defmt",
+    "at-cmux/defmt",
+    "embassy-futures/defmt",
+    "ublox-sockets?/defmt",
+    "embassy-net-ppp?/defmt",
+    "embassy-net?/defmt",
+]
+log = ["dep:log", "ublox-sockets?/log", "atat/log"]
+
+# The supported list of cellular modules.
+#
+# Note: if you add a new module type here, you also need to add it in
+# `modules.rs`
+any-module = []
+lara-r6 = ["ucged"]
+lena-r8 = []
+sara-r410m = ["ucged", "ucged5"]
+sara-r412m = ["ucged", "ucged5"]
+sara-r422 = ["context-mapping-required", "ucged"]
+sara-r5 = ["context-mapping-required", "ucged", "authentication-mode-automatic"]
+sara-u201 = [
+    "use-upsd-context-activation",
+    "context-mapping-required",
+    "ucged",
+    "authentication-mode-automatic",
+]
+toby-r2 = []
+
+
+[workspace]
+members = []
+default-members = ["."]
+exclude = ["examples"]
