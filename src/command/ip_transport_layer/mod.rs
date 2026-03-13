@@ -2,11 +2,13 @@
 //!
 pub mod responses;
 pub mod types;
-pub mod urc;
 use super::NoResponse;
 use atat::atat_derive::AtatCmd;
 #[cfg(feature = "internal-network-stack")]
 pub use internal_network_stack::*;
+
+#[cfg(feature = "internal-network-stack")]
+pub use internal_network_stack::urc;
 
 use responses::CreateSocketResponse;
 use types::{AoNState, PreferredProtocolType, SocketProtocol};
@@ -45,6 +47,8 @@ pub struct CloseSocket {
 
 #[cfg(feature = "internal-network-stack")]
 mod internal_network_stack {
+    use super::urc;
+
     use super::responses::{
         CreateSocketResponse, SocketControlResponse, SocketData, SocketErrorResponse,
         UDPSendToDataResponse, UDPSocketData, WriteSocketDataResponse,

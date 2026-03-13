@@ -21,7 +21,7 @@ embassy-net = { version = "0.4", features = [
     "dns",
 ] }
 embassy-net-ppp = { version = "0.1", features = ["log"] }
-at-cmux = { git = "https://github.com/FactbirdHQ/at-cmux.git", features = [
+embassy-at-cmux = { path = "../../../embassy/embassy-at-cmux", features = [
     "log",
 ] }
 
