@@ -16,7 +16,7 @@ doctest = false
 
 [dependencies]
 # atat = { version = "0.24", features = ["derive", "bytes"] }
-atat = { git = "ssh://git@github.com/FactbirdHQ/atat", rev = "b817747", features = [
+atat = { git = "https://github.com/FactbirdHQ/atat", rev = "b817747", features = [
     "derive",
     "bytes",
 ] }
@@ -25,28 +25,28 @@ serde = { version = "^1", default-features = false, features = ["derive"] }
 ublox-sockets = { git = "https://github.com/FactbirdHQ/ublox-sockets", rev = "5e252b8", optional = true }
 embassy-time = "0.5.0"
 
-embassy-sync = "0.7.2"
+embassy-sync = "0.8"
 
-log = { version = "^0.4", default-features = false, optional = true }
-defmt = { version = "^0.3", optional = true }
+log = { version = "0.4", default-features = false, optional = true }
+defmt = { version = "1", optional = true }
 
 futures-util = { version = "0.3.29", default-features = false }
 
-embassy-futures = { version = "0.1" }
+embassy-futures = "0.1"
 
 embedded-hal = "1.0.0"
-embedded-nal-async = { version = "0.8" }
+embedded-nal-async = "0.9"
 
 at-cmux = { git = "https://github.com/FactbirdHQ/at-cmux", rev = "99f2412"}
 
-embassy-net-ppp = { version = "0.2.1", optional = true }
-embassy-net = { version = "0.7.1", features = [
+embassy-net-ppp = { version = "0.3", optional = true }
+embassy-net = { version = "0.9", features = [
     "proto-ipv4",
     "medium-ip",
 ], optional = true }
 embassy-embedded-hal = { version = "0.5.0", optional = true }
 
-embedded-io-async = "0.6"
+embedded-io-async = "0.7"
 
 [features]
 default = ["socket-udp", "socket-tcp"]
@@ -140,5 +140,19 @@ toby-r2 = []
 members = []
 default-members = ["."]
 exclude = ["examples"]
+
+[patch."https://github.com/FactbirdHQ/atat"]
+atat = { path = "../atat/atat" }
+
+[patch."https://github.com/FactbirdHQ/at-cmux"]
+at-cmux = { path = "../at-cmux" }
+
 [patch.crates-io]
-embassy-time ={ git = "https://github.com/MathiasKoch/embassy", rev = "e438b00"}
+embassy-net-ppp = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
+embassy-net = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
+embassy-time = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
+embassy-time-driver = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
+embassy-sync = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
+embassy-futures = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
+embassy-net-driver = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
+embassy-net-driver-channel = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }

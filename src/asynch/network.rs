@@ -341,7 +341,7 @@ where
                     return Ok(());
                 }
 
-                Timer::after_secs(1).await;
+                Timer::after_secs(3).await;
             }
         };
 
@@ -358,13 +358,15 @@ where
     async fn update_registration(&mut self) -> Result<(), Error> {
         debug!("NetDevice::update_registration() - Checking all registration statuses");
 
+        let mut any_ok = false;
+
         // Check Network Registration (CREG)
         match self.at_client.send(&GetNetworkRegistrationStatus).await {
             Ok(reg) => {
                 debug!("NetDevice::update_registration() - CREG status: {:?}", reg);
-
                 self.ch
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
+                any_ok = true;
             }
             Err(e) => {
                 warn!(
@@ -380,6 +382,7 @@ where
                 debug!("NetDevice::update_registration() - CGREG status: {:?}", reg);
                 self.ch
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
+                any_ok = true;
             }
             Err(e) => {
                 warn!(
@@ -395,6 +398,7 @@ where
                 debug!("NetDevice::update_registration() - CEREG status: {:?}", reg);
                 self.ch
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
+                any_ok = true;
             }
             Err(e) => {
                 warn!(
@@ -404,7 +408,13 @@ where
             }
         }
 
-        trace!("NetDevice::update_registration() - Registration update completed");
+        if !any_ok {
+            // All registration queries failed (likely SIM busy). Back off to
+            // give the SIM time to complete internal operations instead of
+            // hammering it every poll cycle.
+            warn!("NetDevice::update_registration() - All registration queries failed, backing off 5s");
+            Timer::after_secs(5).await;
+        }
 
         Ok(())
     }
