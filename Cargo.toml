@@ -36,7 +36,7 @@ embassy-futures = { version = "0.1" }
 embedded-hal = "1.0.0"
 embedded-nal-async = { version = "0.8" }
 
-at-cmux = { git = "https://github.com/FactbirdHQ/at-cmux.git" }
+at-cmux = { git = "https://github.com/FactbirdHQ/at-cmux", rev = "99f2412"}
 
 
 embassy-net-ppp = { version = "0.2.1", optional = true }
