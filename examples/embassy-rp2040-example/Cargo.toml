@@ -36,7 +36,7 @@ embassy-net = { version = "0.6", features = [
 ] }
 embassy-net-ppp = { version = "0.2", features = ["defmt"] }
 
-embassy-at-cmux = { git = "https://github.com/MathiasKoch/embassy", rev = "66d78d425" }
+at-cmux = { git = "https://github.com/FactbirdHQ/at-cmux", rev = "d361d68" }
 
 embedded-tls = { git = "https://github.com/drogue-iot/embedded-tls", rev = "f788e02", default-features = false, features = [
     "defmt",
