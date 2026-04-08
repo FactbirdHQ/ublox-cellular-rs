@@ -59,7 +59,7 @@ pub(crate) const URC_SUBSCRIBERS: usize = 2;
 pub(crate) const MAX_CMD_LEN: usize = 128;
 
 pub const CMUX_MAX_FRAME_SIZE: usize = 256;
-pub const CMUX_CHANNEL_SIZE: usize = CMUX_MAX_FRAME_SIZE * 4;
+pub const CMUX_CHANNEL_SIZE: usize = CMUX_MAX_FRAME_SIZE * 8;
 
 pub const CMUX_CHANNELS: usize = 2;
 
@@ -210,6 +210,10 @@ where
             baudrate as u32
         );
         self.transport.set_baudrate(baudrate as u32);
+
+        // Flush any stale bytes from a previous mismatched-baudrate attempt
+        self.flush_transport().await;
+
         let mut cmd_buf = [0u8; 16];
 
         {
@@ -237,9 +241,13 @@ where
                 return Ok(());
             }
 
-            at_client
+            // Send the baud rate change command. If this fails, the module may
+            // have still executed it — the OK response arrives at the new baud
+            // rate and appears as garbage at the old rate. We always verify at
+            // the target baud rate below regardless of this result.
+            let _ = at_client
                 .send_retry(&SetDataRate { rate: C::BAUD_RATE })
-                .await?;
+                .await;
         }
 
         self.transport.set_baudrate(C::BAUD_RATE as u32);
@@ -250,7 +258,10 @@ where
         // reconfiguration
         Timer::after_millis(100).await;
 
-        // Verify communication
+        // Flush any garbled bytes from the baud rate transition
+        self.flush_transport().await;
+
+        // Verify communication at the target baud rate
         SimpleClient::new(
             &mut self.transport,
             atat::AtDigester::<Urc>::new(),
@@ -261,6 +272,25 @@ where
         .await?;
 
         Ok(())
+    }
+
+    /// Drain all pending bytes from the transport buffer
+    async fn flush_transport(&mut self) {
+        let _ = embassy_time::with_timeout(Duration::from_millis(100), async {
+            loop {
+                let len = self
+                    .transport
+                    .fill_buf()
+                    .await
+                    .map(|s| s.len())
+                    .unwrap_or_default();
+                if len == 0 {
+                    break;
+                }
+                self.transport.consume(len);
+            }
+        })
+        .await;
     }
 
     async fn init(&mut self) -> Result<(), Error> {
@@ -276,25 +306,7 @@ where
         };
 
         // Rid the transport of garbage bytes from powercycle
-        embassy_time::with_timeout(Duration::from_millis(100), async {
-            loop {
-                let len = self
-                    .transport
-                    .fill_buf()
-                    .await
-                    .map(|s| s.len())
-                    .unwrap_or_default();
-                self.transport.consume(len);
-                info!("Flushed {} bytes from transport", len);
-                if len == 0 {
-                    break;
-                }
-            }
-        })
-        .await
-        .unwrap_or_else(|_| {
-            warn!("Transport buffer drain timeout - continuing anyway");
-        });
+        self.flush_transport().await;
 
         // Probe all possible baudrates with the goal of establishing initial
         // communication with the module, so we can reconfigure it for desired

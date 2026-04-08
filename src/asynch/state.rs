@@ -116,7 +116,12 @@ impl<'d> Runner<'d> {
                     prev_registered, new_registered
                 );
                 debug!(
-                    "State: Registration state details changed: {:?}",
+                    "State: Registration state details changed: {:?} -> {:?}",
+                    prev_state, s.registration_state
+                );
+            } else {
+                trace!(
+                    "State: Registration state updated (no change in registered status): {:?}",
                     s.registration_state
                 );
             }

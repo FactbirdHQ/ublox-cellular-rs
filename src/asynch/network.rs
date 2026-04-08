@@ -10,7 +10,7 @@ use crate::{
         mobile_control::{
             responses::ModuleFunctionality,
             types::{Functionality, PowerMode},
-            GetModuleFunctionality, SetModuleFunctionality,
+            GetExtendedErrorReport, GetModuleFunctionality, SetModuleFunctionality,
         },
         network_service::{
             responses::OperatorSelection,
@@ -120,6 +120,62 @@ where
             false // Reset doesn't constitute a RAT change
         });
         debug!("NetDevice::register_network() - Registration status reset completed");
+
+        // Pre-configure PDP context with APN before enabling radio.
+        // For LTE, the Initial Default EPS Bearer Activation happens during
+        // the Attach procedure — the APN must be defined beforehand.
+        // For 2G/3G this is harmless: CGDCONT just stores parameters for
+        // later device-initiated PDP context activation.
+        #[cfg(not(feature = "use-upsd-context-activation"))]
+        {
+            let apn_info = self.ch.get_apn_config();
+            if let crate::config::Apn::Given {
+                name,
+                username,
+                password,
+            } = apn_info
+            {
+                use crate::command::psn::{
+                    types::AuthenticationType, SetAuthParameters, SetPDPContextDefinition,
+                };
+
+                // Ensure radio is off (CGDCONT only takes effect on next attach)
+                let _ = self
+                    .at_client
+                    .send(&SetModuleFunctionality {
+                        fun: self
+                            .ch
+                            .module()
+                            .ok_or(Error::Uninitialized)?
+                            .radio_off_cfun(),
+                        rst: None,
+                    })
+                    .await;
+
+                info!(
+                    "Defining PDP context before registration: APN={}",
+                    name.as_str()
+                );
+                self.at_client
+                    .send(&SetPDPContextDefinition {
+                        cid: C::CONTEXT_ID,
+                        pdp_type: "IP",
+                        apn: name.as_str(),
+                    })
+                    .await?;
+
+                if let Some(username) = username {
+                    self.at_client
+                        .send(&SetAuthParameters {
+                            cid: C::CONTEXT_ID,
+                            auth_type: AuthenticationType::Auto,
+                            username: username.as_str(),
+                            password: password.unwrap_or_default().as_str(),
+                        })
+                        .await?;
+                }
+            }
+        }
 
         info!("NetDevice::register_network() - Setting module functionality to Full");
         match self
@@ -332,64 +388,111 @@ where
 
         let wait_fut = async {
             loop {
+                debug!("NetDevice::wait_network_registered()");
+
                 self.update_registration().await?;
 
                 if state_runner.is_registered(None) {
-                    info!("✅ Successfully registered to network");
+                    info!("✅ NetDevice::wait_network_registered() - Successfully registered to network");
                     return Ok(());
                 }
 
-                Timer::after_secs(1).await;
+                Timer::after_secs(3).await;
             }
         };
 
         embassy_time::with_timeout(timeout, wait_fut)
             .await
             .map_err(|_| {
-                error!("❌Failed to register within timeout");
+                error!(
+                    "❌ NetDevice::wait_network_registered() - Failed to register within timeout"
+                );
                 Error::Generic(crate::error::GenericError::Timeout)
             })?
     }
 
     async fn update_registration(&mut self) -> Result<(), Error> {
+        debug!("NetDevice::update_registration() - Checking all registration statuses");
+
+        let mut any_ok = false;
+
         // Check Network Registration (CREG)
         match self.at_client.send(&GetNetworkRegistrationStatus).await {
             Ok(reg) => {
-                debug!("CREG status: {:?}", reg.stat);
-
+                debug!("NetDevice::update_registration() - CREG status: {:?}", reg);
                 self.ch
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
+                any_ok = true;
             }
             Err(e) => {
-                warn!("Failed to get CREG status: {:?}", e);
+                warn!(
+                    "NetDevice::update_registration() - Failed to get CREG status: {:?}",
+                    e
+                );
             }
         }
 
         // Check GPRS Registration (CGREG)
         match self.at_client.send(&GetGPRSNetworkRegistrationStatus).await {
             Ok(reg) => {
-                debug!("CGREG status: {:?}", reg.stat);
+                debug!("NetDevice::update_registration() - CGREG status: {:?}", reg);
                 self.ch
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
+                any_ok = true;
             }
             Err(e) => {
-                warn!("Failed to get CGREG status: {:?}", e);
+                warn!(
+                    "NetDevice::update_registration() - Failed to get CGREG status: {:?}",
+                    e
+                );
             }
         }
 
         // Check EPS Registration (CEREG)
         match self.at_client.send(&GetEPSNetworkRegistrationStatus).await {
             Ok(reg) => {
-                debug!("CEREG status: {:?}", reg.stat);
+                debug!("NetDevice::update_registration() - CEREG status: {:?}", reg);
+                let eps_not_registered = !matches!(
+                    reg.stat,
+                    crate::command::psn::types::EPSNetworkRegistrationStat::Registered
+                        | crate::command::psn::types::EPSNetworkRegistrationStat::RegisteredRoaming
+                );
                 self.ch
                     .update_registration_with(|state| state.compare_and_set(reg.into()));
+                any_ok = true;
+
+                // If EPS is not registered, query CEER for the rejection cause
+                if eps_not_registered {
+                    match self.at_client.send(&GetExtendedErrorReport).await {
+                        Ok(report) => {
+                            warn!(
+                                "CEER: type={}, cause={}, desc={}",
+                                report.r#type.as_str(),
+                                report.cause,
+                                report.description.as_str()
+                            );
+                        }
+                        Err(e) => {
+                            debug!("Failed to get CEER: {:?}", e);
+                        }
+                    }
+                }
             }
             Err(e) => {
-                warn!("Failed to get CEREG status: {:?}", e);
+                warn!(
+                    "NetDevice::update_registration() - Failed to get CEREG status: {:?}",
+                    e
+                );
             }
         }
 
-        trace!("Registration update completed");
+        if !any_ok {
+            // All registration queries failed (likely SIM busy). Back off to
+            // give the SIM time to complete internal operations instead of
+            // hammering it every poll cycle.
+            warn!("NetDevice::update_registration() - All registration queries failed, backing off 5s");
+            Timer::after_secs(5).await;
+        }
 
         Ok(())
     }
@@ -511,22 +614,8 @@ where
                 (OperationState::Connected, Ordering::Greater) => {
                     info!("NetDevice::run_to_desired() - Transitioning from Connected to DataEstablished");
                     info!("NetDevice::run_to_desired() - Operation state is connected, establishing data connection");
-                    let apn = self.ch.get_apn_config();
-                    match &apn {
-                        crate::config::Apn::Given { name, .. } => {
-                            info!(
-                                "NetDevice::run_to_desired() - Using configured APN: {}",
-                                name
-                            );
-                        }
-                        crate::config::Apn::None => {
-                            info!(
-                                "NetDevice::run_to_desired() - Using default APN (none specified)"
-                            );
-                        }
-                    }
 
-                    match self.connect(apn, C::PROFILE_ID, C::CONTEXT_ID).await {
+                    match self.connect(C::PROFILE_ID, C::CONTEXT_ID).await {
                         Ok(_) => {
                             info!("NetDevice::run_to_desired() - Data connection established successfully");
                             #[cfg(not(feature = "use-upsd-context-activation"))]
@@ -546,8 +635,21 @@ where
                     }
                 }
 
-                // TODO: do proper backwards "single stepping"
                 (OperationState::Connected, Ordering::Less) => {
+                    // Deregister from network to clear cached NAS/EPS
+                    // security context. Without this, the modem retains
+                    // stale credentials in NVM across power cycles, causing
+                    // the next registration attempt to fail (e.g. when
+                    // switching SIMs — the modem tries a TAU with the old
+                    // SIM's keys instead of a fresh IMSI attach).
+                    let _ = self
+                        .at_client
+                        .send(&SetOperatorSelection {
+                            mode: OperatorSelectionMode::Deregister,
+                            format: None,
+                        })
+                        .await;
+                    self.radio_off().await?;
                     self.ch.set_operation_state(OperationState::Initialized);
                 }
                 (OperationState::DataEstablished, Ordering::Less) => {
@@ -563,28 +665,12 @@ where
     }
 
     #[allow(unused_variables)]
-    async fn connect(
-        &mut self,
-        apn_info: crate::config::Apn,
-        profile_id: ProfileId,
-        context_id: ContextId,
-    ) -> Result<(), Error> {
-        debug!("NetDevice::connect() - APN info: {:?}", apn_info);
-
-        #[cfg(not(feature = "use-upsd-context-activation"))]
-        {
-            debug!("NetDevice::connect() - Defining PDP context");
-            match self.define_context(context_id, apn_info).await {
-                Ok(_) => debug!("NetDevice::connect() - Successfully defined PDP context"),
-                Err(e) => {
-                    error!(
-                        "NetDevice::connect() - Failed to define PDP context: {:?}",
-                        e
-                    );
-                    return Err(e);
-                }
-            }
-        }
+    async fn connect(&mut self, profile_id: ProfileId, context_id: ContextId) -> Result<(), Error> {
+        info!("🔧 NetDevice::connect() - Starting data connection setup");
+        debug!(
+            "NetDevice::connect() - Profile ID: {:?}, Context ID: {:?}",
+            profile_id, context_id
+        );
 
         // This step _shouldn't_ be necessary.  However, for reasons I don't
         // understand, SARA-R4 can be registered but not attached (i.e. AT+CGATT
@@ -593,7 +679,7 @@ where
         // return 1 and then (c) check that a context is active with AT+CGACT or
         // using AT+UPSD (even for EUTRAN). Since this sequence works for both
         // RANs, it is best to be consistent.
-        debug!("NetDevice::connect() - Waiting for network attachment (CGATT)");
+        info!("NetDevice::connect() - Waiting for network attachment (CGATT)");
         let mut attached = false;
         for attempt in 0..10 {
             debug!(
@@ -630,14 +716,15 @@ where
             return Err(Error::AttachTimeout);
         }
 
-        debug!("NetDevice::connect() - Network attached, now activating context");
+        info!("NetDevice::connect() - Network attached, now activating context");
 
         // Activate the context
         #[cfg(feature = "use-upsd-context-activation")]
         {
-            debug!("NetDevice::connect() - Using UPSD context activation");
+            let apn_info = self.ch.get_apn_config();
+            info!("NetDevice::connect() - Using UPSD context activation");
             match self.activate_context_upsd(profile_id, apn_info).await {
-                Ok(_) => debug!("NetDevice::connect() - Successfully activated context via UPSD"),
+                Ok(_) => info!("NetDevice::connect() - Successfully activated context via UPSD"),
                 Err(e) => {
                     error!(
                         "NetDevice::connect() - Failed to activate context via UPSD: {:?}",
@@ -649,8 +736,9 @@ where
         }
         #[cfg(not(feature = "use-upsd-context-activation"))]
         {
+            info!("NetDevice::connect() - Using 3GPP context activation");
             match self.activate_context(context_id, profile_id).await {
-                Ok(_) => debug!("NetDevice::connect() - Successfully activated context via 3GPP"),
+                Ok(_) => info!("NetDevice::connect() - Successfully activated context via 3GPP"),
                 Err(e) => {
                     error!(
                         "NetDevice::connect() - Failed to activate context via 3GPP: {:?}",
@@ -661,66 +749,7 @@ where
             }
         }
 
-        debug!("✅ NetDevice::connect() - Data connection setup completed successfully");
-        Ok(())
-    }
-
-    /// Define a PDP context
-    #[cfg(not(feature = "use-upsd-context-activation"))]
-    async fn define_context(
-        &mut self,
-        cid: ContextId,
-        apn_info: crate::config::Apn,
-    ) -> Result<(), Error> {
-        use crate::command::psn::{
-            types::AuthenticationType, SetAuthParameters, SetPDPContextDefinition,
-        };
-
-        self.at_client
-            .send(&SetModuleFunctionality {
-                fun: self
-                    .ch
-                    .module()
-                    .ok_or(Error::Uninitialized)?
-                    .radio_off_cfun(),
-                rst: None,
-            })
-            .await?;
-
-        if let crate::config::Apn::Given {
-            name,
-            username,
-            password,
-        } = apn_info
-        {
-            info!("Will try to set DPD context with APN NAME {}", name);
-            self.at_client
-                .send(&SetPDPContextDefinition {
-                    cid,
-                    pdp_type: "IP",
-                    apn: name.as_str(),
-                })
-                .await?;
-
-            if let Some(username) = username {
-                self.at_client
-                    .send(&SetAuthParameters {
-                        cid,
-                        auth_type: AuthenticationType::Auto,
-                        username: username.as_str(),
-                        password: password.unwrap_or_default().as_str(),
-                    })
-                    .await?;
-            }
-        }
-
-        self.at_client
-            .send(&SetModuleFunctionality {
-                fun: Functionality::Full,
-                rst: None,
-            })
-            .await?;
-
+        info!("✅ NetDevice::connect() - Data connection setup completed successfully");
         Ok(())
     }
 
