@@ -16,7 +16,7 @@ doctest = false
 
 [dependencies]
 # atat = { version = "0.24", features = ["derive", "bytes"] }
-atat = { git = "https://github.com/FactbirdHQ/atat", rev = "b817747", features = [
+atat = { git = "https://github.com/FactbirdHQ/atat", rev = "edceb1a", features = [
     "derive",
     "bytes",
 ] }
@@ -141,18 +141,5 @@ members = []
 default-members = ["."]
 exclude = ["examples"]
 
-[patch."https://github.com/FactbirdHQ/atat"]
-atat = { path = "../atat/atat" }
-
 [patch."https://github.com/FactbirdHQ/at-cmux"]
 at-cmux = { path = "../at-cmux" }
-
-[patch.crates-io]
-embassy-net-ppp = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
-embassy-net = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
-embassy-time = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
-embassy-time-driver = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
-embassy-sync = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
-embassy-futures = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
-embassy-net-driver = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
-embassy-net-driver-channel = { git = "https://github.com/embassy-rs/embassy.git", rev = "5565326" }
