@@ -76,6 +76,11 @@ impl<'a, const INGRESS_BUF_SIZE: usize> atat::asynch::AtatClient
 
         let sender = self.req_sender.lock().await;
 
+        // Clear any stale response signal left over from prior commands or
+        // late URC-like traffic, so wait_response below returns our command's
+        // response and not a leaked one.
+        self.res_slot.reset();
+
         with_timeout(
             Duration::from_secs(1),
             sender.send(heapless::Vec::try_from(&buf[..len]).unwrap()),
