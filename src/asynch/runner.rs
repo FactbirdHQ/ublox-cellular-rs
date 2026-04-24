@@ -595,7 +595,9 @@ where
                         // Setting desired state will trigger cell_device runner to run to desired state
                         // If this is not changed when we lose connection it will
                         // skip the wait_for_operation_state dataestablished
-                        self.ch.set_desired_state(OperationState::Initialized);
+                        if self.ch.desired_state(None) == OperationState::DataEstablished {
+                            self.ch.set_desired_state(OperationState::Initialized);
+                        }
                     });
 
                     info!("RUNNING PPP");
