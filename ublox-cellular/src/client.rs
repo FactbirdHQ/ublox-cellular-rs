@@ -206,8 +206,13 @@ where
 
         self.power_on()?;
 
-        // At this point, if is_alive fails, the configured Baud rate is probably wrong
-        if let Err(e) = self.is_alive(5).map_err(|_| Error::BaudDetection) {
+        // At this point, if is_alive fails, the configured Baud rate is probably
+        // wrong. Allow enough attempts (~1s each) for the module to finish
+        // booting after a cold power-on: a LARA-R6 can take several seconds after
+        // VInt is asserted before it answers AT. Too few attempts here falls
+        // through to the hard_reset() below, which drives RESET_N and wipes NVM
+        // (e.g. the SIM-select GPIO) on every cold boot.
+        if let Err(e) = self.is_alive(15).map_err(|_| Error::BaudDetection) {
             if self.hard_reset().is_err() {
                 self.hard_power_off()?;
                 BlockingTimer::after(Duration::from_secs(1)).wait();
