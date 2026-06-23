@@ -30,6 +30,22 @@ pub enum Error {
     _Unknown,
 }
 
+impl Error {
+    /// `true` if this error is the modem rejecting a command with a `+CME
+    /// ERROR` (e.g. "SIM busy"). Such errors block GPRS attach / data-context
+    /// bring-up while the module still answers AT commands, so they never trip
+    /// the timeout-based recovery and must be handled explicitly by the caller.
+    pub fn is_sim_busy(&self) -> bool {
+        matches!(
+            self,
+            Error::Network(NetworkError::AT(atat::Error::CmeError(_)))
+                | Error::DataService(DataServiceError::Network(NetworkError::AT(
+                    atat::Error::CmeError(_)
+                )))
+        )
+    }
+}
+
 impl From<DataServiceError> for Error {
     fn from(e: DataServiceError) -> Self {
         // Unwrap generic and network errors

@@ -85,6 +85,10 @@ impl<'sub, AtCl: AtatClient> AtTx<'sub, AtCl> {
                 atat::Error::InvalidResponse => Error::AT(atat::Error::InvalidResponse),
                 atat::Error::Aborted => Error::AT(atat::Error::Aborted),
                 atat::Error::Parse => Error::AT(atat::Error::Parse),
+                // Preserve modem error responses (e.g. "+CME ERROR: SIM busy")
+                // instead of collapsing them to a generic error, so callers can
+                // tell a SIM/equipment problem apart from any other failure.
+                atat::Error::CmeError(e) => Error::AT(atat::Error::CmeError(e)),
                 _ => Error::AT(atat::Error::Error),
             })
             .map(|res| {
@@ -110,6 +114,10 @@ impl<'sub, AtCl: AtatClient> AtTx<'sub, AtCl> {
                 atat::Error::InvalidResponse => Error::AT(atat::Error::InvalidResponse),
                 atat::Error::Aborted => Error::AT(atat::Error::Aborted),
                 atat::Error::Parse => Error::AT(atat::Error::Parse),
+                // Preserve modem error responses (e.g. "+CME ERROR: SIM busy")
+                // instead of collapsing them to a generic error, so callers can
+                // tell a SIM/equipment problem apart from any other failure.
+                atat::Error::CmeError(e) => Error::AT(atat::Error::CmeError(e)),
                 _ => Error::AT(atat::Error::Error),
             })
             .map(|res| {
