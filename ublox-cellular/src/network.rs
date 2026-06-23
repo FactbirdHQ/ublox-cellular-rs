@@ -28,6 +28,13 @@ const REGISTRATION_CHECK_INTERVAL: Duration = Duration::from_secs(15);
 const REGISTRATION_TIMEOUT: Duration = Duration::from_secs(3 * 60);
 const CHECK_IMSI_TIMEOUT: Duration = Duration::from_secs(60);
 
+/// Consecutive failures of the network-registration status read tolerated
+/// before `update_registration` surfaces the error to the caller. The read
+/// talks to the SIM, which can keep failing (e.g. "+CME ERROR: SIM busy" after
+/// a SIM switch) until the module is power cycled; rather than swallow that
+/// forever we propagate it so the caller can recover.
+const MAX_REGISTRATION_READ_FAILURES: u8 = 5;
+
 #[derive(Debug, PartialEq)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
@@ -138,6 +145,7 @@ pub struct Network<'sub, AtCl> {
     pub(crate) status: RegistrationState,
     pub(crate) context_state: ContextState,
     pub(crate) at_tx: AtTx<'sub, AtCl>,
+    reg_read_failures: u8,
 }
 
 impl<'sub, AtCl> Network<'sub, AtCl>
@@ -149,6 +157,7 @@ where
             status: RegistrationState::new(),
             context_state: ContextState::Setup,
             at_tx,
+            reg_read_failures: 0,
         }
     }
 
@@ -422,8 +431,26 @@ where
     pub fn update_registration(&mut self) -> Result<(), Error> {
         self.send_internal(&GetExtendedErrorReport, false).ok();
 
-        if let Ok(reg) = self.send_internal(&GetNetworkRegistrationStatus, false) {
-            self.status.compare_and_set(reg.into());
+        // The registration-status read talks to the SIM and can keep failing
+        // (e.g. "+CME ERROR: SIM busy" after a SIM switch) until the module is
+        // power cycled. Don't swallow it forever: after a few consecutive
+        // failures, propagate the error so the caller can recover the module.
+        match self.send_internal(&GetNetworkRegistrationStatus, false) {
+            Ok(reg) => {
+                self.reg_read_failures = 0;
+                self.status.compare_and_set(reg.into());
+            }
+            Err(e) => {
+                self.reg_read_failures = self.reg_read_failures.saturating_add(1);
+                warn!(
+                    "Network registration read failed ({}/{}): {:?}",
+                    self.reg_read_failures, MAX_REGISTRATION_READ_FAILURES, e
+                );
+                if self.reg_read_failures >= MAX_REGISTRATION_READ_FAILURES {
+                    self.reg_read_failures = 0;
+                    return Err(e);
+                }
+            }
         }
 
         if let Ok(reg) = self.send_internal(&GetGPRSNetworkRegistrationStatus, false) {
