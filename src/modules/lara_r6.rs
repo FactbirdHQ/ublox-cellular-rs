@@ -15,6 +15,14 @@ impl ModuleParams for LaraR6 {
     fn boot_wait(&self) -> Duration {
         Duration::from_secs(10)
     }
+    // After the power-off pulse the module drops VInt within ~1-2s when it
+    // actually powers off. The default (35s) is the time `power_down` spins
+    // waiting for VInt to fall; on boards where VInt does not reflect power-off
+    // that wait is burned in full on every power-down. 5s is ample to observe a
+    // real power-off while capping that wait.
+    fn power_down_wait(&self) -> Duration {
+        Duration::from_secs(5)
+    }
     fn reboot_command_wait(&self) -> Duration {
         Duration::from_secs(10)
     }
