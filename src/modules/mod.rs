@@ -184,4 +184,15 @@ impl ModuleParams for Module {
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Generic;
 
-impl ModuleParams for Generic {}
+impl ModuleParams for Generic {
+    // `Generic` is the fallback used before the module model is identified,
+    // including the per-iteration `power_down()` at the top of `run()` which
+    // fires once at boot before `init()` detects the model. On boards whose
+    // module does not drop VInt during power-off, the default would spin the
+    // full `power_down_wait` on every bring-up; cap it here while still leaving
+    // time to observe a genuine power-off. Detected modules use their own
+    // override.
+    fn power_down_wait(&self) -> Duration {
+        Duration::from_secs(5)
+    }
+}
