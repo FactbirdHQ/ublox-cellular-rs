@@ -352,6 +352,10 @@ where
             return Err(Error::BaudDetection);
         }
 
+        // Drain any late OK from a timed-out probe AT, so it isn't misread as
+        // the reply to GetModelId (which would desync module identification).
+        self.flush_transport().await;
+
         let mut cmd_buf = [0u8; 128];
         let mut at_client = SimpleClient::new(
             &mut self.transport,
