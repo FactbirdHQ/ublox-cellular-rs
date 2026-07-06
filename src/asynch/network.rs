@@ -543,23 +543,43 @@ where
     }
 
     pub async fn run(&mut self) -> Result<(), Error> {
-        self.run_to_desired().await?;
+        // A copy of the shared state handle (it is a shared reference, so this
+        // is cheap), so we can wait on state changes concurrently with the
+        // `&mut self` `run_to_desired()` future below without a borrow clash.
+        let ch = self.ch;
 
         loop {
+            // Drive the operation state toward the desired state, but make the
+            // convergence *preemptible*: abort and restart the moment the
+            // desired state changes. `run_to_desired()` awaits several long
+            // operations (network registration, data-context activation, and
+            // an untimed wait for the modem to finish initializing). If the
+            // desired state changes during one of those awaits - e.g. a
+            // WiFi->cellular decision flips desired to `PowerDown` while we are
+            // still registering - the previous edge-triggered loop could miss
+            // the change and strand operation != desired forever. Selecting
+            // against `wait_for_desired_state_change()` guarantees a new goal
+            // always wins, so the next loop iteration re-runs against it.
+            match select(self.run_to_desired(), ch.wait_for_desired_state_change()).await {
+                Either::First(res) => res?,
+                Either::Second(_) => continue,
+            }
+
+            // operation == desired now. Wait for a reason to act again: either
+            // the desired state moves, or the network registration status
+            // changes underneath us.
             match select(
-                self.ch.wait_for_desired_state_change(),
-                self.ch.wait_registration_change(),
+                ch.wait_for_desired_state_change(),
+                ch.wait_registration_change(),
             )
             .await
             {
                 Either::First(_) => {
-                    info!("desired state chagne, run to desired state");
-                    self.run_to_desired().await?;
+                    info!("desired state change, run to desired state");
                 }
                 Either::Second(false) => {
                     warn!("Lost network registration. Setting operating state back to initialized");
                     self.ch.set_operation_state(OperationState::Initialized);
-                    self.run_to_desired().await?;
                 }
                 Either::Second(true) => {
                     info!("Network registration changed");
