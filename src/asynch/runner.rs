@@ -92,6 +92,57 @@ async fn at_bridge<'a, const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize>
     unreachable!()
 }
 
+/// Diagnostic wrapper around the cell-UART read half.
+///
+/// It forwards `BufRead`/`Read` verbatim but times how long each `fill_buf`
+/// blocks waiting for bytes from the modem. A long block means the raw UART
+/// went silent: combined with the firmware's AT-liveness poll this is the
+/// definitive local-vs-external discriminator for a cellular data blackhole —
+/// a large idle gap that resumes with only a few bytes means nothing reached
+/// the pins (carrier/modem side), whereas a resume with a multi-KB burst means
+/// bytes were backing up locally (a demux/PPP wedge).
+struct RxGapLogger<R> {
+    inner: R,
+}
+
+impl<R> RxGapLogger<R> {
+    fn new(inner: R) -> Self {
+        Self { inner }
+    }
+}
+
+impl<R: embedded_io_async::ErrorType> embedded_io_async::ErrorType for RxGapLogger<R> {
+    type Error = R::Error;
+}
+
+impl<R: embedded_io_async::Read> embedded_io_async::Read for RxGapLogger<R> {
+    async fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+        self.inner.read(buf).await
+    }
+}
+
+impl<R: embedded_io_async::BufRead> embedded_io_async::BufRead for RxGapLogger<R> {
+    async fn fill_buf(&mut self) -> Result<&[u8], Self::Error> {
+        let start = Instant::now();
+        let buf = self.inner.fill_buf().await?;
+        // Only `start` (a Copy local) and `buf` are touched after the await, so
+        // this does not re-borrow `self` and keeps the returned lifetime intact.
+        let waited = start.elapsed();
+        if waited > Duration::from_secs(10) {
+            warn!(
+                "[cell-diag] cmux UART rx blocked {} ms, resumed with {} bytes",
+                waited.as_millis(),
+                buf.len()
+            );
+        }
+        Ok(buf)
+    }
+
+    fn consume(&mut self, amt: usize) {
+        self.inner.consume(amt);
+    }
+}
+
 /// Background runner for the Ublox Module.
 ///
 /// You must call `.run()` in a background task for the Ublox Module to operate.
@@ -706,7 +757,9 @@ where
                 .await;
 
                 debug!("DONE flushing read channel will wait 3 sec now");
-                let (mut tx, mut rx) = self.transport.split_ref();
+                let (mut tx, rx) = self.transport.split_ref();
+                // Diagnostic: time gaps in raw UART reads from the modem.
+                let mut rx = RxGapLogger::new(rx);
 
                 // Signal to the rest of the driver, that the MUX is operational and running
                 let fut = async {
