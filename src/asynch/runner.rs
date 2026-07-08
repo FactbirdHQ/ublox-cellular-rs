@@ -128,11 +128,20 @@ impl<R: embedded_io_async::BufRead> embedded_io_async::BufRead for RxGapLogger<R
         // Only `start` (a Copy local) and `buf` are touched after the await, so
         // this does not re-borrow `self` and keeps the returned lifetime intact.
         let waited = start.elapsed();
+        let len = buf.len();
         if waited > Duration::from_secs(10) {
             warn!(
                 "[cell-diag] cmux UART rx blocked {} ms, resumed with {} bytes",
                 waited.as_millis(),
-                buf.len()
+                len
+            );
+        } else if len >= 400 {
+            // The cell RX buffer is 512 bytes. A near-full chunk means the CMUX
+            // consumer fell behind (e.g. a flash write / stall blocked draining)
+            // and the ring nearly overflowed — a candidate for lost bytes.
+            warn!(
+                "[cell-diag] cmux UART rx large chunk {} bytes (consumer fell behind, ring near cap)",
+                len
             );
         }
         Ok(buf)
@@ -140,6 +149,55 @@ impl<R: embedded_io_async::BufRead> embedded_io_async::BufRead for RxGapLogger<R
 
     fn consume(&mut self, amt: usize) {
         self.inner.consume(amt);
+    }
+}
+
+/// Diagnostic wrapper around the cell-UART write half. Flags when a write or
+/// flush to the modem blocks (the cell TX buffer is full — i.e. we are pushing
+/// data at the modem faster than it drains). If a burst of outbound MQTT/TLS
+/// (e.g. the shadow updates fired while applying a wifi delta) saturates this,
+/// it points at a TX-side/CMUX buffer overflow rather than a silent modem.
+struct TxStallLogger<W> {
+    inner: W,
+}
+
+impl<W> TxStallLogger<W> {
+    fn new(inner: W) -> Self {
+        Self { inner }
+    }
+}
+
+impl<W: embedded_io_async::ErrorType> embedded_io_async::ErrorType for TxStallLogger<W> {
+    type Error = W::Error;
+}
+
+impl<W: embedded_io_async::Write> embedded_io_async::Write for TxStallLogger<W> {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        let start = Instant::now();
+        let n = self.inner.write(buf).await?;
+        let waited = start.elapsed();
+        if waited > Duration::from_millis(100) {
+            warn!(
+                "[cell-diag] cmux UART tx blocked {} ms writing {} of {} bytes (TX buffer backpressure)",
+                waited.as_millis(),
+                n,
+                buf.len()
+            );
+        }
+        Ok(n)
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        let start = Instant::now();
+        self.inner.flush().await?;
+        let waited = start.elapsed();
+        if waited > Duration::from_millis(100) {
+            warn!(
+                "[cell-diag] cmux UART tx flush blocked {} ms",
+                waited.as_millis()
+            );
+        }
+        Ok(())
     }
 }
 
@@ -757,9 +815,10 @@ where
                 .await;
 
                 debug!("DONE flushing read channel will wait 3 sec now");
-                let (mut tx, rx) = self.transport.split_ref();
-                // Diagnostic: time gaps in raw UART reads from the modem.
+                let (tx, rx) = self.transport.split_ref();
+                // Diagnostic: time gaps in raw UART reads/writes to the modem.
                 let mut rx = RxGapLogger::new(rx);
+                let mut tx = TxStallLogger::new(tx);
 
                 // Signal to the rest of the driver, that the MUX is operational and running
                 let fut = async {
