@@ -42,6 +42,13 @@ use embassy_futures::select::{select, Either};
 
 use embassy_time::{Duration, Timer};
 
+/// Upper bound on the graceful network-teardown AT commands (COPS=2 deregister
+/// and CFUN radio-off) issued on the `Connected -> Initialized` descent. A
+/// responsive modem completes both in a few seconds; a wedged one would
+/// otherwise block on their 180s AT timeout. When it fires we fall straight
+/// through to the GPIO power-cycle, which is a stronger reset anyway.
+const GRACEFUL_TEARDOWN_TIMEOUT: Duration = Duration::from_secs(10);
+
 pub struct NetDevice<'a, 'b, C, A> {
     ch: &'b state::Runner<'a>,
     at_client: A,
@@ -662,14 +669,26 @@ where
                     // the next registration attempt to fail (e.g. when
                     // switching SIMs — the modem tries a TAU with the old
                     // SIM's keys instead of a fresh IMSI attach).
-                    let _ = self
-                        .at_client
-                        .send(&SetOperatorSelection {
+                    //
+                    // Bound this graceful teardown with a short timeout. Both
+                    // COPS=2 (deregister) and CFUN=<radio_off> carry a 180s AT
+                    // timeout, so if the modem is mid-blackhole (the ~60-78s
+                    // LARA-R6 baseband silence) each blocks for over a minute,
+                    // stalling the descent to PowerDown. The next step
+                    // (Initialized, Less) hard power-cycles the modem via GPIO
+                    // anyway — a stronger reset than a network deregister — so
+                    // a teardown that can't complete promptly is worthless.
+                    // Skip it and go straight to the power cycle.
+                    let _ = embassy_time::with_timeout(
+                        GRACEFUL_TEARDOWN_TIMEOUT,
+                        self.at_client.send(&SetOperatorSelection {
                             mode: OperatorSelectionMode::Deregister,
                             format: None,
-                        })
+                        }),
+                    )
+                    .await;
+                    let _ = embassy_time::with_timeout(GRACEFUL_TEARDOWN_TIMEOUT, self.radio_off())
                         .await;
-                    self.radio_off().await?;
                     self.ch.set_operation_state(OperationState::Initialized);
                 }
                 (OperationState::DataEstablished, Ordering::Less) => {
