@@ -670,25 +670,30 @@ where
                     // switching SIMs — the modem tries a TAU with the old
                     // SIM's keys instead of a fresh IMSI attach).
                     //
-                    // Bound this graceful teardown with a short timeout. Both
-                    // COPS=2 (deregister) and CFUN=<radio_off> carry a 180s AT
-                    // timeout, so if the modem is mid-blackhole (the ~60-78s
-                    // LARA-R6 baseband silence) each blocks for over a minute,
-                    // stalling the descent to PowerDown. The next step
-                    // (Initialized, Less) hard power-cycles the modem via GPIO
-                    // anyway — a stronger reset than a network deregister — so
-                    // a teardown that can't complete promptly is worthless.
-                    // Skip it and go straight to the power cycle.
-                    let _ = embassy_time::with_timeout(
-                        GRACEFUL_TEARDOWN_TIMEOUT,
-                        self.at_client.send(&SetOperatorSelection {
-                            mode: OperatorSelectionMode::Deregister,
-                            format: None,
-                        }),
-                    )
-                    .await;
-                    let _ = embassy_time::with_timeout(GRACEFUL_TEARDOWN_TIMEOUT, self.radio_off())
+                    // On a hard reset (requested when the modem is known
+                    // unresponsive) skip the teardown entirely: COPS=2 and
+                    // CFUN each carry a 180s AT timeout, so even bounded (see
+                    // GRACEFUL_TEARDOWN_TIMEOUT) they burn ~20s talking to a
+                    // dead modem. The next step (Initialized, Less) GPIO
+                    // power-cycles anyway — a stronger reset than a network
+                    // deregister — so the teardown is pure wasted latency.
+                    if self.ch.take_hard_reset() {
+                        warn!("Hard reset requested — skipping AT teardown, power-cycling");
+                    } else {
+                        // Otherwise still bound the teardown so a modem that
+                        // wedges mid-descent can't block for the full 180s.
+                        let _ = embassy_time::with_timeout(
+                            GRACEFUL_TEARDOWN_TIMEOUT,
+                            self.at_client.send(&SetOperatorSelection {
+                                mode: OperatorSelectionMode::Deregister,
+                                format: None,
+                            }),
+                        )
                         .await;
+                        let _ =
+                            embassy_time::with_timeout(GRACEFUL_TEARDOWN_TIMEOUT, self.radio_off())
+                                .await;
+                    }
                     self.ch.set_operation_state(OperationState::Initialized);
                 }
                 (OperationState::DataEstablished, Ordering::Less) => {
