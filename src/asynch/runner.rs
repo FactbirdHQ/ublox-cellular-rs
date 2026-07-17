@@ -52,6 +52,7 @@ use embassy_futures::{
 };
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel};
 use embassy_time::{Duration, Instant, Timer};
+use embedded_io_async::BufRead as _;
 use embedded_io_async::Write as _;
 
 pub(crate) const URC_SUBSCRIBERS: usize = 2;
@@ -62,6 +63,36 @@ pub const CMUX_MAX_FRAME_SIZE: usize = 256;
 pub const CMUX_CHANNEL_SIZE: usize = CMUX_MAX_FRAME_SIZE * 8;
 
 pub const CMUX_CHANNELS: usize = 2;
+
+/// Drain any late/pending bytes still queued on the PPP data channel.
+///
+/// During roaming registration churn the modem can answer the LARA-R6
+/// `AT+USOCR` dial-up workaround up to ~1s late — after `CreateSocket` has
+/// already timed out. If that stray `+USOCR` reply is still in the channel
+/// when we send `ATD*99***1#`, it is mis-parsed as the dial's response
+/// ("ppp dial failed Parse") and the reconnect loop never recovers. Actively
+/// wait for the channel to fall idle before dialing. Takes the channel by ref
+/// (not `&mut self`) so it stays disjoint from the other `select3` futures.
+#[cfg(feature = "lara-r6")]
+async fn drain_data_channel(channel: &mut at_cmux::Channel<'_, CMUX_CHANNEL_SIZE>) {
+    let _ = embassy_time::with_timeout(Duration::from_secs(2), async {
+        loop {
+            let len =
+                match embassy_time::with_timeout(Duration::from_millis(250), channel.fill_buf())
+                    .await
+                {
+                    Ok(Ok(s)) => s.len(),
+                    // 250ms with no new bytes (or a read error): channel is idle.
+                    _ => break,
+                };
+            if len == 0 {
+                break;
+            }
+            channel.consume(len);
+        }
+    })
+    .await;
+}
 
 async fn at_bridge<'a, const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize>(
     (rx, tx): (
@@ -544,22 +575,21 @@ where
                     last_start = Some(Instant::now());
 
                     {
-                        // Must be large enough to hold CreateSocket cmd
-                        let mut buf = [0u8; 25];
-
-                        let mut at_client = SimpleClient::new(
-                            &mut self.data_channel,
-                            atat::AtDigester::<Urc>::new(),
-                            &mut buf,
-                            C::AT_CONFIG,
-                        );
-
                         #[cfg(feature = "lara-r6")]
                         //This is needed as a workaround for lara r6 firmware 0.13.
                         // Documentation for workaround: https://content.u-blox.com/sites/default/files/documents/LARA-R6001D-00B-IP_IN_UBX-22008409.pdf
                         // In section B.1.2 Dial-up
                         {
-                            let res = at_client
+                            // Must be large enough to hold CreateSocket cmd
+                            let mut buf = [0u8; 25];
+                            let mut at_client = SimpleClient::new(
+                                &mut self.data_channel,
+                                atat::AtDigester::<Urc>::new(),
+                                &mut buf,
+                                C::AT_CONFIG,
+                            );
+
+                            match at_client
                                 .send(&CreateSocket {
                                     protocol: SocketProtocol::UDP,
                                     local_port: Some(1),
@@ -567,19 +597,48 @@ where
                                     cid: Some(1),
                                     report_aon: None,
                                 })
-                                .await;
-
-                            if let Ok(socket_id) = res {
-                                open_socket_id = Some(socket_id.socket);
-                                info!("Socket opened");
+                                .await
+                            {
+                                Ok(socket_id) => {
+                                    open_socket_id = Some(socket_id.socket);
+                                    info!("Socket opened");
+                                }
+                                // On a slow/roaming modem CreateSocket can time
+                                // out while its +USOCR reply is still in flight;
+                                // the drain below stops that stray reply from
+                                // poisoning the ATD dial.
+                                Err(e) => {
+                                    warn!("CreateSocket failed before PPP dial: {:?}", e)
+                                }
                             }
                         }
 
+                        // Drain any late +USOCR reply (or registration-URC burst)
+                        // still queued on the data channel so it can't be
+                        // mis-parsed as the ATD dial's response — the
+                        // "ppp dial failed Parse" loop that never recovers.
+                        #[cfg(feature = "lara-r6")]
+                        drain_data_channel(&mut self.data_channel).await;
+
                         // Send AT command to enter PPP mode
+                        let mut buf = [0u8; 25];
+                        let mut at_client = SimpleClient::new(
+                            &mut self.data_channel,
+                            atat::AtDigester::<Urc>::new(),
+                            &mut buf,
+                            C::AT_CONFIG,
+                        );
                         let res = at_client.send(&EnterPPP { cid: C::CONTEXT_ID }).await;
 
                         if let Err(e) = res {
                             warn!("ppp dial failed {:?}", e);
+                            // Flush the channel so the retry doesn't inherit a
+                            // stray reply and fail the same way.
+                            #[cfg(feature = "lara-r6")]
+                            {
+                                drop(at_client);
+                                drain_data_channel(&mut self.data_channel).await;
+                            }
                             continue;
                         }
 

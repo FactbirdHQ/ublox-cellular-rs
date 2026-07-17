@@ -59,6 +59,7 @@ impl State {
                 apn_config: Apn::None,
                 #[cfg(any(feature = "automatic-apn"))]
                 apn_config: Apn::Automatic,
+                hard_reset: false,
             })),
         }
     }
@@ -75,6 +76,12 @@ pub struct Shared {
     registration_waker: WakerRegistration,
     rat_waker: WakerRegistration,
     apn_config: Apn,
+    /// When set, the next `Connected -> Initialized` descent skips the graceful
+    /// AT teardown (COPS=2 deregister + CFUN radio-off) and goes straight to the
+    /// GPIO power-cycle. Set by the firmware keepalive, which only fires once the
+    /// modem has proven unresponsive — talking AT to a dead modem just burns the
+    /// commands' timeouts (~20s) before the power-cycle that actually recovers it.
+    hard_reset: bool,
 }
 
 #[derive(Clone)]
@@ -202,6 +209,22 @@ impl<'d> Runner<'d> {
                 debug!("State: Operation state unchanged: {:?}", state);
             }
         });
+    }
+
+    /// Request that the next power-down skips the graceful AT teardown and
+    /// hard power-cycles via GPIO. See [`Shared::hard_reset`].
+    pub fn request_hard_reset(&self) {
+        self.shared.lock(|s| {
+            s.borrow_mut().hard_reset = true;
+        });
+    }
+
+    /// Read and clear the hard-reset request.
+    pub(crate) fn take_hard_reset(&self) -> bool {
+        self.shared.lock(|s| {
+            let s = &mut *s.borrow_mut();
+            core::mem::take(&mut s.hard_reset)
+        })
     }
 
     pub fn set_apn_config(&self, apn: Apn) {

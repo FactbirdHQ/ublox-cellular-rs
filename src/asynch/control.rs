@@ -168,6 +168,14 @@ impl<'a, const INGRESS_BUF_SIZE: usize> Control<'a, INGRESS_BUF_SIZE> {
         self.state_ch.set_desired_state(ps);
     }
 
+    /// Make the next power-down skip the graceful AT teardown and hard
+    /// power-cycle via GPIO. Call before driving the state to `PowerDown` when
+    /// the modem is known unresponsive (e.g. the firmware keepalive), so the
+    /// COPS=2/CFUN teardown doesn't burn ~20s of AT timeouts on a dead modem.
+    pub fn request_hard_reset(&self) {
+        self.state_ch.request_hard_reset();
+    }
+
     pub fn set_apn_config(&self, apn: Apn) {
         self.state_ch.set_apn_config(apn);
     }

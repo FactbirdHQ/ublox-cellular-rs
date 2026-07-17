@@ -42,6 +42,13 @@ use embassy_futures::select::{select, Either};
 
 use embassy_time::{Duration, Timer};
 
+/// Upper bound on the graceful network-teardown AT commands (COPS=2 deregister
+/// and CFUN radio-off) issued on the `Connected -> Initialized` descent. A
+/// responsive modem completes both in a few seconds; a wedged one would
+/// otherwise block on their 180s AT timeout. When it fires we fall straight
+/// through to the GPIO power-cycle, which is a stronger reset anyway.
+const GRACEFUL_TEARDOWN_TIMEOUT: Duration = Duration::from_secs(10);
+
 pub struct NetDevice<'a, 'b, C, A> {
     ch: &'b state::Runner<'a>,
     at_client: A,
@@ -662,14 +669,31 @@ where
                     // the next registration attempt to fail (e.g. when
                     // switching SIMs — the modem tries a TAU with the old
                     // SIM's keys instead of a fresh IMSI attach).
-                    let _ = self
-                        .at_client
-                        .send(&SetOperatorSelection {
-                            mode: OperatorSelectionMode::Deregister,
-                            format: None,
-                        })
+                    //
+                    // On a hard reset (requested when the modem is known
+                    // unresponsive) skip the teardown entirely: COPS=2 and
+                    // CFUN each carry a 180s AT timeout, so even bounded (see
+                    // GRACEFUL_TEARDOWN_TIMEOUT) they burn ~20s talking to a
+                    // dead modem. The next step (Initialized, Less) GPIO
+                    // power-cycles anyway — a stronger reset than a network
+                    // deregister — so the teardown is pure wasted latency.
+                    if self.ch.take_hard_reset() {
+                        warn!("Hard reset requested — skipping AT teardown, power-cycling");
+                    } else {
+                        // Otherwise still bound the teardown so a modem that
+                        // wedges mid-descent can't block for the full 180s.
+                        let _ = embassy_time::with_timeout(
+                            GRACEFUL_TEARDOWN_TIMEOUT,
+                            self.at_client.send(&SetOperatorSelection {
+                                mode: OperatorSelectionMode::Deregister,
+                                format: None,
+                            }),
+                        )
                         .await;
-                    self.radio_off().await?;
+                        let _ =
+                            embassy_time::with_timeout(GRACEFUL_TEARDOWN_TIMEOUT, self.radio_off())
+                                .await;
+                    }
                     self.ch.set_operation_state(OperationState::Initialized);
                 }
                 (OperationState::DataEstablished, Ordering::Less) => {
