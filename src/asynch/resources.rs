@@ -1,7 +1,8 @@
 use atat::{ResponseSlot, UrcChannel};
-use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel};
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel, mutex::Mutex};
 
 use super::{
+    control::ProxyState,
     runner::{CMUX_CHANNELS, CMUX_CHANNEL_SIZE, MAX_CMD_LEN, URC_SUBSCRIBERS},
     state,
 };
@@ -12,6 +13,7 @@ pub struct Resources<const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize> {
 
     pub(crate) res_slot: ResponseSlot<INGRESS_BUF_SIZE>,
     pub(crate) req_slot: Channel<NoopRawMutex, heapless::Vec<u8, { MAX_CMD_LEN }>, 1>,
+    pub(crate) proxy_state: Mutex<NoopRawMutex, ProxyState<INGRESS_BUF_SIZE>>,
 
     pub(crate) urc_channel: UrcChannel<Urc, URC_CAPACITY, URC_SUBSCRIBERS>,
     pub(crate) ingress_buf: [u8; INGRESS_BUF_SIZE],
@@ -36,6 +38,7 @@ impl<const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: usize>
 
             res_slot: ResponseSlot::new(),
             req_slot: Channel::new(),
+            proxy_state: Mutex::new(ProxyState::new()),
 
             urc_channel: UrcChannel::new(),
             ingress_buf: [0; INGRESS_BUF_SIZE],

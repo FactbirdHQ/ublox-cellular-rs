@@ -52,6 +52,6 @@ pub struct Dial<'a> {
     /// separator between the dialling number and the DTMF string. The following
     /// occurrences are interpreted only as pause. The use of P as pause has
     /// been introduced for AT&T certification.
-    #[at_arg(position = 0, len = 32)]
+    #[at_arg(position = 0)]
     pub number: &'a str,
 }

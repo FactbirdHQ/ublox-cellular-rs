@@ -1,7 +1,6 @@
 //! Argument and parameter types used by Networking Commands and Responses
 use core::fmt::Write;
 
-use atat::AtatLen;
 use serde::{Serialize, Serializer};
 
 /// Port filtering enable/disable
@@ -12,11 +11,6 @@ pub enum EmbeddedPortFilteringMode {
     Disable,
     /// 1: enable. The <port_range> parameter is mandatory
     Enable(u16, u16),
-}
-
-impl AtatLen for EmbeddedPortFilteringMode {
-    const LEN: usize = 20;
-    const ESCAPED_LEN: usize = 20;
 }
 
 impl Serialize for EmbeddedPortFilteringMode {

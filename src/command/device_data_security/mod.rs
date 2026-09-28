@@ -88,7 +88,7 @@ pub struct PrepareSecurityDataImport<'a> {
     /// **TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 / SARA-G4 /
     /// SARA-G3:**
     /// - The maximum length is 200 characters
-    #[at_arg(position = 1, len = 200)]
+    #[at_arg(position = 1)]
     pub internal_name: &'a str,
     /// Size in bytes of a certificate or private key being imported.
     ///
@@ -101,7 +101,7 @@ pub struct PrepareSecurityDataImport<'a> {
     /// keys.
     ///
     /// The maximum length is 128 characters.
-    #[at_arg(position = 3, len = 128)]
+    #[at_arg(position = 3)]
     pub password: Option<&'a str>,
 }
 
@@ -112,11 +112,10 @@ pub struct PrepareSecurityDataImport<'a> {
     value_sep = false,
     cmd_prefix = "",
     termination = "",
-    force_receive_state = true,
     timeout_ms = 3000
 )]
 pub struct SendSecurityDataImport<'a> {
-    #[at_arg(position = 0, len = 2048)]
+    #[at_arg(position = 0)]
     pub data: &'a atat::serde_bytes::Bytes,
 }
 
@@ -131,7 +130,7 @@ pub struct DeleteSecurityData<'a> {
     /// **TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 / SARA-G4 /
     /// SARA-G3:**
     /// - The maximum length is 200 characters
-    #[at_arg(position = 1, len = 200)]
+    #[at_arg(position = 1)]
     pub internal_name: &'a str,
 }
 
@@ -151,7 +150,7 @@ pub struct RetrieveSecurityMd5<'a> {
     /// **TOBY-L2 / MPCI-L2 / LARA-R2 / TOBY-R2 / SARA-U2 / LISA-U2 / SARA-G4 /
     /// SARA-G3:**
     /// - The maximum length is 200 characters
-    #[at_arg(position = 1, len = 200)]
+    #[at_arg(position = 1)]
     pub internal_name: &'a str,
 }
 
@@ -173,7 +172,7 @@ pub struct SecurityProfileManager {
     /// USECMNG security profile identifier, in range 0-4; if it is not followed
     /// by other parameters the profile settings will be reset (set to
     /// factory-programmed value)
-    #[at_arg(position = 0, len = 1)]
+    #[at_arg(position = 0)]
     pub profile_id: SecurityProfileId,
     #[at_arg(position = 1)]
     pub operation: Option<SecurityProfileOperation>,

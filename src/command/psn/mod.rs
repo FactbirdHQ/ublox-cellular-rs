@@ -89,9 +89,9 @@ use super::NoResponse;
 pub struct SetPDPContextDefinition<'a> {
     #[at_arg(position = 0)]
     pub cid: ContextId,
-    #[at_arg(position = 1, len = 6)]
+    #[at_arg(position = 1)]
     pub pdp_type: &'a str,
-    #[at_arg(position = 2, len = 99)]
+    #[at_arg(position = 2)]
     pub apn: &'a str,
 }
 
@@ -480,7 +480,7 @@ pub struct SetAuthParameters<'a> {
             feature = "sara-r422",
             feature = "lara-r6"
         ),
-        at_arg(position = 3, len = 64)
+        at_arg(position = 3)
     )]
     #[cfg_attr(
         not(any(
@@ -489,7 +489,7 @@ pub struct SetAuthParameters<'a> {
             feature = "sara-r422",
             feature = "lara-r6"
         )),
-        at_arg(position = 2, len = 64)
+        at_arg(position = 2)
     )]
     pub username: &'a str,
     #[cfg_attr(
@@ -499,7 +499,7 @@ pub struct SetAuthParameters<'a> {
             feature = "sara-r422",
             feature = "lara-r6"
         ),
-        at_arg(position = 3, len = 64)
+        at_arg(position = 3)
     )]
     #[cfg_attr(
         not(any(
@@ -508,7 +508,7 @@ pub struct SetAuthParameters<'a> {
             feature = "sara-r422",
             feature = "lara-r6"
         )),
-        at_arg(position = 2, len = 64)
+        at_arg(position = 2)
     )]
     pub password: &'a str,
 }
