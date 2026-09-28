@@ -26,7 +26,7 @@ pub struct GetPinStatus;
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+CPIN", NoResponse)]
 pub struct SetPin<'a> {
-    #[at_arg(position = 0, len = 4)]
+    #[at_arg(position = 0)]
     pub pin: &'a str,
 }
 
@@ -38,8 +38,8 @@ pub struct SetPin<'a> {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+CPIN", NoResponse)]
 pub struct ChangePin<'a> {
-    #[at_arg(position = 0, len = 8)]
+    #[at_arg(position = 0)]
     pub puk: &'a str,
-    #[at_arg(position = 1, len = 4)]
+    #[at_arg(position = 1)]
     pub newpin: &'a str,
 }

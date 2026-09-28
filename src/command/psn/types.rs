@@ -1,4 +1,4 @@
-use atat::atat_derive::{AtatEnum, AtatLen};
+use atat::atat_derive::AtatEnum;
 use core::net::IpAddr;
 use heapless::String;
 use serde::{Deserialize, Serialize};
@@ -40,7 +40,7 @@ pub enum PacketSwitchedParam {
     /// notation form (2001:DB8:: address compression is allowed). The
     /// factory-programmed value is "0.0.0.0".
     #[at_arg(value = 4)]
-    DNS1(#[at_arg(len = 45)] IpAddr),
+    DNS1(IpAddr),
     /// • 5: DNS2 - <param_val> is the text string of the secondary DNS address.
     /// IPv4 DNS addresses are specified in dotted decimal notation form (i.e.
     /// four numbers in range 0-255 separated by periods, e.g.
@@ -48,7 +48,7 @@ pub enum PacketSwitchedParam {
     /// notation form (2001:DB8:: address compression is allowed). The
     /// factory-programmed value is "0.0.0.0".
     #[at_arg(value = 5)]
-    DNS2(#[at_arg(len = 45)] IpAddr),
+    DNS2(IpAddr),
     /// • 6: authentication - the <param_val> parameter selects the
     /// authentication type:
     #[at_arg(value = 6)]
@@ -60,7 +60,7 @@ pub enum PacketSwitchedParam {
     /// "0.0.0.0" means dynamic IP address assigned during PDP context
     /// activation
     #[at_arg(value = 7)]
-    IPAddress(#[at_arg(len = 45)] IpAddr),
+    IPAddress(IpAddr),
     /// • 8: data compression - the <param_val> parameter refers to the default
     /// parameter named d_comp and selects the data compression type:
     #[at_arg(value = 8)]
@@ -649,10 +649,10 @@ pub enum EPSNetworkRegistrationStat {
     AttachedEmergencyOnly = 8,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, AtatLen)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ProfileId(pub u8);
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize, AtatLen)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ContextId(pub u8);

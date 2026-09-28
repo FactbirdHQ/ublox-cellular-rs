@@ -80,9 +80,7 @@ mod internal_network_stack {
     #[derive(Clone, AtatCmd)]
     #[at_cmd("+USOSEC", NoResponse)]
     pub struct SetSocketSslState {
-        // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
-        // FIXME: having all the lines use a constant something like  #[at_arg(position = 0, len = MAX_SOCKETS)]
-        #[at_arg(position = 0, len = 1)]
+        #[at_arg(position = 0)]
         pub socket: SocketHandle,
         #[at_arg(position = 1)]
         pub ssl_tls_status: SslTlsStatus,
@@ -100,7 +98,7 @@ mod internal_network_stack {
     #[at_cmd("+USOCL", NoResponse, attempts = 1, timeout_ms = 120000)]
     pub struct CloseSocket {
         // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
-        #[at_arg(position = 0, len = 1)]
+        #[at_arg(position = 0)]
         pub socket: SocketHandle,
     }
 
@@ -126,9 +124,9 @@ mod internal_network_stack {
     #[at_cmd("+USOCO", NoResponse, attempts = 1, timeout_ms = 120000)]
     pub struct ConnectSocket {
         // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
-        #[at_arg(position = 0, len = 1)]
+        #[at_arg(position = 0)]
         pub socket: SocketHandle,
-        #[at_arg(position = 1, len = 39)]
+        #[at_arg(position = 1)]
         pub remote_addr: IpAddr,
         #[at_arg(position = 2)]
         pub remote_port: u16,
@@ -146,11 +144,11 @@ mod internal_network_stack {
     #[at_cmd("+USOWR", WriteSocketDataResponse)]
     pub struct WriteSocketData<'a> {
         // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
-        #[at_arg(position = 0, len = 1)]
+        #[at_arg(position = 0)]
         pub socket: SocketHandle,
         #[at_arg(position = 1)]
         pub length: usize,
-        #[at_arg(position = 2, len = 512)]
+        #[at_arg(position = 2)]
         pub data: &'a str,
     }
 
@@ -167,11 +165,11 @@ mod internal_network_stack {
     #[at_cmd("+USOWR", WriteSocketDataResponse)]
     pub struct WriteSocketDataHex<'a> {
         // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
-        #[at_arg(position = 0, len = 1)]
+        #[at_arg(position = 0)]
         pub socket: SocketHandle,
         #[at_arg(position = 1)]
         pub length: usize,
-        #[at_arg(position = 2, len = 512)]
+        #[at_arg(position = 2)]
         pub data: &'a [u8],
     }
 
@@ -187,7 +185,7 @@ mod internal_network_stack {
     #[at_cmd("+USOWR", NoResponse)]
     pub struct PrepareWriteSocketDataBinary {
         // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
-        #[at_arg(position = 0, len = 1)]
+        #[at_arg(position = 0)]
         pub socket: SocketHandle,
         #[at_arg(position = 1)]
         pub length: usize,
@@ -199,13 +197,10 @@ mod internal_network_stack {
         WriteSocketDataResponse,
         value_sep = false,
         cmd_prefix = "",
-        termination = "",
-        force_receive_state = true
+        termination = ""
     )]
     pub struct WriteSocketDataBinary<'a> {
-        // FIXME:
-        // #[at_arg(position = 0, len = EgressChunkSize::to_usize())]
-        #[at_arg(position = 0, len = 1024)]
+        #[at_arg(position = 0)]
         pub data: &'a atat::serde_bytes::Bytes,
     }
 
@@ -220,9 +215,9 @@ mod internal_network_stack {
     #[at_cmd("+USOST", NoResponse)]
     pub struct PrepareUDPSendToDataBinary {
         // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
-        #[at_arg(position = 0, len = 1)]
+        #[at_arg(position = 0)]
         pub socket: SocketHandle,
-        #[at_arg(position = 1, len = 39)]
+        #[at_arg(position = 1)]
         pub remote_addr: IpAddr,
         #[at_arg(position = 2)]
         pub remote_port: u16,
@@ -236,11 +231,10 @@ mod internal_network_stack {
         UDPSendToDataResponse,
         value_sep = false,
         cmd_prefix = "",
-        termination = "",
-        force_receive_state = true
+        termination = ""
     )]
     pub struct UDPSendToDataBinary<'a> {
-        #[at_arg(position = 0, len = 512)]
+        #[at_arg(position = 0)]
         pub data: &'a atat::serde_bytes::Bytes,
     }
 
@@ -264,7 +258,7 @@ mod internal_network_stack {
     #[at_cmd("+USORD", SocketData)]
     pub struct ReadSocketData {
         // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
-        #[at_arg(position = 0, len = 1)]
+        #[at_arg(position = 0)]
         pub socket: SocketHandle,
         #[at_arg(position = 1)]
         pub length: usize,
@@ -281,7 +275,7 @@ mod internal_network_stack {
     #[at_cmd("+USORF", UDPSocketData)]
     pub struct ReadUDPSocketData {
         // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
-        #[at_arg(position = 0, len = 1)]
+        #[at_arg(position = 0)]
         pub socket: SocketHandle,
         #[at_arg(position = 1)]
         pub length: usize,
@@ -305,7 +299,7 @@ mod internal_network_stack {
     #[at_cmd("+USOCTL", SocketControlResponse)]
     pub struct SocketControl {
         // len 1 as ublox devices only support 7 sockets but needs to be changed if this changes!
-        #[at_arg(position = 0, len = 1)]
+        #[at_arg(position = 0)]
         pub socket: SocketHandle,
         #[at_arg(position = 1)]
         pub param_id: SocketControlParam,

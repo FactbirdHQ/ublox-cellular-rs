@@ -1,5 +1,5 @@
 //! Argument and parameter types used by System features Commands and Responses
-use atat::atat_derive::{AtatEnum, AtatLen};
+use atat::atat_derive::AtatEnum;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Eq, AtatEnum)]
@@ -33,7 +33,7 @@ pub enum PowerSavingMode {
     CtrlByDtr = 3,
 }
 
-#[derive(Clone, PartialEq, Eq, AtatLen, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Seconds(pub u32);
 
 /// FS factory restore type

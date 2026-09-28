@@ -53,6 +53,6 @@ use types::ResolutionType;
 pub struct ResolveNameIp<'a> {
     #[at_arg(position = 0)]
     pub resolution_type: ResolutionType,
-    #[at_arg(position = 1, len = 128)]
+    #[at_arg(position = 1)]
     pub ip_domain_string: &'a str,
 }

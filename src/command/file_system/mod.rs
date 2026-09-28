@@ -56,23 +56,16 @@ use super::NoResponse;
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+UDWNFILE", NoResponse)]
 pub struct PrepareDownloadFile<'a> {
-    #[at_arg(position = 0, len = 248)]
+    #[at_arg(position = 0)]
     pub filename: &'a str,
     #[at_arg(position = 1)]
     pub size: usize,
 }
 
 #[derive(Clone, AtatCmd)]
-#[at_cmd(
-    "",
-    NoResponse,
-    value_sep = false,
-    cmd_prefix = "",
-    termination = "",
-    force_receive_state = true
-)]
+#[at_cmd("", NoResponse, value_sep = false, cmd_prefix = "", termination = "")]
 pub struct DownloadFile<'a> {
-    #[at_arg(position = 0, len = 2048)]
+    #[at_arg(position = 0)]
     pub text: &'a atat::serde_bytes::Bytes,
 }
 
@@ -119,7 +112,7 @@ pub struct ListFiles;
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+URDFILE", ReadFileResponse)]
 pub struct ReadFile<'a> {
-    #[at_arg(position = 0, len = 248)]
+    #[at_arg(position = 0)]
     pub filename: &'a str,
 }
 
@@ -133,7 +126,7 @@ pub struct ReadFile<'a> {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+URDBLOCK", ReadBlockResponse)]
 pub struct ReadBlock<'a> {
-    #[at_arg(position = 0, len = 248)]
+    #[at_arg(position = 0)]
     pub filename: &'a str,
     #[at_arg(position = 1)]
     pub offset: usize,
@@ -155,6 +148,6 @@ pub struct ReadBlock<'a> {
 #[derive(Clone, AtatCmd)]
 #[at_cmd("+UDELFILE", NoResponse)]
 pub struct DeleteFile<'a> {
-    #[at_arg(position = 0, len = 248)]
+    #[at_arg(position = 0)]
     pub filename: &'a str,
 }

@@ -1,8 +1,7 @@
-use core::cell::Cell;
-
 use atat::{asynch::AtatClient, response_slot::ResponseSlotGuard};
 use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Sender, mutex::Mutex};
 use embassy_time::{with_timeout, Duration, Timer};
+use embedded_io_async::Write;
 
 use crate::{
     command::{
@@ -24,22 +23,106 @@ use super::{
     state::{self, LinkState, OperationState},
 };
 
+/// Writer half of [`ProxyClient`].
+///
+/// Bytes are buffered in `MAX_CMD_LEN` chunks and handed to the runner's AT
+/// bridge through the request channel, which writes them to the modem in
+/// order. A chunk is sent when the buffer fills up or on `flush`, so payloads
+/// larger than `MAX_CMD_LEN` can be streamed through `AtatClient::send_with`.
+pub struct ProxyWriter<'a> {
+    req_sender: Sender<'a, NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>,
+    buf: heapless::Vec<u8, MAX_CMD_LEN>,
+}
+
+impl ProxyWriter<'_> {
+    async fn send_chunk(&mut self) -> Result<(), atat::Error> {
+        if self.buf.is_empty() {
+            return Ok(());
+        }
+
+        let chunk = core::mem::take(&mut self.buf);
+
+        // The bridge drains the channel as fast as it can write to the modem;
+        // if it is not running, fail rather than blocking the caller forever.
+        with_timeout(Duration::from_secs(1), self.req_sender.send(chunk))
+            .await
+            .map_err(|_| atat::Error::Timeout)
+    }
+}
+
+impl embedded_io_async::ErrorType for ProxyWriter<'_> {
+    type Error = atat::Error;
+}
+
+impl Write for ProxyWriter<'_> {
+    async fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+        if buf.is_empty() {
+            return Ok(0);
+        }
+
+        if self.buf.is_full() {
+            self.send_chunk().await?;
+        }
+
+        let n = buf.len().min(self.buf.capacity() - self.buf.len());
+        self.buf
+            .extend_from_slice(&buf[..n])
+            .map_err(|_| atat::Error::Write)?;
+        Ok(n)
+    }
+
+    async fn flush(&mut self) -> Result<(), Self::Error> {
+        self.send_chunk().await
+    }
+}
+
+/// State shared by every [`ProxyClient`] on the same AT link.
+///
+/// The runner's network device and the user's [`Control`] each own a
+/// `ProxyClient`, but they share one request channel and one response slot.
+/// Holding this state's mutex for the whole of a request, from the first byte
+/// queued until the response is parsed, keeps their commands from
+/// interleaving on the wire and from stealing each other's responses.
+pub(crate) struct ProxyState<const CMD_BUF_SIZE: usize> {
+    /// Modem cooldown after the previous response; awaited before the next
+    /// request regardless of which client issues it.
+    cooldown_timer: Option<Timer>,
+    /// Serialisation buffer for `AtatClient::send`. Sized like the ingress
+    /// buffer, as the commands carrying large payloads (file and security data
+    /// writes, socket writes) come paired with responses of the same size.
+    cmd_buf: [u8; CMD_BUF_SIZE],
+}
+
+impl<const CMD_BUF_SIZE: usize> ProxyState<CMD_BUF_SIZE> {
+    pub(crate) const fn new() -> Self {
+        Self {
+            cooldown_timer: None,
+            cmd_buf: [0; CMD_BUF_SIZE],
+        }
+    }
+}
+
+/// AT client that forwards commands to the runner's AT bridge over the request
+/// channel and reads the parsed result back from the shared response slot.
 pub(crate) struct ProxyClient<'a, const INGRESS_BUF_SIZE: usize> {
-    pub(crate) req_sender:
-        Mutex<NoopRawMutex, Sender<'a, NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>>,
-    pub(crate) res_slot: &'a atat::ResponseSlot<INGRESS_BUF_SIZE>,
-    cooldown_timer: Cell<Option<Timer>>,
+    writer: ProxyWriter<'a>,
+    res_slot: &'a atat::ResponseSlot<INGRESS_BUF_SIZE>,
+    state: &'a Mutex<NoopRawMutex, ProxyState<INGRESS_BUF_SIZE>>,
 }
 
 impl<'a, const INGRESS_BUF_SIZE: usize> ProxyClient<'a, INGRESS_BUF_SIZE> {
-    pub fn new(
+    pub const fn new(
         req_sender: Sender<'a, NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>,
         res_slot: &'a atat::ResponseSlot<INGRESS_BUF_SIZE>,
+        state: &'a Mutex<NoopRawMutex, ProxyState<INGRESS_BUF_SIZE>>,
     ) -> Self {
         Self {
-            req_sender: Mutex::new(req_sender),
+            writer: ProxyWriter {
+                req_sender,
+                buf: heapless::Vec::new(),
+            },
             res_slot,
-            cooldown_timer: Cell::new(None),
+            state,
         }
     }
 
@@ -51,96 +134,132 @@ impl<'a, const INGRESS_BUF_SIZE: usize> ProxyClient<'a, INGRESS_BUF_SIZE> {
             .await
             .map_err(|_| atat::Error::Timeout)
     }
-}
 
-impl<'a, const INGRESS_BUF_SIZE: usize> atat::asynch::AtatClient
-    for &ProxyClient<'a, INGRESS_BUF_SIZE>
-{
-    async fn send<Cmd: atat::AtatCmd>(&mut self, cmd: &Cmd) -> Result<Cmd::Response, atat::Error> {
-        let mut buf = [0u8; MAX_CMD_LEN];
-        let len = cmd.write(&mut buf);
-
-        if len < 50 {
-            info!("🔧 AT Command: {:?}", atat::helpers::LossyStr(&buf[..len]));
-        } else {
-            info!("🔧 AT Command: Long payload ({} bytes)", len);
-            debug!(
-                "AT Command payload: {:?}",
-                atat::helpers::LossyStr(&buf[..len.min(200)])
-            );
+    /// Run one request while the caller holds the shared [`ProxyState`] lock.
+    async fn request<Cmd: atat::AtatCmd>(
+        &mut self,
+        cooldown_timer: &mut Option<Timer>,
+        cmd: &Cmd,
+        write: impl AsyncFnOnce(&mut ProxyWriter<'a>) -> Result<(), atat::Error>,
+    ) -> Result<Cmd::Response, atat::Error> {
+        if let Some(cooldown) = cooldown_timer.take() {
+            cooldown.await;
         }
 
-        if let Some(cooldown) = self.cooldown_timer.take() {
-            cooldown.await
-        }
-
-        let sender = self.req_sender.lock().await;
+        // Discard any bytes left behind by a request whose writer closure
+        // failed part-way, so they are not prepended to this request.
+        self.writer.buf.clear();
 
         // Clear any stale response signal left over from prior commands or
         // late URC-like traffic, so wait_response below returns our command's
         // response and not a leaked one.
         self.res_slot.reset();
 
-        with_timeout(
-            Duration::from_secs(1),
-            sender.send(heapless::Vec::try_from(&buf[..len]).unwrap()),
-        )
-        .await
-        .map_err(|_| atat::Error::Timeout)?;
+        write(&mut self.writer).await?;
+        self.writer.flush().await?;
 
-        self.cooldown_timer.set(Some(Timer::after_millis(20)));
+        *cooldown_timer = Some(Timer::after_millis(20));
 
         if !Cmd::EXPECTS_RESPONSE_CODE {
             debug!("AT Command expects no response, parsing empty response");
-            drop(sender);
-            cmd.parse(Ok(&[]))
-        } else {
-            debug!(
-                "AT Command expects response, waiting up to {}ms",
-                Cmd::MAX_TIMEOUT_MS
-            );
-            let response = self
-                .wait_response(Duration::from_millis(Cmd::MAX_TIMEOUT_MS.into()))
-                .await?;
-
-            // Release sender lock after receiving response
-            drop(sender);
-
-            let response: &atat::Response<INGRESS_BUF_SIZE> = &response.borrow();
-            let response_result: Result<&[u8], _> = response.into();
-            if let Ok(response_bytes) = &response_result {
-                if response_bytes.len() < 200 {
-                    debug!(
-                        "📡 AT Response: {:?}",
-                        atat::helpers::LossyStr(response_bytes)
-                    );
-                } else {
-                    debug!(
-                        "📡 AT Response: Long response ({} bytes): {:?}",
-                        response_bytes.len(),
-                        atat::helpers::LossyStr(&response_bytes[..200.min(response_bytes.len())])
-                    );
-                }
-            }
-            cmd.parse(response_result)
+            return cmd.parse(Ok(&[]));
         }
+
+        debug!(
+            "AT Command expects response, waiting up to {}ms",
+            Cmd::MAX_TIMEOUT_MS
+        );
+        let response = self
+            .wait_response(Duration::from_millis(Cmd::MAX_TIMEOUT_MS.into()))
+            .await?;
+
+        let response: &atat::Response<INGRESS_BUF_SIZE> = &response;
+        let response_result: Result<&[u8], _> = response.into();
+        if let Ok(response_bytes) = &response_result {
+            if response_bytes.len() < 200 {
+                debug!(
+                    "📡 AT Response: {:?}",
+                    atat::helpers::LossyStr(response_bytes)
+                );
+            } else {
+                debug!(
+                    "📡 AT Response: Long response ({} bytes): {:?}",
+                    response_bytes.len(),
+                    atat::helpers::LossyStr(&response_bytes[..200.min(response_bytes.len())])
+                );
+            }
+        }
+        cmd.parse(response_result)
+    }
+}
+
+impl<'a, const INGRESS_BUF_SIZE: usize> AtatClient for ProxyClient<'a, INGRESS_BUF_SIZE> {
+    type Writer = ProxyWriter<'a>;
+
+    fn inner(&mut self) -> &mut Self::Writer {
+        &mut self.writer
+    }
+
+    async fn send_with<Cmd: atat::AtatCmd>(
+        &mut self,
+        cmd: &Cmd,
+        write: impl AsyncFnOnce(&mut Self::Writer) -> Result<(), atat::Error>,
+    ) -> Result<Cmd::Response, atat::Error> {
+        // Held until the response is parsed; see `ProxyState`.
+        let mut state = self.state.lock().await;
+        self.request(&mut state.cooldown_timer, cmd, write).await
+    }
+
+    /// Serialises the command into the shared command buffer and streams it
+    /// to the modem. Commands larger than `INGRESS_BUF_SIZE` cannot be sent
+    /// this way; use `send_with` and write the payload directly instead.
+    async fn send<Cmd: atat::AtatCmd>(&mut self, cmd: &Cmd) -> Result<Cmd::Response, atat::Error> {
+        // Held until the response is parsed; see `ProxyState`.
+        let mut state = self.state.lock().await;
+        let ProxyState {
+            cooldown_timer,
+            cmd_buf,
+        } = &mut *state;
+
+        let len = cmd.write(cmd_buf);
+
+        if len < 50 {
+            info!(
+                "🔧 AT Command: {:?}",
+                atat::helpers::LossyStr(&cmd_buf[..len])
+            );
+        } else {
+            info!("🔧 AT Command: Long payload ({} bytes)", len);
+            debug!(
+                "AT Command payload: {:?}",
+                atat::helpers::LossyStr(&cmd_buf[..len.min(200)])
+            );
+        }
+
+        self.request(cooldown_timer, cmd, async |writer| {
+            writer.write_all(&cmd_buf[..len]).await
+        })
+        .await
     }
 }
 
 pub struct Control<'a, const INGRESS_BUF_SIZE: usize> {
     state_ch: state::Runner<'a>,
-    at_client: ProxyClient<'a, INGRESS_BUF_SIZE>,
+    /// Behind a mutex only so `send` can take `&self`; the ordering against
+    /// the runner's own client is done by the shared [`ProxyState`] lock.
+    at_client: Mutex<NoopRawMutex, ProxyClient<'a, INGRESS_BUF_SIZE>>,
 }
 
 impl<'a, const INGRESS_BUF_SIZE: usize> Control<'a, INGRESS_BUF_SIZE> {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         state_ch: state::Runner<'a>,
         req_sender: Sender<'a, NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>,
         res_slot: &'a atat::ResponseSlot<INGRESS_BUF_SIZE>,
+        proxy_state: &'a Mutex<NoopRawMutex, ProxyState<INGRESS_BUF_SIZE>>,
     ) -> Self {
         Self {
             state_ch,
-            at_client: ProxyClient::new(req_sender, res_slot),
+            at_client: Mutex::new(ProxyClient::new(req_sender, res_slot, proxy_state)),
         }
     }
 
@@ -267,12 +386,35 @@ impl<'a, const INGRESS_BUF_SIZE: usize> Control<'a, INGRESS_BUF_SIZE> {
     /// Send an AT command to the modem This is useful if you have special
     /// configuration but might break the drivers functionality if your settings
     /// interfere with the drivers settings
+    ///
+    /// The serialised command must fit in `INGRESS_BUF_SIZE` bytes. For
+    /// larger payloads use [`Control::send_with`].
     pub async fn send<Cmd: atat::AtatCmd>(&self, cmd: &Cmd) -> Result<Cmd::Response, Error> {
         if self.operation_state() == OperationState::PowerDown {
             return Err(Error::Uninitialized);
         }
 
-        Ok((&self.at_client).send_retry::<Cmd>(cmd).await?)
+        Ok(self.at_client.lock().await.send_retry::<Cmd>(cmd).await?)
+    }
+
+    /// Send an AT command whose bytes are produced by `write` instead of by
+    /// `AtatCmd::write`. The response is still parsed as `cmd`'s response,
+    /// so `cmd` only needs to describe the expected reply and timeout.
+    ///
+    /// Use this for commands carrying payloads that do not fit the command
+    /// buffer, e.g. binary socket writes, file downloads or security data
+    /// imports: write the payload straight to the writer, which streams it to
+    /// the modem in chunks.
+    pub async fn send_with<Cmd: atat::AtatCmd>(
+        &self,
+        cmd: &Cmd,
+        write: impl AsyncFnOnce(&mut ProxyWriter<'a>) -> Result<(), atat::Error>,
+    ) -> Result<Cmd::Response, Error> {
+        if self.operation_state() == OperationState::PowerDown {
+            return Err(Error::Uninitialized);
+        }
+
+        Ok(self.at_client.lock().await.send_with(cmd, write).await?)
     }
 
     pub async fn get_apn_info(&self) -> Result<heapless::String<62>, Error> {

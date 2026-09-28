@@ -34,7 +34,7 @@ use crate::{
 };
 
 use super::{
-    control::{Control, ProxyClient},
+    control::{Control, ProxyClient, ProxyState},
     pwr::PwrCtrl,
     state,
     urc_handler::UrcHandler,
@@ -50,13 +50,15 @@ use embassy_futures::{
     join::join,
     select::{select3, Either3},
 };
-use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel};
+use embassy_sync::{blocking_mutex::raw::NoopRawMutex, channel::Channel, mutex::Mutex};
 use embassy_time::{Duration, Instant, Timer};
 use embedded_io_async::BufRead as _;
 use embedded_io_async::Write as _;
 
 pub(crate) const URC_SUBSCRIBERS: usize = 2;
 
+/// Size of one message on the request channel between the proxy clients and
+/// the AT bridge. Longer requests are streamed as several messages.
 pub(crate) const MAX_CMD_LEN: usize = 128;
 
 pub const CMUX_MAX_FRAME_SIZE: usize = 256;
@@ -143,6 +145,7 @@ pub struct Runner<'a, T, C, const INGRESS_BUF_SIZE: usize, const URC_CAPACITY: u
     >,
     pub res_slot: &'a atat::ResponseSlot<INGRESS_BUF_SIZE>,
     pub req_slot: &'a Channel<NoopRawMutex, heapless::Vec<u8, MAX_CMD_LEN>, 1>,
+    proxy_state: &'a Mutex<NoopRawMutex, ProxyState<INGRESS_BUF_SIZE>>,
 
     pub mux_runner: at_cmux::Runner<'a, CMUX_CHANNELS, CMUX_CHANNEL_SIZE>,
 
@@ -187,6 +190,7 @@ where
             ch_runner.clone(),
             resources.req_slot.sender(),
             &resources.res_slot,
+            &resources.proxy_state,
         );
 
         (
@@ -200,6 +204,7 @@ where
                 ingress,
                 res_slot: &resources.res_slot,
                 req_slot: &resources.req_slot,
+                proxy_state: &resources.proxy_state,
 
                 mux_runner,
 
@@ -786,8 +791,9 @@ where
             let device_fut = async {
                 let (at_rx, at_tx, _) = &mut self.at_channel;
 
-                let at_client = ProxyClient::new(self.req_slot.sender(), self.res_slot);
-                let mut cell_device = NetDevice::<C, _>::new(&self.ch, &at_client);
+                let at_client =
+                    ProxyClient::new(self.req_slot.sender(), self.res_slot, self.proxy_state);
+                let mut cell_device = NetDevice::<C, _>::new(&self.ch, at_client);
 
                 let mut urc_handler = UrcHandler::new(&self.ch, self.urc_channel);
 

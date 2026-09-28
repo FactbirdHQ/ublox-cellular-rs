@@ -12,7 +12,7 @@ use heapless::String;
 pub struct DataConnectionActivated {
     #[at_arg(position = 0)]
     pub result: u8,
-    #[at_arg(position = 1, len = 39)]
+    #[at_arg(position = 1)]
     pub ip_addr: Option<IpAddr>,
 }
 
